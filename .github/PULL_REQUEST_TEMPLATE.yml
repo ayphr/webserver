@@ -1,0 +1,38 @@
+name: Pull Request
+description: Propose a new change
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear and concise description of the changes.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - UI (React)
+        - API
+        - Types/library
+        - Server
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: type
+    attributes:
+      label: Type of change
+      options:
+        - label: Bug fix
+        - label: New feature
+        - label: Breaking change
+    validations:
+      required: true
+  - type: textarea
+    id: testing
+    attributes:
+      label: How has this been tested?
+    validations:
+      required: true

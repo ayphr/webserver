@@ -1,0 +1,130 @@
+.n-sidebar {
+  width: 220px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface, hsl(0, 0%, 7%));
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.n-sidebar__title {
+  font-size: 1.1rem;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.n-sidebar__tabs {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.n-sidebar__tab {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.4rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s, font-weight 0.2s;
+}
+
+.n-sidebar__tab:hover {
+  background: rgba(255, 255, 255, 0.015);
+  color: var(--text-primary)
+}
+
+.n-sidebar__tab.active {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  font-weight: 600
+}
+
+.n-sidebar__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.n-sidebar__label {
+  font-size: 0.95rem;
+  line-height: 1;
+  display: inline-block;
+}
+
+.n-sidebar__spacer {
+  flex: 1
+}
+
+.n-sidebar__bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+}
+
+.n-sidebar__bottomTabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.n-sidebar__accountDisplay {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.n-sidebar__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--accent, hsl(210, 80%, 45%));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+}
+
+.n-sidebar__username {
+  font-size: 0.95rem;
+}
+
+.n-sidebar__menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.n-sidebar__menuItem:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.n-sidebar__menuIcon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Ensure SVG icons don't have extra descender space and align with text */
+.n-sidebar__icon svg,
+.n-sidebar__menuIcon svg {
+  display: block;
+}

@@ -1,0 +1,126 @@
+.dashboard-layout {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+  background: var(--bg-base);
+}
+
+.dashboard-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.dashboard-page__card {
+  width: 100%;
+  max-width: 640px;
+}
+
+.dashboard-page__user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  font-size: 1.1rem;
+}
+
+.dashboard-page__role-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  min-width: 1rem;
+}
+
+.dashboard-page__flag {
+  font-size: 1.1rem;
+}
+
+.dashboard-page__username {
+  font-weight: var(--font-weight-md);
+}
+
+.dashboard-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-page__field label {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.dashboard-page__field select {
+  background-color: hsl(0, 0%, 10%);
+  border: 1px solid hsl(0, 0%, 16%);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 1rem;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+}
+
+.dashboard-page__field select:focus {
+  border-color: hsl(0, 0%, 28%);
+  outline: none;
+}
+
+.dashboard-page__country-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.dashboard-page__error {
+  color: var(--status-error);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.dashboard-page__punishment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 2rem;
+  background: var(--bg-base);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+}
+
+.dashboard-page__punishment-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.dashboard-page__punishment-label {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-md);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-page__punishment-value {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-md);
+  word-break: break-word;
+  font-size: 1rem;
+}
+
+.dashboard-page__countdown {
+  color: var(--status-error);
+  font-weight: var(--font-weight-bold);
+  font-size: 1.1rem;
+}
+
+.dashboard-page__lift-button {
+  margin-top: 1.5rem;
+}

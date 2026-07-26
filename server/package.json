@@ -1,0 +1,20 @@
+{
+  "name": "ayphr-server",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "mongodb": "^7.2.0",
+    "pino": "^10.3.1",
+    "redis": "^5.12.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
