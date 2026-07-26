@@ -1,6 +1,6 @@
 # Ayphr Website + Server
 
-[![CodeQL Advanced](https://github.com/ayphr/client/actions/workflows/codeql.yml/badge.svg)](https://github.com/ayphr/client/actions/workflows/codeql.yml)
+[![CodeQL Advanced](https://github.com/ayphr/webserver/actions/workflows/codeql.yml/badge.svg)](https://github.com/ayphr/webserver/actions/workflows/codeql.yml)
 
 Frontend and backend for Ayphr.
 
