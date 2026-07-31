@@ -1,5 +1,6 @@
 name: Pull Request
 description: Propose a new change
+labels: ["triage needed"]
 body:
   - type: textarea
     id: description
@@ -13,26 +14,10 @@ body:
     attributes:
       label: Component
       options:
-        - UI (React)
-        - API
-        - Types/library
-        - Server
+        - Companion UI
+        - Companion Backend
+        - Device Firmware
+        - Shared
         - Other
-    validations:
-      required: true
-  - type: checkboxes
-    id: type
-    attributes:
-      label: Type of change
-      options:
-        - label: Bug fix
-        - label: New feature
-        - label: Breaking change
-    validations:
-      required: true
-  - type: textarea
-    id: testing
-    attributes:
-      label: How has this been tested?
     validations:
       required: true
