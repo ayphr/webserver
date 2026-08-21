@@ -1,17 +1,17 @@
-import type { Server } from "bun";
-import { routeRequest } from "./router";
-import { addCorsHeaders } from "./routes/util";
+import type { Server } from 'bun';
+import { routeRequest } from './router';
+import { addCorsHeaders } from './routes/util';
 
 function getRequestBaseOrigin(request: Request): string {
-  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || request.headers.get("host") || "localhost";
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const host = forwardedHost || request.headers.get('host') || 'localhost';
 
-  if (forwardedProto === "http" || forwardedProto === "https") {
+  if (forwardedProto === 'http' || forwardedProto === 'https') {
     return `${forwardedProto}://${host}`;
   }
 
-  return request.url.startsWith("https://") ? `https://${host}` : `http://${host}`;
+  return request.url.startsWith('https://') ? `https://${host}` : `http://${host}`;
 }
 
 function normalizeRequest(request: Request): Request {
@@ -24,12 +24,12 @@ function normalizeRequest(request: Request): Request {
   }
 }
 
-export function setupServer(port: number, callback: Function): Server<undefined> {
+export function setupServer(port: number, callback: () => void): Server<undefined> {
   const server = Bun.serve({
     port,
 
-    fetch(request) {
-      return addCorsHeaders(routeRequest(normalizeRequest(request)), request);
+    async fetch(request) {
+      return addCorsHeaders(await routeRequest(normalizeRequest(request)), request);
     },
   });
 

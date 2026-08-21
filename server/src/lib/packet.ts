@@ -1,5 +1,5 @@
-import { STX, ETX, PacketType } from "./constants";
-import { PacketHandlingError } from "./errors";
+import { STX, ETX, PacketType } from './constants';
+import { PacketHandlingError } from './errors';
 
 export type SensorPacket = {
   /**
@@ -35,19 +35,19 @@ export type SensorPacket = {
  */
 export function validatePacket(packet: SensorPacket): void {
   if (packet.type < 0 || packet.type > 15) {
-    throw new PacketHandlingError("Packet type must be between 0 and 15");
+    throw new PacketHandlingError('Packet type must be between 0 and 15');
   }
   if (packet.temperature < -150 || packet.temperature > 150) {
-    throw new PacketHandlingError("Packet temperature must be between -150 and 150 °C");
+    throw new PacketHandlingError('Packet temperature must be between -150 and 150 °C');
   }
   if (packet.humidity < 0 || packet.humidity > 100) {
-    throw new PacketHandlingError("Packet humidity must be between 0 and 100 %");
+    throw new PacketHandlingError('Packet humidity must be between 0 and 100 %');
   }
   if (!Number.isInteger(packet.airPressure) || packet.airPressure < 300 || packet.airPressure > 1100) {
-    throw new PacketHandlingError("Packet air pressure must be between 300 and 1100 hPa");
+    throw new PacketHandlingError('Packet air pressure must be between 300 and 1100 hPa');
   }
   if (packet.serial < 0 || packet.serial > 0xFFFFFFFF) {
-    throw new PacketHandlingError("Packet serial number must be a valid unsigned 32-bit integer");
+    throw new PacketHandlingError('Packet serial number must be a valid unsigned 32-bit integer');
   }
 }
 
