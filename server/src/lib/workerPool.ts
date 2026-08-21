@@ -6,7 +6,7 @@ export function createWorkerPool(workerCount: number, workerUrl: URL, onRecord: 
 
   for (let i = 0; i < workerCount; i++) {
     const worker = new Worker(workerUrl, { type: 'module' } as WorkerOptions);
-    worker.on('message', (message: any) => {
+    worker.on('message', (message: { action: string; record: unknown }) => {
       if (message?.action === 'record' && message.record) {
         onRecord(message.record);
       }

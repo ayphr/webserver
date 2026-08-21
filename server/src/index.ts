@@ -17,7 +17,7 @@ const workerPool = createWorkerPool(WORKER_COUNT, new URL('./worker.ts', import.
 });
 
 const dbWorker = new Worker(new URL('./dbWorker.ts', import.meta.url), { type: 'module' } as WorkerOptions);
-dbWorker.on('message', (message: any) => {
+dbWorker.on('message', (message: { action: string; msg?: string; error?: unknown }) => {
   if (message?.action === 'log') log.info({ component: 'db' }, message.msg);
   if (message?.action === 'error') log.error({ component: 'db', error: message.error }, 'database worker error');
 });

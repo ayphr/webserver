@@ -1,7 +1,7 @@
 import { Collection, Db, MongoClient, type Document } from 'mongodb';
 import { createLogger } from '../lib/logger';
 import type { TelemetryRecord } from '../lib/telemetry';
-import { type Device, type Punishment, type User, type UserRole } from '../../common';
+import { type Device, type Punishment, type User, type UserRole } from '../../../common';
 import { CREDIT_PER_RECORD } from '../constants';
 
 const log = createLogger('db-worker');
@@ -63,7 +63,7 @@ async function createCollections() {
   const collections = await database.collections();
   const collectionsToCreate: {
     name: string;
-    creator: Function;
+    creator: (database: Db) => Promise<Collection<Document>>;
   }[] = [
       {
         name: TELEMETRY_COLLECTION,
@@ -77,9 +77,11 @@ async function createCollections() {
           // geo index for telemetry location
           try {
             await col.createIndex({ location: '2dsphere' });
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (e) {
             // ignore if server doesn't support 2dsphere
           }
+          return col;
         }
       },
       {
@@ -117,6 +119,7 @@ async function createCollections() {
           // geo index for location
           try {
             await collection.createIndex({ location: '2dsphere' });
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (e) {
             // ignore if server doesn't support 2dsphere
           }
@@ -233,7 +236,7 @@ export async function flushRecords(records: TelemetryRecord[], emit: (payload: u
     try {
       const countsByDevice: Record<number, number> = {};
       for (const doc of documents) {
-        const id = (doc as any).deviceId as number;
+        const id = (doc as { deviceId: number }).deviceId as number;
         countsByDevice[id] = (countsByDevice[id] || 0) + 1;
       }
 
@@ -454,7 +457,7 @@ export async function getTelemetryByLocationAndTime(center: { lat: number; lon: 
   const endDate = end ?? new Date();
 
   const metersToRadians = (m: number) => m / 6378137;
-  const query: any = {
+  const query: { timestamp: { $gte: Date; $lte: Date }; location: { $geoWithin: { $centerSphere: [number[], number] } } } = {
     timestamp: { $gte: startDate, $lte: endDate },
     location: {
       $geoWithin: {
