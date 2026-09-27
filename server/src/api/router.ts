@@ -1,5 +1,5 @@
 import { handleAuthRoute } from './routes/auth';
-import { handleApiNotFoundRoute, handleNotFoundRoute, handleOptionsRoute, handleStatusRoute } from './routes/util';
+import { handleApiNotFoundRoute, handleMetricsRoute, handleNotFoundRoute, handleOptionsRoute, handleStatusRoute } from './routes/util';
 import { handlePunishmentsRoute } from './routes/punishments';
 import { handleStaffRoute } from './routes/staff';
 import { handleDevicesRoute } from './routes/devices';
@@ -13,10 +13,14 @@ function cleanPathname(pathname: string): string {
   return pathname;
 }
 
-export function routeRequest(request: Request) {
+export async function routeRequest(request: Request) {
   const url = new URL(request.url);
 
   url.pathname = cleanPathname(url.pathname);
+
+  if (request.method === 'GET' && url.pathname === '/metrics') {
+    return await handleMetricsRoute(request);
+  }
 
   if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
     return handleOptionsRoute(request);

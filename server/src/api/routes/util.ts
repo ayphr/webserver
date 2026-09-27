@@ -1,3 +1,5 @@
+import { register } from 'prom-client';
+
 const DEFAULT_ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const DEFAULT_ALLOWED_HEADERS = 'Content-Type, Authorization';
 
@@ -49,4 +51,9 @@ export function handleApiNotFoundRoute(request: Request) {
 
 export function handleNotFoundRoute(request: Request) {
   return addCorsHeaders(new Response('Not Found', { status: 404 }), request);
+}
+
+export async function handleMetricsRoute(request: Request) {
+  const metrics = await register.metrics();
+  return addCorsHeaders(new Response(metrics, { status: 200, headers: { 'Content-Type': register.contentType } }), request);
 }
