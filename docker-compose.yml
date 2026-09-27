@@ -60,6 +60,20 @@ services:
     ports:
       - '7232:7232'
       - '7233:7233'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "const p = process.env.ENABLE_TLS === 'true' ? require('https') :
+          require('http'); const req = p.get({hostname:'127.0.0.1', port:process.env.API_PORT ||
+          7233, path:'/api/status/', rejectUnauthorized:false}, res => { let b='';
+          res.on('data', c => b += c); res.on('end', () => { try { if
+          (res.statusCode !== 200 || JSON.parse(b).ok !== true) process.exit(1);
+          } catch { process.exit(1); } }); }); req.on('error', () => process.exit(1));"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     ulimits:
       nofile:
         soft: 65536
