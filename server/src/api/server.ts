@@ -1,8 +1,8 @@
 import type { Server } from 'bun';
 import { routeRequest } from './router';
 import { addCorsHeaders } from './routes/util';
-import { CERT_PATH, KEY_PATH } from '../env';
 import { httpRequestDuration, httpRequestsTotal } from '../lib/metrics';
+import { ensureValidCertificate, type CertConfig } from '../certs';
 
 function getRequestBaseOrigin(request: Request): string {
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
@@ -26,11 +26,20 @@ function normalizeRequest(request: Request): Request {
   }
 }
 
-export function setupServer(port: number, tls: boolean, callback: () => void): Server<undefined> {
+export async function setupServer(port: number, tls: boolean, callback: () => void): Promise<Server<undefined>> {
+  let certConfig: CertConfig | null = null;
+  if (tls) {
+    certConfig = await ensureValidCertificate();
+
+    if (!certConfig) {
+      throw new Error('Failed to obtain valid TLS certificate');
+    }
+  }
+
   const server = Bun.serve({
     port,
 
-    tls: tls ? { certFile: CERT_PATH, keyFile: KEY_PATH } : undefined,
+    tls: tls ? { certFile: certConfig!.certPath, keyFile: certConfig!.keyPath } : undefined,
 
     async fetch(request) {
       const normalized = normalizeRequest(request);
