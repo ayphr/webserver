@@ -6,6 +6,8 @@ import { appendChunk, parseIncomingBuffer } from './lib/socketFraming';
 import type { TelemetryRecord } from './lib/telemetry';
 import { createWorkerPool } from './lib/workerPool';
 import { setupServer } from './api/server';
+import { ENABLE_TLS } from './env';
+import { packetsReceivedTotal } from './lib/metrics';
 
 const log = createLogger('server');
 const WORKER_COUNT = 4;
@@ -49,6 +51,7 @@ const tcpServer = net.createServer((socket) => {
     buffer = remainder;
 
     for (const frame of frames) {
+      packetsReceivedTotal.inc({ protocol: 'tcp' });
       workerPool.post(frame);
     }
   });
@@ -60,7 +63,7 @@ const TCP_PORT = Number(process.env.TCP_PORT || 4000);
 const API_PORT = Number(process.env.API_PORT || 8080);
 
 tcpServer.listen(TCP_PORT, () => log.info({ port: TCP_PORT }, 'TCP server listening'));
-const httpServer = setupServer(API_PORT, () => log.info({ port: API_PORT }, 'API (HTTP) server listening'));
+const httpServer = setupServer(API_PORT, ENABLE_TLS, () => log.info({ port: API_PORT }, 'API server listening'));
 
 process.once('SIGINT', async () => {
   log.info('shutting down');

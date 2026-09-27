@@ -5,5 +5,4 @@ export type Device = {
   registeredAt: Date;
   lastBroadcastedAt?: Date;
   metadata?: Record<string, unknown>;
-  location: { type: 'Point'; coordinates: [number, number] };
 };

@@ -1,5 +1,3 @@
-// Use raw JS Date objects for timestamps.
-
 export type UserRole = 'user' | 'staff' | 'owner';
 
 export type SocialLinkType = 'website' | 'youtube' | 'github' | 'bluesky' | 'reddit' | 'x' | 'facebook' | 'instagram' | 'tiktok';
@@ -19,8 +17,7 @@ export type User = {
   };
   createdAt: Date;
   lastActive: Date;
-  credits?: number;
   country?: string;
 };
 
-export type PublicUser = Omit<User, 'auth' | 'credits'>;
+export type PublicUser = Omit<User, 'auth'>;

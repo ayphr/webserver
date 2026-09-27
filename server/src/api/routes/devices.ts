@@ -28,27 +28,12 @@ const handleRegister = requireAuth(async (request, user: User) => {
   const existing = await getDeviceBySerial(serial);
   if (existing) return json({ error: 'serial already registered' }, 409);
 
-  // location: { lat, lon }
-  let location: Device['location'] | null = null;
-  if (body?.location && typeof body.location === 'object') {
-    const lat = Number(body.location.lat);
-    const lon = Number(body.location.lon);
-    if (Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-      location = { type: 'Point', coordinates: [lon, lat] };
-    } else {
-      return json({ error: 'invalid location' }, 400);
-    }
-  }
-
-  if (location == null) return json({ error: 'invalid location' }, 400);
-
   const now = new Date();
   const device: Device = {
     serial,
     ownerUuid: user.uuid,
     ownerUsername: user.username,
-    registeredAt: now,
-    location
+    registeredAt: now
   };
 
   await createDevice(device);

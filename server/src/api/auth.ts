@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { User, UserRole } from '../../common';
+import type { User, UserRole } from '../../../common';
 import { getActiveSuspensionForUserUuid, getUserFromToken, updateUser } from '../workers/dbWriter';
 
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
