@@ -6,8 +6,17 @@ import { handleDevicesRoute } from './routes/devices';
 import { handleUsersRoute } from './routes/users';
 import { handleProfileRoute } from './routes/profile';
 
+function cleanPathname(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    return pathname.slice(0, -1);
+  }
+  return pathname;
+}
+
 export function routeRequest(request: Request) {
   const url = new URL(request.url);
+
+  url.pathname = cleanPathname(url.pathname);
 
   if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
     return handleOptionsRoute(request);

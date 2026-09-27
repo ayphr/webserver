@@ -59,11 +59,11 @@ const tcpServer = net.createServer((socket) => {
   socket.on('error', (error) => log.error({ error }, 'socket error'));
 });
 
-const TCP_PORT = Number(process.env.TCP_PORT || 4000);
-const API_PORT = Number(process.env.API_PORT || 8080);
+const TCP_PORT = Number(process.env.TCP_PORT || 7232);
+const API_PORT = Number(process.env.API_PORT || 7233);
 
 tcpServer.listen(TCP_PORT, () => log.info({ port: TCP_PORT }, 'TCP server listening'));
-const httpServer = setupServer(API_PORT, ENABLE_TLS, () => log.info({ port: API_PORT }, 'API server listening'));
+const httpServer = await setupServer(API_PORT, ENABLE_TLS, () => log.info({ port: API_PORT }, 'API server listening'));
 
 process.once('SIGINT', async () => {
   log.info('shutting down');
