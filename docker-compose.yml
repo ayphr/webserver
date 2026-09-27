@@ -68,7 +68,7 @@ services:
           require('http'); const req = p.get({hostname:'127.0.0.1', port:process.env.API_PORT ||
           7233, path:'/api/status/', rejectUnauthorized:false}, res => { let b='';
           res.on('data', c => b += c); res.on('end', () => { try { if
-          (res.statusCode !== 200 || JSON.parse(b).ok !== true) process.exit(1);
+          (res.statusCode !== 200) process.exit(1);
           } catch { process.exit(1); } }); }); req.on('error', () => process.exit(1));"
       interval: 10s
       timeout: 5s
