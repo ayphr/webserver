@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Ayphr
+    orgId: 1
+    folder: Ayphr
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

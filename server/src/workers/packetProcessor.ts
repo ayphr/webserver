@@ -27,10 +27,7 @@ export async function handlePacketMessage(message: Uint8Array, emit: (payload: u
         humidity: packet.humidity,
         airPressure: packet.airPressure
       };
-      if (device.location && Array.isArray(device.location.coordinates)) {
-        const [lon, lat] = device.location.coordinates;
-        record.location = { lat, lon };
-      }
+      
       emit({ action: 'record', record });
     }
   } catch (error) {

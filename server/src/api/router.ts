@@ -3,7 +3,6 @@ import { handleApiNotFoundRoute, handleNotFoundRoute, handleOptionsRoute, handle
 import { handlePunishmentsRoute } from './routes/punishments';
 import { handleStaffRoute } from './routes/staff';
 import { handleDevicesRoute } from './routes/devices';
-import { handleMarketRoute } from './routes/market';
 import { handleUsersRoute } from './routes/users';
 import { handleProfileRoute } from './routes/profile';
 
@@ -32,10 +31,6 @@ export function routeRequest(request: Request) {
 
   if (url.pathname.startsWith('/api/devices')) {
     return handleDevicesRoute(request);
-  }
-
-  if (url.pathname.startsWith('/api/market')) {
-    return handleMarketRoute(request);
   }
 
   if (url.pathname.startsWith('/api/profile/')) {

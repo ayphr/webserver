@@ -1,0 +1,128 @@
+services:
+  mongodb:
+    container_name: ayphr-mongodb
+    image: mongo:7
+    restart: unless-stopped
+    command: ['mongod', '--wiredTigerCacheSizeGB', '1']
+    healthcheck:
+      test: ['CMD-SHELL', "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          memory: 1G
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    container_name: ayphr-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - redis_data:/data
+
+  server:
+    container_name: ayphr-server
+    init: true
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          memory: 1G
+    build:
+      context: ./server
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '7232:7232'
+      - '7233:7233'
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - certs_data:/app/certs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: ayphr-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.wal-compression'
+      - '--web.listen-address=:7444'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - '7444:7444'
+    depends_on:
+      server:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./monitoring/prometheus/prometheus.yml
+          target: /etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    container_name: ayphr-grafana
+    restart: unless-stopped
+    environment:
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SERVER_HTTP_PORT: 7443
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - '7443:7443'
+    depends_on:
+      prometheus:
+        condition: service_started
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./monitoring/grafana/provisioning
+          target: /etc/grafana/provisioning
+        - action: sync+restart
+          path: ./monitoring/grafana/dashboards
+          target: /var/lib/grafana/dashboards
+
+volumes:
+  mongo_data: {}
+  redis_data: {}
+  certs_data: {}
+  prometheus_data: {}
+  grafana_data: {}

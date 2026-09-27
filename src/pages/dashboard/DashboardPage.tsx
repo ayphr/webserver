@@ -301,18 +301,6 @@ export const DashboardPage = () => {
               </Card>
             )}
 
-            {activePage === 'credits' && (
-              <Card className="dashboard-page__card" elevated>
-                <CardHeader>
-                  <h2>Credits</h2>
-                  <p>Buy credits</p>
-                </CardHeader>
-                <CardBody>
-                  <p>You cannot buy credits at this time.</p>
-                </CardBody>
-              </Card>
-            )}
-
             {activePage === 'profile' && (
               <Card className="dashboard-page__card" elevated>
                 <CardHeader>

@@ -1,6 +1,8 @@
 import type { Server } from 'bun';
 import { routeRequest } from './router';
 import { addCorsHeaders } from './routes/util';
+import { CERT_PATH, KEY_PATH } from '../env';
+import { httpRequestDuration, httpRequestsTotal } from '../lib/metrics';
 
 function getRequestBaseOrigin(request: Request): string {
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
@@ -24,12 +26,31 @@ function normalizeRequest(request: Request): Request {
   }
 }
 
-export function setupServer(port: number, callback: () => void): Server<undefined> {
+export function setupServer(port: number, tls: boolean, callback: () => void): Server<undefined> {
   const server = Bun.serve({
     port,
 
+    tls: tls ? { certFile: CERT_PATH, keyFile: KEY_PATH } : undefined,
+
     async fetch(request) {
-      return addCorsHeaders(await routeRequest(normalizeRequest(request)), request);
+      const normalized = normalizeRequest(request);
+      const method = normalized.method;
+      const route = new URL(normalized.url).pathname;
+
+      const endTimer = httpRequestDuration.startTimer({ method, route });
+
+      try {
+        const response = await routeRequest(normalized);
+        const status = response.status.toString();
+
+        httpRequestsTotal.inc({ method, route, status });
+        return addCorsHeaders(response, request);
+      } catch (error) {
+        httpRequestsTotal.inc({ method, route, status: '500' });
+        throw error;
+      } finally {
+        endTimer();
+      }
     },
   });
 
