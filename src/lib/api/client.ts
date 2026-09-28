@@ -93,7 +93,7 @@ async function readResponseBody(response: Response) {
   return text;
 }
 
-export function createAyphrRequestClient(config: ApiClientConfig = {}) {
+export function createRequestClient(config: ApiClientConfig = {}) {
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const storageKey = config.storageKey ?? 'ayphr-api-token';
 
@@ -154,8 +154,7 @@ export function createAyphrRequestClient(config: ApiClientConfig = {}) {
     },
     requestJson,
     requestText,
-    // serializeDate removed — use JS Date objects directly when constructing bodies
   };
 }
 
-export type AyphrRequestClient = ReturnType<typeof createAyphrRequestClient>;
+export type RequestClient = ReturnType<typeof createRequestClient>;

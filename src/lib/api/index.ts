@@ -1,17 +1,17 @@
 import { createAuthApi } from './auth';
 import { createDevicesApi } from './devices';
 import { createMarketApi } from './market';
-import { createAyphrRequestClient, type ApiClientConfig, type AyphrRequestClient } from './client';
+import { createRequestClient, type ApiClientConfig, type RequestClient } from './client';
 import { createPunishmentsApi } from './punishments';
 import { createStaffApi } from './staff';
 import { createUsersApi } from './users';
 import { createProfileApi } from './profile';
 
 export const API_BASE_URL = import.meta.env.DEV
-  ? 'http://localhost:8080'
-  : 'https://ayphrapi.proplayer919.dev:8080';
+  ? 'http://localhost:7233'
+  : 'https://api.ayphr.com:7233';
 
-export type AyphrApiClient = AyphrRequestClient & {
+export type AyphrApiClient = RequestClient & {
   getStatus: () => Promise<string>;
   auth: ReturnType<typeof createAuthApi>;
   users: ReturnType<typeof createUsersApi>;
@@ -22,8 +22,8 @@ export type AyphrApiClient = AyphrRequestClient & {
   market: ReturnType<typeof createMarketApi>;
 };
 
-export function createAyphrApiClient(config: ApiClientConfig = {}): AyphrApiClient {
-  const client = createAyphrRequestClient({
+export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
+  const client = createRequestClient({
     baseUrl: API_BASE_URL,
     ...config,
   });
@@ -43,4 +43,4 @@ export function createAyphrApiClient(config: ApiClientConfig = {}): AyphrApiClie
   };
 }
 
-export const api = createAyphrApiClient();
+export const api = createApiClient();
