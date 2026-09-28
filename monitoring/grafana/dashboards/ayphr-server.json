@@ -6,237 +6,293 @@
   "graphTooltip": 1,
   "panels": [
     {
+      "type": "row",
+      "title": "Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
       "type": "stat",
       "title": "Requests / second",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
+      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
       "targets": [
-        {
-          "expr": "sum(rate(ayphr_http_requests_total[5m]))"
-        }
+        { "expr": "sum(rate(ayphr_http_requests_total[5m]))", "legendFormat": "req/s" }
       ]
     },
     {
       "type": "stat",
-      "title": "Packets received / second",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
+      "title": "Packets / second",
+      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
       "targets": [
-        {
-          "expr": "sum(rate(ayphr_packets_received_total[5m]))"
-        }
+        { "expr": "sum(rate(ayphr_packets_received_total[5m]))", "legendFormat": "pkt/s" }
       ]
     },
     {
       "type": "stat",
       "title": "Active devices",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 0
+      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "ayphr_active_devices", "legendFormat": "devices" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Requests in flight",
+      "gridPos": { "h": 4, "w": 5, "x": 15, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "ayphr_http_requests_in_flight", "legendFormat": "in flight" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "5xx / second",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.01 }] }
+        },
+        "overrides": []
       },
       "targets": [
-        {
-          "expr": "ayphr_active_devices"
-        }
+        { "expr": "sum(rate(ayphr_http_requests_total{status=~\"5..\"}[5m])) or vector(0)", "legendFormat": "5xx/s" }
       ]
     },
     {
       "type": "row",
-      "title": "System resources",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 4
-      },
+      "title": "HTTP",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP latency percentiles",
+      "description": "Request duration quantiles computed from ayphr_http_request_duration_seconds across all routes.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.75, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p75" },
+        { "expr": "histogram_quantile(0.90, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p90" },
+        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" },
+        { "expr": "sum(rate(ayphr_http_request_duration_seconds_sum[5m])) / sum(rate(ayphr_http_request_duration_seconds_count[5m]))", "legendFormat": "avg" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests by status",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(ayphr_http_requests_total[5m])) by (status)", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p95 by route",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (route, le) (rate(ayphr_http_request_duration_seconds_bucket[5m])))", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Busiest routes",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "topk(5, sum by (route) (rate(ayphr_http_requests_total[5m])))", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "TCP / devices",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "TCP connections / second",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "targets": [
+        { "expr": "sum(rate(ayphr_tcp_connections_total[5m]))", "legendFormat": "connections/s" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "TCP bytes received / second",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "targets": [
+        { "expr": "sum(rate(ayphr_tcp_bytes_received_total[5m]))", "legendFormat": "bytes/s" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Connection duration percentiles",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 1, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_tcp_connection_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.90, sum(rate(ayphr_tcp_connection_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p90" },
+        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_tcp_connection_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Connection errors / second",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "targets": [
+        { "expr": "sum(rate(ayphr_tcp_connection_errors_total[5m])) or vector(0)", "legendFormat": "errors/s" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Telemetry pipeline",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Telemetry throughput",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(ayphr_telemetry_records_buffered_total[5m]))", "legendFormat": "buffered/s" },
+        { "expr": "sum(rate(ayphr_telemetry_records_flushed_total[5m]))", "legendFormat": "flushed/s" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis buffer backlog",
+      "description": "Records waiting in Redis at the last drain. A sustained climb means the database sink is falling behind.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "targets": [
+        { "expr": "ayphr_telemetry_buffer_length", "legendFormat": "backlog" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Flush batch size percentiles",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_flush_batch_size_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_flush_batch_size_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_flush_batch_size_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Flush duration percentiles",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 49 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_flush_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_flush_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_flush_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Telemetry pipeline errors / second",
+      "description": "Enqueue failures lose individual records; drain failures can drop a whole batch.",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 57 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(ayphr_telemetry_enqueue_errors_total[5m])) or vector(0)", "legendFormat": "enqueue errors/s" },
+        { "expr": "sum(rate(ayphr_telemetry_drain_errors_total[5m])) or vector(0)", "legendFormat": "drain errors/s" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "System",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 64 },
       "collapsed": false,
       "panels": []
     },
     {
       "type": "timeseries",
       "title": "CPU usage",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 5
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "max": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 65 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
       "targets": [
-        {
-          "expr": "rate(ayphr_process_cpu_user_seconds_total[5m]) + rate(ayphr_process_cpu_system_seconds_total[5m])",
-          "legendFormat": "CPU usage"
-        }
+        { "expr": "rate(ayphr_process_cpu_user_seconds_total[5m]) + rate(ayphr_process_cpu_system_seconds_total[5m])", "legendFormat": "CPU" }
       ]
     },
     {
       "type": "timeseries",
       "title": "Memory usage",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 5
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 65 },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
-        {
-          "expr": "ayphr_process_resident_memory_bytes",
-          "legendFormat": "RSS"
-        },
-        {
-          "expr": "ayphr_nodejs_heap_size_used_bytes",
-          "legendFormat": "Heap used"
-        }
+        { "expr": "ayphr_process_resident_memory_bytes", "legendFormat": "RSS" },
+        { "expr": "ayphr_nodejs_heap_size_used_bytes", "legendFormat": "Heap used" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "HTTP latency p95",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 13
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 3
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
+      "title": "Event loop lag",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 65 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "HTTP responses by status",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 13
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(ayphr_http_requests_total[5m])) by (status)",
-          "legendFormat": "{{status}}"
-        }
+        { "expr": "ayphr_nodejs_eventloop_lag_p50_seconds", "legendFormat": "p50" },
+        { "expr": "ayphr_nodejs_eventloop_lag_p99_seconds", "legendFormat": "p99" }
       ]
     },
     {
       "type": "timeseries",
       "title": "MongoDB operations",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 21
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops"
-        },
-        "overrides": []
-      },
-      "options": {
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 73 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
-        {
-          "expr": "sum(rate(ayphr_mongo_operations_total[5m])) by (operation, collection)",
-          "legendFormat": "{{operation}} {{collection}}"
-        }
+        { "expr": "sum(rate(ayphr_mongo_operations_total[5m])) by (operation, collection)", "legendFormat": "{{operation}} {{collection}}" }
       ]
     }
   ],
+  "refresh": "5s",
   "schemaVersion": 39,
   "tags": [
     "ayphr",
     "server"
   ],
-  "title": "ayphr Server",
-  "uid": "ayphr-server",
-  "version": 1,
   "time": {
     "from": "now-6h",
     "to": "now"
   },
-  "refresh": "5s"
+  "timepicker": {},
+  "timezone": "",
+  "title": "ayphr Server",
+  "uid": "ayphr-server",
+  "version": 3
 }
