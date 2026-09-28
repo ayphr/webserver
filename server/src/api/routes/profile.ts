@@ -1,6 +1,7 @@
 import type { User } from '../../../../common';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '../../lib/country';
+import { isSocialLinkType, normalizeSocialHandle } from '../../../../common/utils/social';
 import { updateUser, getUserFromUuid } from '../../workers/dbWriter';
 
 type CountryUpdatePayload = {
@@ -102,18 +103,26 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
 
   if (body.socialLinks && typeof body.socialLinks === 'object') {
     const nextSocialLinks = { ...targetUser.socialLinks };
+
     for (const [key, value] of Object.entries(body.socialLinks)) {
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed.length > 0) {
-          nextSocialLinks[key as keyof typeof nextSocialLinks] = trimmed;
-        } else {
-          delete nextSocialLinks[key as keyof typeof nextSocialLinks];
-        }
-      } else if (value === undefined || value === null) {
-        delete nextSocialLinks[key as keyof typeof nextSocialLinks];
+      if (!isSocialLinkType(key)) {
+        return json({ error: `unknown social link type: ${key}` }, 400);
       }
+
+      if (typeof value !== 'string' || value.trim().length === 0) {
+        delete nextSocialLinks[key];
+        continue;
+      }
+
+      const handle = normalizeSocialHandle(key, value);
+
+      if (!handle) {
+        return json({ error: `"${value}" is not a valid ${key} handle` }, 400);
+      }
+
+      nextSocialLinks[key] = handle;
     }
+
     targetUser.socialLinks = nextSocialLinks;
   }
 

@@ -2,6 +2,7 @@ export type UserRole = 'user' | 'staff' | 'owner';
 
 export type SocialLinkType = 'website' | 'youtube' | 'github' | 'bluesky' | 'reddit' | 'x' | 'facebook' | 'instagram' | 'tiktok';
 
+/** Bare platform handles (e.g. `torvalds` or `example.com`), never full URLs. */
 export type SocialLinks = Partial<Record<SocialLinkType, string>>;
 
 export type User = {

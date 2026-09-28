@@ -4,6 +4,7 @@ import type {
   ProfileMePayload,
   ProfileMeResponse,
   PublicUser,
+  SocialLinks,
 } from '../../../common';
 import type { RequestClient } from './client';
 
@@ -28,7 +29,7 @@ export function createProfileApi(client: RequestClient) {
       });
       return response.user;
     },
-    async editUser(userUuid: string, input: { country?: string; bio?: string; socialLinks?: Record<string, string | undefined> }) {
+    async editUser(userUuid: string, input: { country?: string; bio?: string; socialLinks?: SocialLinks }) {
       const response = await client.requestJson<{ user: PublicUser }>(`/api/profile/${userUuid}`, {
         method: 'PATCH',
         body: input,
