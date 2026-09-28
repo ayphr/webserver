@@ -6,8 +6,19 @@ import { appendChunk, parseIncomingBuffer } from './lib/socketFraming';
 import type { TelemetryRecord } from './lib/telemetry';
 import { createWorkerPool } from './lib/workerPool';
 import { setupServer } from './api/server';
-import { ENABLE_TLS } from './env';
-import { packetsReceivedTotal, recordActiveDevices, recordMongoOperation } from './lib/metrics';
+import { API_PORT, ENABLE_TLS, TCP_PORT } from './env';
+import {
+  packetsReceivedTotal,
+  recordActiveDevices,
+  recordMongoOperation,
+  tcpBytesReceivedTotal,
+  tcpConnectionDuration,
+  tcpConnectionErrorsTotal,
+  tcpConnectionsTotal,
+  telemetryFlushBatchSize,
+  telemetryFlushDuration,
+  telemetryRecordsFlushedTotal,
+} from './lib/metrics';
 
 const log = createLogger('server');
 const WORKER_COUNT = 4;
@@ -35,25 +46,38 @@ setInterval(() => {
 
   flushInProgress = true;
   void (async () => {
+    const endTimer = telemetryFlushDuration.startTimer();
+
     try {
       const toFlush = await drainTelemetryBuffer();
       if (toFlush.length === 0) return;
 
       dbWorker.postMessage({ action: 'flush', records: toFlush });
+      telemetryRecordsFlushedTotal.inc(toFlush.length);
+      telemetryFlushBatchSize.observe(toFlush.length);
       log.info({ flushed: toFlush.length }, 'flushed buffered records to database worker');
     } finally {
       flushInProgress = false;
+      endTimer();
     }
   })();
 }, FLUSH_INTERVAL_MS);
 
 const tcpServer = net.createServer((socket) => {
   let buffer: Uint8Array<ArrayBufferLike> = new Uint8Array(0);
+  const connectedAt = process.hrtime.bigint();
 
+  tcpConnectionsTotal.inc();
   recordActiveDevices(1);
-  socket.once('close', () => recordActiveDevices(-1));
+  socket.once('close', () => {
+    const seconds = Number(process.hrtime.bigint() - connectedAt) / 1e9;
+    tcpConnectionDuration.observe(seconds);
+    recordActiveDevices(-1);
+  });
 
   socket.on('data', (chunk: Uint8Array<ArrayBufferLike>) => {
+    tcpBytesReceivedTotal.inc(chunk.byteLength);
+
     buffer = appendChunk(buffer, chunk);
     const { frames, remainder } = parseIncomingBuffer(buffer);
     buffer = remainder;
@@ -64,11 +88,11 @@ const tcpServer = net.createServer((socket) => {
     }
   });
 
-  socket.on('error', (error) => log.error({ error }, 'socket error'));
+  socket.on('error', (error) => {
+    tcpConnectionErrorsTotal.inc();
+    log.error({ error }, 'socket error');
+  });
 });
-
-const TCP_PORT = Number(process.env.TCP_PORT || 7232);
-const API_PORT = Number(process.env.API_PORT || 7233);
 
 tcpServer.listen(TCP_PORT, () => log.info({ port: TCP_PORT }, 'TCP server listening'));
 const httpServer = await setupServer(API_PORT, ENABLE_TLS, () => log.info({ port: API_PORT }, 'API server listening'));

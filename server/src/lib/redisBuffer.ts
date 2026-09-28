@@ -1,5 +1,11 @@
 import { createClient, type RedisClientType } from 'redis';
 import { createLogger } from './logger';
+import {
+  telemetryBufferLength,
+  telemetryDrainErrorsTotal,
+  telemetryEnqueueErrorsTotal,
+  telemetryRecordsBufferedTotal,
+} from './metrics';
 import type { TelemetryRecord } from './telemetry';
 import { REDIS_BUFFER_KEY, REDIS_URL } from '../env';
 
@@ -46,7 +52,9 @@ export async function enqueueTelemetryRecord(record: TelemetryRecord) {
   try {
     const redis = await getClient();
     await redis.rPush(REDIS_BUFFER_KEY, JSON.stringify(record));
+    telemetryRecordsBufferedTotal.inc();
   } catch (error) {
+    telemetryEnqueueErrorsTotal.inc();
     log.error({ error }, 'failed to enqueue telemetry record');
   }
 }
@@ -58,8 +66,15 @@ export async function drainTelemetryBuffer() {
       keys: [REDIS_BUFFER_KEY]
     })) as string[] | null;
 
-    return (rawRecords || []).map(parseRecord);
+    const records = (rawRecords || []).map(parseRecord);
+
+    // The script drains atomically, so this is the backlog depth that built up
+    // since the previous flush. Non-zero over time means the sink is behind.
+    telemetryBufferLength.set(records.length);
+
+    return records;
   } catch (error) {
+    telemetryDrainErrorsTotal.inc();
     log.error({ error }, 'failed to drain telemetry buffer');
     return [];
   }

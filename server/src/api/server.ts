@@ -1,7 +1,7 @@
 import type { Server } from 'bun';
 import { resolveRoute } from './router';
 import { addCorsHeaders } from './routes/util';
-import { httpRequestDuration, httpRequestsTotal } from '../lib/metrics';
+import { httpRequestDuration, httpRequestsTotal, httpRequestsInFlight } from '../lib/metrics';
 import { ensureValidCertificate, type CertConfig } from '../certs';
 
 function getRequestBaseOrigin(request: Request): string {
@@ -51,6 +51,7 @@ export async function setupServer(port: number, tls: boolean, callback: () => vo
       }
 
       const endTimer = httpRequestDuration.startTimer({ method, route: template });
+      httpRequestsInFlight.inc();
 
       try {
         const response = await dispatch();
@@ -61,6 +62,7 @@ export async function setupServer(port: number, tls: boolean, callback: () => vo
         httpRequestsTotal.inc({ method, route: template, status: '500' });
         throw error;
       } finally {
+        httpRequestsInFlight.dec();
         endTimer();
       }
     },
