@@ -1,4 +1,4 @@
-import { register } from 'prom-client';
+import { metricsText, registry } from '../../lib/metrics';
 
 const DEFAULT_ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const DEFAULT_ALLOWED_HEADERS = 'Content-Type, Authorization';
@@ -54,6 +54,6 @@ export function handleNotFoundRoute(request: Request) {
 }
 
 export async function handleMetricsRoute(request: Request) {
-  const metrics = await register.metrics();
-  return addCorsHeaders(new Response(metrics, { status: 200, headers: { 'Content-Type': register.contentType } }), request);
+  const metrics = await metricsText();
+  return addCorsHeaders(new Response(metrics, { status: 200, headers: { 'Content-Type': registry.contentType } }), request);
 }
