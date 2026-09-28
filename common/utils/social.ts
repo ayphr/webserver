@@ -28,7 +28,7 @@ export const SOCIAL_LINK_HANDLE_HINTS: Record<SocialLinkType, string> = {
   website: 'example.com',
   youtube: 'username',
   github: 'username',
-  bluesky: 'username',
+  bluesky: 'alice.bsky.social',
   reddit: 'username',
   x: 'username',
   facebook: 'username',
@@ -45,7 +45,7 @@ const SOCIAL_URL_TEMPLATES: Record<SocialLinkType, SocialUrlTemplate> = {
   website: { prefix: 'https://', suffix: '' },
   youtube: { prefix: 'https://youtube.com/@', suffix: '' },
   github: { prefix: 'https://github.com/', suffix: '' },
-  bluesky: { prefix: 'https://bsky.app/profile/', suffix: '.bsky.social' },
+  bluesky: { prefix: 'https://bsky.app/profile/', suffix: '' },
   reddit: { prefix: 'https://reddit.com/user/', suffix: '' },
   x: { prefix: 'https://x.com/', suffix: '' },
   facebook: { prefix: 'https://facebook.com/', suffix: '' },
@@ -62,18 +62,8 @@ export function isSocialLinkType(value: string): value is SocialLinkType {
   return (SOCIAL_LINK_TYPES as readonly string[]).includes(value);
 }
 
-function stripDecorations(type: SocialLinkType, value: string): string {
-  let handle = value.trim();
-
-  if (handle.startsWith('@')) {
-    handle = handle.slice(1);
-  }
-
-  if (type === 'bluesky' && handle.toLowerCase().endsWith('.bsky.social')) {
-    handle = handle.slice(0, -'.bsky.social'.length);
-  }
-
-  return handle;
+function stripDecorations(value: string): string {
+  return value.startsWith('@') ? value.slice(1).trim() : value.trim();
 }
 
 /**
@@ -81,14 +71,21 @@ function stripDecorations(type: SocialLinkType, value: string): string {
  * normalized handle, or null when the input is not a valid handle for the type.
  */
 export function normalizeSocialHandle(type: SocialLinkType, value: string): string | null {
-  const handle = stripDecorations(type, value);
+  const handle = stripDecorations(value);
 
   if (!handle || handle.length > MAX_HANDLE_LENGTH) {
     return null;
   }
 
-  if (type === 'website') {
-    const domain = handle.toLowerCase();
+  // Websites and Bluesky handles are both real domains.
+  if (type === 'website' || type === 'bluesky') {
+    const lower = handle.toLowerCase();
+
+    // A Bluesky handle with no dot cannot be a custom domain, so it can only be
+    // the default one. Anything containing a dot is kept exactly as typed, which
+    // is what makes custom domains work.
+    const domain = type === 'bluesky' && !lower.includes('.') ? `${lower}.bsky.social` : lower;
+
     return DOMAIN_PATTERN.test(domain) && DOMAIN_TLD_PATTERN.test(domain) ? domain : null;
   }
 
