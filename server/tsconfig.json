@@ -25,6 +25,16 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+
+    // Shared contract package lives outside this directory. The alias keeps
+    // imports depth-independent, so the same specifier resolves identically
+    // whether the server runs from the repo (server/ -> ../common) or from its
+    // container layout (/app -> /common).
+    "baseUrl": ".",
+    "paths": {
+      "@common": ["../common/index.ts"],
+      "@common/*": ["../common/*"]
+    }
   }
 }

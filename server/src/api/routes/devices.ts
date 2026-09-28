@@ -1,6 +1,6 @@
 import { requireAuth } from '../auth';
 import { createDevice, getDeviceBySerial, getDevicesForOwnerUuid } from '../../workers/dbWriter';
-import type { Device, User } from '../../../../common';
+import type { Device, User } from '@common';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });

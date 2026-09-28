@@ -1,6 +1,6 @@
 import { requireAuth } from '../auth';
 import { getPunishmentById, getPunishmentsForUserUuid } from '../../workers/dbWriter';
-import type { User } from '../../../../common';
+import type { User } from '@common';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });

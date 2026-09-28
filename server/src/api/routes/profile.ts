@@ -1,7 +1,7 @@
-import type { User } from '../../../../common';
+import type { User } from '@common';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '../../lib/country';
-import { isSocialLinkType, normalizeSocialHandle } from '../../../../common/utils/social';
+import { isSocialLinkType, normalizeSocialHandle } from '@common/utils/social';
 import { updateUser, getUserFromUuid } from '../../workers/dbWriter';
 
 type CountryUpdatePayload = {

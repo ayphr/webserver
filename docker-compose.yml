@@ -53,7 +53,8 @@ services:
         reservations:
           memory: 1G
     build:
-      context: ./server
+      context: .
+      dockerfile: server/Dockerfile
     restart: unless-stopped
     env_file:
       - .env
