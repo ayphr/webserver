@@ -1,7 +1,7 @@
 import type { DeviceListPayload, DevicePayload } from '../../../common';
-import type { AyphrRequestClient } from './client';
+import type { RequestClient } from './client';
 
-export function createDevicesApi(client: AyphrRequestClient) {
+export function createDevicesApi(client: RequestClient) {
   return {
     async register(input: { serial: number; location: { lat: number; lon: number } }) {
       const response = await client.requestJson<DevicePayload>('/api/devices/register', {

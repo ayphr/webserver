@@ -1,7 +1,7 @@
 import type { PunishmentPayload, PunishmentsMePayload, PunishmentsMeResponse } from '../../../common';
-import type { AyphrRequestClient } from './client';
+import type { RequestClient } from './client';
 
-export function createPunishmentsApi(client: AyphrRequestClient) {
+export function createPunishmentsApi(client: RequestClient) {
   return {
     async me() {
       const response = await client.requestJson<PunishmentsMePayload>('/api/punishments/me');

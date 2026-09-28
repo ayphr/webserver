@@ -5,9 +5,9 @@ import type {
   ProfileMeResponse,
   PublicUser,
 } from '../../../common';
-import type { AyphrRequestClient } from './client';
+import type { RequestClient } from './client';
 
-export function createProfileApi(client: AyphrRequestClient) {
+export function createProfileApi(client: RequestClient) {
   return {
     async me() {
       const response = await client.requestJson<ProfileMePayload>('/api/profile/me');

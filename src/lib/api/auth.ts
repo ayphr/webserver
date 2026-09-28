@@ -1,7 +1,7 @@
 import type { AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession } from '../../../common';
-import type { AyphrRequestClient } from './client';
+import type { RequestClient } from './client';
 
-export function createAuthApi(client: AyphrRequestClient) {
+export function createAuthApi(client: RequestClient) {
   return {
     async register(input: { username: string; password: string; country?: string }) {
       const response = await client.requestJson<AuthResponsePayload>('/api/auth/register', {
