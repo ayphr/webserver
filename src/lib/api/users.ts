@@ -1,7 +1,7 @@
 import type { UserMePayload, UserMeResponse, PublicUser } from '../../../common';
-import type { AyphrRequestClient } from './client';
+import type { RequestClient } from './client';
 
-export function createUsersApi(client: AyphrRequestClient) {
+export function createUsersApi(client: RequestClient) {
   return {
     async me() {
       const response = await client.requestJson<UserMePayload>('/api/users/me');

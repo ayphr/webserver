@@ -6,9 +6,9 @@ import type {
   StaffSummary,
   StaffUsersPayload,
 } from '../../../common';
-import type { AyphrRequestClient } from './client';
+import type { RequestClient } from './client';
 
-export function createStaffApi(client: AyphrRequestClient) {
+export function createStaffApi(client: RequestClient) {
   return {
     async summary() {
       return client.requestJson<StaffSummary>('/api/staff/summary');
