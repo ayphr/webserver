@@ -1,6 +1,6 @@
 import { clearToken, createPasswordHash, issueToken, requireAuth, verifyPassword } from '../auth';
 import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, updateUser } from '../../workers/dbWriter';
-import type { User } from '../../../../common';
+import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
 
 type AuthPayload = {

@@ -2,7 +2,7 @@ import { Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../lib/logger';
 import { recordMongoOperation } from '../lib/metrics';
 import type { TelemetryRecord } from '../lib/telemetry';
-import { type Device, type Punishment, type User, type UserRole } from '../../../common';
+import { type Device, type Punishment, type User, type UserRole } from '@common';
 import {
   TELEMETRY_COLLECTION,
   USERS_COLLECTION,

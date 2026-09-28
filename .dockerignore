@@ -1,0 +1,31 @@
+# Keep the Docker build context small: the server image only needs server/ and
+# common/, so everything else (including the 284M frontend node_modules) is
+# excluded from the context sent to the daemon.
+**/node_modules
+**/dist
+**/.git
+**/.env
+**/*.log
+**/certs
+
+.git
+.gitignore
+.env
+.env.*
+dist
+node_modules
+monitoring
+public
+src
+index.html
+netlify.toml
+package.json
+package-lock.json
+vite.config.ts
+tsconfig.json
+tsconfig.app.json
+tsconfig.node.json
+eslint.config.js
+docker-compose.yml
+README.md
+LICENSE

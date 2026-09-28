@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { requireRole } from '../auth';
 import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsers, getUsersByRole, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid } from '../../workers/dbWriter';
-import type { Punishment, User, UserRole } from '../../../../common';
+import type { Punishment, User, UserRole } from '@common';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });

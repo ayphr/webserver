@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { User, UserRole } from '../../../common';
+import type { User, UserRole } from '@common';
 import { getActiveSuspensionForUserUuid, getUserFromToken, updateUser } from '../workers/dbWriter';
 import type { RouteParams } from './types';
 
