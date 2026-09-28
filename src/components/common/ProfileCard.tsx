@@ -17,19 +17,19 @@ import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '../../../common/utils/country';
 import { PunishModal } from './PunishModal';
 import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
+import {
+  SOCIAL_LINK_LABELS,
+  SOCIAL_LINK_HANDLE_HINTS,
+  SOCIAL_LINK_TYPES,
+  buildSocialLinkUrl,
+  normalizeSocialHandle,
+} from '../../../common/utils/social';
 import './ProfileCard.css';
 
-const SOCIAL_LINK_FIELDS: Array<{ key: SocialLinkType; label: string; placeholder: string }> = [
-  { key: 'website', label: 'Website', placeholder: 'https://example.com' },
-  { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@username' },
-  { key: 'github', label: 'GitHub', placeholder: 'https://github.com/username' },
-  { key: 'bluesky', label: 'Bluesky', placeholder: 'https://bsky.app/profile/username.bsky.social' },
-  { key: 'reddit', label: 'Reddit', placeholder: 'https://reddit.com/user/username' },
-  { key: 'x', label: 'X', placeholder: 'https://x.com/username' },
-  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/username' },
-  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/username' },
-  { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@username' },
-];
+const SOCIAL_LINK_FIELDS: Array<{ key: SocialLinkType; label: string }> = SOCIAL_LINK_TYPES.map((key) => ({
+  key,
+  label: SOCIAL_LINK_LABELS[key],
+}));
 
 const SOCIAL_LINK_ICONS: Record<SocialLinkType, { label: string; icon: ReactNode }> = {
   website: { label: 'Website', icon: <IconWorld size={18} /> },
@@ -42,14 +42,6 @@ const SOCIAL_LINK_ICONS: Record<SocialLinkType, { label: string; icon: ReactNode
   instagram: { label: 'Instagram', icon: <IconBrandInstagram size={18} /> },
   tiktok: { label: 'TikTok', icon: <IconBrandTiktok size={18} /> },
 };
-
-function resolveSocialLinkUrl(value: string): string {
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
-    return value;
-  }
-
-  return `https://${value}`;
-}
 
 function getInitialSocialLinkKey(links: SocialLinks): SocialLinkType {
   const first = Object.entries(links).find(([, value]) => typeof value === 'string' && value.trim().length > 0)?.[0];
@@ -172,6 +164,15 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const canEditThisProfile = canEditProfile || isSelfProfile || isStaffOrOwner;
   const canPunishThisProfile = (isPunishable || isStaffOrOwner) && !!user && (user.role !== 'owner' || isSelfProfile);
 
+  const invalidSocialLinkKey = SOCIAL_LINK_FIELDS.map(({ key }) => key).find((key) => {
+    const handle = socialLinks[key];
+    return typeof handle === 'string' && handle.trim().length > 0 && normalizeSocialHandle(key, handle) === null;
+  });
+
+  const socialHandleError = invalidSocialLinkKey
+    ? `Enter a ${SOCIAL_LINK_LABELS[invalidSocialLinkKey]} handle, not a link`
+    : null;
+
   if (isLoading) {
     return <div className="profile-card profile-card--loading">Loading profile...</div>;
   }
@@ -179,6 +180,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   if (error || !user) {
     return <div className="profile-card profile-card--error">{error || 'Failed to load profile'}</div>;
   }
+
+  const renderedSocialLinks = SOCIAL_LINK_FIELDS.flatMap(({ key }) => {
+    const handle = user.socialLinks?.[key];
+    if (!handle) return [];
+
+    const href = buildSocialLinkUrl(key, handle);
+    return href ? [{ key, label: SOCIAL_LINK_LABELS[key], href }] : [];
+  });
 
   return (
     <div className="profile-card">
@@ -223,7 +232,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 variant="primary"
                 onClick={handleSaveProfile}
                 isLoading={isSaving}
-                disabled={isSaving}
+                disabled={isSaving || !!socialHandleError}
               >
                 Save
               </Button>
@@ -253,26 +262,21 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                   </EmojiText>
                 </div>
               )}
-              {user.socialLinks && Object.values(user.socialLinks).some(Boolean) && (
+              {renderedSocialLinks.length > 0 && (
                 <div className="profile-card__socials" aria-label="Social links">
-                  {SOCIAL_LINK_FIELDS.map((field) => {
-                    const value = user.socialLinks?.[field.key];
-                    if (!value) return null;
-
-                    return (
-                      <a
-                        key={field.key}
-                        className="profile-card__social-iconLink"
-                        href={resolveSocialLinkUrl(value)}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={field.label}
-                        title={field.label}
-                      >
-                        <span className="profile-card__social-icon">{SOCIAL_LINK_ICONS[field.key].icon}</span>
-                      </a>
-                    );
-                  })}
+                  {renderedSocialLinks.map(({ key, label, href }) => (
+                    <a
+                      key={key}
+                      className="profile-card__social-iconLink"
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={label}
+                      title={label}
+                    >
+                      <span className="profile-card__social-icon">{SOCIAL_LINK_ICONS[key].icon}</span>
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
@@ -331,9 +335,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 
                   <input
                     className="profile-card__socialValueInput"
-                    type="url"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="off"
+                    spellCheck={false}
                     value={selectedSocialValue}
-                    placeholder={SOCIAL_LINK_FIELDS.find((field) => field.key === selectedSocialKey)?.placeholder}
+                    placeholder={SOCIAL_LINK_HANDLE_HINTS[selectedSocialKey]}
                     onChange={(event) => {
                       const value = event.target.value;
                       setSelectedSocialValue(value);
@@ -362,10 +369,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                   </button>
                 </div>
 
+                {socialHandleError && (
+                  <p className="profile-card__form-error">{socialHandleError}</p>
+                )}
+
                 <div className="profile-card__socialPreviewRow" aria-label="Saved social links">
                   {SOCIAL_LINK_FIELDS.map((field) => {
                     const value = socialLinks[field.key];
-                    if (!value) return null;
+                    if (!value || !normalizeSocialHandle(field.key, value)) return null;
 
                     return (
                       <button
