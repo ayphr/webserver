@@ -1,7 +1,6 @@
 import { requireAuth } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid } from '../../workers/dbWriter';
 import type { User } from '../../../../common';
-import { handleApiNotFoundRoute } from './util';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -21,9 +20,8 @@ const handleMe = requireAuth(async (_request, user) => {
   });
 }, { allowSuspended: true });
 
-const handleUserByUuid = requireAuth(async (request, user) => {
-  const url = new URL(request.url);
-  const targetUuid = url.pathname.split('/')[3];
+const handleUserByUuid = requireAuth(async (_request, user, params) => {
+  const targetUuid = params.uuid;
 
   if (!targetUuid) {
     return json({ error: 'user uuid is required' }, 400);
@@ -37,16 +35,4 @@ const handleUserByUuid = requireAuth(async (request, user) => {
   return json({ user: publicUser(targetUser), requestedBy: publicUser(user) });
 }, { allowSuspended: true });
 
-export function handleUsersRoute(request: Request) {
-  const url = new URL(request.url);
-
-  if (request.method === 'GET' && url.pathname === '/api/users/me') {
-    return handleMe(request);
-  }
-
-  if (request.method === 'GET' && url.pathname.startsWith('/api/users/') && url.pathname !== '/api/users/me') {
-    return handleUserByUuid(request);
-  }
-
-  return handleApiNotFoundRoute(request);
-}
+export { handleMe, handleUserByUuid };

@@ -1,7 +1,6 @@
 import { requireAuth } from '../auth';
 import { createDevice, getDeviceBySerial, getDevicesForOwnerUuid } from '../../workers/dbWriter';
 import type { Device, User } from '../../../../common';
-import { handleApiNotFoundRoute } from './util';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -46,10 +45,8 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   return json({ devices });
 });
 
-const handleGetBySerial = requireAuth(async (request, user: User) => {
-  const parts = new URL(request.url).pathname.split('/');
-  const serialStr = parts[parts.length - 1];
-  const serial = Number(serialStr);
+const handleGetBySerial = requireAuth(async (_request, user: User, params) => {
+  const serial = Number(params.serial);
   if (!Number.isFinite(serial)) return json({ error: 'invalid serial' }, 400);
 
   const device = await getDeviceBySerial(serial);
@@ -60,20 +57,4 @@ const handleGetBySerial = requireAuth(async (request, user: User) => {
   return json({ device });
 });
 
-export function handleDevicesRoute(request: Request) {
-  const url = new URL(request.url);
-
-  if (request.method === 'POST' && (url.pathname === '/api/devices' || url.pathname === '/api/devices/register')) {
-    return handleRegister(request);
-  }
-
-  if (request.method === 'GET' && (url.pathname === '/api/devices' || url.pathname === '/api/devices/mine')) {
-    return handleListMine(request);
-  }
-
-  if (request.method === 'GET' && url.pathname.startsWith('/api/devices/') && url.pathname !== '/api/devices/mine' && url.pathname !== '/api/devices/register') {
-    return handleGetBySerial(request);
-  }
-
-  return handleApiNotFoundRoute(request);
-}
+export { handleRegister, handleListMine, handleGetBySerial };

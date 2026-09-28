@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { requireRole } from '../auth';
 import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsers, getUsersByRole, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid } from '../../workers/dbWriter';
 import type { Punishment, User, UserRole } from '../../../../common';
-import { handleApiNotFoundRoute } from './util';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -94,12 +93,15 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
     return json({ punishment }, 201);
   }
 
-  return handleApiNotFoundRoute(request);
+  return json({ error: 'method not allowed' }, 405);
 });
 
-const handleStaffPunishmentLift = requireRole('staff', async (request, staffUser) => {
-  const url = new URL(request.url);
-  const punishmentId = url.pathname.split('/')[4] as string;
+const handleStaffPunishmentLift = requireRole('staff', async (_request, staffUser, params) => {
+  const punishmentId = params.id;
+  if (!punishmentId) {
+    return json({ error: 'punishment id is required' }, 400);
+  }
+
   const punishment = await getPunishmentById(punishmentId);
   if (!punishment) {
     return json({ error: 'punishment not found' }, 404);
@@ -120,9 +122,8 @@ const handleStaffPunishmentLift = requireRole('staff', async (request, staffUser
   return json({ punishment });
 }, { allowSuspended: true });
 
-const handleStaffRoleUpdate = requireRole('owner', async (request) => {
-  const url = new URL(request.url);
-  const targetUuid = url.pathname.split('/')[4];
+const handleStaffRoleUpdate = requireRole('owner', async (request, _user, params) => {
+  const targetUuid = params.uuid;
 
   if (!targetUuid) {
     return json({ error: 'user uuid is required' }, 400);
@@ -160,28 +161,10 @@ const handleStaffRoleUpdate = requireRole('owner', async (request) => {
   return json({ user: updatedUser });
 });
 
-export function handleStaffRoute(request: Request) {
-  const url = new URL(request.url);
-
-  if (request.method === 'GET' && url.pathname === '/api/staff/summary') {
-    return handleUsersSummary(request);
-  }
-
-  if (request.method === 'GET' && url.pathname === '/api/staff/users') {
-    return handleStaffUsers(request);
-  }
-
-  if (request.method === 'POST' && url.pathname.startsWith('/api/staff/role/')) {
-    return handleStaffRoleUpdate(request);
-  }
-
-  if (request.method === 'POST' && url.pathname.startsWith('/api/staff/punishments/') && url.pathname.endsWith('/lift')) {
-    return handleStaffPunishmentLift(request);
-  }
-
-  if ((request.method === 'GET' || request.method === 'POST') && url.pathname.startsWith('/api/staff/punishments')) {
-    return handleStaffPunishments(request);
-  }
-
-  return handleApiNotFoundRoute(request);
-}
+export {
+  handleUsersSummary,
+  handleStaffUsers,
+  handleStaffPunishments,
+  handleStaffPunishmentLift,
+  handleStaffRoleUpdate,
+};

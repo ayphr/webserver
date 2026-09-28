@@ -7,7 +7,7 @@ import type { TelemetryRecord } from './lib/telemetry';
 import { createWorkerPool } from './lib/workerPool';
 import { setupServer } from './api/server';
 import { ENABLE_TLS } from './env';
-import { packetsReceivedTotal } from './lib/metrics';
+import { packetsReceivedTotal, recordActiveDevices, recordMongoOperation } from './lib/metrics';
 
 const log = createLogger('server');
 const WORKER_COUNT = 4;
@@ -19,9 +19,14 @@ const workerPool = createWorkerPool(WORKER_COUNT, new URL('./worker.ts', import.
 });
 
 const dbWorker = new Worker(new URL('./dbWorker.ts', import.meta.url), { type: 'module' } as WorkerOptions);
-dbWorker.on('message', (message: { action: string; msg?: string; error?: unknown }) => {
+dbWorker.on('message', (message: { action: string; msg?: string; error?: unknown; operations?: Array<{ operation: string; collection: string; count: number }> }) => {
   if (message?.action === 'log') log.info({ component: 'db' }, message.msg);
   if (message?.action === 'error') log.error({ component: 'db', error: message.error }, 'database worker error');
+  if (message?.action === 'mongoOperations' && Array.isArray(message.operations)) {
+    for (const tally of message.operations) {
+      recordMongoOperation(tally.operation, tally.collection, tally.count);
+    }
+  }
 });
 dbWorker.on('error', (error) => log.error({ error }, 'database worker crashed'));
 
@@ -45,13 +50,16 @@ setInterval(() => {
 const tcpServer = net.createServer((socket) => {
   let buffer: Uint8Array<ArrayBufferLike> = new Uint8Array(0);
 
+  recordActiveDevices(1);
+  socket.once('close', () => recordActiveDevices(-1));
+
   socket.on('data', (chunk: Uint8Array<ArrayBufferLike>) => {
     buffer = appendChunk(buffer, chunk);
     const { frames, remainder } = parseIncomingBuffer(buffer);
     buffer = remainder;
 
     for (const frame of frames) {
-      packetsReceivedTotal.inc({ protocol: 'tcp' });
+      packetsReceivedTotal.inc();
       workerPool.post(frame);
     }
   });
