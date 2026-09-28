@@ -1,7 +1,6 @@
 import { requireAuth } from '../auth';
 import { getPunishmentById, getPunishmentsForUserUuid } from '../../workers/dbWriter';
 import type { User } from '../../../../common';
-import { handleApiNotFoundRoute } from './util';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -32,10 +31,10 @@ const handleMe = requireAuth(async (_request, user) => {
   });
 }, { allowSuspended: true });
 
-const handlePunishment = requireAuth(async (request, user) => {
-  const punishmentId = new URL(request.url).pathname.split('/').pop();
+const handlePunishment = requireAuth(async (_request, user, params) => {
+  const punishmentId = params.id;
   if (!punishmentId) {
-    return handleApiNotFoundRoute(request);
+    return json({ error: 'punishment not found' }, 404);
   }
 
   const punishment = await getPunishmentById(punishmentId);
@@ -50,16 +49,4 @@ const handlePunishment = requireAuth(async (request, user) => {
   return json({ punishment });
 }, { allowSuspended: true });
 
-export function handlePunishmentsRoute(request: Request) {
-  const url = new URL(request.url);
-
-  if (request.method === 'GET' && url.pathname === '/api/punishments/me') {
-    return handleMe(request);
-  }
-
-  if (request.method === 'GET' && url.pathname.startsWith('/api/punishments/')) {
-    return handlePunishment(request);
-  }
-
-  return handleApiNotFoundRoute(request);
-}
+export { handleMe, handlePunishment };

@@ -2,7 +2,6 @@ import type { User } from '../../../../common';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '../../lib/country';
 import { updateUser, getUserFromUuid } from '../../workers/dbWriter';
-import { handleApiNotFoundRoute } from './util';
 
 type CountryUpdatePayload = {
   country?: string;
@@ -56,9 +55,8 @@ const handleCountryUpdate = requireAuth(async (request, user) => {
   return json({ user: publicUser(user) });
 }, { allowSuspended: true });
 
-const handleProfileEdit = requireAuth(async (request, user) => {
-  const url = new URL(request.url);
-  const targetUuid = url.pathname.split('/')[3]; // /api/profile/{uuid}
+const handleProfileEdit = requireAuth(async (request, user, params) => {
+  const targetUuid = params.uuid;
 
   if (!targetUuid) {
     return json({ error: 'invalid user uuid' }, 400);
@@ -124,24 +122,4 @@ const handleProfileEdit = requireAuth(async (request, user) => {
   return json({ user: publicUser(targetUser) });
 }, { allowSuspended: true });
 
-export function handleProfileRoute(request: Request) {
-  const url = new URL(request.url);
-
-  if (request.method === 'GET' && url.pathname === '/api/profile/me') {
-    return handleMe(request);
-  }
-
-  if (request.method === 'GET' && url.pathname === '/api/profile/countries') {
-    return handleCountries(request);
-  }
-
-  if (request.method === 'PATCH' && url.pathname === '/api/profile/country') {
-    return handleCountryUpdate(request);
-  }
-
-  if (request.method === 'PATCH' && new RegExp(/^\/api\/profile\/[a-f0-9-]+$/).exec(url.pathname)) {
-    return handleProfileEdit(request);
-  }
-
-  return handleApiNotFoundRoute(request);
-}
+export { handleMe, handleCountries, handleCountryUpdate, handleProfileEdit };

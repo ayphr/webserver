@@ -1,5 +1,5 @@
 import type { Server } from 'bun';
-import { routeRequest } from './router';
+import { resolveRoute } from './router';
 import { addCorsHeaders } from './routes/util';
 import { httpRequestDuration, httpRequestsTotal } from '../lib/metrics';
 import { ensureValidCertificate, type CertConfig } from '../certs';
@@ -44,18 +44,21 @@ export async function setupServer(port: number, tls: boolean, callback: () => vo
     async fetch(request) {
       const normalized = normalizeRequest(request);
       const method = normalized.method;
-      const route = new URL(normalized.url).pathname;
+      const { template, dispatch } = resolveRoute(normalized);
 
-      const endTimer = httpRequestDuration.startTimer({ method, route });
+      if (method === 'GET' && template === '/metrics') {
+        return addCorsHeaders(await dispatch(), request);
+      }
+
+      const endTimer = httpRequestDuration.startTimer({ method, route: template });
 
       try {
-        const response = await routeRequest(normalized);
-        const status = response.status.toString();
+        const response = await dispatch();
 
-        httpRequestsTotal.inc({ method, route, status });
+        httpRequestsTotal.inc({ method, route: template, status: response.status.toString() });
         return addCorsHeaders(response, request);
       } catch (error) {
-        httpRequestsTotal.inc({ method, route, status: '500' });
+        httpRequestsTotal.inc({ method, route: template, status: '500' });
         throw error;
       } finally {
         endTimer();

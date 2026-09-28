@@ -1,6 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import type { User, UserRole } from '../../../common';
 import { getActiveSuspensionForUserUuid, getUserFromToken, updateUser } from '../workers/dbWriter';
+import type { RouteParams } from './types';
 
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
 export type TokenVerificationResult = 'invalid' | 'expired' | 'success';
@@ -8,7 +9,7 @@ export type TokenVerificationResult = 'invalid' | 'expired' | 'success';
 const PASSWORD_HASH_ALGORITHM = 'scrypt';
 const PASSWORD_HASH_LENGTH = 64;
 
-export type AuthenticatedHandler = (request: Request, user: User) => Promise<Response> | Response;
+export type AuthenticatedHandler = (request: Request, user: User, params: RouteParams) => Promise<Response> | Response;
 
 export type AuthGuardOptions = {
   allowSuspended?: boolean;
@@ -122,7 +123,7 @@ export function hasRoleAtLeast(userRole: UserRole, minimumRole: UserRole) {
 }
 
 export function requireAuth(handler: AuthenticatedHandler, options: AuthGuardOptions = {}) {
-  return async (request: Request) => {
+  return async (request: Request, params: RouteParams) => {
     const user = await getUserFromRequest(request);
 
     if (!user) {
@@ -140,16 +141,16 @@ export function requireAuth(handler: AuthenticatedHandler, options: AuthGuardOpt
       );
     }
 
-    return handler(request, user);
+    return handler(request, user, params);
   };
 }
 
 export function requireRole(minimumRole: UserRole, handler: AuthenticatedHandler, options: AuthGuardOptions = {}) {
-  return requireAuth(async (request, user) => {
+  return requireAuth(async (request, user, params) => {
     if (!hasRoleAtLeast(user.role, minimumRole)) {
       return getAuthError('Forbidden', 403);
     }
 
-    return handler(request, user);
+    return handler(request, user, params);
   }, options);
 }

@@ -1,7 +1,6 @@
 import { clearToken, createPasswordHash, issueToken, requireAuth, verifyPassword } from '../auth';
 import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, updateUser } from '../../workers/dbWriter';
 import type { User } from '../../../../common';
-import { handleApiNotFoundRoute } from './util';
 import { normalizeCountryCode } from '../../lib/country';
 
 type AuthPayload = {
@@ -119,24 +118,4 @@ const handleLogout = requireAuth(async (_request, user) => {
   return new Response(null, { status: 204 });
 }, { allowSuspended: true });
 
-export function handleAuthRoute(request: Request) {
-  const url = new URL(request.url);
-
-  if (request.method === 'POST' && url.pathname === '/api/auth/register') {
-    return handleRegister(request);
-  }
-
-  if (request.method === 'POST' && url.pathname === '/api/auth/login') {
-    return handleLogin(request);
-  }
-
-  if (request.method === 'GET' && url.pathname === '/api/auth/me') {
-    return handleMe(request);
-  }
-
-  if (request.method === 'POST' && url.pathname === '/api/auth/logout') {
-    return handleLogout(request);
-  }
-
-  return handleApiNotFoundRoute(request);
-}
+export { handleRegister, handleLogin, handleMe, handleLogout };

@@ -1,5 +1,6 @@
 import { Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../lib/logger';
+import { recordMongoOperation } from '../lib/metrics';
 import type { TelemetryRecord } from '../lib/telemetry';
 import { type Device, type Punishment, type User, type UserRole } from '../../../common';
 import {
@@ -27,6 +28,34 @@ interface Collections {
 }
 
 let collections: Collections | null = null;
+
+type MongoOperationTally = { operation: string; collection: string; count: number };
+
+let pendingMongoOperations = new Map<string, MongoOperationTally>();
+
+function trackMongoOperation(operation: string, collection: string) {
+  recordMongoOperation(operation, collection);
+
+  const key = `${operation}\u0000${collection}`;
+  const existing = pendingMongoOperations.get(key);
+
+  if (existing) {
+    existing.count += 1;
+  } else {
+    pendingMongoOperations.set(key, { operation, collection, count: 1 });
+  }
+}
+
+/**
+ * The db worker thread keeps its own prom-client registry that is never scraped,
+ * so operations issued there are forwarded to the main thread and replayed into
+ * the registry that `/metrics` actually serves.
+ */
+export function drainMongoOperations(): MongoOperationTally[] {
+  const drained = [...pendingMongoOperations.values()];
+  pendingMongoOperations = new Map();
+  return drained;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value == null || typeof value !== 'object') return false;
@@ -59,12 +88,14 @@ function normalizeDateValues<T>(value: T): T {
 }
 
 async function setupCollections(db: Db): Promise<Collections> {
+  trackMongoOperation('listCollections', '*');
   const existingCollections = await db.collections();
   const existingNames = new Set(existingCollections.map((c) => c.collectionName));
 
   // Initialize time-series telemetry collection if missing
   if (!existingNames.has(TELEMETRY_COLLECTION)) {
     try {
+      trackMongoOperation('createCollection', TELEMETRY_COLLECTION);
       await db.createCollection(TELEMETRY_COLLECTION, {
         timeseries: { timeField: 'timestamp', metaField: 'deviceId', granularity: 'seconds' }
       });
@@ -81,16 +112,23 @@ async function setupCollections(db: Db): Promise<Collections> {
     devices: db.collection<Device>(DEVICES_COLLECTION)
   };
 
-  await Promise.all([
-    cols.telemetry.createIndex({ deviceId: 1 }),
-    cols.users.createIndex({ uuid: 1 }, { unique: true }),
-    cols.users.createIndex({ username: 1 }, { unique: true }),
-    cols.users.createIndex({ 'auth.token': 1 }),
-    cols.punishments.createIndex({ userUuid: 1 }),
-    cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 }),
-    cols.devices.createIndex({ serial: 1 }, { unique: true }),
-    cols.devices.createIndex({ ownerUuid: 1 })
-  ]).catch((error) => log.warn({ error }, 'failed to ensure indexes'));
+  const indexSpecs: Array<[string, () => Promise<unknown>]> = [
+    [TELEMETRY_COLLECTION, () => cols.telemetry.createIndex({ deviceId: 1 })],
+    [USERS_COLLECTION, () => cols.users.createIndex({ uuid: 1 }, { unique: true })],
+    [USERS_COLLECTION, () => cols.users.createIndex({ username: 1 }, { unique: true })],
+    [USERS_COLLECTION, () => cols.users.createIndex({ 'auth.token': 1 })],
+    [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1 })],
+    [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
+    [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
+    [DEVICES_COLLECTION, () => cols.devices.createIndex({ ownerUuid: 1 })],
+  ];
+
+  await Promise.all(
+    indexSpecs.map(async ([collection, createIndex]) => {
+      trackMongoOperation('createIndex', collection);
+      return createIndex();
+    })
+  ).catch((error) => log.warn({ error }, 'failed to ensure indexes'));
 
   return cols;
 }
@@ -135,6 +173,7 @@ export async function flushRecords(records: TelemetryRecord[], emit: (payload: u
       return;
     }
 
+    trackMongoOperation('insertMany', TELEMETRY_COLLECTION);
     const result = await telemetry.insertMany(documents);
     emit({ action: 'log', msg: `inserted ${result.insertedCount} documents` });
   } catch (error) {
@@ -146,49 +185,58 @@ export async function flushRecords(records: TelemetryRecord[], emit: (payload: u
 export async function createUser(user: User) {
   const { users } = await getCols();
   const normalizedUser = normalizeDateValues(user);
+  trackMongoOperation('insertOne', USERS_COLLECTION);
   await users.insertOne(normalizedUser);
   return normalizedUser;
 }
 
 export async function getUserFromUuid(uuid: string) {
   const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
   return users.findOne({ uuid });
 }
 
 export async function getUserFromUsername(username: string) {
   const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
   return users.findOne({ username });
 }
 
 export async function getUserFromToken(token: string) {
   const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
   return users.findOne({ 'auth.token': token } as Record<string, unknown>);
 }
 
 export async function getUsers() {
   const { users } = await getCols();
+  trackMongoOperation('find', USERS_COLLECTION);
   return users.find({}).sort({ createdAt: -1 }).toArray();
 }
 
 export async function getUsersByRole(role: UserRole) {
   const { users } = await getCols();
+  trackMongoOperation('find', USERS_COLLECTION);
   return users.find({ role }).sort({ createdAt: -1 }).toArray();
 }
 
 export async function getUserCount() {
   const { users } = await getCols();
+  trackMongoOperation('countDocuments', USERS_COLLECTION);
   return users.countDocuments({});
 }
 
 export async function updateUser(user: User) {
   const { users } = await getCols();
   const normalizedUser = normalizeDateValues(user);
+  trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid: user.uuid }, { $set: normalizedUser });
   return normalizedUser;
 }
 
 export async function updateUserRole(userUuid: string, role: UserRole) {
   const { users } = await getCols();
+  trackMongoOperation('findOneAndUpdate', USERS_COLLECTION);
   const result = await users.findOneAndUpdate(
     { uuid: userUuid },
     { $set: { role } },
@@ -200,17 +248,20 @@ export async function updateUserRole(userUuid: string, role: UserRole) {
 export async function createPunishment(punishment: Punishment) {
   const { punishments } = await getCols();
   const normalizedPunishment = normalizeDateValues(punishment);
+  trackMongoOperation('insertOne', PUNISHMENTS_COLLECTION);
   await punishments.insertOne(normalizedPunishment);
   return normalizedPunishment;
 }
 
 export async function getPunishmentById(id: string) {
   const { punishments } = await getCols();
+  trackMongoOperation('findOne', PUNISHMENTS_COLLECTION);
   return punishments.findOne({ id } as Record<string, unknown>);
 }
 
 export async function getPunishmentsForUserUuid(userUuid: string) {
   const { punishments } = await getCols();
+  trackMongoOperation('find', PUNISHMENTS_COLLECTION);
   return punishments.find({ userUuid }).sort({ issuedAt: -1 }).toArray();
 }
 
@@ -218,6 +269,7 @@ export async function getActiveSuspensionForUserUuid(userUuid: string) {
   const { punishments } = await getCols();
   const now = new Date();
 
+  trackMongoOperation('findOne', PUNISHMENTS_COLLECTION);
   return punishments.findOne({
     userUuid,
     type: 'suspension',
@@ -229,12 +281,14 @@ export async function getActiveSuspensionForUserUuid(userUuid: string) {
 
 export async function getPunishmentsByType(type: Punishment['type']) {
   const { punishments } = await getCols();
+  trackMongoOperation('find', PUNISHMENTS_COLLECTION);
   return punishments.find({ type }).sort({ issuedAt: -1 }).toArray();
 }
 
 export async function updatePunishment(punishment: Punishment) {
   const { punishments } = await getCols();
   const normalizedPunishment = normalizeDateValues(punishment);
+  trackMongoOperation('updateOne', PUNISHMENTS_COLLECTION);
   await punishments.updateOne(
     { id: punishment.id } as Record<string, unknown>,
     { $set: normalizedPunishment }
@@ -245,28 +299,33 @@ export async function updatePunishment(punishment: Punishment) {
 export async function createDevice(device: Device) {
   const { devices } = await getCols();
   const normalizedDevice = normalizeDateValues(device);
+  trackMongoOperation('insertOne', DEVICES_COLLECTION);
   await devices.insertOne(normalizedDevice);
   return normalizedDevice;
 }
 
 export async function getDeviceBySerial(serial: number) {
   const { devices } = await getCols();
+  trackMongoOperation('findOne', DEVICES_COLLECTION);
   return devices.findOne({ serial });
 }
 
 export async function updateDevice(device: Device) {
   const { devices } = await getCols();
   const normalizedDevice = normalizeDateValues(device);
+  trackMongoOperation('updateOne', DEVICES_COLLECTION);
   await devices.updateOne({ serial: device.serial }, { $set: normalizedDevice });
   return normalizedDevice;
 }
 
 export async function getDevicesForOwnerUuid(ownerUuid: string) {
   const { devices } = await getCols();
+  trackMongoOperation('find', DEVICES_COLLECTION);
   return devices.find({ ownerUuid }).sort({ registeredAt: -1 }).toArray();
 }
 
 export async function updateDeviceLastBroadcast(serial: number, when: Date) {
   const { devices } = await getCols();
+  trackMongoOperation('updateOne', DEVICES_COLLECTION);
   await devices.updateOne({ serial }, { $set: { lastBroadcastedAt: when } as Record<string, unknown> });
 }

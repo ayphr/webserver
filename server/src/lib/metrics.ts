@@ -20,14 +20,13 @@ export const httpRequestDuration = new Histogram({
 
 export const activeDevices = new Gauge({
   name: 'ayphr_active_devices',
-  help: 'Number of active devices connected to the server.',
+  help: 'Number of devices currently connected over the TCP listener.',
   registers: [registry],
 });
 
 export const packetsReceivedTotal = new Counter({
   name: 'ayphr_packets_received_total',
-  help: 'Total packets received by the server.',
-  labelNames: ['protocol'],
+  help: 'Total packets received by the server over the TCP listener.',
   registers: [registry],
 });
 
@@ -37,6 +36,14 @@ export const mongoOperationsTotal = new Counter({
   labelNames: ['operation', 'collection'],
   registers: [registry],
 });
+
+export function recordMongoOperation(operation: string, collection: string, count = 1) {
+  mongoOperationsTotal.inc({ operation, collection }, count);
+}
+
+export function recordActiveDevices(delta: number) {
+  activeDevices.inc(delta);
+}
 
 export async function metricsText(): Promise<string> {
   return registry.metrics();

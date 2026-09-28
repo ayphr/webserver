@@ -58,7 +58,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(ayphr_active_devices[5m]))"
+          "expr": "ayphr_active_devices"
         }
       ]
     },
