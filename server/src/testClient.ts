@@ -16,7 +16,7 @@ function sendBinary(serial: number, temp: number, humidity: number, airPressure:
   client.on('error', (error) => log.error({ error }, 'binary client error'));
 }
 
-(async () => {
+void (async () => {
   for (let i = 0; i < 3; i++) {
     sendBinary(1000 + i, 20 + i, 40 + i, 1000 + i);
     await new Promise((r) => setTimeout(r, 200));
