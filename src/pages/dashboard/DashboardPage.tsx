@@ -128,7 +128,7 @@ export const DashboardPage = () => {
   }, []);
 
   const isSuspended = activeSuspension !== null;
-  const isStaffOrOwner = user?.role === 'staff' || user?.role === 'owner';
+  const isStaff = user?.role === 'staff';
 
   const handleSelfPunishment = async () => {
     // Refresh user data to get updated suspension status
@@ -243,7 +243,7 @@ export const DashboardPage = () => {
                   />
                 </div>
               </div>
-              {isStaffOrOwner && (
+              {isStaff && (
                 <Button
                   onClick={handleLiftSuspension}
                   isLoading={isLiftingPunishment}

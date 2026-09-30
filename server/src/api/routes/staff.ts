@@ -26,16 +26,14 @@ async function readJsonBody(request: Request): Promise<Record<string, unknown> |
 }
 
 const handleUsersSummary = requireRole('staff', async () => {
-  const [users, staffUsers, ownerUsers] = await Promise.all([
+  const [users, staffUsers] = await Promise.all([
     getUserCount(),
-    getUsersByRole('staff'),
-    getUsersByRole('owner'),
+    getUsersByRole('staff')
   ]);
 
   return json({
     userCount: users,
-    staffCount: staffUsers.length,
-    ownerCount: ownerUsers.length,
+    staffCount: staffUsers.length
   });
 });
 
@@ -64,10 +62,6 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
     const targetUser = targetUuid ? await getUserFromUuid(targetUuid) : targetUsername ? await getUserFromUsername(targetUsername) : null;
     if (!targetUser) {
       return json({ error: 'target user not found' }, 404);
-    }
-
-    if (targetUser.role === 'owner' && targetUser.uuid !== staffUser.uuid) {
-      return json({ error: 'you cannot suspend other owners' }, 403);
     }
 
     if (!Number.isFinite(durationMinutes) || durationMinutes < -1) {
@@ -122,7 +116,7 @@ const handleStaffPunishmentLift = requireRole('staff', async (_request, staffUse
   return json({ punishment });
 }, { allowSuspended: true });
 
-const handleStaffRoleUpdate = requireRole('owner', async (request, _user, params) => {
+const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params) => {
   const targetUuid = params.uuid;
 
   if (!targetUuid) {
@@ -137,20 +131,17 @@ const handleStaffRoleUpdate = requireRole('owner', async (request, _user, params
     body = null;
   }
 
-  if (!body?.role || !['user', 'staff', 'owner'].includes(body.role)) {
-    return json({ error: 'role must be user, staff, or owner' }, 400);
+  if (!body?.role || !body.role) {
+    return json({ error: 'role is required' }, 400);
+  }
+
+  if (!['user', 'staff'].includes(body.role)) {
+    return json({ error: 'role must be user or staff' }, 400);
   }
 
   const targetUser = await getUserFromUuid(targetUuid);
   if (!targetUser) {
     return json({ error: 'user not found' }, 404);
-  }
-
-  if (targetUser.role === 'owner' && body.role !== 'owner') {
-    const ownerUsers = await getUsersByRole('owner');
-    if (ownerUsers.length <= 1) {
-      return json({ error: 'cannot remove the last owner' }, 409);
-    }
   }
 
   const updatedUser = await updateUserRole(targetUuid, body.role);

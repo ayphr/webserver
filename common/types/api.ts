@@ -39,7 +39,6 @@ export type PunishmentsMeResponse = {
 export type StaffSummary = {
   userCount: number;
   staffCount: number;
-  ownerCount: number;
 };
 
 export type PurchaseRequest = {

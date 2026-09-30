@@ -59,8 +59,8 @@ export const ProfilePage = () => {
   }
 
   const isOwnProfile = currentUser?.uuid === userUuid;
-  const isStaffOrOwner = currentUser?.role === 'staff' || currentUser?.role === 'owner';
-  const canEditProfile = isOwnProfile || isStaffOrOwner;
+  const isStaff = currentUser?.role === 'staff';
+  const canEditProfile = isOwnProfile || isStaff;
 
   return (
     <div className="profile-layout">
@@ -77,7 +77,7 @@ export const ProfilePage = () => {
               viewerUuid={currentUser?.uuid}
               viewerRole={currentUser?.role}
               canEditProfile={canEditProfile}
-              isPunishable={isStaffOrOwner}
+              isPunishable={isStaff}
             />
           </CardBody>
         </Card>
