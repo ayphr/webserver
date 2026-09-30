@@ -2,6 +2,7 @@ import { clearToken, createPasswordHash, issueToken, requireAuth, verifyPassword
 import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, updateUser } from '../../workers/dbWriter';
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
+import { DEFAULT_BIO } from '@common/utils/bio';
 
 type AuthPayload = {
   username?: string;
@@ -57,7 +58,7 @@ async function handleRegister(request: Request) {
     uuid: crypto.randomUUID(),
     username: body.username,
     role: 'user',
-    bio: "Hi! I'm a Ayphr user",
+    bio: DEFAULT_BIO,
     socialLinks: {},
     auth: {
       passwordHash: createPasswordHash(body.password),

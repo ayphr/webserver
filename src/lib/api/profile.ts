@@ -1,4 +1,5 @@
 import type {
+  BioFormat,
   ProfileCountriesPayload,
   ProfileCountriesResponse,
   ProfileMePayload,
@@ -29,7 +30,7 @@ export function createProfileApi(client: RequestClient) {
       });
       return response.user;
     },
-    async editUser(userUuid: string, input: { country?: string; bio?: string; socialLinks?: SocialLinks }) {
+    async editUser(userUuid: string, input: { country?: string; bio?: string; bioFormat?: BioFormat; socialLinks?: SocialLinks }) {
       const response = await client.requestJson<{ user: PublicUser }>(`/api/profile/${userUuid}`, {
         method: 'PATCH',
         body: input,

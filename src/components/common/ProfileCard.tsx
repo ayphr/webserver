@@ -12,11 +12,17 @@ import {
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { api } from '../../lib/api';
-import { Button, UsernameDisplay } from './index';
+import { BioEditor, BioText, Button, UsernameDisplay } from './index';
 import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '../../../common/utils/country';
 import { PunishModal } from './PunishModal';
-import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
+import type { BioFormat, ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
+import {
+  BIO_MAX_LENGTH,
+  BIO_MAX_LENGTH_MARKDOWN,
+  DEFAULT_BIO,
+  sanitizeBioMarkdown,
+} from '../../../common';
 import {
   SOCIAL_LINK_LABELS,
   SOCIAL_LINK_HANDLE_HINTS,
@@ -101,6 +107,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState('');
   const [bio, setBio] = useState('');
+  const [bioFormat, setBioFormat] = useState<BioFormat>('limited');
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({});
   const [selectedSocialKey, setSelectedSocialKey] = useState<SocialLinkType>('website');
   const [selectedSocialValue, setSelectedSocialValue] = useState('');
@@ -120,7 +127,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         setUser(userData.user);
         setCountries(countryData.countries);
         setSelectedCountry(userData.user.country ?? '');
-        setBio(userData.user.bio ?? "Hi! I'm a Ayphr user");
+        setBio(userData.user.bio ?? DEFAULT_BIO);
+        setBioFormat(userData.user.bioFormat ?? 'limited');
         const nextSocialLinks = userData.user.socialLinks ?? {};
         setSocialLinks(nextSocialLinks);
         const initialSocialKey = getInitialSocialLinkKey(nextSocialLinks);
@@ -146,7 +154,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     try {
       const updated = await api.profile.editUser(userUuid, {
         country: selectedCountry,
-        bio,
+        bio: sanitizeBioMarkdown(bio, usesMarkdown),
+        bioFormat: usesMarkdown ? 'markdown' : 'limited',
         socialLinks,
       });
       setUser(updated);
@@ -163,6 +172,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const isSelfProfile = viewerUuid === user?.uuid;
   const canEditThisProfile = canEditProfile || isSelfProfile || isStaff;
   const canPunishThisProfile = (isPunishable || isStaff) && !!user;
+  // Only staff may write the full markdown dialect, whatever the stored format.
+  const usesMarkdown = isStaff && bioFormat === 'markdown';
+  const bioMaxLength = usesMarkdown ? BIO_MAX_LENGTH_MARKDOWN : BIO_MAX_LENGTH;
 
   const invalidSocialLinkKey = SOCIAL_LINK_FIELDS.map(({ key }) => key).find((key) => {
     const handle = socialLinks[key];
@@ -172,6 +184,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const socialHandleError = invalidSocialLinkKey
     ? `Enter a ${SOCIAL_LINK_LABELS[invalidSocialLinkKey]} handle, not a link`
     : null;
+
+  const bioError = bio.length > bioMaxLength ? `Bio must be ${bioMaxLength} characters or fewer` : null;
 
   if (isLoading) {
     return <div className="profile-card profile-card--loading">Loading profile...</div>;
@@ -216,7 +230,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 onClick={() => {
                   setIsEditingProfile(false);
                   setSelectedCountry(user.country ?? '');
-                  setBio(user.bio ?? "Hi! I'm a Ayphr user");
+                  setBio(user.bio ?? DEFAULT_BIO);
+                  setBioFormat(user.bioFormat ?? 'limited');
                   const nextSocialLinks = user.socialLinks ?? {};
                   setSocialLinks(nextSocialLinks);
                   const initialSocialKey = getInitialSocialLinkKey(nextSocialLinks);
@@ -232,7 +247,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 variant="primary"
                 onClick={handleSaveProfile}
                 isLoading={isSaving}
-                disabled={isSaving || !!socialHandleError}
+                disabled={isSaving || !!socialHandleError || !!bioError}
               >
                 Save
               </Button>
@@ -245,7 +260,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         {!isEditingProfile ? (
           <>
             <div className="profile-card__bio">
-              <EmojiText>{user.bio ?? "Hi! I'm a Ayphr user"}</EmojiText>
+              <BioText value={user.bio ?? DEFAULT_BIO} format={user.bioFormat} />
             </div>
             <div className="profile-card__meta">
               <p>
@@ -284,18 +299,21 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         ) : (
           <div className="profile-card__edit-form">
             <div className="profile-card__form-group">
-              <label htmlFor="bio" className="profile-card__form-label">
+              <label id="bio-label" htmlFor="bio" className="profile-card__form-label">
                 Bio
               </label>
-              <textarea
+              <BioEditor
                 id="bio"
-                className="profile-card__form-textarea"
+                labelledBy="bio-label"
                 value={bio}
-                onChange={(event) => setBio(event.target.value)}
+                onChange={setBio}
                 disabled={isSaving}
-                placeholder="Tell people a little about yourself"
-                rows={4}
+                maxLength={bioMaxLength}
+                markdownEnabled={isStaff}
+                markdown={usesMarkdown}
+                onMarkdownChange={(markdown) => setBioFormat(markdown ? 'markdown' : 'limited')}
               />
+              {bioError && <p className="profile-card__form-error">{bioError}</p>}
             </div>
 
             <div className="profile-card__socials-form">

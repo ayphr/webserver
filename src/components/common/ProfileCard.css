@@ -51,7 +51,6 @@
   color: var(--text-primary);
   font-size: 0.98rem;
   line-height: 1.55;
-  white-space: pre-wrap;
   user-select: text;
   cursor: text;
 }
@@ -282,29 +281,6 @@
   color: var(--text-primary);
   font-family: var(--font-family-base);
   font-size: 0.9rem;
-}
-
-.profile-card__form-textarea {
-  min-height: 7rem;
-  resize: vertical;
-  background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 0.75rem;
-  color: var(--text-primary);
-  font-family: var(--font-family-base);
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-
-.profile-card__form-textarea:hover {
-  border-color: var(--text-muted);
-}
-
-.profile-card__form-textarea:focus {
-  border-color: var(--text-primary);
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
 .profile-card__form-error {

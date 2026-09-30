@@ -1,0 +1,260 @@
+.bio-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.bio-editor__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.bio-editor__tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.bio-editor__tool:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.bio-editor__tool.is-active {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.bio-editor__tool:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bio-editor__surface {
+  position: relative;
+  min-height: 7rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  background-color: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+  user-select: text;
+  cursor: text;
+}
+
+.bio-editor__blockSelect {
+  margin-right: 0.2rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.bio-editor__blockSelect:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.bio-editor__blockSelect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bio-editor__linkRow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bio-editor__linkInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  background-color: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.5rem;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.85rem;
+}
+
+.bio-editor__linkInput:focus {
+  border-color: var(--text-primary);
+  outline: none;
+}
+
+.bio-editor__linkInput.is-error {
+  border-color: var(--status-error);
+}
+
+.bio-editor__linkButton {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.bio-editor__linkButton:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.bio-editor__linkButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bio-editor__linkError {
+  margin: 0;
+  color: var(--status-error);
+  font-size: 0.8rem;
+}
+
+.bio-editor__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.bio-editor__toggle input {
+  accent-color: var(--accent-green);
+  cursor: pointer;
+}
+
+.bio-editor__toggle input:disabled {
+  cursor: not-allowed;
+}
+
+.bio-editor__surface:hover {
+  border-color: var(--text-muted);
+}
+
+.bio-editor__surface:focus {
+  border-color: var(--text-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.bio-editor__surface[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bio-editor__surface.is-empty::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.bio-editor__surface p {
+  margin: 0 0 0.35rem;
+}
+
+.bio-editor__surface p:last-child {
+  margin-bottom: 0;
+}
+
+.bio-editor__surface ul,
+.bio-editor__surface ol {
+  margin: 0.25rem 0;
+  padding-left: 1.35rem;
+}
+
+.bio-editor__surface ul {
+  list-style: disc;
+}
+
+.bio-editor__surface ol {
+  list-style: decimal;
+}
+
+.bio-editor__surface h1,
+.bio-editor__surface h2,
+.bio-editor__surface h3,
+.bio-editor__surface h4,
+.bio-editor__surface h5,
+.bio-editor__surface h6 {
+  margin: 0.4rem 0 0.2rem;
+  font-size: 0.98rem;
+  font-weight: var(--font-weight-hv);
+}
+
+.bio-editor__surface blockquote {
+  margin: 0.25rem 0;
+  padding: 0.1rem 0 0.1rem 0.7rem;
+  border-left: 2px solid var(--border-focus);
+  color: var(--text-muted);
+}
+
+.bio-editor__surface pre {
+  margin: 0.25rem 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  font-family: var(--font-family-mono);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.bio-editor__surface code {
+  font-family: var(--font-family-mono);
+  font-size: 0.88em;
+}
+
+.bio-editor__surface p code,
+.bio-editor__surface li code {
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.bio-editor__surface a {
+  color: var(--accent-green);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.bio-editor__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.bio-editor__counter {
+  font-variant-numeric: tabular-nums;
+}
+
+.bio-editor__counter.is-over {
+  color: var(--status-error);
+}

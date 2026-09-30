@@ -2,6 +2,7 @@ import type { User } from '@common';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '../../lib/country';
 import { isSocialLinkType, normalizeSocialHandle } from '@common/utils/social';
+import { BIO_MAX_LENGTH, BIO_MAX_LENGTH_MARKDOWN, DEFAULT_BIO, sanitizeBioMarkdown } from '@common/utils/bio';
 import { updateUser, getUserFromUuid } from '../../workers/dbWriter';
 
 type CountryUpdatePayload = {
@@ -11,6 +12,7 @@ type CountryUpdatePayload = {
 type ProfileEditPayload = {
   country?: string;
   bio?: string;
+  bioFormat?: string;
   socialLinks?: Record<string, string | undefined>;
 };
 
@@ -97,8 +99,18 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
   }
 
   if (typeof body.bio === 'string') {
-    const bio = body.bio.trim();
-    targetUser.bio = bio.length > 0 ? bio : "Hi! I'm a Ayphr user";
+    // The full markdown dialect is staff-only, so the requester decides which
+    // dialect the bio is validated and stored as.
+    const extended = isStaff && body.bioFormat === 'markdown';
+    const bio = sanitizeBioMarkdown(body.bio, extended);
+    const maxLength = extended ? BIO_MAX_LENGTH_MARKDOWN : BIO_MAX_LENGTH;
+
+    if (bio.length > maxLength) {
+      return json({ error: `bio must be ${maxLength} characters or fewer` }, 400);
+    }
+
+    targetUser.bio = bio.length > 0 ? bio : DEFAULT_BIO;
+    targetUser.bioFormat = extended ? 'markdown' : 'limited';
   }
 
   if (body.socialLinks && typeof body.socialLinks === 'object') {
