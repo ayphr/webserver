@@ -16,13 +16,8 @@ import { BioEditor, BioText, Button, UsernameDisplay } from './index';
 import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '../../../common/utils/country';
 import { PunishModal } from './PunishModal';
-import type { BioFormat, ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
-import {
-  BIO_MAX_LENGTH,
-  BIO_MAX_LENGTH_MARKDOWN,
-  DEFAULT_BIO,
-  sanitizeBioMarkdown,
-} from '../../../common';
+import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
+import { BIO_MAX_LENGTH, DEFAULT_BIO, bioVisibleLength, sanitizeBioMarkdown } from '../../../common';
 import {
   SOCIAL_LINK_LABELS,
   SOCIAL_LINK_HANDLE_HINTS,
@@ -107,7 +102,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState('');
   const [bio, setBio] = useState('');
-  const [bioFormat, setBioFormat] = useState<BioFormat>('limited');
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({});
   const [selectedSocialKey, setSelectedSocialKey] = useState<SocialLinkType>('website');
   const [selectedSocialValue, setSelectedSocialValue] = useState('');
@@ -128,7 +122,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         setCountries(countryData.countries);
         setSelectedCountry(userData.user.country ?? '');
         setBio(userData.user.bio ?? DEFAULT_BIO);
-        setBioFormat(userData.user.bioFormat ?? 'limited');
         const nextSocialLinks = userData.user.socialLinks ?? {};
         setSocialLinks(nextSocialLinks);
         const initialSocialKey = getInitialSocialLinkKey(nextSocialLinks);
@@ -154,8 +147,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     try {
       const updated = await api.profile.editUser(userUuid, {
         country: selectedCountry,
-        bio: sanitizeBioMarkdown(bio, usesMarkdown),
-        bioFormat: usesMarkdown ? 'markdown' : 'limited',
+        bio: sanitizeBioMarkdown(bio, canUseMarkdown),
         socialLinks,
       });
       setUser(updated);
@@ -172,9 +164,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const isSelfProfile = viewerUuid === user?.uuid;
   const canEditThisProfile = canEditProfile || isSelfProfile || isStaff;
   const canPunishThisProfile = (isPunishable || isStaff) && !!user;
-  // Only staff may write the full markdown dialect, whatever the stored format.
-  const usesMarkdown = isStaff && bioFormat === 'markdown';
-  const bioMaxLength = usesMarkdown ? BIO_MAX_LENGTH_MARKDOWN : BIO_MAX_LENGTH;
+  // Staff may use links and code blocks; everyone else is limited to inline
+  // formatting and bullet points. The server enforces the same rule.
+  const canUseMarkdown = isStaff;
 
   const invalidSocialLinkKey = SOCIAL_LINK_FIELDS.map(({ key }) => key).find((key) => {
     const handle = socialLinks[key];
@@ -185,7 +177,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     ? `Enter a ${SOCIAL_LINK_LABELS[invalidSocialLinkKey]} handle, not a link`
     : null;
 
-  const bioError = bio.length > bioMaxLength ? `Bio must be ${bioMaxLength} characters or fewer` : null;
+  const bioError = bioVisibleLength(bio, canUseMarkdown) > BIO_MAX_LENGTH
+    ? `Bio must be ${BIO_MAX_LENGTH} characters or fewer`
+    : null;
 
   if (isLoading) {
     return <div className="profile-card profile-card--loading">Loading profile...</div>;
@@ -231,7 +225,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                   setIsEditingProfile(false);
                   setSelectedCountry(user.country ?? '');
                   setBio(user.bio ?? DEFAULT_BIO);
-                  setBioFormat(user.bioFormat ?? 'limited');
                   const nextSocialLinks = user.socialLinks ?? {};
                   setSocialLinks(nextSocialLinks);
                   const initialSocialKey = getInitialSocialLinkKey(nextSocialLinks);
@@ -308,10 +301,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 value={bio}
                 onChange={setBio}
                 disabled={isSaving}
-                maxLength={bioMaxLength}
-                markdownEnabled={isStaff}
-                markdown={usesMarkdown}
-                onMarkdownChange={(markdown) => setBioFormat(markdown ? 'markdown' : 'limited')}
+                maxLength={BIO_MAX_LENGTH}
+                markdown={canUseMarkdown}
               />
               {bioError && <p className="profile-card__form-error">{bioError}</p>}
             </div>

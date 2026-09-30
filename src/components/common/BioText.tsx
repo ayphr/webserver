@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
+import { IconExternalLink } from '@tabler/icons-react';
 import { parseBioMarkdown } from '../../../common';
 import type { BioFormat, BioInline } from '../../../common';
 import { EmojiText } from './EmojiText';
+import './BioLink.css';
 import './BioText.css';
-
-const HEADING_TAGS = { 1: 'h3', 2: 'h4', 3: 'h5' } as const;
 
 function renderInlines(inlines: BioInline[], keyPrefix: string): ReactNode[] {
   return inlines.map((inline, index) => {
@@ -25,8 +25,9 @@ function renderInlines(inlines: BioInline[], keyPrefix: string): ReactNode[] {
 
     if (inline.kind === 'link') {
       return (
-        <a key={key} className="bio-text__link" href={inline.href} target="_blank" rel="noreferrer noopener">
+        <a key={key} className="bio-link" href={inline.href} target="_blank" rel="noreferrer noopener">
           {renderInlines(inline.children, key)}
+          <IconExternalLink className="bio-link__icon" size={12} aria-hidden="true" />
         </a>
       );
     }
@@ -70,42 +71,15 @@ export const BioText = ({ value, format = 'limited', className }: BioTextProps) 
           );
         }
 
-        if (block.kind === 'bullets' || block.kind === 'ordered') {
-          const items = block.items.map((item, itemIndex) => (
-            <li key={`item-${itemIndex}`} className="bio-text__listItem">
-              {renderInlines(item, `${key}-item-${itemIndex}`)}
-            </li>
-          ));
-
-          if (block.kind === 'ordered') {
-            return (
-              <ol key={key} className="bio-text__list bio-text__list--ordered">
-                {items}
-              </ol>
-            );
-          }
-
+        if (block.kind === 'bullets') {
           return (
             <ul key={key} className="bio-text__list">
-              {items}
+              {block.items.map((item, itemIndex) => (
+                <li key={`item-${itemIndex}`} className="bio-text__listItem">
+                  {renderInlines(item, `${key}-item-${itemIndex}`)}
+                </li>
+              ))}
             </ul>
-          );
-        }
-
-        if (block.kind === 'heading') {
-          const Heading = HEADING_TAGS[block.level];
-          return (
-            <Heading key={key} className={`bio-text__heading bio-text__heading--${block.level}`}>
-              {renderInlines(block.inlines, key)}
-            </Heading>
-          );
-        }
-
-        if (block.kind === 'quote') {
-          return (
-            <blockquote key={key} className="bio-text__quote">
-              {renderInlines(block.inlines, key)}
-            </blockquote>
           );
         }
 

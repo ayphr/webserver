@@ -1,19 +1,19 @@
 export { countryCodeToFlag } from './country';
 export {
-  BIO_FORMATS,
   BIO_MAX_LENGTH,
-  BIO_MAX_LENGTH_MARKDOWN,
+  BIO_MAX_SOURCE_LENGTH,
   BIO_MAX_URL_LENGTH,
   DEFAULT_BIO,
+  lexBioMarkdown,
   parseBioMarkdown,
   serializeBio,
-  bioMarkdownToHtml,
   sanitizeBioMarkdown,
   sanitizeBioUrl,
+  bioVisibleLength,
   type BioBlock,
   type BioFormat,
-  type BioHeadingLevel,
   type BioInline,
+  type BioToken,
 } from './bio';
 export {
   SOCIAL_LINK_TYPES,
