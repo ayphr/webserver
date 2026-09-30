@@ -59,7 +59,15 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
       return json({ error: 'reason is required' }, 400);
     }
 
-    const targetUser = targetUuid ? await getUserFromUuid(targetUuid) : targetUsername ? await getUserFromUsername(targetUsername) : null;
+    const targetUser = await (async () => {
+      if (targetUuid) {
+        return await getUserFromUuid(targetUuid);
+      } else if (targetUsername) {
+        return await getUserFromUsername(targetUsername);
+      }
+      return null;
+    })();
+
     if (!targetUser) {
       return json({ error: 'target user not found' }, 404);
     }
