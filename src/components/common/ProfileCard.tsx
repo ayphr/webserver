@@ -164,8 +164,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const isSelfProfile = viewerUuid === user?.uuid;
   const canEditThisProfile = canEditProfile || isSelfProfile || isStaff;
   const canPunishThisProfile = (isPunishable || isStaff) && !!user;
-  // Staff may use links and code blocks; everyone else is limited to inline
-  // formatting and bullet points. The server enforces the same rule.
   const canUseMarkdown = isStaff;
 
   const invalidSocialLinkKey = SOCIAL_LINK_FIELDS.map(({ key }) => key).find((key) => {

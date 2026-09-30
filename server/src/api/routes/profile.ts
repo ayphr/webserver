@@ -70,13 +70,11 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     return json({ error: 'invalid user uuid' }, 400);
   }
 
-  // Check authorization: only staff can edit others, users can only edit themselves
   const isStaff = user.role === 'staff';
   if (targetUuid !== user.uuid && !isStaff) {
     return json({ error: 'unauthorized' }, 403);
   }
 
-  // Get the target user
   const targetUser = await getUserFromUuid(targetUuid);
   if (!targetUser) {
     return json({ error: 'user not found' }, 404);
@@ -94,7 +92,6 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     return json({ error: 'no fields to update' }, 400);
   }
 
-  // Update country if provided
   if (typeof body.country === 'string') {
     const countryCode = normalizeCountryCode(body.country);
     if (!countryCode) {
@@ -108,8 +105,6 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
       return json({ error: 'bio is too long' }, 400);
     }
 
-    // The dialect follows the author: staff may write links and code blocks,
-    // everyone else is limited to inline formatting and bullet points.
     const extended = isStaff;
     const bio = sanitizeBioMarkdown(body.bio, extended);
 

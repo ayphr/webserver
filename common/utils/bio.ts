@@ -1,7 +1,6 @@
 export type BioFormat = 'limited' | 'markdown';
 
 export const BIO_MAX_LENGTH = 200;
-export const BIO_MAX_URL_LENGTH = 300;
 export const BIO_MAX_SOURCE_LENGTH = 4000;
 
 export const DEFAULT_BIO = "Hi! I'm a Ayphr user";
@@ -11,8 +10,7 @@ export type BioInline =
   | { kind: 'bold'; children: BioInline[] }
   | { kind: 'italic'; children: BioInline[] }
   | { kind: 'strike'; children: BioInline[] }
-  | { kind: 'code'; value: string }
-  | { kind: 'link'; href: string; children: BioInline[] };
+  | { kind: 'code'; value: string };
 
 export type BioBlock =
   | { kind: 'line'; inlines: BioInline[] }
@@ -27,8 +25,7 @@ export type BioToken =
   | { kind: 'italic'; open: string; close: string; children: BioToken[] }
   | { kind: 'strike'; open: string; close: string; children: BioToken[] }
   | { kind: 'code'; open: string; close: string; value: string }
-  | { kind: 'codeBlock'; value: string }
-  | { kind: 'link'; open: string; middle: string; close: string; url: string; href: string; children: BioToken[] };
+  | { kind: 'codeBlock'; value: string };
 
 const BULLET_LINE = /^\s*[-*+]\s+(.*)$/;
 const CODE_FENCE = /^(`{3,})([^`]*)$/;
@@ -36,34 +33,10 @@ const MARKER_ALLOWED_BEFORE = /[\s([{<,.;:!?'"]/;
 const MARKER_ALLOWED_AFTER = /[\s.,;:!?'")\]}>]/;
 const CLOSABLE_MARKER = /[^\s]/;
 const LIMITED_ESCAPED = /([*\\])/g;
-const MARKDOWN_ESCAPED = /([*\\`~[\]<>])/g;
-const LABEL_ESCAPED = /([\\]])/g;
+const MARKDOWN_ESCAPED = /([*\\`~])/g;
 
 const LIMITED_ESCAPABLE = '*\\';
-const MARKDOWN_ESCAPABLE = '*\\`~[]<>';
-
-export function sanitizeBioUrl(value: string): string | null {
-  const raw = value.trim();
-
-  if (!raw || raw.length > BIO_MAX_URL_LENGTH || raw.startsWith('/') || /[\s<>]/.test(raw)) {
-    return null;
-  }
-
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
-
-  let url: URL;
-  try {
-    url = new URL(withScheme);
-  } catch {
-    return null;
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    return null;
-  }
-
-  return url.toString();
-}
+const MARKDOWN_ESCAPABLE = '*\\`~';
 
 function readDelimited(text: string, start: number, open: string, close: string, closable: boolean): { value: string; end: number } | null {
   const contentStart = start + open.length;
@@ -86,40 +59,6 @@ function readDelimited(text: string, start: number, open: string, close: string,
   }
 
   return null;
-}
-
-function readLinkLabel(text: string, start: number): { label: string; end: number } | null {
-  const labelEnd = text.indexOf(']', start + 1);
-  if (labelEnd < 0 || text[labelEnd + 1] !== '(') return null;
-
-  let depth = 1;
-  for (let i = labelEnd + 2; i < text.length; i += 1) {
-    const char = text[i];
-
-    if (char === '\\' && i + 1 < text.length) {
-      i += 1;
-      continue;
-    }
-    if (char === '(') depth += 1;
-    if (char === ')') depth -= 1;
-    if (depth === 0) {
-      return { label: text.slice(start + 1, labelEnd), end: i + 1 };
-    }
-  }
-
-  return null;
-}
-
-function readAngleUrl(text: string, start: number): { url: string; end: number } | null {
-  const end = text.indexOf('>', start + 1);
-  if (end < 0) return null;
-
-  const url = text.slice(start + 1, end);
-  return sanitizeBioUrl(url) ? { url, end: end + 1 } : null;
-}
-
-function isImageMarker(text: string, start: number): boolean {
-  return text[start - 1] === '!' && (start === 1 || MARKER_ALLOWED_BEFORE.test(text[start - 2] ?? ''));
 }
 
 function lexInline(text: string, extended: boolean): BioToken[] {
@@ -190,52 +129,6 @@ function lexInline(text: string, extended: boolean): BioToken[] {
       if (pushed) continue;
     }
 
-    if (extended && char === '[' && !isImageMarker(text, index)) {
-      const link = readLinkLabel(text, index);
-
-      if (link) {
-        const raw = text.slice(index, link.end);
-        const url = raw.slice(raw.indexOf('](') + 2, -1);
-        const href = sanitizeBioUrl(url);
-
-        if (href) {
-          flush();
-          tokens.push({
-            kind: 'link',
-            open: '[',
-            middle: '](',
-            close: ')',
-            url,
-            href,
-            children: lexInline(link.label, extended),
-          });
-          index = link.end;
-          continue;
-        }
-      }
-    }
-
-    if (extended && char === '<') {
-      const angle = readAngleUrl(text, index);
-
-      if (angle) {
-        const href = sanitizeBioUrl(angle.url);
-        if (href) {
-          flush();
-          tokens.push({
-            kind: 'link',
-            open: '<',
-            middle: '',
-            close: '>',
-            url: angle.url,
-            href,
-            children: [],
-          });
-          index = angle.end;
-          continue;
-        }
-      }
-    }
 
     buffer += char;
     index += 1;
@@ -353,15 +246,6 @@ function tokensToInlines(tokens: BioToken[]): BioInline[] {
       continue;
     }
 
-    if (token.kind === 'link') {
-      const children = tokensToInlines(token.children);
-      inlines.push({
-        kind: 'link',
-        href: token.href,
-        children: children.length > 0 ? children : [{ kind: 'text', value: token.url }],
-      });
-      continue;
-    }
 
     const children = tokensToInlines(token.children);
     if (children.length > 0) {
@@ -404,13 +288,7 @@ export function parseBioMarkdown(markdown: string, extended = false): BioBlock[]
   return blocks;
 }
 
-type EscapeMode = 'text' | 'label';
-
-function escapeText(value: string, extended: boolean, mode: EscapeMode): string {
-  if (mode === 'label') {
-    return extended ? value.replace(LABEL_ESCAPED, String.raw`\$1`) : value;
-  }
-
+function escapeText(value: string, extended: boolean): string {
   return extended ? value.replace(MARKDOWN_ESCAPED, String.raw`\$1`) : value.replace(LIMITED_ESCAPED, String.raw`\$1`);
 }
 
@@ -425,10 +303,10 @@ function fenceFor(value: string, minimum: number): string {
   return '`'.repeat(Math.max(minimum, longest + 1));
 }
 
-function serializeInlines(inlines: BioInline[], extended: boolean, mode: EscapeMode = 'text'): string {
+function serializeInlines(inlines: BioInline[], extended: boolean): string {
   return inlines
     .map((inline) => {
-      if (inline.kind === 'text') return escapeText(inline.value, extended, mode);
+      if (inline.kind === 'text') return escapeText(inline.value, extended);
       if (inline.kind === 'code') {
         if (!extended) return inline.value;
         const fence = fenceFor(inline.value, 1);
@@ -436,13 +314,12 @@ function serializeInlines(inlines: BioInline[], extended: boolean, mode: EscapeM
         return `${fence}${padding}${inline.value}${padding}${fence}`;
       }
 
-      const content = serializeInlines(inline.children, extended, inline.kind === 'link' ? 'label' : 'text').trim();
+      const content = serializeInlines(inline.children, extended).trim();
       if (!content) return '';
 
       if (inline.kind === 'bold') return `**${content}**`;
       if (inline.kind === 'italic') return `*${content}*`;
-      if (inline.kind === 'strike') return extended ? `~~${content}~~` : content;
-      return `[${content}](${inline.href})`;
+      return extended ? `~~${content}~~` : content;
     })
     .join('');
 }
@@ -453,7 +330,7 @@ export function serializeBio(blocks: BioBlock[], extended = false): string {
   for (const block of blocks) {
     if (block.kind === 'codeBlock') {
       if (!extended) {
-        lines.push(block.code.split('\n').map((line) => escapeText(line, false, 'text')).join('\n'));
+        lines.push(block.code.split('\n').map((line) => escapeText(line, false)).join('\n'));
         continue;
       }
 
