@@ -1,0 +1,90 @@
+.bio-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.bio-text__line {
+  margin: 0;
+}
+
+.bio-text__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  padding-left: 1.35rem;
+  list-style: disc;
+}
+
+.bio-text__list--ordered {
+  list-style: decimal;
+}
+
+.bio-text__listItem {
+  margin: 0;
+}
+
+.bio-text__heading {
+  margin: 0.45rem 0 0;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-hv);
+  line-height: 1.3;
+}
+
+.bio-text__heading--1 {
+  font-size: 1.1rem;
+}
+
+.bio-text__heading--2 {
+  font-size: 1.02rem;
+}
+
+.bio-text__heading--3 {
+  font-size: 0.98rem;
+}
+
+.bio-text__quote {
+  margin: 0.2rem 0;
+  padding: 0.1rem 0 0.1rem 0.7rem;
+  border-left: 2px solid var(--border-focus);
+  color: var(--text-muted);
+}
+
+.bio-text__code {
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  font-family: var(--font-family-mono);
+  font-size: 0.88em;
+}
+
+.bio-text__codeBlock {
+  margin: 0.2rem 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-x: auto;
+  user-select: text;
+  white-space: pre;
+}
+
+.bio-text__codeBlock code {
+  font-family: inherit;
+}
+
+.bio-text__link {
+  color: var(--accent-green);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  word-break: break-word;
+}
+
+.bio-text__link:hover {
+  color: var(--text-primary);
+}
