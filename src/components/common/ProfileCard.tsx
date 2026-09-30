@@ -159,10 +159,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     }
   };
 
-  const isStaffOrOwner = viewerRole === 'staff' || viewerRole === 'owner';
+  const isStaff = viewerRole === 'staff';
   const isSelfProfile = viewerUuid === user?.uuid;
-  const canEditThisProfile = canEditProfile || isSelfProfile || isStaffOrOwner;
-  const canPunishThisProfile = (isPunishable || isStaffOrOwner) && !!user && (user.role !== 'owner' || isSelfProfile);
+  const canEditThisProfile = canEditProfile || isSelfProfile || isStaff;
+  const canPunishThisProfile = (isPunishable || isStaff) && !!user;
 
   const invalidSocialLinkKey = SOCIAL_LINK_FIELDS.map(({ key }) => key).find((key) => {
     const handle = socialLinks[key];

@@ -1,5 +1,5 @@
 import './UsernameDisplay.css';
-import { IconCrown, IconTools } from '@tabler/icons-react';
+import { IconTools } from '@tabler/icons-react';
 import type { PublicUser } from '../../../common';
 import type { ReactNode } from 'react';
 import { EmojiText } from './EmojiText';
@@ -12,17 +12,14 @@ export interface UsernameDisplayProps {
 }
 
 function countryCodeToFlag(code?: string): string | null {
-  if (!code || code.length !== 2) return null;
+  if (code?.length !== 2) return null;
 
   const upper = code.toUpperCase();
   const points = [...upper].map((char) => 127397 + char.charCodeAt(0));
   return String.fromCodePoint(...points);
 }
 
-function RoleIcon({ role }: { role?: PublicUser['role'] }): ReactNode | null {
-  if (role === 'owner') {
-    return <IconCrown size={18} stroke={2} aria-label="Owner" />;
-  }
+function RoleIcon({ role }: Readonly<{ role?: PublicUser['role'] }>): ReactNode | null {
 
   if (role === 'staff') {
     return <IconTools size={18} stroke={2} aria-label="Staff" />;

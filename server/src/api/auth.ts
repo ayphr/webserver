@@ -114,8 +114,7 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
 
 const roleRank: Record<UserRole, number> = {
   user: 0,
-  staff: 1,
-  owner: 2,
+  staff: 1
 };
 
 export function hasRoleAtLeast(userRole: UserRole, minimumRole: UserRole) {

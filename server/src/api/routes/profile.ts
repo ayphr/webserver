@@ -63,9 +63,9 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     return json({ error: 'invalid user uuid' }, 400);
   }
 
-  // Check authorization: only owner/staff can edit others, users can only edit themselves
-  const isOwner = user.role === 'owner' || user.role === 'staff';
-  if (targetUuid !== user.uuid && !isOwner) {
+  // Check authorization: only staff can edit others, users can only edit themselves
+  const isStaff = user.role === 'staff';
+  if (targetUuid !== user.uuid && !isStaff) {
     return json({ error: 'unauthorized' }, 403);
   }
 
