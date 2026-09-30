@@ -87,6 +87,7 @@
 
 .bio-editor__code {
   padding: 0.1em 0.25em;
+  margin: 0 -0.25em;
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   font-family: var(--font-family-mono);
@@ -96,21 +97,10 @@
 .bio-editor__code--block {
   display: inline-block;
   padding: 0.3em 0.45em;
+  margin: 0 -0.45em;
   color: var(--text-primary);
   line-height: 1.45;
   white-space: pre-wrap;
-}
-
-.bio-editor__url {
-  font-family: var(--font-family-mono);
-  font-size: 0.85em;
-  opacity: 0.7;
-  user-select: none;
-}
-
-.bio-editor__link {
-  cursor: text;
-  text-decoration-thickness: 1px;
 }
 
 .bio-editor__footer {

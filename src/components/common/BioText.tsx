@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { IconExternalLink } from '@tabler/icons-react';
 import { parseBioMarkdown } from '../../../common';
 import type { BioFormat, BioInline } from '../../../common';
 import { EmojiText } from './EmojiText';
-import './BioLink.css';
 import './BioText.css';
 
 function renderInlines(inlines: BioInline[], keyPrefix: string): ReactNode[] {
@@ -20,15 +18,6 @@ function renderInlines(inlines: BioInline[], keyPrefix: string): ReactNode[] {
         <code key={key} className="bio-text__code">
           {inline.value}
         </code>
-      );
-    }
-
-    if (inline.kind === 'link') {
-      return (
-        <a key={key} className="bio-link" href={inline.href} target="_blank" rel="noreferrer noopener">
-          {renderInlines(inline.children, key)}
-          <IconExternalLink className="bio-link__icon" size={12} aria-hidden="true" />
-        </a>
       );
     }
 

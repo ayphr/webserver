@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { BIO_MAX_LENGTH, bioVisibleLength, lexBioMarkdown } from '../../../common';
 import type { BioToken } from '../../../common';
-import './BioLink.css';
 import './BioEditor.css';
 
 function renderTokens(tokens: BioToken[], keyPrefix: string): ReactNode[] {
@@ -47,18 +46,6 @@ function renderTokens(tokens: BioToken[], keyPrefix: string): ReactNode[] {
       );
     }
 
-    if (token.kind === 'link') {
-      return (
-        <span key={key} className="bio-link bio-editor__link">
-          <span className="bio-editor__marker">{token.open}</span>
-          {renderTokens(token.children, key)}
-          <span className="bio-editor__marker">{token.middle}</span>
-          <span className="bio-editor__url">{token.url}</span>
-          <span className="bio-editor__marker">{token.close}</span>
-        </span>
-      );
-    }
-
     const Tag = token.kind === 'bold' ? 'strong' : token.kind === 'italic' ? 'em' : 'del';
 
     return (
@@ -79,7 +66,6 @@ export interface BioEditorProps {
   placeholder?: string;
   disabled?: boolean;
   maxLength?: number;
-  /** Whether the viewer may use the staff-only markdown (links, code blocks). */
   markdown?: boolean;
 }
 
@@ -136,9 +122,6 @@ export const BioEditor = ({
       </div>
 
       <div className="bio-editor__footer">
-        <span className="bio-editor__hint">
-          {markdown ? 'Also links and code blocks' : 'Markdown supported'}
-        </span>
         <span
           id={id ? `${id}-counter` : undefined}
           className={`bio-editor__counter ${isOverLimit ? 'is-over' : ''}`}
