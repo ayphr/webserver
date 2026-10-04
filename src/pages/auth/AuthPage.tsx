@@ -174,9 +174,6 @@ export const AuthPage = () => {
                   <li className={hasEnteredPassword && passwordChecks.symbol ? 'is-valid' : ''}>
                     One special character
                   </li>
-                  <li className="is-note">
-                    We also block passwords found in known data breaches.
-                  </li>
                 </ul>
               )}
 
