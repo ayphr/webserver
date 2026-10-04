@@ -21,3 +21,9 @@ export {
   normalizeSocialHandle,
   buildSocialLinkUrl,
 } from './social';
+export {
+  PASSWORD_MIN_LENGTH,
+  getPasswordValidationChecks,
+  getPasswordValidationErrors,
+  type PasswordValidationChecks,
+} from './password';

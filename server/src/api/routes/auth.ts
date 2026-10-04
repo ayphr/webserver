@@ -3,6 +3,7 @@ import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, update
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
 import { DEFAULT_BIO } from '@common/utils/bio';
+import { getPasswordValidationErrors } from '@common/utils/password';
 
 type AuthPayload = {
   username?: string;
@@ -37,6 +38,11 @@ async function handleRegister(request: Request) {
 
   if (!body?.username || !body.password) {
     return json({ error: 'username and password are required' }, 400);
+  }
+
+  const passwordValidationErrors = getPasswordValidationErrors(body.password);
+  if (passwordValidationErrors.length > 0) {
+    return json({ error: passwordValidationErrors[0] }, 400);
   }
 
   const existingUser = await getUserFromUsername(body.username);

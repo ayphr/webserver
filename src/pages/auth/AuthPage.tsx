@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { IconCheck, IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Input } from '../../components/common';
 import { api } from '../../lib/api';
+import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '../../../common/utils/password';
 
 type AuthMode = 'login' | 'signup';
 
@@ -22,6 +24,7 @@ export const AuthPage = () => {
   const [errors, setErrors] = useState<Partial<FormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const passwordChecks = getPasswordValidationChecks(formData.password);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -51,12 +54,14 @@ export const AuthPage = () => {
     // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
     }
 
-    // Signup-specific validation
     if (mode === 'signup') {
+      const passwordValidationErrors = getPasswordValidationErrors(formData.password);
+      if (passwordValidationErrors.length > 0) {
+        newErrors.password = passwordValidationErrors[0];
+      }
+
       if (!formData.confirmPassword) {
         newErrors.confirmPassword = 'Please confirm your password';
       } else if (formData.password !== formData.confirmPassword) {
@@ -109,6 +114,7 @@ export const AuthPage = () => {
   };
 
   const isSignup = mode === 'signup';
+  const hasEnteredPassword = formData.password.length > 0;
 
   return (
     <div className="auth-page">
@@ -149,9 +155,53 @@ export const AuthPage = () => {
                 value={formData.password}
                 onChange={handleInputChange}
                 error={errors.password}
-                helperText={isSignup ? 'At least 8 characters' : undefined}
                 fullWidth
               />
+
+              {isSignup && (
+                <ul className="auth-form__password-checklist">
+                  <li className={hasEnteredPassword ? (passwordChecks.minLength ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.minLength
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
+                    At least {PASSWORD_MIN_LENGTH} characters
+                  </li>
+                  <li className={hasEnteredPassword ? (passwordChecks.lowercase ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.lowercase
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
+                    One lowercase letter
+                  </li>
+                  <li className={hasEnteredPassword ? (passwordChecks.uppercase ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.uppercase
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
+                    One uppercase letter
+                  </li>
+                  <li className={hasEnteredPassword ? (passwordChecks.number ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.number
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
+                    One number
+                  </li>
+                  <li className={hasEnteredPassword ? (passwordChecks.symbol ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.symbol
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
+                    One special character
+                  </li>
+                </ul>
+              )}
 
               {isSignup && (
                 <Input
