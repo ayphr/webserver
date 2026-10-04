@@ -65,6 +65,44 @@
   gap: 1rem;
 }
 
+.auth-form__password-checklist {
+  margin: -0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.auth-form__password-checklist li {
+  color: hsl(180, 67%, 99%, 0.5);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.auth-form__password-checklist li::before {
+  content: '•';
+  font-size: 0.7rem;
+  color: hsl(0, 0%, 40%);
+}
+
+.auth-form__password-checklist li.is-valid {
+  color: hsl(142, 71%, 60%);
+}
+
+.auth-form__password-checklist li.is-valid::before {
+  content: '✓';
+  color: hsl(142, 71%, 60%);
+}
+
+.auth-form__password-checklist li.is-note {
+  margin-top: 0.3rem;
+  color: hsl(180, 67%, 99%, 0.4);
+}
+
 .auth-form__submit {
   margin-top: 0.5rem;
   font-weight: 600;
