@@ -75,7 +75,7 @@
 }
 
 .auth-form__password-checklist li {
-  color: hsl(180, 67%, 99%, 0.5);
+  color: var(--text-muted);
   font-size: 0.8rem;
   line-height: 1.35;
   display: flex;
@@ -83,19 +83,30 @@
   gap: 0.45rem;
 }
 
-.auth-form__password-checklist li::before {
-  content: '•';
-  font-size: 0.7rem;
-  color: hsl(0, 0%, 40%);
+.auth-form__password-rule-icon {
+  width: 0.9rem;
+  min-width: 0.9rem;
+  height: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
 }
 
 .auth-form__password-checklist li.is-valid {
-  color: hsl(142, 71%, 60%);
+  color: var(--accent-green);
 }
 
-.auth-form__password-checklist li.is-valid::before {
-  content: '✓';
-  color: hsl(142, 71%, 60%);
+.auth-form__password-checklist li.is-valid .auth-form__password-rule-icon {
+  color: var(--accent-green);
+}
+
+.auth-form__password-checklist li.is-invalid {
+  color: var(--accent-red);
+}
+
+.auth-form__password-checklist li.is-invalid .auth-form__password-rule-icon {
+  color: var(--accent-red);
 }
 
 .auth-form__submit {
