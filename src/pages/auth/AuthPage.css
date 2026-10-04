@@ -98,11 +98,6 @@
   color: hsl(142, 71%, 60%);
 }
 
-.auth-form__password-checklist li.is-note {
-  margin-top: 0.3rem;
-  color: hsl(180, 67%, 99%, 0.4);
-}
-
 .auth-form__submit {
   margin-top: 0.5rem;
   font-weight: 600;
