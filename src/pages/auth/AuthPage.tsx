@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Input } from '../../components/common';
 import { api } from '../../lib/api';
+import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '../../../common/utils/password';
 
 type AuthMode = 'login' | 'signup';
 
@@ -22,6 +23,7 @@ export const AuthPage = () => {
   const [errors, setErrors] = useState<Partial<FormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const passwordChecks = getPasswordValidationChecks(formData.password);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -51,12 +53,14 @@ export const AuthPage = () => {
     // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
     }
 
-    // Signup-specific validation
     if (mode === 'signup') {
+      const passwordValidationErrors = getPasswordValidationErrors(formData.password);
+      if (passwordValidationErrors.length > 0) {
+        newErrors.password = passwordValidationErrors[0];
+      }
+
       if (!formData.confirmPassword) {
         newErrors.confirmPassword = 'Please confirm your password';
       } else if (formData.password !== formData.confirmPassword) {
@@ -109,6 +113,7 @@ export const AuthPage = () => {
   };
 
   const isSignup = mode === 'signup';
+  const hasEnteredPassword = formData.password.length > 0;
 
   return (
     <div className="auth-page">
@@ -149,9 +154,31 @@ export const AuthPage = () => {
                 value={formData.password}
                 onChange={handleInputChange}
                 error={errors.password}
-                helperText={isSignup ? 'At least 8 characters' : undefined}
                 fullWidth
               />
+
+              {isSignup && (
+                <ul className="auth-form__password-checklist">
+                  <li className={hasEnteredPassword && passwordChecks.minLength ? 'is-valid' : ''}>
+                    At least {PASSWORD_MIN_LENGTH} characters
+                  </li>
+                  <li className={hasEnteredPassword && passwordChecks.lowercase ? 'is-valid' : ''}>
+                    One lowercase letter
+                  </li>
+                  <li className={hasEnteredPassword && passwordChecks.uppercase ? 'is-valid' : ''}>
+                    One uppercase letter
+                  </li>
+                  <li className={hasEnteredPassword && passwordChecks.number ? 'is-valid' : ''}>
+                    One number
+                  </li>
+                  <li className={hasEnteredPassword && passwordChecks.symbol ? 'is-valid' : ''}>
+                    One special character
+                  </li>
+                  <li className="is-note">
+                    We also block passwords found in known data breaches.
+                  </li>
+                </ul>
+              )}
 
               {isSignup && (
                 <Input

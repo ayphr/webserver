@@ -1,14 +1,18 @@
+import { createHash } from 'node:crypto';
 import { clearToken, createPasswordHash, issueToken, requireAuth, verifyPassword } from '../auth';
 import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, updateUser } from '../../workers/dbWriter';
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
 import { DEFAULT_BIO } from '@common/utils/bio';
+import { getPasswordValidationErrors } from '@common/utils/password';
 
 type AuthPayload = {
   username?: string;
   password?: string;
   country?: string;
 };
+
+const PWNED_PASSWORDS_RANGE_ENDPOINT = 'https://api.pwnedpasswords.com/range/';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -32,11 +36,48 @@ async function readJsonBody(request: Request): Promise<AuthPayload | null> {
   }
 }
 
+async function isKnownBreachedPassword(password: string): Promise<boolean> {
+  const hash = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase();
+  const prefix = hash.slice(0, 5);
+  const suffix = hash.slice(5);
+
+  try {
+    const response = await fetch(`${PWNED_PASSWORDS_RANGE_ENDPOINT}${prefix}`, {
+      headers: {
+        'Add-Padding': 'true',
+      },
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const hashList = await response.text();
+    const matchedHashLine = hashList
+      .split('\r\n')
+      .find((line) => line.split(':', 1)[0] === suffix);
+
+    return Boolean(matchedHashLine);
+  } catch {
+    return false;
+  }
+}
+
 async function handleRegister(request: Request) {
   const body = await readJsonBody(request);
 
   if (!body?.username || !body.password) {
     return json({ error: 'username and password are required' }, 400);
+  }
+
+  const passwordValidationErrors = getPasswordValidationErrors(body.password);
+  if (passwordValidationErrors.length > 0) {
+    return json({ error: passwordValidationErrors[0] }, 400);
+  }
+
+  const isBreachedPassword = await isKnownBreachedPassword(body.password);
+  if (isBreachedPassword) {
+    return json({ error: 'password has appeared in known data breaches, please choose a different password' }, 400);
   }
 
   const existingUser = await getUserFromUsername(body.username);
