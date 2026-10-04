@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { IconCheck, IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Input } from '../../components/common';
 import { api } from '../../lib/api';
@@ -159,19 +160,44 @@ export const AuthPage = () => {
 
               {isSignup && (
                 <ul className="auth-form__password-checklist">
-                  <li className={hasEnteredPassword && passwordChecks.minLength ? 'is-valid' : ''}>
+                  <li className={hasEnteredPassword ? (passwordChecks.minLength ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.minLength
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
                     At least {PASSWORD_MIN_LENGTH} characters
                   </li>
-                  <li className={hasEnteredPassword && passwordChecks.lowercase ? 'is-valid' : ''}>
+                  <li className={hasEnteredPassword ? (passwordChecks.lowercase ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.lowercase
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
                     One lowercase letter
                   </li>
-                  <li className={hasEnteredPassword && passwordChecks.uppercase ? 'is-valid' : ''}>
+                  <li className={hasEnteredPassword ? (passwordChecks.uppercase ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.uppercase
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
                     One uppercase letter
                   </li>
-                  <li className={hasEnteredPassword && passwordChecks.number ? 'is-valid' : ''}>
+                  <li className={hasEnteredPassword ? (passwordChecks.number ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.number
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
                     One number
                   </li>
-                  <li className={hasEnteredPassword && passwordChecks.symbol ? 'is-valid' : ''}>
+                  <li className={hasEnteredPassword ? (passwordChecks.symbol ? 'is-valid' : 'is-invalid') : ''}>
+                    <span className="auth-form__password-rule-icon" aria-hidden="true">
+                      {hasEnteredPassword && !passwordChecks.symbol
+                        ? <IconX size={14} strokeWidth={2} />
+                        : <IconCheck size={14} strokeWidth={2} />}
+                    </span>
                     One special character
                   </li>
                 </ul>
