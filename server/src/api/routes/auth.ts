@@ -36,7 +36,12 @@ async function readJsonBody(request: Request): Promise<AuthPayload | null> {
 async function handleRegister(request: Request) {
   const body = await readJsonBody(request);
 
-  if (!body?.username || !body.password) {
+  if (
+    typeof body?.username !== 'string'
+    || typeof body.password !== 'string'
+    || !body.username
+    || !body.password
+  ) {
     return json({ error: 'username and password are required' }, 400);
   }
 
@@ -84,7 +89,12 @@ async function handleRegister(request: Request) {
 async function handleLogin(request: Request) {
   const body = await readJsonBody(request);
 
-  if (!body?.username || !body.password) {
+  if (
+    typeof body?.username !== 'string'
+    || typeof body.password !== 'string'
+    || !body.username
+    || !body.password
+  ) {
     return json({ error: 'username and password are required' }, 400);
   }
 
