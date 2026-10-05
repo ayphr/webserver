@@ -57,9 +57,11 @@ export const AuthPage = () => {
     }
 
     if (mode === 'signup') {
-      const passwordValidationErrors = getPasswordValidationErrors(formData.password);
-      if (passwordValidationErrors.length > 0) {
-        newErrors.password = passwordValidationErrors[0];
+      if (formData.password) {
+        const passwordValidationErrors = getPasswordValidationErrors(formData.password);
+        if (passwordValidationErrors.length > 0) {
+          newErrors.password = passwordValidationErrors[0];
+        }
       }
 
       if (!formData.confirmPassword) {
@@ -159,7 +161,7 @@ export const AuthPage = () => {
               />
 
               {isSignup && (
-                <ul className="auth-form__password-checklist">
+                <ul className="auth-form__password-checklist" aria-live="polite">
                   <li className={hasEnteredPassword ? (passwordChecks.minLength ? 'is-valid' : 'is-invalid') : ''}>
                     <span className="auth-form__password-rule-icon" aria-hidden="true">
                       {hasEnteredPassword && !passwordChecks.minLength
@@ -167,6 +169,10 @@ export const AuthPage = () => {
                         : <IconCheck size={14} strokeWidth={2} />}
                     </span>
                     At least {PASSWORD_MIN_LENGTH} characters
+                    <span className="auth-form__screen-reader-status">
+                      {' '}
+                      ({hasEnteredPassword ? (passwordChecks.minLength ? 'met' : 'not met') : 'not checked'})
+                    </span>
                   </li>
                   <li className={hasEnteredPassword ? (passwordChecks.lowercase ? 'is-valid' : 'is-invalid') : ''}>
                     <span className="auth-form__password-rule-icon" aria-hidden="true">
@@ -175,6 +181,10 @@ export const AuthPage = () => {
                         : <IconCheck size={14} strokeWidth={2} />}
                     </span>
                     One lowercase letter
+                    <span className="auth-form__screen-reader-status">
+                      {' '}
+                      ({hasEnteredPassword ? (passwordChecks.lowercase ? 'met' : 'not met') : 'not checked'})
+                    </span>
                   </li>
                   <li className={hasEnteredPassword ? (passwordChecks.uppercase ? 'is-valid' : 'is-invalid') : ''}>
                     <span className="auth-form__password-rule-icon" aria-hidden="true">
@@ -183,6 +193,10 @@ export const AuthPage = () => {
                         : <IconCheck size={14} strokeWidth={2} />}
                     </span>
                     One uppercase letter
+                    <span className="auth-form__screen-reader-status">
+                      {' '}
+                      ({hasEnteredPassword ? (passwordChecks.uppercase ? 'met' : 'not met') : 'not checked'})
+                    </span>
                   </li>
                   <li className={hasEnteredPassword ? (passwordChecks.number ? 'is-valid' : 'is-invalid') : ''}>
                     <span className="auth-form__password-rule-icon" aria-hidden="true">
@@ -191,6 +205,10 @@ export const AuthPage = () => {
                         : <IconCheck size={14} strokeWidth={2} />}
                     </span>
                     One number
+                    <span className="auth-form__screen-reader-status">
+                      {' '}
+                      ({hasEnteredPassword ? (passwordChecks.number ? 'met' : 'not met') : 'not checked'})
+                    </span>
                   </li>
                   <li className={hasEnteredPassword ? (passwordChecks.symbol ? 'is-valid' : 'is-invalid') : ''}>
                     <span className="auth-form__password-rule-icon" aria-hidden="true">
@@ -199,6 +217,10 @@ export const AuthPage = () => {
                         : <IconCheck size={14} strokeWidth={2} />}
                     </span>
                     One special character
+                    <span className="auth-form__screen-reader-status">
+                      {' '}
+                      ({hasEnteredPassword ? (passwordChecks.symbol ? 'met' : 'not met') : 'not checked'})
+                    </span>
                   </li>
                 </ul>
               )}
