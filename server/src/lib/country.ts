@@ -48,10 +48,16 @@ function getRegionCandidates(): string[] {
   return candidates;
 }
 
+let cachedCountries: CountryOption[] | null = null;
+
 export function getSupportedCountries(): CountryOption[] {
-  return getRegionCandidates()
+  if (cachedCountries) return cachedCountries;
+
+  cachedCountries = getRegionCandidates()
     .map((candidate) => normalizeCountryCode(candidate))
     .filter((code): code is string => Boolean(code))
     .map((code) => ({ code, name: getRegionName(code) ?? code }))
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  return cachedCountries;
 }

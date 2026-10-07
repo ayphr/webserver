@@ -9,7 +9,8 @@ const log = createLogger('packet-worker');
 export async function handlePacketMessage(message: Uint8Array, emit: (payload: unknown) => void) {
   try {
     const packet = unpack(message);
-    if (packet && packet.valid && packet.type === PacketType.SENSOR && validatePacket(packet)) {
+    if (packet && packet.valid && packet.type === PacketType.SENSOR) {
+      validatePacket(packet);
       const serial = packet.serial;
 
       const device = await getDeviceBySerial(serial);

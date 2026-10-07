@@ -36,7 +36,7 @@ function readStoredToken(storageKey: string) {
 }
 
 function writeStoredToken(storageKey: string, token: string | null) {
-  if (typeof globalThis === 'undefined') return;
+  if (globalThis.window === undefined) return;
 
   if (token) {
     globalThis.localStorage.setItem(storageKey, token);

@@ -80,7 +80,7 @@ async function generateNetlifyDnsCert(): Promise<CertConfig> {
   } else {
     logger.info('Generating new ACME account key and persisting to certs/account.pem...');
     accountKey = await acme.crypto.createPrivateKey();
-    fs.writeFileSync(ACCOUNT_KEY_PATH, accountKey.toString());
+    fs.writeFileSync(ACCOUNT_KEY_PATH, accountKey.toString(), { mode: 0o600 });
   }
 
   const client = new acme.Client({
@@ -94,7 +94,7 @@ async function generateNetlifyDnsCert(): Promise<CertConfig> {
     contact: [`mailto:${email}`],
   });
 
-  const [accountPrivateKey, csr] = await acme.crypto.createCsr({
+  const [certPrivateKey, csr] = await acme.crypto.createCsr({
     commonName: domain,
   });
 
@@ -187,7 +187,7 @@ async function generateNetlifyDnsCert(): Promise<CertConfig> {
   }
 
   fs.writeFileSync(CERT_PATH, certPem.toString());
-  fs.writeFileSync(KEY_PATH, accountPrivateKey.toString());
+  fs.writeFileSync(KEY_PATH, certPrivateKey.toString(), { mode: 0o600 });
 
   logger.info(`SSL Certificate successfully written to ${CERT_PATH}`);
   return { certPath: CERT_PATH, keyPath: KEY_PATH };

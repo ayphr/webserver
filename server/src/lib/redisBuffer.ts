@@ -34,7 +34,14 @@ async function getClient() {
   if (!connectPromise) {
     client = createClient({ url: REDIS_URL });
     attachClientHandlers(client);
-    connectPromise = client.connect().then(() => client!);
+    connectPromise = client.connect()
+      .then(() => client!)
+      .catch((error) => {
+        // Reset so the next caller retries instead of reusing a poisoned promise.
+        connectPromise = null;
+        client = null;
+        throw error;
+      });
   }
 
   return connectPromise;
@@ -66,7 +73,16 @@ export async function drainTelemetryBuffer() {
       keys: [REDIS_BUFFER_KEY]
     })) as string[] | null;
 
-    const records = (rawRecords || []).map(parseRecord);
+    // The drain script already deleted the batch, so a single malformed entry
+    // must not discard the records that parsed successfully.
+    const records: TelemetryRecord[] = [];
+    for (const payload of rawRecords || []) {
+      try {
+        records.push(parseRecord(payload));
+      } catch (error) {
+        log.warn({ error, payload }, 'skipping malformed telemetry record');
+      }
+    }
 
     // The script drains atomically, so this is the backlog depth that built up
     // since the previous flush. Non-zero over time means the sink is behind.

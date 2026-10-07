@@ -79,9 +79,18 @@ export function verifyToken(user: User, token: string): TokenVerificationResult 
     return 'expired';
   }
 
-  if (user.auth.token !== token) return 'invalid';
+  if (!safeTokenEqual(user.auth.token, token)) return 'invalid';
 
   return 'success';
+}
+
+function safeTokenEqual(expected: string, provided: string): boolean {
+  const expectedBuffer = Buffer.from(expected);
+  const providedBuffer = Buffer.from(provided);
+
+  if (expectedBuffer.length !== providedBuffer.length) return false;
+
+  return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
 export function getBearerToken(request: Request): string | null {

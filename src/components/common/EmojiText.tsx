@@ -6,13 +6,25 @@ interface EmojiTextProps {
   children: React.ReactNode;
 }
 
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]!);
+
 const emojiCache: { [key: string]: string } = {};
 
 const createEmoji = (emoji: string): string => {
   if (emojiCache[emoji]) {
     return emojiCache[emoji];
   }
-  const parsed = twemoji.parse(emoji, {
+  // twemoji only replaces emoji and passes the rest of the string through, so the
+  // text must be escaped before it is assigned via innerHTML.
+  const parsed = twemoji.parse(escapeHtml(emoji), {
     folder: 'svg',
     ext: '.svg',
   });
