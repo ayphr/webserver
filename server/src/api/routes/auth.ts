@@ -3,6 +3,7 @@ import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, update
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
 import { DEFAULT_BIO } from '@common/utils/bio';
+import { getPasswordValidationErrors } from '@common/utils/password';
 
 type AuthPayload = {
   username?: string;
@@ -40,13 +41,11 @@ async function handleRegister(request: Request) {
   }
 
   const username = body.username.trim();
+  const password = body.password.trim();
 
-  if (username.length < 3 || username.length > 32) {
-    return json({ error: 'username must be between 3 and 32 characters' }, 400);
-  }
-
-  if (body.password.length < 8 || body.password.length > 256) {
-    return json({ error: 'password must be between 8 and 256 characters' }, 400);
+  const passwordValidationErrors = getPasswordValidationErrors(password);
+  if (passwordValidationErrors.length > 0) {
+    return json({ error: passwordValidationErrors[0] }, 400);
   }
 
   const existingUser = await getUserFromUsername(username);
@@ -71,7 +70,7 @@ async function handleRegister(request: Request) {
     bio: DEFAULT_BIO,
     socialLinks: {},
     auth: {
-      passwordHash: createPasswordHash(body.password),
+      passwordHash: createPasswordHash(password),
     },
     createdAt: now,
     lastActive: now,
@@ -92,8 +91,11 @@ async function handleLogin(request: Request) {
     return json({ error: 'username and password are required' }, 400);
   }
 
-  const user = await getUserFromUsername(body.username.trim());
-  if (!user || !verifyPassword(body.password, user.auth.passwordHash)) {
+  const username = body.username.trim();
+  const password = body.password.trim();
+
+  const user = await getUserFromUsername(username);
+  if (!user || !verifyPassword(password, user.auth.passwordHash)) {
     return json({ error: 'invalid username or password' }, 401);
   }
 
