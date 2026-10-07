@@ -100,20 +100,15 @@ async function handleLogin(request: Request) {
   }
 
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
-  if (activeSuspension) {
-    return Response.json(
-      {
-        error: 'Account suspended',
-        suspension: activeSuspension,
-      },
-      { status: 403 },
-    );
-  }
 
   user.lastActive = new Date();
   const token = await issueToken(user);
 
-  return json({ user: publicUser(user), token });
+  return json({
+    user: publicUser(user),
+    token,
+    suspension: activeSuspension,
+  });
 }
 
 const handleMe = requireAuth(async (_request, user) => {

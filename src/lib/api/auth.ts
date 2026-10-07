@@ -15,6 +15,7 @@ export function createAuthApi(client: RequestClient) {
       return {
         user: response.user,
         token: response.token,
+        ...(response.suspension ? { suspension: response.suspension } : {}),
       } satisfies AuthSession;
     },
     async login(input: { username: string; password: string }) {
@@ -29,6 +30,7 @@ export function createAuthApi(client: RequestClient) {
       return {
         user: response.user,
         token: response.token,
+        ...(response.suspension ? { suspension: response.suspension } : {}),
       } satisfies AuthSession;
     },
     async me() {

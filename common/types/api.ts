@@ -5,6 +5,7 @@ import type { PublicUser, UserRole } from './user';
 export type AuthSession = {
   user: PublicUser;
   token: string;
+  suspension?: Punishment | null;
 };
 
 export type AuthMeResponse = {
@@ -50,6 +51,7 @@ export type ApiErrorBody = {
 export type AuthResponsePayload = {
   user: PublicUser;
   token: string;
+  suspension?: Punishment | null;
 };
 
 export type AuthMePayload = {
