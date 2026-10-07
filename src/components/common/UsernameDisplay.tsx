@@ -1,6 +1,7 @@
 import './UsernameDisplay.css';
 import { IconTools } from '@tabler/icons-react';
 import type { PublicUser } from '../../../common';
+import { countryCodeToFlag } from '../../../common';
 import type { ReactNode } from 'react';
 import { EmojiText } from './EmojiText';
 
@@ -9,14 +10,6 @@ export interface UsernameDisplayProps {
   role?: PublicUser['role'];
   country?: string;
   className?: string;
-}
-
-function countryCodeToFlag(code?: string): string | null {
-  if (code?.length !== 2) return null;
-
-  const upper = code.toUpperCase();
-  const points = [...upper].map((char) => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...points);
 }
 
 function RoleIcon({ role }: Readonly<{ role?: PublicUser['role'] }>): ReactNode | null {

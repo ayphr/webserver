@@ -1,17 +1,41 @@
 import { Worker } from 'node:worker_threads';
 import type { WorkerOptions } from 'node:worker_threads';
+import { createLogger } from './logger';
+
+const log = createLogger('worker-pool');
 
 export function createWorkerPool(workerCount: number, workerUrl: URL, onRecord: (record: unknown) => void) {
   const workers: Worker[] = [];
+  let shuttingDown = false;
 
-  for (let i = 0; i < workerCount; i++) {
+  function spawn() {
     const worker = new Worker(workerUrl, { type: 'module' } as WorkerOptions);
+
     worker.on('message', (message: { action: string; record: unknown }) => {
       if (message?.action === 'record' && message.record) {
         onRecord(message.record);
       }
     });
-    workers.push(worker);
+
+    worker.on('error', (error) => {
+      log.error({ error }, 'packet worker error');
+    });
+
+    worker.on('exit', (code) => {
+      if (shuttingDown || code === 0) return;
+
+      const index = workers.indexOf(worker);
+      if (index === -1) return;
+
+      log.warn({ code }, 'packet worker exited unexpectedly, restarting');
+      workers[index] = spawn();
+    });
+
+    return worker;
+  }
+
+  for (let i = 0; i < workerCount; i++) {
+    workers.push(spawn());
   }
 
   let roundRobinIndex = 0;
@@ -24,6 +48,7 @@ export function createWorkerPool(workerCount: number, workerUrl: URL, onRecord: 
   }
 
   async function shutdown() {
+    shuttingDown = true;
     await Promise.all(workers.map((worker) => worker.terminate()));
   }
 

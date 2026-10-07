@@ -2,7 +2,7 @@ import net from 'node:net';
 import { pack } from './lib/packet';
 import { createLogger } from './lib/logger';
 
-const PORT = Number(process.env.PORT || 4000);
+const PORT = Number(process.env.PORT || 7232);
 const HOST = process.env.HOST || '127.0.0.1';
 const log = createLogger('test-client');
 

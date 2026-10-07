@@ -41,20 +41,6 @@ export type StaffSummary = {
   staffCount: number;
 };
 
-export type PurchaseRequest = {
-  center: { lat: number; lon: number };
-  radiusMeters?: number;
-  start: Date;
-  end: Date;
-  limit?: number;
-};
-
-export type MarketPurchaseResponse = {
-  total: number;
-  returned: number;
-  records: Array<Record<string, unknown>>;
-};
-
 export type ApiErrorBody = {
   error?: string;
   message?: string;

@@ -226,11 +226,17 @@ export async function getUserCount() {
   return users.countDocuments({});
 }
 
-export async function updateUser(user: User) {
+export async function updateUser(user: User, unsetKeys: string[] = []) {
   const { users } = await getCols();
   const normalizedUser = normalizeDateValues(user);
+  const update: Record<string, unknown> = { $set: normalizedUser };
+
+  if (unsetKeys.length > 0) {
+    update.$unset = Object.fromEntries(unsetKeys.map((key) => [key, '']));
+  }
+
   trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne({ uuid: user.uuid }, { $set: normalizedUser });
+  await users.updateOne({ uuid: user.uuid }, update);
   return normalizedUser;
 }
 
@@ -275,7 +281,7 @@ export async function getActiveSuspensionForUserUuid(userUuid: string) {
     type: 'suspension',
     liftedAt: { $exists: false },
     startsAt: { $lte: now },
-    endsAt: { $gt: now }
+    $or: [{ endsAt: null }, { endsAt: { $exists: false } }, { endsAt: { $gt: now } }]
   } as Record<string, unknown>);
 }
 

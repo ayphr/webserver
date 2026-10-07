@@ -3,7 +3,7 @@ export type BioFormat = 'limited' | 'markdown';
 export const BIO_MAX_LENGTH = 200;
 export const BIO_MAX_SOURCE_LENGTH = 4000;
 
-export const DEFAULT_BIO = "Hi! I'm a Ayphr user";
+export const DEFAULT_BIO = "Hi! I'm an Ayphr user";
 
 export type BioInline =
   | { kind: 'text'; value: string }

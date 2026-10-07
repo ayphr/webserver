@@ -63,13 +63,17 @@ setInterval(() => {
   })();
 }, FLUSH_INTERVAL_MS);
 
+const sockets = new Set<net.Socket>();
+
 const tcpServer = net.createServer((socket) => {
   let buffer: Uint8Array<ArrayBufferLike> = new Uint8Array(0);
   const connectedAt = process.hrtime.bigint();
 
+  sockets.add(socket);
   tcpConnectionsTotal.inc();
   recordActiveDevices(1);
   socket.once('close', () => {
+    sockets.delete(socket);
     const seconds = Number(process.hrtime.bigint() - connectedAt) / 1e9;
     tcpConnectionDuration.observe(seconds);
     recordActiveDevices(-1);
@@ -97,10 +101,16 @@ const tcpServer = net.createServer((socket) => {
 tcpServer.listen(TCP_PORT, () => log.info({ port: TCP_PORT }, 'TCP server listening'));
 const httpServer = await setupServer(API_PORT, ENABLE_TLS, () => log.info({ port: API_PORT }, 'API server listening'));
 
-process.once('SIGINT', async () => {
-  log.info('shutting down');
+let shuttingDown = false;
 
-  tcpServer.close();
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  log.info({ signal }, 'shutting down');
+
+  for (const socket of sockets) socket.destroy();
+  await new Promise<void>((resolve) => tcpServer.close(() => resolve()));
   await httpServer.stop();
 
   await workerPool.shutdown();
@@ -108,4 +118,7 @@ process.once('SIGINT', async () => {
   await dbWorker.terminate();
 
   process.exit(0);
-});
+}
+
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.once('SIGTERM', () => void shutdown('SIGTERM'));

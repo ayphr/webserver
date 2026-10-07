@@ -39,7 +39,17 @@ async function handleRegister(request: Request) {
     return json({ error: 'username and password are required' }, 400);
   }
 
-  const existingUser = await getUserFromUsername(body.username);
+  const username = body.username.trim();
+
+  if (username.length < 3 || username.length > 32) {
+    return json({ error: 'username must be between 3 and 32 characters' }, 400);
+  }
+
+  if (body.password.length < 8 || body.password.length > 256) {
+    return json({ error: 'password must be between 8 and 256 characters' }, 400);
+  }
+
+  const existingUser = await getUserFromUsername(username);
   if (existingUser) {
     return json({ error: 'username already exists' }, 409);
   }
@@ -56,7 +66,7 @@ async function handleRegister(request: Request) {
   const now = new Date();
   const user: User = {
     uuid: crypto.randomUUID(),
-    username: body.username,
+    username,
     role: 'user',
     bio: DEFAULT_BIO,
     socialLinks: {},
@@ -82,7 +92,7 @@ async function handleLogin(request: Request) {
     return json({ error: 'username and password are required' }, 400);
   }
 
-  const user = await getUserFromUsername(body.username);
+  const user = await getUserFromUsername(body.username.trim());
   if (!user || !verifyPassword(body.password, user.auth.passwordHash)) {
     return json({ error: 'invalid username or password' }, 401);
   }

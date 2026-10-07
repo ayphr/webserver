@@ -1,6 +1,5 @@
 import { createAuthApi } from './auth';
 import { createDevicesApi } from './devices';
-import { createMarketApi } from './market';
 import { createRequestClient, type ApiClientConfig, type RequestClient } from './client';
 import { createPunishmentsApi } from './punishments';
 import { createStaffApi } from './staff';
@@ -19,7 +18,6 @@ export type AyphrApiClient = RequestClient & {
   punishments: ReturnType<typeof createPunishmentsApi>;
   devices: ReturnType<typeof createDevicesApi>;
   staff: ReturnType<typeof createStaffApi>;
-  market: ReturnType<typeof createMarketApi>;
 };
 
 export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
@@ -39,7 +37,6 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     punishments: createPunishmentsApi(client),
     devices: createDevicesApi(client),
     staff: createStaffApi(client),
-    market: createMarketApi(client),
   };
 }
 

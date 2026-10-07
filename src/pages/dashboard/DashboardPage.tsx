@@ -131,27 +131,15 @@ export const DashboardPage = () => {
   const isStaff = user?.role === 'staff';
 
   const handleSelfPunishment = async () => {
-    // Refresh user data to get updated suspension status
+    // Refresh user data to get the updated suspension status.
     try {
       const userData = await api.users.me();
+      setUser(userData.user);
       setActiveSuspension(userData.activeSuspension);
       setActivePage('overview');
     } catch (err) {
       console.error('Failed to refresh user data after punishment:', err);
     }
-
-    if (!activeSuspension) return;
-
-    setIsLiftingPunishment(true);
-    try {
-      await api.staff.punishments.lift(activeSuspension.id);
-      setActiveSuspension(null);
-      setActivePage('overview');
-    } catch (err) {
-      console.error('Failed to lift suspension:', err);
-    } finally {
-      setIsLiftingPunishment(false);
-    };
   };
 
   const handleLiftSuspension = async () => {
@@ -285,18 +273,6 @@ export const DashboardPage = () => {
                 </CardHeader>
                 <CardBody>
                   <p>No devices registered.</p>
-                </CardBody>
-              </Card>
-            )}
-
-            {activePage === 'data' && (
-              <Card className="dashboard-page__card" elevated>
-                <CardHeader>
-                  <h2>Data</h2>
-                  <p>Buy data</p>
-                </CardHeader>
-                <CardBody>
-                  <p>No data available.</p>
                 </CardBody>
               </Card>
             )}

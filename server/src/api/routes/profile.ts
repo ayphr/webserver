@@ -92,12 +92,19 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     return json({ error: 'no fields to update' }, 400);
   }
 
+  const unsetKeys: string[] = [];
+
   if (typeof body.country === 'string') {
-    const countryCode = normalizeCountryCode(body.country);
-    if (!countryCode) {
-      return json({ error: 'country must be a valid ISO 3166-1 alpha-2 code' }, 400);
+    if (body.country.trim() === '') {
+      delete targetUser.country;
+      unsetKeys.push('country');
+    } else {
+      const countryCode = normalizeCountryCode(body.country);
+      if (!countryCode) {
+        return json({ error: 'country must be a valid ISO 3166-1 alpha-2 code' }, 400);
+      }
+      targetUser.country = countryCode;
     }
-    targetUser.country = countryCode;
   }
 
   if (typeof body.bio === 'string') {
@@ -141,7 +148,7 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     targetUser.socialLinks = nextSocialLinks;
   }
 
-  await updateUser(targetUser);
+  await updateUser(targetUser, unsetKeys);
 
   return json({ user: publicUser(targetUser) });
 }, { allowSuspended: true });

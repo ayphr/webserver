@@ -1,6 +1,6 @@
 import React from 'react';
 import './Sidebar.css';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconTable, IconBan } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import type { UserRole } from '../../../common/types/user';
 
@@ -9,7 +9,6 @@ type Tab = { id: string; name: string };
 const tabs: Tab[] = [
   { id: 'overview', name: 'Overview' },
   { id: 'devices', name: 'Devices' },
-  { id: 'data', name: 'Data' },
 ];
 
 const iconFor = (id: string) => {
@@ -18,8 +17,6 @@ const iconFor = (id: string) => {
       return <IconGauge size={18} />;
     case 'devices':
       return <IconDatabase size={18} />;
-    case 'data':
-      return <IconTable size={18} />;
     case 'jail':
       return <IconBan
         size={18} />;

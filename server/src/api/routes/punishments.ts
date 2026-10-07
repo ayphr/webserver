@@ -20,7 +20,7 @@ const handleMe = requireAuth(async (_request, user) => {
       punishment.type === 'suspension' &&
       !punishment.liftedAt &&
       new Date(punishment.startsAt).getTime() <= now &&
-      punishment.endsAt ? new Date(punishment.endsAt).getTime() > now : null
+      (punishment.endsAt === null || new Date(punishment.endsAt).getTime() > now)
     );
   }) ?? null;
 
