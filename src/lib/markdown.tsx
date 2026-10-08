@@ -79,7 +79,7 @@ function getHeadingLevel(text: string): number | null {
 
 function stripHeading(text: string): string {
   const trimmed = text.trimStart();
-  const match = trimmed.match(/^(#{1,6})\s*(.*)$/);
+  const match = new RegExp(/^(#{1,6})\s*(.*)$/).exec(trimmed);
   if (match) return match[2] || '';
   return text;
 }
@@ -146,7 +146,7 @@ function renderBlocks(blocks: MarkdownBlock[], features: MarkdownFeature[], keyP
   return elements;
 }
 
-export function MarkdownRenderer({ markdown, features = ALL_FEATURES, className }: MarkdownRendererProps) {
+export function MarkdownRenderer({ markdown, features = ALL_FEATURES, className }: Readonly<MarkdownRendererProps>) {
   const blocks = markdown.blocks();
 
   if (blocks.length === 0) {
