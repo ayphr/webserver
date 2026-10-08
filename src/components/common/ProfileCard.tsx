@@ -17,7 +17,7 @@ import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '../../../common/utils/country';
 import { PunishModal } from './PunishModal';
 import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
-import { BIO_MAX_LENGTH, DEFAULT_BIO, bioVisibleLength, sanitizeBioMarkdown } from '../../../common';
+import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '../../../common';
 import {
   SOCIAL_LINK_LABELS,
   SOCIAL_LINK_HANDLE_HINTS,
@@ -147,7 +147,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     try {
       const updated = await api.profile.editUser(userUuid, {
         country: selectedCountry,
-        bio: sanitizeBioMarkdown(bio, canUseMarkdown),
+        bio: new Markdown(bio, canUseMarkdown).sanitize(),
         socialLinks,
       });
       setUser(updated);
@@ -175,7 +175,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     ? `Enter a ${SOCIAL_LINK_LABELS[invalidSocialLinkKey]} handle, not a link`
     : null;
 
-  const bioError = bioVisibleLength(bio, canUseMarkdown) > BIO_MAX_LENGTH
+  const bioError = new Markdown(bio, canUseMarkdown).visibleLength() > BIO_MAX_LENGTH
     ? `Bio must be ${BIO_MAX_LENGTH} characters or fewer`
     : null;
 

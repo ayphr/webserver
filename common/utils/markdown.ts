@@ -1,29 +1,29 @@
-export type BioFormat = 'limited' | 'markdown';
+export type MarkdownFormat = 'limited' | 'markdown';
 
 export const BIO_MAX_LENGTH = 200;
 export const BIO_MAX_SOURCE_LENGTH = 4000;
 
 export const DEFAULT_BIO = "Hi! I'm an Ayphr user";
 
-export type BioInline =
+export type MarkdownInline =
   | { kind: 'text'; value: string }
-  | { kind: 'bold'; children: BioInline[] }
-  | { kind: 'italic'; children: BioInline[] }
-  | { kind: 'strike'; children: BioInline[] }
+  | { kind: 'bold'; children: MarkdownInline[] }
+  | { kind: 'italic'; children: MarkdownInline[] }
+  | { kind: 'strike'; children: MarkdownInline[] }
   | { kind: 'code'; value: string };
 
-export type BioBlock =
-  | { kind: 'line'; inlines: BioInline[] }
-  | { kind: 'bullets'; items: BioInline[][] }
+export type MarkdownBlock =
+  | { kind: 'line'; inlines: MarkdownInline[] }
+  | { kind: 'bullets'; items: MarkdownInline[][] }
   | { kind: 'codeBlock'; code: string };
 
-export type BioToken =
+export type MarkdownToken =
   | { kind: 'text'; value: string }
   | { kind: 'marker'; value: string }
   | { kind: 'visibleMarker'; value: string }
-  | { kind: 'bold'; open: string; close: string; children: BioToken[] }
-  | { kind: 'italic'; open: string; close: string; children: BioToken[] }
-  | { kind: 'strike'; open: string; close: string; children: BioToken[] }
+  | { kind: 'bold'; open: string; close: string; children: MarkdownToken[] }
+  | { kind: 'italic'; open: string; close: string; children: MarkdownToken[] }
+  | { kind: 'strike'; open: string; close: string; children: MarkdownToken[] }
   | { kind: 'code'; open: string; close: string; value: string }
   | { kind: 'codeBlock'; value: string };
 
@@ -61,9 +61,9 @@ function readDelimited(text: string, start: number, open: string, close: string,
   return null;
 }
 
-function lexInline(text: string, extended: boolean): BioToken[] {
+function lexInline(text: string, extended: boolean): MarkdownToken[] {
   const escapable = extended ? MARKDOWN_ESCAPABLE : LIMITED_ESCAPABLE;
-  const tokens: BioToken[] = [];
+  const tokens: MarkdownToken[] = [];
   let buffer = '';
   let index = 0;
 
@@ -129,7 +129,6 @@ function lexInline(text: string, extended: boolean): BioToken[] {
       if (pushed) continue;
     }
 
-
     buffer += char;
     index += 1;
   }
@@ -139,7 +138,7 @@ function lexInline(text: string, extended: boolean): BioToken[] {
 }
 
 type BlockLex =
-  | { type: 'line'; bullet: boolean; prefix: string; inlines: BioToken[] }
+  | { type: 'line'; bullet: boolean; prefix: string; inlines: MarkdownToken[] }
   | { type: 'codeBlock'; open: string; close: string; code: string };
 
 type Lexeme = { gap: number; block: BlockLex | null };
@@ -200,8 +199,8 @@ function lexBlocks(markdown: string, extended: boolean): Lexeme[] {
   return lexemes;
 }
 
-export function lexBioMarkdown(markdown: string, extended = false): BioToken[] {
-  const tokens: BioToken[] = [];
+function lexMarkdown(markdown: string, extended: boolean): MarkdownToken[] {
+  const tokens: MarkdownToken[] = [];
 
   for (const { gap, block } of lexBlocks(markdown, extended)) {
     if (gap > 0) {
@@ -230,8 +229,8 @@ export function lexBioMarkdown(markdown: string, extended = false): BioToken[] {
   return tokens;
 }
 
-function tokensToInlines(tokens: BioToken[]): BioInline[] {
-  const inlines: BioInline[] = [];
+function tokensToInlines(tokens: MarkdownToken[]): MarkdownInline[] {
+  const inlines: MarkdownInline[] = [];
 
   for (const token of tokens) {
     if (token.kind === 'text') {
@@ -246,7 +245,6 @@ function tokensToInlines(tokens: BioToken[]): BioInline[] {
       continue;
     }
 
-
     const children = tokensToInlines(token.children);
     if (children.length > 0) {
       inlines.push({ kind: token.kind, children });
@@ -256,8 +254,8 @@ function tokensToInlines(tokens: BioToken[]): BioInline[] {
   return inlines;
 }
 
-export function parseBioMarkdown(markdown: string, extended = false): BioBlock[] {
-  const blocks: BioBlock[] = [];
+function parseMarkdown(markdown: string, extended: boolean): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
 
   for (const { block } of lexBlocks(markdown, extended)) {
     if (!block) continue;
@@ -288,8 +286,17 @@ export function parseBioMarkdown(markdown: string, extended = false): BioBlock[]
   return blocks;
 }
 
+function escapeExtendedMarkdown(text: string): string {
+  return text.replace(MARKDOWN_ESCAPED, String.raw`\$1`);
+}
+
+function escapeLimitedMarkdown(text: string): string {
+  return text.replace(LIMITED_ESCAPED, String.raw`\$1`);
+}
+
 function escapeText(value: string, extended: boolean): string {
-  return extended ? value.replace(MARKDOWN_ESCAPED, String.raw`\$1`) : value.replace(LIMITED_ESCAPED, String.raw`\$1`);
+  if (extended) return escapeExtendedMarkdown(value);
+  return escapeLimitedMarkdown(value);
 }
 
 function fenceFor(value: string, minimum: number): string {
@@ -303,7 +310,7 @@ function fenceFor(value: string, minimum: number): string {
   return '`'.repeat(Math.max(minimum, longest + 1));
 }
 
-function serializeInlines(inlines: BioInline[], extended: boolean): string {
+function serializeInlines(inlines: MarkdownInline[], extended: boolean): string {
   return inlines
     .map((inline) => {
       if (inline.kind === 'text') return escapeText(inline.value, extended);
@@ -324,7 +331,7 @@ function serializeInlines(inlines: BioInline[], extended: boolean): string {
     .join('');
 }
 
-export function serializeBio(blocks: BioBlock[], extended = false): string {
+function serializeMarkdown(blocks: MarkdownBlock[], extended: boolean): string {
   const lines: string[] = [];
 
   for (const block of blocks) {
@@ -354,20 +361,14 @@ export function serializeBio(blocks: BioBlock[], extended = false): string {
   return lines.join('\n');
 }
 
-export function sanitizeBioMarkdown(markdown: string, extended = false): string {
-  return serializeBio(parseBioMarkdown(markdown, extended), extended);
-}
-
-function inlineLength(inlines: BioInline[]): number {
+function inlineLength(inlines: MarkdownInline[]): number {
   return inlines.reduce((total, inline) => {
     if (inline.kind === 'text' || inline.kind === 'code') return total + inline.value.length;
     return total + inlineLength(inline.children);
   }, 0);
 }
 
-export function bioVisibleLength(markdown: string, extended = false): number {
-  const blocks = parseBioMarkdown(markdown, extended);
-
+function visibleLength(blocks: MarkdownBlock[]): number {
   return blocks.reduce((total, block, index) => {
     const separator = index > 0 ? 1 : 0;
 
@@ -380,4 +381,35 @@ export function bioVisibleLength(markdown: string, extended = false): number {
 
     return total + separator + items;
   }, 0);
+}
+
+export class Markdown {
+  readonly source: string;
+  readonly extended: boolean;
+
+  private tokenCache?: MarkdownToken[];
+  private blockCache?: MarkdownBlock[];
+
+  constructor(source: string, extended = false) {
+    this.source = source ?? '';
+    this.extended = extended;
+  }
+
+  tokens(): MarkdownToken[] {
+    if (!this.tokenCache) this.tokenCache = lexMarkdown(this.source, this.extended);
+    return this.tokenCache;
+  }
+
+  blocks(): MarkdownBlock[] {
+    if (!this.blockCache) this.blockCache = parseMarkdown(this.source, this.extended);
+    return this.blockCache;
+  }
+
+  visibleLength(): number {
+    return visibleLength(this.blocks());
+  }
+
+  sanitize(): string {
+    return serializeMarkdown(this.blocks(), this.extended);
+  }
 }

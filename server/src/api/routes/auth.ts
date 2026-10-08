@@ -2,7 +2,7 @@ import { clearToken, createPasswordHash, issueToken, requireAuth, verifyPassword
 import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, updateUser } from '../../workers/dbWriter';
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
-import { DEFAULT_BIO } from '@common/utils/bio';
+import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
 
 type AuthPayload = {

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { BIO_MAX_LENGTH, bioVisibleLength, lexBioMarkdown } from '../../../common';
-import type { BioToken } from '../../../common';
+import { BIO_MAX_LENGTH, Markdown } from '../../../common';
+import type { MarkdownToken } from '../../../common';
 import './BioEditor.css';
 
-function renderTokens(tokens: BioToken[], keyPrefix: string): ReactNode[] {
+function renderTokens(tokens: MarkdownToken[], keyPrefix: string): ReactNode[] {
   return tokens.map((token, index) => {
     const key = `${keyPrefix}-${index}`;
 
@@ -82,8 +82,9 @@ export const BioEditor = ({
   const surfaceRef = useRef<HTMLTextAreaElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
 
-  const tokens = useMemo(() => lexBioMarkdown(value, markdown), [value, markdown]);
-  const used = useMemo(() => bioVisibleLength(value, markdown), [value, markdown]);
+  const markdownDoc = useMemo(() => new Markdown(value, markdown), [value, markdown]);
+  const tokens = markdownDoc.tokens();
+  const used = markdownDoc.visibleLength();
   const isOverLimit = used > maxLength;
 
   const syncScroll = (top: number, left: number) => {
