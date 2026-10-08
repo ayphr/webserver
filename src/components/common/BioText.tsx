@@ -1,83 +1,28 @@
 import { useMemo } from 'react';
-import type { ReactNode } from 'react';
-import { parseBioMarkdown } from '../../../common';
-import type { BioFormat, BioInline } from '../../../common';
-import { EmojiText } from './EmojiText';
+import { Markdown } from '../../../common';
+import type { MarkdownFormat } from '../../../common';
+import type { MarkdownFeature } from '../../lib/markdown';
+import { MarkdownRenderer } from '../../lib/markdown';
 import './BioText.css';
-
-function renderInlines(inlines: BioInline[], keyPrefix: string): ReactNode[] {
-  return inlines.map((inline, index) => {
-    const key = `${keyPrefix}-${index}`;
-
-    if (inline.kind === 'text') {
-      return <EmojiText key={key}>{inline.value}</EmojiText>;
-    }
-
-    if (inline.kind === 'code') {
-      return (
-        <code key={key} className="bio-text__code">
-          {inline.value}
-        </code>
-      );
-    }
-
-    if (inline.kind === 'bold') {
-      return <strong key={key}>{renderInlines(inline.children, key)}</strong>;
-    }
-
-    if (inline.kind === 'italic') {
-      return <em key={key}>{renderInlines(inline.children, key)}</em>;
-    }
-
-    return <del key={key}>{renderInlines(inline.children, key)}</del>;
-  });
-}
 
 export interface BioTextProps {
   value: string;
-  format?: BioFormat;
+  format?: MarkdownFormat;
   className?: string;
 }
 
-export const BioText = ({ value, format = 'limited', className }: BioTextProps) => {
-  const extended = format === 'markdown';
-  const blocks = useMemo(() => parseBioMarkdown(value, extended), [value, extended]);
+const BIO_FEATURES: MarkdownFeature[] = ['bold', 'italic', 'strike', 'code', 'codeBlock', 'lists'];
 
-  if (blocks.length === 0) {
-    return null;
-  }
+export const BioText = ({ value, format = 'limited', className }: BioTextProps) => {
+  const markdown = useMemo(() => new Markdown(value, format === 'markdown'), [value, format]);
+
+  if (!markdown.source) return null;
 
   return (
-    <div className={`bio-text ${className ?? ''}`.trim()}>
-      {blocks.map((block, index) => {
-        const key = `block-${index}`;
-
-        if (block.kind === 'codeBlock') {
-          return (
-            <pre key={key} className="bio-text__codeBlock">
-              <code>{block.code}</code>
-            </pre>
-          );
-        }
-
-        if (block.kind === 'bullets') {
-          return (
-            <ul key={key} className="bio-text__list">
-              {block.items.map((item, itemIndex) => (
-                <li key={`item-${itemIndex}`} className="bio-text__listItem">
-                  {renderInlines(item, `${key}-item-${itemIndex}`)}
-                </li>
-              ))}
-            </ul>
-          );
-        }
-
-        return (
-          <p key={key} className="bio-text__line">
-            {renderInlines(block.inlines, key)}
-          </p>
-        );
-      })}
-    </div>
+    <MarkdownRenderer
+      markdown={markdown}
+      features={BIO_FEATURES}
+      className={`bio-text ${className ?? ''}`.trim()}
+    />
   );
 };

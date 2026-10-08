@@ -1,4 +1,4 @@
-import type { BioFormat } from '../utils/bio';
+import type { MarkdownFormat } from '../utils/markdown';
 
 export type UserRole = 'user' | 'staff';
 export type SocialLinkType = 'website' | 'youtube' | 'github' | 'bluesky' | 'reddit' | 'x' | 'facebook' | 'instagram' | 'tiktok';
@@ -11,7 +11,7 @@ export type User = {
   role: UserRole;
   bio?: string;
   /** `markdown` unlocks the full dialect, which only staff may author. */
-  bioFormat?: BioFormat;
+  bioFormat?: MarkdownFormat;
   socialLinks?: SocialLinks;
   auth: {
     token?: string;

@@ -6,9 +6,8 @@ import {
   BIO_MAX_LENGTH,
   BIO_MAX_SOURCE_LENGTH,
   DEFAULT_BIO,
-  bioVisibleLength,
-  sanitizeBioMarkdown,
-} from '@common/utils/bio';
+  Markdown,
+} from '@common/utils/markdown';
 import { updateUser, getUserFromUuid } from '../../workers/dbWriter';
 
 type CountryUpdatePayload = {
@@ -113,9 +112,10 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     }
 
     const extended = isStaff;
-    const bio = sanitizeBioMarkdown(body.bio, extended);
+    const markdown = new Markdown(body.bio, extended);
+    const bio = markdown.sanitize();
 
-    if (bioVisibleLength(bio, extended) > BIO_MAX_LENGTH) {
+    if (markdown.visibleLength() > BIO_MAX_LENGTH) {
       return json({ error: `bio must be ${BIO_MAX_LENGTH} characters or fewer` }, 400);
     }
 

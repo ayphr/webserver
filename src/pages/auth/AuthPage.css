@@ -130,9 +130,29 @@
 
   p {
     margin: 0;
-    color: hsl(180, 67%, 99%, 0.4);
+    color: var(--text-dim);
     font-size: 0.8rem;
   }
+}
+
+.auth-page__links {
+  margin-bottom: 0.5rem !important;
+  color: var(--text-muted) !important;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-page__link {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.auth-page__link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
 }
 
 /* Responsive */

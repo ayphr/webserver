@@ -243,6 +243,10 @@ export const AuthPage = () => {
         </Card>
 
         <div className="auth-page__footer">
+          <p className="auth-page__links">
+            <a href="/policies/terms" className="auth-page__link">Terms</a>
+            <a href="/policies/privacy" className="auth-page__link">Privacy</a>
+          </p>
           <p>&copy; 2026 Ayphr. All rights reserved.</p>
         </div>
       </div>
