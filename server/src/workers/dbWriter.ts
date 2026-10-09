@@ -375,6 +375,12 @@ export async function getSessionByToken(token: string) {
   return sessions.findOne({ token });
 }
 
+export async function getSessionById(id: string) {
+  const { sessions } = await getCols();
+  trackMongoOperation('findOne', SESSIONS_COLLECTION);
+  return sessions.findOne({ id } as Record<string, unknown>);
+}
+
 export async function getSessionsForUserUuid(userUuid: string) {
   const { sessions } = await getCols();
   trackMongoOperation('find', SESSIONS_COLLECTION);

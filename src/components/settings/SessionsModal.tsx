@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
   IconDeviceDesktop,
+  IconDeviceLaptop,
   IconDeviceMobile,
   IconDeviceTablet,
+  IconDeviceTv,
   IconMapPin,
   IconAlertCircle,
 } from '@tabler/icons-react';
 import type { SessionInfo } from '../../../common';
 import { api } from '../../lib/api';
-import { Modal } from '../common';
+import { Button, ConfirmDialog, Modal } from '../common';
 import './SessionsModal.css';
 
 export interface SessionsModalProps {
@@ -23,13 +25,14 @@ function toDate(value: Date | string): Date {
 }
 
 function getRelativeTime(date: Date | string): string {
-  const diffMs = Date.now() - toDate(date).getTime();
+  const resolved = toDate(date);
+  const diffMs = Date.now() - resolved.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffDays > 30) {
-    return toDate(date).toLocaleDateString('en-GB');
+    return resolved.toLocaleDateString('en-GB');
   }
   if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
   if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
@@ -56,9 +59,20 @@ function formatLocation(session: SessionInfo): string {
 }
 
 function DeviceIcon({ deviceType }: { deviceType?: SessionInfo['deviceType'] }) {
-  if (deviceType === 'mobile') return <IconDeviceMobile size={20} strokeWidth={1.75} />;
-  if (deviceType === 'tablet') return <IconDeviceTablet size={20} strokeWidth={1.75} />;
-  return <IconDeviceDesktop size={20} strokeWidth={1.75} />;
+  switch (deviceType) {
+    case 'phone':
+      return <IconDeviceMobile size={20} strokeWidth={1.75} />;
+    case 'tablet':
+      return <IconDeviceTablet size={20} strokeWidth={1.75} />;
+    case 'laptop':
+      return <IconDeviceLaptop size={20} strokeWidth={1.75} />;
+    case 'tv':
+      return <IconDeviceTv size={20} strokeWidth={1.75} />;
+    case 'desktop':
+      return <IconDeviceDesktop size={20} strokeWidth={1.75} />;
+    default:
+      return <IconDeviceDesktop size={20} strokeWidth={1.75} />;
+  }
 }
 
 function describeClient(session: SessionInfo): string {
@@ -71,6 +85,9 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [sessionToRevoke, setSessionToRevoke] = useState<SessionInfo | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -96,50 +113,100 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, reloadToken]);
+
+  const handleRevoke = async () => {
+    const session = sessionToRevoke;
+    if (!session) return;
+
+    setSessionToRevoke(null);
+    setRevokingId(session.id);
+    setError(null);
+
+    try {
+      await api.sessions.remove(session.id);
+      setReloadToken((token) => token + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign out session');
+    } finally {
+      setRevokingId(null);
+    }
+  };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Active sessions" size="md" showCancel={false}>
-      {isLoading && <p className="sessions-modal__status">Loading sessions...</p>}
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title="Active sessions" size="md" showCancel={false}>
+        {isLoading && <p className="sessions-modal__status">Loading sessions...</p>}
 
-      {!isLoading && error && (
-        <div className="sessions-modal__error">
-          <IconAlertCircle size={18} strokeWidth={1.75} />
-          <span>{error}</span>
-        </div>
-      )}
+        {!isLoading && error && (
+          <div className="sessions-modal__error">
+            <IconAlertCircle size={18} strokeWidth={1.75} />
+            <span>{error}</span>
+          </div>
+        )}
 
-      {!isLoading && !error && sessions.length === 0 && (
-        <p className="sessions-modal__status">No active sessions found.</p>
-      )}
+        {!isLoading && !error && sessions.length === 0 && (
+          <p className="sessions-modal__status">No active sessions found.</p>
+        )}
 
-      {!isLoading && !error && sessions.length > 0 && (
-        <ul className="sessions-modal__list">
-          {sessions.map((session) => (
-            <li className="sessions-modal__item" key={session.id}>
-              <span className="sessions-modal__icon">
-                <DeviceIcon deviceType={session.deviceType} />
-              </span>
+        {!isLoading && !error && sessions.length > 0 && (
+          <ul className="sessions-modal__list">
+            {sessions.map((session) => (
+              <li className="sessions-modal__item" key={session.id}>
+                <span className="sessions-modal__icon">
+                  <DeviceIcon deviceType={session.deviceType} />
+                </span>
 
-              <div className="sessions-modal__details">
-                <div className="sessions-modal__title-row">
-                  <span className="sessions-modal__title">{describeClient(session)}</span>
-                  {session.current && <span className="sessions-modal__badge">This device</span>}
+                <div className="sessions-modal__details">
+                  <div className="sessions-modal__title-row">
+                    <span className="sessions-modal__title">{describeClient(session)}</span>
+                    {session.current && <span className="sessions-modal__badge">This device</span>}
+                  </div>
+
+                  <span className="sessions-modal__meta">
+                    <IconMapPin size={14} strokeWidth={1.75} />
+                    {formatLocation(session)}
+                  </span>
+
+                  <span className="sessions-modal__meta">
+                    Last active {getRelativeTime(session.lastActive)}
+                  </span>
                 </div>
 
-                <span className="sessions-modal__meta">
-                  <IconMapPin size={14} strokeWidth={1.75} />
-                  {formatLocation(session)}
-                </span>
+                {!session.current && (
+                  <div className="sessions-modal__actions">
+                    <Button
+                      variant="secondary"
+                      disabled={revokingId !== null}
+                      isLoading={revokingId === session.id}
+                      onClick={() => setSessionToRevoke(session)}
+                    >
+                      Sign out
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
 
-                <span className="sessions-modal__meta">
-                  Last active {getRelativeTime(session.lastActive)}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Modal>
+      <ConfirmDialog
+        isOpen={sessionToRevoke !== null}
+        title="Sign out device"
+        confirmText="Sign out"
+        cancelText="Cancel"
+        isDangerous
+        onConfirm={handleRevoke}
+        onCancel={() => setSessionToRevoke(null)}
+      >
+        {sessionToRevoke && (
+          <p>
+            Sign out <strong>{describeClient(sessionToRevoke)}</strong> ({formatLocation(sessionToRevoke)})? That
+            device will need to log in again.
+          </p>
+        )}
+      </ConfirmDialog>
+    </>
   );
 };

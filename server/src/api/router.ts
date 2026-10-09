@@ -24,7 +24,7 @@ import {
 } from './routes/staff';
 import { handleGetBySerial, handleListMine, handleRegister as handleDeviceRegister } from './routes/devices';
 import { handleUserByUuid, handleMe as handleUsersMe } from './routes/users';
-import { handleListMine as handleSessionsListMine } from './routes/sessions';
+import { handleListMine as handleSessionsListMine, handleRevoke as handleSessionRevoke } from './routes/sessions';
 import {
   handleCountries,
   handleCountryUpdate,
@@ -61,6 +61,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
 
   { method: 'GET', path: '/api/sessions', handle: handleSessionsListMine },
+  { method: 'DELETE', path: '/api/sessions/:id', handle: handleSessionRevoke },
 
   { method: 'GET', path: '/api/punishments/me', handle: handlePunishmentsMe },
   { method: 'GET', path: '/api/punishments/:id', handle: handlePunishment },

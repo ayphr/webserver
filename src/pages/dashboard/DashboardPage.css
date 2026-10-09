@@ -1,9 +1,10 @@
 .dashboard-layout {
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   align-items: stretch;
   justify-content: flex-start;
+  overflow: hidden;
   padding: 0;
   background: var(--bg-base);
 }
@@ -19,15 +20,16 @@
 
 .dashboard-main {
   flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 2rem 1rem;
+  overflow-y: auto;
 }
 
 .dashboard-page__card {
   width: 100%;
   max-width: 640px;
+  margin: auto;
 }
 
 .dashboard-page__user-row {
