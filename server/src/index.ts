@@ -6,7 +6,7 @@ import { appendChunk, parseIncomingBuffer } from './lib/socketFraming';
 import type { TelemetryRecord } from './lib/telemetry';
 import { createWorkerPool } from './lib/workerPool';
 import { setupServer } from './api/server';
-import { API_PORT, ENABLE_TLS, TCP_PORT } from './env';
+import { API_PORT, TCP_PORT } from './env';
 import {
   packetsReceivedTotal,
   recordActiveDevices,
@@ -99,7 +99,7 @@ const tcpServer = net.createServer((socket) => {
 });
 
 tcpServer.listen(TCP_PORT, () => log.info({ port: TCP_PORT }, 'TCP server listening'));
-const httpServer = await setupServer(API_PORT, ENABLE_TLS, () => log.info({ port: API_PORT }, 'API server listening'));
+const httpServer = setupServer(API_PORT, () => log.info({ port: API_PORT }, 'API server listening'));
 
 let shuttingDown = false;
 
