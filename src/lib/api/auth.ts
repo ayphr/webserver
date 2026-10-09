@@ -1,13 +1,26 @@
 import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession } from '../../../common';
 import type { RequestClient } from './client';
 
+function getClientSessionMeta() {
+  if (typeof navigator === 'undefined') return {};
+
+  let timezone: string | undefined;
+  try {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    timezone = undefined;
+  }
+
+  return { timezone, locale: navigator.language };
+}
+
 export function createAuthApi(client: RequestClient) {
   return {
     async register(input: { username: string; password: string; country?: string; acceptPolicies: boolean }) {
       const response = await client.requestJson<AuthResponsePayload>('/api/auth/register', {
         method: 'POST',
         auth: false,
-        body: input,
+        body: { ...input, ...getClientSessionMeta() },
       });
 
       client.setAuthToken(response.token);
@@ -23,7 +36,7 @@ export function createAuthApi(client: RequestClient) {
       const response = await client.requestJson<AuthResponsePayload>('/api/auth/login', {
         method: 'POST',
         auth: false,
-        body: input,
+        body: { ...input, ...getClientSessionMeta() },
       });
 
       client.setAuthToken(response.token);

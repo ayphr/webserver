@@ -1,8 +1,9 @@
-import { clearToken, createPasswordHash, issueToken, requireAuth, verifyPassword } from '../auth';
+import { createPasswordHash, endAllSessions, endCurrentSession, requireAuth, startSession, verifyPassword } from '../auth';
 import {
   createUser,
   deleteDevicesForOwnerUuid,
   deletePunishmentsForUserUuid,
+  deleteSessionsForUserUuid,
   deleteUser,
   getActiveSuspensionForUserUuid,
   getUserFromUsername,
@@ -19,6 +20,8 @@ type AuthPayload = {
   password?: string;
   country?: string;
   acceptPolicies?: boolean;
+  timezone?: string;
+  locale?: string;
 };
 
 const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
@@ -104,7 +107,7 @@ async function handleRegister(request: Request) {
 
   await createUser(user);
 
-  const token = await issueToken(user);
+  const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -128,8 +131,7 @@ async function handleLogin(request: Request) {
 
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
 
-  user.lastActive = new Date();
-  const token = await issueToken(user);
+  const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -152,15 +154,13 @@ const handleMe = requireAuth(async (_request, user) => {
   });
 }, { allowSuspended: true, allowPolicyPending: true });
 
-const handleLogout = requireAuth(async (_request, user) => {
-  clearToken(user);
-  await updateUser(user);
+const handleLogout = requireAuth(async (request, user) => {
+  await endCurrentSession(request, user);
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
 const handleLogoutAll = requireAuth(async (_request, user) => {
-  clearToken(user);
-  await updateUser(user);
+  await endAllSessions(user);
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
@@ -185,6 +185,7 @@ const handleDeleteAccount = requireAuth(async (_request, user) => {
   await Promise.all([
     deletePunishmentsForUserUuid(user.uuid),
     deleteDevicesForOwnerUuid(user.uuid),
+    deleteSessionsForUserUuid(user.uuid),
   ]);
   await deleteUser(user.uuid);
 

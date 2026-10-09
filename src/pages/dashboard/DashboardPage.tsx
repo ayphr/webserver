@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLogout, IconLogout2, IconTrash } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLogout, IconLogout2, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type { Punishment, PublicUser } from '../../../common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
-import { SettingsPanel } from '../../components/settings';
+import { SettingsPanel, SessionsModal } from '../../components/settings';
 import './DashboardPage.css';
 
 function toDate(value: Date | string): Date {
@@ -116,6 +116,7 @@ export const DashboardPage = () => {
   const [activePage, setActivePage] = useState<string>(getStoredDefaultTab);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
+  const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   const [compactLayout, setCompactLayout] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-compact') === '1',
@@ -217,6 +218,22 @@ export const DashboardPage = () => {
             await api.auth.logoutAll();
             navigate('/auth', { replace: true });
           },
+        },
+      ],
+    },
+    {
+      id: 'security',
+      title: 'Security',
+      options: [
+        {
+          id: 'sessions',
+          optionType: 'button',
+          icon: <IconShieldLock size={18} strokeWidth={1.75} />,
+          title: 'Active sessions',
+          description: 'See where your account is signed in, with approximate location and device.',
+          label: 'View sessions',
+          variant: 'secondary',
+          action: () => setIsSessionsOpen(true),
         },
       ],
     },
@@ -438,6 +455,7 @@ export const DashboardPage = () => {
           </>
         )}
       </main>
+      <SessionsModal isOpen={isSessionsOpen} onClose={() => setIsSessionsOpen(false)} />
     </div>
   );
 };

@@ -2,12 +2,13 @@ import { Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../lib/logger';
 import { recordMongoOperation } from '../lib/metrics';
 import type { TelemetryRecord } from '../lib/telemetry';
-import { type Device, type Punishment, type User, type UserRole } from '@common';
+import { type Device, type Punishment, type Session, type User, type UserRole } from '@common';
 import {
   TELEMETRY_COLLECTION,
   USERS_COLLECTION,
   PUNISHMENTS_COLLECTION,
   DEVICES_COLLECTION,
+  SESSIONS_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME
 } from '../env';
@@ -25,6 +26,7 @@ interface Collections {
   users: Collection<User>;
   punishments: Collection<Punishment>;
   devices: Collection<Device>;
+  sessions: Collection<Session>;
 }
 
 let collections: Collections | null = null;
@@ -109,7 +111,8 @@ async function setupCollections(db: Db): Promise<Collections> {
     telemetry: db.collection<TelemetryRecord>(TELEMETRY_COLLECTION),
     users: db.collection<User>(USERS_COLLECTION),
     punishments: db.collection<Punishment>(PUNISHMENTS_COLLECTION),
-    devices: db.collection<Device>(DEVICES_COLLECTION)
+    devices: db.collection<Device>(DEVICES_COLLECTION),
+    sessions: db.collection<Session>(SESSIONS_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -121,6 +124,10 @@ async function setupCollections(db: Db): Promise<Collections> {
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ ownerUuid: 1 })],
+    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ id: 1 }, { unique: true })],
+    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ token: 1 }, { unique: true })],
+    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ userUuid: 1 })],
+    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
   ];
 
   await Promise.all(
@@ -352,4 +359,48 @@ export async function updateDeviceLastBroadcast(serial: number, when: Date) {
   const { devices } = await getCols();
   trackMongoOperation('updateOne', DEVICES_COLLECTION);
   await devices.updateOne({ serial }, { $set: { lastBroadcastedAt: when } as Record<string, unknown> });
+}
+
+export async function createSession(session: Session) {
+  const { sessions } = await getCols();
+  const normalizedSession = normalizeDateValues(session);
+  trackMongoOperation('insertOne', SESSIONS_COLLECTION);
+  await sessions.insertOne(normalizedSession);
+  return normalizedSession;
+}
+
+export async function getSessionByToken(token: string) {
+  const { sessions } = await getCols();
+  trackMongoOperation('findOne', SESSIONS_COLLECTION);
+  return sessions.findOne({ token });
+}
+
+export async function getSessionsForUserUuid(userUuid: string) {
+  const { sessions } = await getCols();
+  trackMongoOperation('find', SESSIONS_COLLECTION);
+  return sessions.find({ userUuid }).sort({ lastActive: -1 }).toArray();
+}
+
+export async function updateSessionLastActive(id: string, when: Date) {
+  const { sessions } = await getCols();
+  trackMongoOperation('updateOne', SESSIONS_COLLECTION);
+  await sessions.updateOne({ id } as Record<string, unknown>, { $set: { lastActive: when } });
+}
+
+export async function deleteSession(id: string) {
+  const { sessions } = await getCols();
+  trackMongoOperation('deleteOne', SESSIONS_COLLECTION);
+  await sessions.deleteOne({ id } as Record<string, unknown>);
+}
+
+export async function deleteSessionByToken(token: string) {
+  const { sessions } = await getCols();
+  trackMongoOperation('deleteOne', SESSIONS_COLLECTION);
+  await sessions.deleteOne({ token });
+}
+
+export async function deleteSessionsForUserUuid(userUuid: string) {
+  const { sessions } = await getCols();
+  trackMongoOperation('deleteMany', SESSIONS_COLLECTION);
+  await sessions.deleteMany({ userUuid });
 }

@@ -1,0 +1,86 @@
+.sessions-modal__status {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 0.5rem 0;
+}
+
+.sessions-modal__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid hsla(4, 100%, 71%, 0.3);
+  background-color: hsla(4, 100%, 71%, 0.15);
+  color: hsl(4, 100%, 71%);
+  font-size: 0.9rem;
+}
+
+.sessions-modal__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sessions-modal__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.sessions-modal__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.sessions-modal__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.sessions-modal__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sessions-modal__title {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-md);
+  font-size: 0.95rem;
+}
+
+.sessions-modal__badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: hsla(129, 77%, 43%, 0.18);
+  color: var(--accent-green);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-md);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.sessions-modal__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}

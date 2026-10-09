@@ -1,14 +1,34 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { User, UserRole } from '@common';
-import { getActiveSuspensionForUserUuid, getUserFromToken, updateUser } from '../workers/dbWriter';
+import type { Session, User, UserRole } from '@common';
+import {
+  createSession,
+  deleteSession,
+  deleteSessionsForUserUuid,
+  deleteSessionByToken,
+  getActiveSuspensionForUserUuid,
+  getSessionByToken,
+  getUserFromToken,
+  getUserFromUuid,
+  updateSessionLastActive,
+  updateUser,
+} from '../workers/dbWriter';
 import { getPolicyStatus } from '../lib/policies';
+import { parseUserAgent, resolveLocationFromClient } from '../lib/session';
 import type { RouteParams } from './types';
 
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
 export type TokenVerificationResult = 'invalid' | 'expired' | 'success';
 
+/** How often a session's `lastActive` timestamp is persisted. */
+const SESSION_ACTIVITY_THRESHOLD_MS = 60 * 1000;
+
 const PASSWORD_HASH_ALGORITHM = 'scrypt';
 const PASSWORD_HASH_LENGTH = 64;
+
+export type ClientSessionMeta = {
+  timezone?: string;
+  locale?: string;
+};
 
 export type AuthenticatedHandler = (request: Request, user: User, params: RouteParams) => Promise<Response> | Response;
 
@@ -46,17 +66,50 @@ export function verifyPassword(password: string, passwordHash?: string): boolean
   return timingSafeEqual(computed, stored);
 }
 
-export function createToken(user: User) {
+export async function startSession(user: User, request: Request, meta: ClientSessionMeta = {}) {
   const token = randomBytes(32).toString('hex');
-  user.auth.token = token;
-  user.auth.issuedAt = new Date();
+  const now = new Date();
+  const userAgent = request.headers.get('user-agent') ?? undefined;
+
+  const session: Session = {
+    id: crypto.randomUUID(),
+    userUuid: user.uuid,
+    token,
+    createdAt: now,
+    lastActive: now,
+    expiresAt: getExpiryDate(now),
+    userAgent,
+    ...parseUserAgent(userAgent),
+    location: resolveLocationFromClient(meta),
+  };
+
+  await createSession(session);
+
+  // Sessions supersede the legacy single-token model.
+  delete user.auth.token;
+  delete user.auth.issuedAt;
+  user.lastActive = now;
+  await updateUser(user, ['auth.token', 'auth.issuedAt']);
+
   return token;
 }
 
-export async function issueToken(user: User) {
-  const token = createToken(user);
-  await updateUser(user);
-  return token;
+export async function endCurrentSession(request: Request, user?: User) {
+  const token = getBearerToken(request);
+  if (token) await deleteSessionByToken(token);
+
+  // A token migrated from the legacy single-token model still lingers on the
+  // user document; clear it so it cannot re-authenticate.
+  if (user && (user.auth.token || user.auth.issuedAt)) {
+    clearToken(user);
+    await updateUser(user, ['auth.token', 'auth.issuedAt']);
+  }
+}
+
+export async function endAllSessions(user: User) {
+  await deleteSessionsForUserUuid(user.uuid);
+  clearToken(user);
+  await updateUser(user, ['auth.token', 'auth.issuedAt']);
 }
 
 export function clearToken(user: User) {
@@ -109,6 +162,33 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
 
   if (!token) return null;
 
+  const session = await getSessionByToken(token);
+
+  if (session) {
+    if (Date.now() > session.expiresAt.getTime()) {
+      await deleteSession(session.id);
+      return null;
+    }
+
+    const user = await getUserFromUuid(session.userUuid);
+    if (!user) {
+      await deleteSession(session.id);
+      return null;
+    }
+
+    const now = new Date();
+    if (now.getTime() - session.lastActive.getTime() > SESSION_ACTIVITY_THRESHOLD_MS) {
+      await updateSessionLastActive(session.id, now);
+    }
+
+    user.lastActive = now;
+    await updateUser(user);
+
+    return user;
+  }
+
+  // Legacy fallback: tokens issued before session tracking existed are upgraded
+  // into a tracked session on first use.
   const user = await getUserFromToken(token);
 
   if (!user) return null;
@@ -118,7 +198,23 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
     return null;
   }
 
-  user.lastActive = new Date();
+  const now = new Date();
+  const issuedAt = user.auth.issuedAt ?? now;
+  const userAgent = request.headers.get('user-agent') ?? undefined;
+
+  await createSession({
+    id: crypto.randomUUID(),
+    userUuid: user.uuid,
+    token,
+    createdAt: issuedAt,
+    lastActive: now,
+    expiresAt: getExpiryDate(issuedAt),
+    userAgent,
+    ...parseUserAgent(userAgent),
+    location: {},
+  });
+
+  user.lastActive = now;
   await updateUser(user);
 
   return user;
