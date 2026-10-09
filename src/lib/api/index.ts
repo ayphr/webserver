@@ -25,6 +25,12 @@ export type AyphrApiClient = RequestClient & {
 export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
   const client = createRequestClient({
     baseUrl: API_BASE_URL,
+    onUnauthorized: () => {
+      if (globalThis.window === undefined) return;
+      if (globalThis.location.pathname !== '/auth') {
+        globalThis.location.assign('/auth');
+      }
+    },
     ...config,
   });
 

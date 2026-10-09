@@ -3,6 +3,8 @@ import { type ApiErrorBody } from '../../../common';
 export type ApiClientConfig = {
   baseUrl?: string;
   storageKey?: string;
+  /** Invoked when an authenticated request is rejected with a 401. */
+  onUnauthorized?: () => void;
 };
 
 export type RequestOptions = Omit<RequestInit, 'body'> & {
@@ -96,6 +98,7 @@ async function readResponseBody(response: Response) {
 export function createRequestClient(config: ApiClientConfig = {}) {
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const storageKey = config.storageKey ?? 'ayphr-api-token';
+  const onUnauthorized = config.onUnauthorized;
 
   async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const headers = new Headers(options.headers);
@@ -125,6 +128,11 @@ export function createRequestClient(config: ApiClientConfig = {}) {
         : (responseBody as ApiErrorBody | null)?.error
         ?? (responseBody as ApiErrorBody | null)?.message
         ?? `Request failed with status ${response.status}`;
+
+      if (response.status === 401 && token) {
+        writeStoredToken(storageKey, null);
+        onUnauthorized?.();
+      }
 
       throw new ApiError(errorMessage, response.status, responseBody, response.url);
     }

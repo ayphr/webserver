@@ -1,5 +1,6 @@
 import type { SessionDeviceType, SessionLocation } from '@common';
 import { normalizeCountryCode } from './country';
+import { TIMEZONE_COUNTRY } from './timezoneCountry';
 
 const regionDisplayNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
@@ -50,22 +51,27 @@ function extractRegionFromLocale(locale?: string): string | null {
 export function resolveLocationFromClient(input: { timezone?: string; locale?: string }): SessionLocation {
   const location: SessionLocation = {};
 
+  let country: string | null = null;
+
   const timezone = input.timezone?.trim();
   if (timezone && isValidTimezone(timezone)) {
     location.timezone = timezone;
 
     const segments = timezone.split('/');
-    const city = segments[segments.length - 1]?.replace(/_/g, ' ');
+    const city = segments[segments.length - 1]?.replaceAll('_', ' ');
     if (city && !city.startsWith('GMT') && !/^[+-]?\d/.test(city)) {
       location.city = city;
     }
 
     if (segments.length > 2) {
-      location.region = segments[segments.length - 2]?.replace(/_/g, ' ');
+      location.region = segments[segments.length - 2]?.replaceAll('_', ' ');
     }
+
+    country = normalizeCountryCode(TIMEZONE_COUNTRY[timezone] ?? '');
   }
 
-  const country = extractRegionFromLocale(input.locale);
+  country ??= extractRegionFromLocale(input.locale);
+
   if (country) {
     location.country = country;
     location.countryName = getCountryName(country);
@@ -108,7 +114,7 @@ function detectOs(userAgent: string): string | undefined {
   for (const [pattern, name] of patterns) {
     const match = pattern.exec(userAgent);
     if (match) {
-      const version = match[1]?.replace(/_/g, '.');
+      const version = match[1]?.replaceAll('_', '.');
       return version ? `${name} ${version}` : name;
     }
   }
