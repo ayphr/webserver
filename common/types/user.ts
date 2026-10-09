@@ -14,6 +14,15 @@ export type PolicyAgreements = Partial<Record<PolicyKey, number>>;
 /** The latest published version of each policy, per policy. */
 export type PolicyVersions = Record<PolicyKey, number>;
 
+/**
+ * The latest published policy versions plus their human-readable
+ * updated dates (e.g. "October 2026"), when available.
+ */
+export type PolicyVersionsData = {
+  versions: PolicyVersions;
+  updatedDates: Partial<Record<PolicyKey, string>>;
+};
+
 export type User = {
   uuid: string;
   username: string;

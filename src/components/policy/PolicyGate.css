@@ -44,13 +44,14 @@
 }
 
 .policy-gate__item a {
-  color: var(--accent-green);
-  text-decoration: none;
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   font-weight: 500;
 }
 
 .policy-gate__item a:hover {
-  text-decoration: underline;
+  color: var(--text-muted);
 }
 
 .policy-gate__version {
