@@ -19,7 +19,6 @@ import type { RouteParams } from './types';
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
 export type TokenVerificationResult = 'invalid' | 'expired' | 'success';
 
-/** How often a session's `lastActive` timestamp is persisted. */
 const SESSION_ACTIVITY_THRESHOLD_MS = 60 * 1000;
 
 const PASSWORD_HASH_ALGORITHM = 'scrypt';
@@ -89,11 +88,10 @@ export async function startSession(user: User, request: Request, meta: ClientSes
 
   await createSession(session);
 
-  // Sessions supersede the legacy single-token model.
   delete user.auth.token;
   delete user.auth.issuedAt;
   user.lastActive = now;
-  await updateUser(user, ['auth.token', 'auth.issuedAt']);
+  await updateUser(user);
 
   return token;
 }
@@ -102,18 +100,16 @@ export async function endCurrentSession(request: Request, user?: User) {
   const token = getBearerToken(request);
   if (token) await deleteSessionByToken(token);
 
-  // A token migrated from the legacy single-token model still lingers on the
-  // user document; clear it so it cannot re-authenticate.
   if (user && (user.auth.token || user.auth.issuedAt)) {
     clearToken(user);
-    await updateUser(user, ['auth.token', 'auth.issuedAt']);
+    await updateUser(user);
   }
 }
 
 export async function endAllSessions(user: User) {
   await deleteSessionsForUserUuid(user.uuid);
   clearToken(user);
-  await updateUser(user, ['auth.token', 'auth.issuedAt']);
+  await updateUser(user);
 }
 
 export function clearToken(user: User) {
@@ -191,8 +187,6 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
     return user;
   }
 
-  // Legacy fallback: tokens issued before session tracking existed are upgraded
-  // into a tracked session on first use.
   const user = await getUserFromToken(token);
 
   if (!user) return null;
