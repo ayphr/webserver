@@ -49,6 +49,16 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
     };
   }, [navigate]);
 
+  // Poll the session so this device is signed out shortly after another
+  // device revokes it. A 401 triggers the global unauthorized handler.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void api.auth.me().catch(() => undefined);
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleAccept = async () => {
     setIsAccepting(true);
     setError(null);
