@@ -1,5 +1,5 @@
 import { POLICIES_VERSIONS_URL } from '@common';
-import type { PolicyKey, PolicyStatus, PolicyVersions, User } from '@common';
+import type { PolicyKey, PolicyStatus, PolicyVersions, PolicyVersionsData, User } from '@common';
 import { createLogger } from './logger';
 
 const log = createLogger('policies');
@@ -7,13 +7,13 @@ const log = createLogger('policies');
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 type PolicyVersionsFile = {
-  policies: Record<PolicyKey, { version: number }>;
+  policies: Record<PolicyKey, { version: number; updated_date_formatted?: string }>;
 };
 
-let cached: { versions: PolicyVersions; fetchedAt: number } | null = null;
-let inflight: Promise<PolicyVersions | null> | null = null;
+let cached: { data: PolicyVersionsData; fetchedAt: number } | null = null;
+let inflight: Promise<PolicyVersionsData | null> | null = null;
 
-async function fetchPolicyVersions(): Promise<PolicyVersions> {
+async function fetchPolicyData(): Promise<PolicyVersionsData> {
   const response = await fetch(POLICIES_VERSIONS_URL);
   if (!response.ok) {
     throw new Error(`unexpected status ${response.status}`);
@@ -22,26 +22,32 @@ async function fetchPolicyVersions(): Promise<PolicyVersions> {
   const data = await response.json() as PolicyVersionsFile;
 
   return {
-    tos: data.policies.tos.version,
-    privacy: data.policies.privacy.version,
+    versions: {
+      tos: data.policies.tos.version,
+      privacy: data.policies.privacy.version,
+    },
+    updatedDates: {
+      tos: data.policies.tos.updated_date_formatted,
+      privacy: data.policies.privacy.updated_date_formatted,
+    },
   };
 }
 
-export async function getPolicyVersions(): Promise<PolicyVersions | null> {
+export async function getPolicyData(): Promise<PolicyVersionsData | null> {
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return cached.versions;
+    return cached.data;
   }
 
   inflight ??= (async () => {
     try {
-      const versions = await fetchPolicyVersions();
-      cached = { versions, fetchedAt: Date.now() };
-      return versions;
+      const data = await fetchPolicyData();
+      cached = { data, fetchedAt: Date.now() };
+      return data;
     } catch (error) {
       log.error({ error }, 'failed to fetch policy versions');
       if (cached) {
-        cached = { versions: cached.versions, fetchedAt: Date.now() };
-        return cached.versions;
+        cached = { data: cached.data, fetchedAt: Date.now() };
+        return cached.data;
       }
       return null;
     } finally {
@@ -52,20 +58,26 @@ export async function getPolicyVersions(): Promise<PolicyVersions | null> {
   return inflight;
 }
 
+export async function getPolicyVersions(): Promise<PolicyVersions | null> {
+  const data = await getPolicyData();
+  return data?.versions ?? null;
+}
+
 export async function getPolicyStatus(user: User): Promise<PolicyStatus | null> {
-  const versions = await getPolicyVersions();
-  if (!versions) return null;
+  const data = await getPolicyData();
+  if (!data) return null;
 
   const accepted = user.policyAgreements ?? {};
   const pending: PolicyKey[] = [];
 
-  if (accepted.tos !== versions.tos) pending.push('tos');
-  if (accepted.privacy !== versions.privacy) pending.push('privacy');
+  if (accepted.tos !== data.versions.tos) pending.push('tos');
+  if (accepted.privacy !== data.versions.privacy) pending.push('privacy');
 
   return {
     upToDate: pending.length === 0,
     pending,
-    current: versions,
+    current: data.versions,
+    updatedDates: data.updatedDates,
     accepted: {
       tos: accepted.tos,
       privacy: accepted.privacy,

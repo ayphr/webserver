@@ -10,6 +10,8 @@ export type PolicyStatus = {
   upToDate: boolean;
   pending: PolicyKey[];
   current: PolicyVersions;
+  /** Human-readable updated dates (e.g. "October 2026") for the latest versions. */
+  updatedDates: Partial<Record<PolicyKey, string>>;
   accepted: PolicyAgreements;
 };
 

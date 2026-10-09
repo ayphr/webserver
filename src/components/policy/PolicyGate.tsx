@@ -115,7 +115,7 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
                   <a href={POLICY_META[key].to} target="_blank" rel="noreferrer">
                     {POLICY_META[key].title}
                   </a>
-                  <span className="policy-gate__version">version {status.current[key]}</span>
+                  <span className="policy-gate__version">Updated {status.updatedDates[key] ?? `v${status.current[key]}`}</span>
                 </li>
               ))}
             </ul>

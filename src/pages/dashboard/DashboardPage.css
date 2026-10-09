@@ -12,6 +12,11 @@
   padding: 1rem 0.5rem;
 }
 
+.dashboard-layout--compact .n-sidebar {
+  width: 188px;
+  padding: 1rem;
+}
+
 .dashboard-main {
   flex: 1;
   display: flex;

@@ -105,17 +105,18 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
   return <span className="dashboard-page__countdown">{timeLeft}</span>;
 }
 
+function getStoredDefaultTab(): string {
+  const stored = localStorage.getItem('ayphr-pref-default-tab');
+  return stored === 'overview' || stored === 'devices' ? stored : 'overview';
+}
+
 export const DashboardPage = () => {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
-  const [activePage, setActivePage] = useState<string>(
-    () => localStorage.getItem('ayphr-pref-default-tab') ?? 'overview',
-  );
+  const [activePage, setActivePage] = useState<string>(getStoredDefaultTab);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
-  const [defaultTab, setDefaultTab] = useState<string>(
-    () => localStorage.getItem('ayphr-pref-default-tab') ?? 'overview',
-  );
+  const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   const [compactLayout, setCompactLayout] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-compact') === '1',
   );
@@ -173,6 +174,7 @@ export const DashboardPage = () => {
 
   const setDefaultTabPref = (value: string) => {
     setDefaultTab(value);
+    setActivePage(value);
     localStorage.setItem('ayphr-pref-default-tab', value);
   };
 
@@ -276,7 +278,7 @@ export const DashboardPage = () => {
 
   if (isLoading) {
     return (
-      <div className="dashboard-layout">
+      <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
         <Sidebar activeTab={activePage} onChange={setActivePage} username={user?.username ?? '...'} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
@@ -291,7 +293,7 @@ export const DashboardPage = () => {
 
   if (!user) {
     return (
-      <div className="dashboard-layout">
+      <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
         <Sidebar activeTab={activePage} onChange={setActivePage} username={'guest'} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
