@@ -174,7 +174,6 @@ export const DashboardPage = () => {
 
   const setDefaultTabPref = (value: string) => {
     setDefaultTab(value);
-    setActivePage(value);
     localStorage.setItem('ayphr-pref-default-tab', value);
   };
 
