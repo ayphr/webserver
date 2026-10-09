@@ -1,5 +1,6 @@
 import type { Device } from './device';
 import type { Punishment } from './punishment';
+import type { SessionInfo } from './session';
 import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, UserRole } from './user';
 
 /**
@@ -112,6 +113,10 @@ export type DevicePayload = {
 
 export type PunishmentPayload = {
   punishment: Punishment;
+};
+
+export type SessionListPayload = {
+  sessions: SessionInfo[];
 };
 
 export type StaffUsersPayload = {

@@ -5,6 +5,7 @@ export const TELEMETRY_COLLECTION = 'telemetry';
 export const USERS_COLLECTION = 'users';
 export const PUNISHMENTS_COLLECTION = 'punishments';
 export const DEVICES_COLLECTION = 'devices';
+export const SESSIONS_COLLECTION = 'sessions';
 
 export const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 export const REDIS_BUFFER_KEY = process.env.REDIS_BUFFER_KEY || 'ayphr:telemetry:buffer';

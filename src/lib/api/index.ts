@@ -5,6 +5,7 @@ import { createPunishmentsApi } from './punishments';
 import { createStaffApi } from './staff';
 import { createUsersApi } from './users';
 import { createProfileApi } from './profile';
+import { createSessionsApi } from './sessions';
 
 export const API_BASE_URL = import.meta.env.DEV
   ? 'http://localhost:7233'
@@ -18,6 +19,7 @@ export type AyphrApiClient = RequestClient & {
   punishments: ReturnType<typeof createPunishmentsApi>;
   devices: ReturnType<typeof createDevicesApi>;
   staff: ReturnType<typeof createStaffApi>;
+  sessions: ReturnType<typeof createSessionsApi>;
 };
 
 export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
@@ -37,6 +39,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     punishments: createPunishmentsApi(client),
     devices: createDevicesApi(client),
     staff: createStaffApi(client),
+    sessions: createSessionsApi(client),
   };
 }
 
