@@ -1,21 +1,35 @@
 import type { Device } from './device';
 import type { Punishment } from './punishment';
-import type { PublicUser, UserRole } from './user';
+import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, UserRole } from './user';
+
+/**
+ * Whether a user has agreed to the latest published policies.
+ * `null` when the latest versions could not be determined.
+ */
+export type PolicyStatus = {
+  upToDate: boolean;
+  pending: PolicyKey[];
+  current: PolicyVersions;
+  accepted: PolicyAgreements;
+};
 
 export type AuthSession = {
   user: PublicUser;
   token: string;
   suspension?: Punishment | null;
+  policyStatus: PolicyStatus | null;
 };
 
 export type AuthMeResponse = {
   user: PublicUser;
   suspension: Punishment | null;
+  policyStatus: PolicyStatus | null;
 };
 
 export type UserMeResponse = {
   user: PublicUser;
   activeSuspension: Punishment | null;
+  policyStatus: PolicyStatus | null;
 };
 
 export type ProfileMeResponse = {
@@ -52,16 +66,24 @@ export type AuthResponsePayload = {
   user: PublicUser;
   token: string;
   suspension?: Punishment | null;
+  policyStatus: PolicyStatus | null;
 };
 
 export type AuthMePayload = {
   user: PublicUser;
   suspension: Punishment | null;
+  policyStatus: PolicyStatus | null;
 };
 
 export type UserMePayload = {
   user: PublicUser;
   activeSuspension: Punishment | null;
+  policyStatus: PolicyStatus | null;
+};
+
+export type AcceptPoliciesPayload = {
+  user: PublicUser;
+  policyStatus: PolicyStatus | null;
 };
 
 export type ProfileMePayload = {

@@ -190,6 +190,24 @@ export async function createUser(user: User) {
   return normalizedUser;
 }
 
+export async function deleteUser(uuid: string) {
+  const { users } = await getCols();
+  trackMongoOperation('deleteOne', USERS_COLLECTION);
+  await users.deleteOne({ uuid });
+}
+
+export async function deletePunishmentsForUserUuid(userUuid: string) {
+  const { punishments } = await getCols();
+  trackMongoOperation('deleteMany', PUNISHMENTS_COLLECTION);
+  await punishments.deleteMany({ userUuid });
+}
+
+export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
+  const { devices } = await getCols();
+  trackMongoOperation('deleteMany', DEVICES_COLLECTION);
+  await devices.deleteMany({ ownerUuid });
+}
+
 export async function getUserFromUuid(uuid: string) {
   const { users } = await getCols();
   trackMongoOperation('findOne', USERS_COLLECTION);

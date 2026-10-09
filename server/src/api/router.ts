@@ -1,6 +1,9 @@
 import {
+  handleAcceptPolicies,
+  handleDeleteAccount,
   handleLogin,
   handleLogout,
+  handleLogoutAll,
   handleMe as handleAuthMe,
   handleRegister as handleAuthRegister,
 } from './routes/auth';
@@ -49,6 +52,9 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/auth/login', handle: handleLogin },
   { method: 'GET', path: '/api/auth/me', handle: handleAuthMe },
   { method: 'POST', path: '/api/auth/logout', handle: handleLogout },
+  { method: 'POST', path: '/api/auth/logout-all', handle: handleLogoutAll },
+  { method: 'POST', path: '/api/auth/policies/accept', handle: handleAcceptPolicies },
+  { method: 'DELETE', path: '/api/auth/account', handle: handleDeleteAccount },
 
   { method: 'GET', path: '/api/users/me', handle: handleUsersMe },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },

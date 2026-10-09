@@ -1,5 +1,6 @@
 import { requireAuth } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid } from '../../workers/dbWriter';
+import { getPolicyStatus } from '../../lib/policies';
 import type { User } from '@common';
 
 function json(body: unknown, status = 200) {
@@ -14,11 +15,13 @@ function publicUser(user: User) {
 
 const handleMe = requireAuth(async (_request, user) => {
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
+  const policyStatus = await getPolicyStatus(user);
   return json({
     user: publicUser(user),
     activeSuspension,
+    policyStatus,
   });
-}, { allowSuspended: true });
+}, { allowSuspended: true, allowPolicyPending: true });
 
 const handleUserByUuid = requireAuth(async (_request, user, params) => {
   const targetUuid = params.uuid;
