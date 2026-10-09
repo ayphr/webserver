@@ -1,15 +1,27 @@
 import { clearToken, createPasswordHash, issueToken, requireAuth, verifyPassword } from '../auth';
-import { createUser, getActiveSuspensionForUserUuid, getUserFromUsername, updateUser } from '../../workers/dbWriter';
+import {
+  createUser,
+  deleteDevicesForOwnerUuid,
+  deletePunishmentsForUserUuid,
+  deleteUser,
+  getActiveSuspensionForUserUuid,
+  getUserFromUsername,
+  updateUser,
+} from '../../workers/dbWriter';
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
+import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
 
 type AuthPayload = {
   username?: string;
   password?: string;
   country?: string;
+  acceptPolicies?: boolean;
 };
+
+const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -43,6 +55,10 @@ async function handleRegister(request: Request) {
   const username = body.username.trim();
   const password = body.password.trim();
 
+  if (body.acceptPolicies !== true) {
+    return json({ error: 'You must agree to the Terms of Service and Privacy Policy' }, 400);
+  }
+
   const passwordValidationErrors = getPasswordValidationErrors(password);
   if (passwordValidationErrors.length > 0) {
     return json({ error: passwordValidationErrors[0] }, 400);
@@ -51,6 +67,11 @@ async function handleRegister(request: Request) {
   const existingUser = await getUserFromUsername(username);
   if (existingUser) {
     return json({ error: 'username already exists' }, 409);
+  }
+
+  const policyVersions = await getPolicyVersions();
+  if (!policyVersions) {
+    return json({ error: POLICY_FETCH_ERROR }, 503);
   }
 
   let country: string | undefined;
@@ -69,6 +90,10 @@ async function handleRegister(request: Request) {
     role: 'user',
     bio: DEFAULT_BIO,
     socialLinks: {},
+    policyAgreements: {
+      tos: policyVersions.tos,
+      privacy: policyVersions.privacy,
+    },
     auth: {
       passwordHash: createPasswordHash(password),
     },
@@ -81,7 +106,9 @@ async function handleRegister(request: Request) {
 
   const token = await issueToken(user);
 
-  return json({ user: publicUser(user), token }, 201);
+  const policyStatus = await getPolicyStatus(user);
+
+  return json({ user: publicUser(user), token, policyStatus }, 201);
 }
 
 async function handleLogin(request: Request) {
@@ -104,26 +131,64 @@ async function handleLogin(request: Request) {
   user.lastActive = new Date();
   const token = await issueToken(user);
 
+  const policyStatus = await getPolicyStatus(user);
+
   return json({
     user: publicUser(user),
     token,
     suspension: activeSuspension,
+    policyStatus,
   });
 }
 
 const handleMe = requireAuth(async (_request, user) => {
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
+  const policyStatus = await getPolicyStatus(user);
 
   return json({
     user: publicUser(user),
     suspension: activeSuspension,
+    policyStatus,
   });
-}, { allowSuspended: true });
+}, { allowSuspended: true, allowPolicyPending: true });
 
 const handleLogout = requireAuth(async (_request, user) => {
   clearToken(user);
   await updateUser(user);
   return new Response(null, { status: 204 });
-}, { allowSuspended: true });
+}, { allowSuspended: true, allowPolicyPending: true });
 
-export { handleRegister, handleLogin, handleMe, handleLogout };
+const handleLogoutAll = requireAuth(async (_request, user) => {
+  clearToken(user);
+  await updateUser(user);
+  return new Response(null, { status: 204 });
+}, { allowSuspended: true, allowPolicyPending: true });
+
+const handleAcceptPolicies = requireAuth(async (_request, user) => {
+  const policyVersions = await getPolicyVersions();
+  if (!policyVersions) {
+    return json({ error: POLICY_FETCH_ERROR }, 503);
+  }
+
+  user.policyAgreements = {
+    tos: policyVersions.tos,
+    privacy: policyVersions.privacy,
+  };
+  await updateUser(user);
+
+  const policyStatus = await getPolicyStatus(user);
+
+  return json({ user: publicUser(user), policyStatus });
+}, { allowSuspended: true, allowPolicyPending: true });
+
+const handleDeleteAccount = requireAuth(async (_request, user) => {
+  await Promise.all([
+    deletePunishmentsForUserUuid(user.uuid),
+    deleteDevicesForOwnerUuid(user.uuid),
+  ]);
+  await deleteUser(user.uuid);
+
+  return new Response(null, { status: 204 });
+}, { allowSuspended: true, allowPolicyPending: true });
+
+export { handleRegister, handleLogin, handleMe, handleLogout, handleLogoutAll, handleAcceptPolicies, handleDeleteAccount };

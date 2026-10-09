@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconCheck, IconX } from '@tabler/icons-react';
 import './AuthPage.css';
-import { Button, Card, CardHeader, CardBody, CardFooter, Input } from '../../components/common';
+import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input } from '../../components/common';
 import { api } from '../../lib/api';
 import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '../../../common/utils/password';
 
@@ -22,6 +22,8 @@ export const AuthPage = () => {
     password: '',
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
+  const [policyError, setPolicyError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const passwordChecks = getPasswordValidationChecks(formData.password);
@@ -67,10 +69,12 @@ export const AuthPage = () => {
       } else if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords do not match';
       }
+
+      setPolicyError(acceptedPolicies ? null : 'You must agree to the Terms of Service and Privacy Policy');
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 && (mode !== 'signup' || acceptedPolicies);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,6 +96,7 @@ export const AuthPage = () => {
         await api.auth.register({
           username: formData.username,
           password: formData.password,
+          acceptPolicies: acceptedPolicies,
         });
       }
       navigate('/dashboard');
@@ -110,6 +115,8 @@ export const AuthPage = () => {
       password: '',
     });
     setErrors({});
+    setAcceptedPolicies(false);
+    setPolicyError(null);
     setAuthError(null);
   };
 
@@ -213,6 +220,25 @@ export const AuthPage = () => {
                   onChange={handleInputChange}
                   error={errors.confirmPassword}
                   fullWidth
+                />
+              )}
+
+              {isSignup && (
+                <Checkbox
+                  checked={acceptedPolicies}
+                  onChange={(e) => {
+                    setAcceptedPolicies(e.target.checked);
+                    if (policyError) setPolicyError(null);
+                  }}
+                  error={policyError ?? undefined}
+                  label={
+                    <>
+                      I agree to the{' '}
+                      <a href="/policies/terms" target="_blank" rel="noreferrer">Terms of Service</a>
+                      {' '}and{' '}
+                      <a href="/policies/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>
+                    </>
+                  }
                 />
               )}
 

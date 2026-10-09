@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardBody, CardHeader } from '../../components/common';
-import { Markdown } from '../../../common';
+import { Markdown, POLICIES_VERSIONS_URL } from '../../../common';
 import { MarkdownRenderer } from '../../lib/markdown';
 import './Policies.css';
 
@@ -23,7 +23,7 @@ export const PolicyPage = ({ title, policyKey }: PolicyPageProps) => {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch('https://raw.githubusercontent.com/ayphr/policies-static/refs/heads/main/versions.json');
+        const res = await fetch(POLICIES_VERSIONS_URL);
         const data = await res.json();
         setPolicy(data.policies[policyKey]);
       } catch (err) {

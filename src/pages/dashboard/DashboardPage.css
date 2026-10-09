@@ -8,6 +8,10 @@
   background: var(--bg-base);
 }
 
+.dashboard-layout--compact .dashboard-main {
+  padding: 1rem 0.5rem;
+}
+
 .dashboard-main {
   flex: 1;
   display: flex;

@@ -1,9 +1,9 @@
-import type { AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession } from '../../../common';
+import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession } from '../../../common';
 import type { RequestClient } from './client';
 
 export function createAuthApi(client: RequestClient) {
   return {
-    async register(input: { username: string; password: string; country?: string }) {
+    async register(input: { username: string; password: string; country?: string; acceptPolicies: boolean }) {
       const response = await client.requestJson<AuthResponsePayload>('/api/auth/register', {
         method: 'POST',
         auth: false,
@@ -16,6 +16,7 @@ export function createAuthApi(client: RequestClient) {
         user: response.user,
         token: response.token,
         ...(response.suspension ? { suspension: response.suspension } : {}),
+        policyStatus: response.policyStatus,
       } satisfies AuthSession;
     },
     async login(input: { username: string; password: string }) {
@@ -31,6 +32,7 @@ export function createAuthApi(client: RequestClient) {
         user: response.user,
         token: response.token,
         ...(response.suspension ? { suspension: response.suspension } : {}),
+        policyStatus: response.policyStatus,
       } satisfies AuthSession;
     },
     async me() {
@@ -38,10 +40,28 @@ export function createAuthApi(client: RequestClient) {
       return {
         user: response.user,
         suspension: response.suspension || null,
+        policyStatus: response.policyStatus ?? null,
       } satisfies AuthMeResponse;
+    },
+    async acceptPolicies() {
+      const response = await client.requestJson<AcceptPoliciesPayload>('/api/auth/policies/accept', {
+        method: 'POST',
+      });
+      return {
+        user: response.user,
+        policyStatus: response.policyStatus ?? null,
+      };
+    },
+    async deleteAccount() {
+      await client.requestJson<null>('/api/auth/account', { method: 'DELETE' });
+      client.clearAuthToken();
     },
     async logout() {
       await client.requestJson<null>('/api/auth/logout', { method: 'POST' });
+      client.clearAuthToken();
+    },
+    async logoutAll() {
+      await client.requestJson<null>('/api/auth/logout-all', { method: 'POST' });
       client.clearAuthToken();
     },
   };

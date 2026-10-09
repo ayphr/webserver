@@ -8,6 +8,7 @@ export function createUsersApi(client: RequestClient) {
       return {
         user: response.user,
         activeSuspension: response.activeSuspension || null,
+        policyStatus: response.policyStatus ?? null,
       } satisfies UserMeResponse;
     },
     async getByUuid(uuid: string) {

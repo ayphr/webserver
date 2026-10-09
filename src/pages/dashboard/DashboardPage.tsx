@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLogout, IconLogout2, IconTrash } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type { Punishment, PublicUser } from '../../../common';
+import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
+import { SettingsPanel } from '../../components/settings';
 import './DashboardPage.css';
 
 function toDate(value: Date | string): Date {
@@ -104,9 +108,17 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 export const DashboardPage = () => {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
-  const [activePage, setActivePage] = useState<string>('overview');
+  const [activePage, setActivePage] = useState<string>(
+    () => localStorage.getItem('ayphr-pref-default-tab') ?? 'overview',
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
+  const [defaultTab, setDefaultTab] = useState<string>(
+    () => localStorage.getItem('ayphr-pref-default-tab') ?? 'overview',
+  );
+  const [compactLayout, setCompactLayout] = useState<boolean>(
+    () => localStorage.getItem('ayphr-pref-compact') === '1',
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -157,6 +169,111 @@ export const DashboardPage = () => {
     }
   };
 
+  const navigate = useNavigate();
+
+  const setDefaultTabPref = (value: string) => {
+    setDefaultTab(value);
+    localStorage.setItem('ayphr-pref-default-tab', value);
+  };
+
+  const setCompactPref = (checked: boolean) => {
+    setCompactLayout(checked);
+    localStorage.setItem('ayphr-pref-compact', checked ? '1' : '0');
+  };
+
+  const settingsSections = useMemo<SettingsSection[]>(() => [
+    {
+      id: 'account',
+      title: 'Account',
+      options: [
+        {
+          id: 'logout',
+          optionType: 'button',
+          icon: <IconLogout size={18} strokeWidth={1.75} />,
+          title: 'Log out',
+          description: 'Sign out of your account on this device.',
+          label: 'Log out',
+          variant: 'secondary',
+          action: async () => {
+            await api.auth.logout();
+            navigate('/auth', { replace: true });
+          },
+        },
+        {
+          id: 'logout-all',
+          optionType: 'button',
+          icon: <IconLogout2 size={18} strokeWidth={1.75} />,
+          title: 'Log out everywhere',
+          description: 'Sign out of all devices and active sessions.',
+          label: 'Log out everywhere',
+          variant: 'secondary',
+          confirm: {
+            title: 'Log out everywhere',
+            message: 'You will be signed out of all devices and active sessions, including this one.',
+            confirmText: 'Log out everywhere',
+          },
+          action: async () => {
+            await api.auth.logoutAll();
+            navigate('/auth', { replace: true });
+          },
+        },
+      ],
+    },
+    {
+      id: 'danger',
+      title: 'Danger Zone',
+      options: [
+        {
+          id: 'delete-account',
+          optionType: 'button',
+          icon: <IconTrash size={18} strokeWidth={1.75} />,
+          title: 'Delete account',
+          description: 'Permanently delete your account and all associated data.',
+          label: 'Delete account',
+          variant: 'danger',
+          danger: true,
+          confirm: {
+            title: 'Delete Account',
+            message: 'This will permanently delete your account and all associated data. This action cannot be undone.',
+            confirmText: 'Delete account',
+          },
+          action: async () => {
+            await api.auth.deleteAccount();
+            navigate('/auth', { replace: true });
+          },
+        },
+      ],
+    },
+    {
+      id: 'preferences',
+      title: 'Preferences',
+      options: [
+        {
+          id: 'default-tab',
+          optionType: 'select',
+          icon: <IconLayoutDashboard size={18} strokeWidth={1.75} />,
+          title: 'Default dashboard view',
+          description: 'Choose which tab opens when you visit the dashboard.',
+          value: defaultTab,
+          options: [
+            { value: 'overview', label: 'Overview' },
+            { value: 'devices', label: 'Devices' },
+          ],
+          onChange: setDefaultTabPref,
+        },
+        {
+          id: 'compact-layout',
+          optionType: 'checkbox',
+          icon: <IconAdjustmentsHorizontal size={18} strokeWidth={1.75} />,
+          title: 'Compact layout',
+          description: 'Reduce padding and tighten the dashboard layout.',
+          checked: compactLayout,
+          onChange: setCompactPref,
+        },
+      ],
+    },
+  ], [defaultTab, compactLayout, navigate]);
+
   if (isLoading) {
     return (
       <div className="dashboard-layout">
@@ -188,7 +305,7 @@ export const DashboardPage = () => {
   }
 
   return (
-    <div className="dashboard-layout">
+    <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
       <Sidebar activeTab={activePage} onChange={setActivePage} username={user.username} role={user.role} country={user.country} isSuspended={isSuspended} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
@@ -310,9 +427,10 @@ export const DashboardPage = () => {
               <Card className="dashboard-page__card" elevated>
                 <CardHeader>
                   <h2>Account Settings</h2>
+                  <p>Manage your account, sessions, and preferences</p>
                 </CardHeader>
                 <CardBody>
-                  <p>Account-specific settings go here.</p>
+                  <SettingsPanel sections={settingsSections} />
                 </CardBody>
               </Card>
             )}

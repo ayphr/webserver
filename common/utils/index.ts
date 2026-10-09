@@ -23,3 +23,4 @@ export {
   getPasswordValidationErrors,
   type PasswordValidationChecks,
 } from './password';
+export { POLICIES_VERSIONS_URL } from './policies';

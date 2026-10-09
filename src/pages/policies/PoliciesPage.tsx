@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardBody, CardHeader } from '../../components/common';
+import { POLICIES_VERSIONS_URL } from '../../../common';
 import './Policies.css';
 
 interface PoliciesVersions {
@@ -19,7 +20,7 @@ export const PoliciesPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch('https://raw.githubusercontent.com/ayphr/policies-static/refs/heads/main/versions.json');
+        const res = await fetch(POLICIES_VERSIONS_URL);
         const data = await res.json();
         setVersions(data);
       } catch (err) {

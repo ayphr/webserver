@@ -1,6 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import type { User, UserRole } from '@common';
 import { getActiveSuspensionForUserUuid, getUserFromToken, updateUser } from '../workers/dbWriter';
+import { getPolicyStatus } from '../lib/policies';
 import type { RouteParams } from './types';
 
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
@@ -13,6 +14,8 @@ export type AuthenticatedHandler = (request: Request, user: User, params: RouteP
 
 export type AuthGuardOptions = {
   allowSuspended?: boolean;
+  /** Allow access even when the user has not accepted the latest policies. */
+  allowPolicyPending?: boolean;
 };
 
 export type AuthErrorBody = {
@@ -147,6 +150,19 @@ export function requireAuth(handler: AuthenticatedHandler, options: AuthGuardOpt
         },
         { status: 403 },
       );
+    }
+
+    if (!options.allowPolicyPending) {
+      const policyStatus = await getPolicyStatus(user);
+      if (policyStatus && !policyStatus.upToDate) {
+        return Response.json(
+          {
+            error: 'Policy acceptance required',
+            policyStatus,
+          },
+          { status: 403 },
+        );
+      }
     }
 
     return handler(request, user, params);
