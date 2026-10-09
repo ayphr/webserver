@@ -5,6 +5,12 @@ const regionDisplayNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
 const TIMEZONE_PATTERN = /^[A-Za-z0-9_+\-/]{1,64}$/;
 
+const DEVICE_TYPES = new Set<SessionDeviceType>(['desktop', 'laptop', 'phone', 'tablet', 'tv', 'unknown']);
+
+export function isSessionDeviceType(value: unknown): value is SessionDeviceType {
+  return typeof value === 'string' && DEVICE_TYPES.has(value as SessionDeviceType);
+}
+
 function getCountryName(code: string): string | undefined {
   try {
     const name = regionDisplayNames.of(code);
@@ -111,10 +117,15 @@ function detectOs(userAgent: string): string | undefined {
 }
 
 function detectDeviceType(userAgent: string): SessionDeviceType | undefined {
-  if (/iPad|Tablet/i.test(userAgent)) return 'tablet';
-  if (/Mobi|iPhone|iPod|Android.*Mobile/i.test(userAgent)) return 'mobile';
-  if (userAgent) return 'desktop';
-  return undefined;
+  if (!userAgent) return undefined;
+
+  if (/\b(SmartTV|Smart-TV|HbbTV|NetCast|Viera|BRAVIA|Roku|CrKey|AFT[MNB]|AppleTV|GoogleTV)\b/i.test(userAgent)) {
+    return 'tv';
+  }
+  if (/iPad|Tablet|PlayBook|Silk|Kindle/i.test(userAgent)) return 'tablet';
+  if (/Android/i.test(userAgent) && !/Mobile/i.test(userAgent)) return 'tablet';
+  if (/Mobi|iPhone|iPod|Windows Phone|Android.*Mobile/i.test(userAgent)) return 'phone';
+  return 'desktop';
 }
 
 export function parseUserAgent(userAgent?: string | null): {

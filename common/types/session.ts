@@ -1,4 +1,4 @@
-export type SessionDeviceType = 'desktop' | 'mobile' | 'tablet';
+export type SessionDeviceType = 'desktop' | 'laptop' | 'phone' | 'tablet' | 'tv' | 'unknown';
 
 /** Approximate location of a session, derived from the client's timezone and locale. */
 export type SessionLocation = {

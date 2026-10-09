@@ -22,6 +22,7 @@ type AuthPayload = {
   acceptPolicies?: boolean;
   timezone?: string;
   locale?: string;
+  deviceType?: string;
 };
 
 const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
@@ -107,7 +108,7 @@ async function handleRegister(request: Request) {
 
   await createUser(user);
 
-  const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale });
+  const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -131,7 +132,7 @@ async function handleLogin(request: Request) {
 
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
 
-  const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale });
+  const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
   const policyStatus = await getPolicyStatus(user);
 

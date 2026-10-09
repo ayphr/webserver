@@ -7,5 +7,8 @@ export function createSessionsApi(client: RequestClient) {
       const response = await client.requestJson<SessionListPayload>('/api/sessions');
       return response.sessions;
     },
+    async remove(id: string) {
+      await client.requestJson<null>(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
   };
 }

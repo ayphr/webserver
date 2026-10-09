@@ -13,7 +13,7 @@ import {
   updateUser,
 } from '../workers/dbWriter';
 import { getPolicyStatus } from '../lib/policies';
-import { parseUserAgent, resolveLocationFromClient } from '../lib/session';
+import { isSessionDeviceType, parseUserAgent, resolveLocationFromClient } from '../lib/session';
 import type { RouteParams } from './types';
 
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
@@ -28,6 +28,7 @@ const PASSWORD_HASH_LENGTH = 64;
 export type ClientSessionMeta = {
   timezone?: string;
   locale?: string;
+  deviceType?: string;
 };
 
 export type AuthenticatedHandler = (request: Request, user: User, params: RouteParams) => Promise<Response> | Response;
@@ -70,6 +71,7 @@ export async function startSession(user: User, request: Request, meta: ClientSes
   const token = randomBytes(32).toString('hex');
   const now = new Date();
   const userAgent = request.headers.get('user-agent') ?? undefined;
+  const parsedUserAgent = parseUserAgent(userAgent);
 
   const session: Session = {
     id: crypto.randomUUID(),
@@ -79,7 +81,9 @@ export async function startSession(user: User, request: Request, meta: ClientSes
     lastActive: now,
     expiresAt: getExpiryDate(now),
     userAgent,
-    ...parseUserAgent(userAgent),
+    browser: parsedUserAgent.browser,
+    os: parsedUserAgent.os,
+    deviceType: isSessionDeviceType(meta.deviceType) ? meta.deviceType : parsedUserAgent.deviceType,
     location: resolveLocationFromClient(meta),
   };
 

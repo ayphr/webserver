@@ -1,5 +1,27 @@
-import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession } from '../../../common';
+import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession, SessionDeviceType } from '../../../common';
 import type { RequestClient } from './client';
+
+function getClientDeviceType(): SessionDeviceType | undefined {
+  if (typeof navigator === 'undefined') return undefined;
+
+  const userAgent = navigator.userAgent;
+  const userAgentData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
+  const maxTouchPoints = navigator.maxTouchPoints ?? 0;
+
+  const isTouchIpad = /Macintosh/.test(userAgent) && maxTouchPoints > 1;
+  if (isTouchIpad || /iPad|Tablet|PlayBook|Silk|Kindle/i.test(userAgent)) return 'tablet';
+  if (!userAgentData && /Android/i.test(userAgent) && !/Mobile/i.test(userAgent)) return 'tablet';
+
+  const isMobile = userAgentData?.mobile ?? /Mobi|iPhone|iPod|Windows Phone|Android.*Mobile/i.test(userAgent);
+  if (isMobile) return 'phone';
+
+  if (/\b(SmartTV|Smart-TV|HbbTV|NetCast|Viera|BRAVIA|Roku|CrKey|AppleTV|GoogleTV)\b/i.test(userAgent)) return 'tv';
+
+  // Touch-capable desktop hardware is generally a laptop.
+  if (maxTouchPoints > 0) return 'laptop';
+
+  return 'desktop';
+}
 
 function getClientSessionMeta() {
   if (typeof navigator === 'undefined') return {};
@@ -11,7 +33,7 @@ function getClientSessionMeta() {
     timezone = undefined;
   }
 
-  return { timezone, locale: navigator.language };
+  return { timezone, locale: navigator.language, deviceType: getClientDeviceType() };
 }
 
 export function createAuthApi(client: RequestClient) {
