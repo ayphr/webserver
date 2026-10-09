@@ -9,7 +9,7 @@ import { createSessionsApi } from './sessions';
 
 export const API_BASE_URL = import.meta.env.DEV
   ? 'http://localhost:7233'
-  : 'https://api.ayphr.com:7233';
+  : 'https://api.ayphr.com';
 
 export type AyphrApiClient = RequestClient & {
   getStatus: () => Promise<string>;
