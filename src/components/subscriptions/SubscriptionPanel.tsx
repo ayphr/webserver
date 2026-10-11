@@ -275,6 +275,7 @@ const CurrentSubscription = ({
 }: CurrentSubscriptionProps) => {
   const tier = subscription.tier;
   const isPaid = subscription.source === 'paid';
+  const isTrialing = paidSubscription?.status === 'trialing';
   const status = paidSubscription ? STATUS_LABELS[paidSubscription.status] ?? paidSubscription.status : null;
 
   return (
@@ -284,9 +285,9 @@ const CurrentSubscription = ({
       <div className="subscription__current-info">
         <div className="subscription__current-heading">
           <h3>{getTierName(tier)}</h3>
-          <span className={`subscription__source subscription__source--${subscription.source}`}>
-            {isPaid ? 'Paid' : 'Granted'}
-          </span>
+          {!isPaid && (
+            <span className="subscription__source subscription__source--attached">Granted</span>
+          )}
           {status && <span className="subscription__status">{status}</span>}
         </div>
 
@@ -308,15 +309,17 @@ const CurrentSubscription = ({
             <label className="subscription__toggle">
               <Checkbox
                 checked={!paidSubscription.cancelAtPeriodEnd}
-                disabled={isAutoRenewPending}
+                disabled={isAutoRenewPending || isTrialing}
                 onChange={(event) => onAutoRenew(event.target.checked)}
               />
               <span>
                 Auto-renew
                 <small>
-                  {paidSubscription.cancelAtPeriodEnd
-                    ? 'Your subscription will end at the current period.'
-                    : 'Your subscription renews automatically.'}
+                  {isTrialing
+                    ? 'Auto-renew can\u2019t be turned off during your free trial.'
+                    : paidSubscription.cancelAtPeriodEnd
+                      ? 'Your subscription will end at the current period.'
+                      : 'Your subscription renews automatically.'}
                 </small>
               </span>
             </label>

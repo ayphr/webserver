@@ -65,10 +65,6 @@
   background: var(--bg-elevated);
 }
 
-.subscription__current--paid {
-  border-color: var(--accent-green);
-}
-
 .subscription__current-icon {
   display: flex;
   align-items: center;
@@ -111,11 +107,6 @@
   font-weight: var(--font-weight-md);
   letter-spacing: 0.03em;
   text-transform: uppercase;
-}
-
-.subscription__source--paid {
-  background: rgba(60, 200, 100, 0.16);
-  color: var(--status-success);
 }
 
 .subscription__source--attached {
