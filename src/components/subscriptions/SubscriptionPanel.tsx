@@ -275,8 +275,10 @@ const CurrentSubscription = ({
 }: CurrentSubscriptionProps) => {
   const tier = subscription.tier;
   const isPaid = subscription.source === 'paid';
-  const isTrialing = paidSubscription?.status === 'trialing';
-  const status = paidSubscription ? STATUS_LABELS[paidSubscription.status] ?? paidSubscription.status : null;
+  const isTrialing = isPaid && paidSubscription?.status === 'trialing';
+  const status = isPaid && paidSubscription
+    ? STATUS_LABELS[paidSubscription.status] ?? paidSubscription.status
+    : null;
 
   return (
     <div className={`subscription__current subscription__current--${subscription.source}`}>
@@ -306,23 +308,23 @@ const CurrentSubscription = ({
 
         {paidSubscription && (
           <div className="subscription__controls">
-            <label className="subscription__toggle">
-              <Checkbox
-                checked={!paidSubscription.cancelAtPeriodEnd}
-                disabled={isAutoRenewPending || isTrialing}
-                onChange={(event) => onAutoRenew(event.target.checked)}
-              />
-              <span>
-                Auto-renew
-                <small>
-                  {isTrialing
-                    ? 'Auto-renew can\u2019t be turned off during your free trial.'
-                    : paidSubscription.cancelAtPeriodEnd
+            {isPaid && !isTrialing && (
+              <label className="subscription__toggle">
+                <Checkbox
+                  checked={!paidSubscription.cancelAtPeriodEnd}
+                  disabled={isAutoRenewPending}
+                  onChange={(event) => onAutoRenew(event.target.checked)}
+                />
+                <span>
+                  Auto-renew
+                  <small>
+                    {paidSubscription.cancelAtPeriodEnd
                       ? 'Your subscription will end at the current period.'
                       : 'Your subscription renews automatically.'}
-                </small>
-              </span>
-            </label>
+                  </small>
+                </span>
+              </label>
+            )}
 
             <Button
               variant="secondary"
