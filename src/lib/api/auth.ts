@@ -17,7 +17,6 @@ function getClientDeviceType(): SessionDeviceType | undefined {
 
   if (/\b(SmartTV|Smart-TV|HbbTV|NetCast|Viera|BRAVIA|Roku|CrKey|AppleTV|GoogleTV)\b/i.test(userAgent)) return 'tv';
 
-  // Touch-capable desktop hardware is generally a laptop.
   if (maxTouchPoints > 0) return 'laptop';
 
   return 'desktop';
@@ -87,8 +86,11 @@ export function createAuthApi(client: RequestClient) {
         policyStatus: response.policyStatus ?? null,
       };
     },
-    async deleteAccount() {
-      await client.requestJson<null>('/api/auth/account', { method: 'DELETE' });
+    async deleteAccount(input: { password: string }) {
+      await client.requestJson<null>('/api/auth/account', {
+        method: 'DELETE',
+        body: { password: input.password },
+      });
       client.clearAuthToken();
     },
     async logout() {

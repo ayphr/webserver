@@ -16,19 +16,26 @@ const HTML_ESCAPES: Record<string, string> = {
 
 const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]!);
 
-const emojiCache: { [key: string]: string } = {};
+const EMOJI_CACHE_MAX_ENTRIES = 200;
+const emojiCache = new Map<string, string>();
 
 const createEmoji = (emoji: string): string => {
-  if (emojiCache[emoji]) {
-    return emojiCache[emoji];
+  const cached = emojiCache.get(emoji);
+  if (cached !== undefined) {
+    return cached;
   }
-  // twemoji only replaces emoji and passes the rest of the string through, so the
-  // text must be escaped before it is assigned via innerHTML.
+
   const parsed = twemoji.parse(escapeHtml(emoji), {
     folder: 'svg',
     ext: '.svg',
   });
-  emojiCache[emoji] = parsed;
+
+  if (emojiCache.size >= EMOJI_CACHE_MAX_ENTRIES) {
+    const oldest = emojiCache.keys().next().value;
+    if (oldest !== undefined) emojiCache.delete(oldest);
+  }
+  emojiCache.set(emoji, parsed);
+
   return parsed;
 };
 

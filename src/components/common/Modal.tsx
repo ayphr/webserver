@@ -13,6 +13,7 @@ export interface ModalProps {
   cancelText?: string;
   showCancel?: boolean;
   isDangerous?: boolean;
+  confirmDisabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -26,6 +27,7 @@ export const Modal = ({
   cancelText = 'Cancel',
   showCancel = true,
   isDangerous = false,
+  confirmDisabled = false,
   size = 'md',
 }: ModalProps) => {
   useEffect(() => {
@@ -75,6 +77,7 @@ export const Modal = ({
             {onConfirm && (
               <Button
                 variant={isDangerous ? 'danger' : 'primary'}
+                disabled={confirmDisabled}
                 onClick={handleConfirm}
               >
                 {confirmText}

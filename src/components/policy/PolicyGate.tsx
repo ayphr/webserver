@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type { PolicyKey, PolicyStatus } from '../../../common';
-import { Button, Card, CardBody, CardHeader, ConfirmDialog } from '../common';
+import { Button, Card, CardBody, CardHeader, ConfirmDialog, Input } from '../common';
 import './PolicyGate.css';
 
 const POLICY_META: Record<PolicyKey, { title: string; to: string }> = {
@@ -20,6 +20,7 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
         }
       } catch {
         if (!active) return;
-        navigate('/auth', { replace: true });
+        await navigate('/auth', { replace: true });
       }
     };
 
@@ -79,7 +80,7 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
     } catch {
       // Ignore logout failures, the local session is cleared regardless.
     }
-    navigate('/auth', { replace: true });
+    await navigate('/auth', { replace: true });
   };
 
   const handleDelete = async () => {
@@ -87,13 +88,18 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
     setError(null);
 
     try {
-      await api.auth.deleteAccount();
-      navigate('/auth', { replace: true });
+      await api.auth.deleteAccount({ password: deletePassword });
+      await navigate('/auth', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete your account');
       setIsDeleting(false);
       setIsConfirmOpen(false);
     }
+  };
+
+  const closeDeleteConfirm = () => {
+    setIsConfirmOpen(false);
+    setDeletePassword('');
   };
 
   if (state === 'loading') {
@@ -168,13 +174,20 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
         title="Delete Account"
         confirmText="Delete Account"
         isDangerous
+        confirmDisabled={!deletePassword}
         onConfirm={handleDelete}
-        onCancel={() => setIsConfirmOpen(false)}
+        onCancel={closeDeleteConfirm}
       >
         <p>
           This will permanently delete your account and all associated data. This action cannot be
-          undone.
+          undone. Confirm your password to continue.
         </p>
+        <Input
+          type="password"
+          value={deletePassword}
+          placeholder="Enter your password"
+          onChange={(e) => setDeletePassword(e.target.value)}
+        />
       </ConfirmDialog>
     </div>
   );

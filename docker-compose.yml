@@ -28,7 +28,7 @@ services:
     container_name: ayphr-redis
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 512mb --maxmemory-policy noeviction
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
@@ -89,11 +89,13 @@ services:
     restart: unless-stopped
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.config.file=/etc/prometheus/web.config.yml'
       - '--storage.tsdb.retention.time=7d'
       - '--storage.tsdb.wal-compression'
       - '--web.listen-address=:7444'
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/web.config.yml:/etc/prometheus/web.config.yml:ro
       - prometheus_data:/prometheus
     ports:
       - '7444:7444'
@@ -113,6 +115,10 @@ services:
     environment:
       GF_USERS_ALLOW_SIGN_UP: 'false'
       GF_SERVER_HTTP_PORT: 7443
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_SECURITY_ADMIN_USER: '${GRAFANA_ADMIN_USER}'
+      GF_SECURITY_ADMIN_PASSWORD: '${GRAFANA_ADMIN_PASSWORD}'
+      PROMETHEUS_PASSWORD: '${PROMETHEUS_PASSWORD}'
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

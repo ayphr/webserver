@@ -1,12 +1,18 @@
+import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { Worker, type WorkerOptions } from 'node:worker_threads';
 import { createLogger } from './lib/logger';
-import { closeTelemetryBuffer, drainTelemetryBuffer, enqueueTelemetryRecord } from './lib/redisBuffer';
+import {
+  ackTelemetryBatch,
+  closeTelemetryBuffer,
+  enqueueTelemetryRecord,
+  readTelemetryBatch,
+} from './lib/redisBuffer';
 import { appendChunk, parseIncomingBuffer } from './lib/socketFraming';
 import type { TelemetryRecord } from './lib/telemetry';
 import { createWorkerPool } from './lib/workerPool';
-import { setupServer } from './api/server';
-import { API_PORT, TCP_PORT } from './env';
+import { setupMetricsServer, setupServer } from './api/server';
+import { API_PORT, METRICS_PORT, TCP_PORT } from './env';
 import {
   packetsReceivedTotal,
   recordActiveDevices,
@@ -23,16 +29,30 @@ import {
 const log = createLogger('server');
 const WORKER_COUNT = 4;
 const FLUSH_INTERVAL_MS = 15_000;
+const FLUSH_BATCH_LIMIT = 5_000;
+const FLUSH_TIMEOUT_MS = 30_000;
 let flushInProgress = false;
+
+type FlushResult = { ok: boolean; insertedCount?: number; error?: string };
+const pendingFlushes = new Map<string, (result: FlushResult) => void>();
 
 const workerPool = createWorkerPool(WORKER_COUNT, new URL('./worker.ts', import.meta.url), (record) => {
   void enqueueTelemetryRecord(record as TelemetryRecord);
 });
 
 const dbWorker = new Worker(new URL('./dbWorker.ts', import.meta.url), { type: 'module' } as WorkerOptions);
-dbWorker.on('message', (message: { action: string; msg?: string; error?: unknown; operations?: Array<{ operation: string; collection: string; count: number }> }) => {
+dbWorker.on('message', (message: { action: string; id?: string; msg?: string; ok?: boolean; insertedCount?: number; error?: unknown; operations?: Array<{ operation: string; collection: string; count: number }> }) => {
   if (message?.action === 'log') log.info({ component: 'db' }, message.msg);
   if (message?.action === 'error') log.error({ component: 'db', error: message.error }, 'database worker error');
+  if (message?.action === 'flushResult' && message.id) {
+    pendingFlushes.get(message.id)?.({
+      ok: message.ok === true,
+      insertedCount: message.insertedCount,
+      error: typeof message.error === 'string' ? message.error : undefined,
+    });
+    pendingFlushes.delete(message.id);
+    return;
+  }
   if (message?.action === 'mongoOperations' && Array.isArray(message.operations)) {
     for (const tally of message.operations) {
       recordMongoOperation(tally.operation, tally.collection, tally.count);
@@ -40,6 +60,22 @@ dbWorker.on('message', (message: { action: string; msg?: string; error?: unknown
   }
 });
 dbWorker.on('error', (error) => log.error({ error }, 'database worker crashed'));
+
+function flushToDatabase(records: TelemetryRecord[]): Promise<FlushResult> {
+  return new Promise((resolve) => {
+    const id = randomUUID();
+    const timeout = setTimeout(() => {
+      if (pendingFlushes.delete(id)) resolve({ ok: false, error: 'timed out waiting for database worker' });
+    }, FLUSH_TIMEOUT_MS);
+
+    pendingFlushes.set(id, (result) => {
+      clearTimeout(timeout);
+      resolve(result);
+    });
+
+    dbWorker.postMessage({ action: 'flush', id, records });
+  });
+}
 
 setInterval(() => {
   if (flushInProgress) return;
@@ -49,13 +85,24 @@ setInterval(() => {
     const endTimer = telemetryFlushDuration.startTimer();
 
     try {
-      const toFlush = await drainTelemetryBuffer();
-      if (toFlush.length === 0) return;
+      const { records, rawCount } = await readTelemetryBatch(FLUSH_BATCH_LIMIT);
+      if (rawCount === 0) return;
 
-      dbWorker.postMessage({ action: 'flush', records: toFlush });
-      telemetryRecordsFlushedTotal.inc(toFlush.length);
-      telemetryFlushBatchSize.observe(toFlush.length);
-      log.info({ flushed: toFlush.length }, 'flushed buffered records to database worker');
+      if (records.length === 0) {
+        await ackTelemetryBatch(rawCount);
+        return;
+      }
+
+      const result = await flushToDatabase(records);
+      if (!result.ok) {
+        log.error({ error: result.error, retained: rawCount }, 'telemetry flush failed; records retained for retry');
+        return;
+      }
+
+      await ackTelemetryBatch(rawCount);
+      telemetryRecordsFlushedTotal.inc(result.insertedCount ?? records.length);
+      telemetryFlushBatchSize.observe(records.length);
+      log.info({ flushed: records.length }, 'flushed buffered records to database worker');
     } finally {
       flushInProgress = false;
       endTimer();
@@ -100,6 +147,7 @@ const tcpServer = net.createServer((socket) => {
 
 tcpServer.listen(TCP_PORT, () => log.info({ port: TCP_PORT }, 'TCP server listening'));
 const httpServer = setupServer(API_PORT, () => log.info({ port: API_PORT }, 'API server listening'));
+const metricsServer = setupMetricsServer(METRICS_PORT, () => log.info({ port: METRICS_PORT }, 'metrics server listening'));
 
 let shuttingDown = false;
 
@@ -112,6 +160,7 @@ async function shutdown(signal: string) {
   for (const socket of sockets) socket.destroy();
   await new Promise<void>((resolve) => tcpServer.close(() => resolve()));
   await httpServer.stop();
+  await metricsServer.stop();
 
   await workerPool.shutdown();
   await closeTelemetryBuffer();

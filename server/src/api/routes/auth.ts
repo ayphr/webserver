@@ -1,4 +1,11 @@
-import { createPasswordHash, endAllSessions, endCurrentSession, requireAuth, startSession, verifyPassword } from '../auth';
+import {
+  createPasswordHash,
+  endAllSessions,
+  endCurrentSession,
+  requireAuth,
+  startSession,
+  verifyPassword,
+} from '../auth';
 import {
   createUser,
   deleteDevicesForOwnerUuid,
@@ -13,6 +20,9 @@ import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
+import { getUsernameValidationError } from '@common/utils/username';
+import { getClientIp } from '../../lib/requestContext';
+import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
 
 type AuthPayload = {
@@ -26,6 +36,9 @@ type AuthPayload = {
 };
 
 const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
+
+const registerLimiter = createRateLimiter(60 * 60 * 1000, 10);
+const loginLimiter = createRateLimiter(15 * 60 * 1000, 20);
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -49,7 +62,14 @@ async function readJsonBody(request: Request): Promise<AuthPayload | null> {
   }
 }
 
+function isDuplicateKeyError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: number }).code === 11000;
+}
+
 async function handleRegister(request: Request) {
+  const ipCheck = registerLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+
   const body = await readJsonBody(request);
 
   if (!body?.username || !body.password) {
@@ -59,6 +79,11 @@ async function handleRegister(request: Request) {
   const username = body.username.trim();
   const password = body.password.trim();
 
+  const usernameError = getUsernameValidationError(username);
+  if (usernameError) {
+    return json({ error: usernameError }, 400);
+  }
+
   if (body.acceptPolicies !== true) {
     return json({ error: 'You must agree to the Terms of Service and Privacy Policy' }, 400);
   }
@@ -66,11 +91,6 @@ async function handleRegister(request: Request) {
   const passwordValidationErrors = getPasswordValidationErrors(password);
   if (passwordValidationErrors.length > 0) {
     return json({ error: passwordValidationErrors[0] }, 400);
-  }
-
-  const existingUser = await getUserFromUsername(username);
-  if (existingUser) {
-    return json({ error: 'username already exists' }, 409);
   }
 
   const policyVersions = await getPolicyVersions();
@@ -99,14 +119,22 @@ async function handleRegister(request: Request) {
       privacy: policyVersions.privacy,
     },
     auth: {
-      passwordHash: createPasswordHash(password),
+      passwordHash: await createPasswordHash(password),
     },
     createdAt: now,
     lastActive: now,
     country,
   };
 
-  await createUser(user);
+  try {
+    await createUser(user);
+  } catch (error) {
+    // The unique username index is the source of truth, closing the check-then-insert race.
+    if (isDuplicateKeyError(error) || (await getUserFromUsername(username))) {
+      return json({ error: 'username already exists' }, 409);
+    }
+    throw error;
+  }
 
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
@@ -116,6 +144,9 @@ async function handleRegister(request: Request) {
 }
 
 async function handleLogin(request: Request) {
+  const ipCheck = loginLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+
   const body = await readJsonBody(request);
 
   if (!body?.username || !body.password) {
@@ -125,8 +156,11 @@ async function handleLogin(request: Request) {
   const username = body.username.trim();
   const password = body.password.trim();
 
+  const userCheck = loginLimiter.check(`user:${username.toLowerCase()}`);
+  if (!userCheck.allowed) return tooManyRequests(userCheck.retryAfterMs);
+
   const user = await getUserFromUsername(username);
-  if (!user || !verifyPassword(password, user.auth.passwordHash)) {
+  if (!user || !(await verifyPassword(password, user.auth.passwordHash))) {
     return json({ error: 'invalid username or password' }, 401);
   }
 
@@ -155,8 +189,8 @@ const handleMe = requireAuth(async (_request, user) => {
   });
 }, { allowSuspended: true, allowPolicyPending: true });
 
-const handleLogout = requireAuth(async (request, user) => {
-  await endCurrentSession(request, user);
+const handleLogout = requireAuth(async (request) => {
+  await endCurrentSession(request);
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
@@ -182,7 +216,17 @@ const handleAcceptPolicies = requireAuth(async (_request, user) => {
   return json({ user: publicUser(user), policyStatus });
 }, { allowSuspended: true, allowPolicyPending: true });
 
-const handleDeleteAccount = requireAuth(async (_request, user) => {
+const handleDeleteAccount = requireAuth(async (request, user) => {
+  const body = await readJsonBody(request);
+
+  if (!body?.password) {
+    return json({ error: 'password is required' }, 400);
+  }
+
+  if (!(await verifyPassword(body.password, user.auth.passwordHash))) {
+    return json({ error: 'invalid password' }, 401);
+  }
+
   await Promise.all([
     deletePunishmentsForUserUuid(user.uuid),
     deleteDevicesForOwnerUuid(user.uuid),

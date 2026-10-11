@@ -9,7 +9,6 @@ import {
 } from './routes/auth';
 import {
   handleApiNotFoundRoute,
-  handleMetricsRoute,
   handleNotFoundRoute,
   handleOptionsRoute,
   handleStatusRoute,
@@ -46,7 +45,6 @@ type RouteDefinition = {
 };
 
 const ROUTES: readonly RouteDefinition[] = [
-  { method: 'GET', path: '/metrics', handle: handleMetricsRoute },
   { method: 'GET', path: '/api/status', handle: handleStatusRoute },
 
   { method: 'POST', path: '/api/auth/register', handle: handleAuthRegister },

@@ -18,6 +18,11 @@ export type SettingsConfirm = {
   confirmText?: string;
   cancelText?: string;
   dangerous?: boolean;
+  requirePassword?: boolean;
+};
+
+export type SettingsActionContext = {
+  password?: string;
 };
 
 export type ButtonSettingsOption = SettingsOptionBase & {
@@ -25,7 +30,7 @@ export type ButtonSettingsOption = SettingsOptionBase & {
   label: string;
   variant?: 'primary' | 'secondary' | 'danger';
   confirm?: SettingsConfirm;
-  action: () => void | Promise<void>;
+  action: (context: SettingsActionContext) => void | Promise<void>;
 };
 
 export type InputSettingsOption = SettingsOptionBase & {

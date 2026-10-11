@@ -1,5 +1,6 @@
 import { getBearerToken, requireAuth } from '../auth';
 import { deleteSession, getSessionById, getSessionsForUserUuid } from '../../workers/dbWriter';
+import { hashToken } from '../../lib/tokens';
 import type { SessionInfo } from '@common';
 
 function json(body: unknown, status = 200) {
@@ -10,12 +11,13 @@ const guardOptions = { allowSuspended: true, allowPolicyPending: true };
 
 const handleListMine = requireAuth(async (request, user) => {
   const token = getBearerToken(request);
+  const tokenHash = token ? hashToken(token) : null;
   const sessions = await getSessionsForUserUuid(user.uuid);
 
   const payload: SessionInfo[] = sessions.map((session) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { token: sessionToken, userUuid, ...rest } = session;
-    return { ...rest, current: sessionToken === token };
+    const { tokenHash: storedHash, userUuid, ...rest } = session;
+    return { ...rest, current: storedHash === tokenHash };
   });
 
   return json({ sessions: payload });

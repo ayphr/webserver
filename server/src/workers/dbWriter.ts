@@ -119,13 +119,12 @@ async function setupCollections(db: Db): Promise<Collections> {
     [TELEMETRY_COLLECTION, () => cols.telemetry.createIndex({ deviceId: 1 })],
     [USERS_COLLECTION, () => cols.users.createIndex({ uuid: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ username: 1 }, { unique: true })],
-    [USERS_COLLECTION, () => cols.users.createIndex({ 'auth.token': 1 })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1 })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ ownerUuid: 1 })],
     [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ id: 1 }, { unique: true })],
-    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ token: 1 }, { unique: true })],
+    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ tokenHash: 1 }, { unique: true })],
     [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ userUuid: 1 })],
     [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
   ];
@@ -170,23 +169,15 @@ async function getCols(): Promise<Collections> {
   return collections ?? connect();
 }
 
-export async function flushRecords(records: TelemetryRecord[], emit: (payload: unknown) => void) {
-  try {
-    const { telemetry } = await getCols();
-    const documents = records.map((record) => normalizeDateValues(record));
+export async function flushRecords(records: TelemetryRecord[]): Promise<number> {
+  const { telemetry } = await getCols();
+  const documents = records.map((record) => normalizeDateValues(record));
 
-    if (documents.length === 0) {
-      emit({ action: 'log', msg: 'nothing to insert' });
-      return;
-    }
+  if (documents.length === 0) return 0;
 
-    trackMongoOperation('insertMany', TELEMETRY_COLLECTION);
-    const result = await telemetry.insertMany(documents);
-    emit({ action: 'log', msg: `inserted ${result.insertedCount} documents` });
-  } catch (error) {
-    log.error({ error }, 'failed to flush records');
-    emit({ action: 'error', error: String(error) });
-  }
+  trackMongoOperation('insertMany', TELEMETRY_COLLECTION);
+  const result = await telemetry.insertMany(documents);
+  return result.insertedCount;
 }
 
 export async function createUser(user: User) {
@@ -227,12 +218,6 @@ export async function getUserFromUsername(username: string) {
   return users.findOne({ username });
 }
 
-export async function getUserFromToken(token: string) {
-  const { users } = await getCols();
-  trackMongoOperation('findOne', USERS_COLLECTION);
-  return users.findOne({ 'auth.token': token } as Record<string, unknown>);
-}
-
 export async function getUsers() {
   const { users } = await getCols();
   trackMongoOperation('find', USERS_COLLECTION);
@@ -263,6 +248,12 @@ export async function updateUser(user: User, unsetKeys: string[] = []) {
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid: user.uuid }, update);
   return normalizedUser;
+}
+
+export async function updateUserLastActive(uuid: string, when: Date) {
+  const { users } = await getCols();
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne({ uuid }, { $set: { lastActive: when } });
 }
 
 export async function updateUserRole(userUuid: string, role: UserRole) {
@@ -369,10 +360,10 @@ export async function createSession(session: Session) {
   return normalizedSession;
 }
 
-export async function getSessionByToken(token: string) {
+export async function getSessionByTokenHash(tokenHash: string) {
   const { sessions } = await getCols();
   trackMongoOperation('findOne', SESSIONS_COLLECTION);
-  return sessions.findOne({ token });
+  return sessions.findOne({ tokenHash });
 }
 
 export async function getSessionById(id: string) {
@@ -399,10 +390,10 @@ export async function deleteSession(id: string) {
   await sessions.deleteOne({ id } as Record<string, unknown>);
 }
 
-export async function deleteSessionByToken(token: string) {
+export async function deleteSessionByTokenHash(tokenHash: string) {
   const { sessions } = await getCols();
   trackMongoOperation('deleteOne', SESSIONS_COLLECTION);
-  await sessions.deleteOne({ token });
+  await sessions.deleteOne({ tokenHash });
 }
 
 export async function deleteSessionsForUserUuid(userUuid: string) {
