@@ -256,10 +256,6 @@
   background: var(--bg-elevated);
 }
 
-.subscription__plan--featured {
-  border-color: var(--accent-green);
-}
-
 .subscription__plan--current {
   border-color: var(--border-focus);
   opacity: 0.85;
