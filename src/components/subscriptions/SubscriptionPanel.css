@@ -271,8 +271,8 @@
   left: 1rem;
   padding: 0.1rem 0.5rem;
   border-radius: 999px;
-  background: var(--accent-green);
-  color: hsl(129, 80%, 12%);
+  background: var(--text-primary);
+  color: var(--bg-base);
   font-size: 0.65rem;
   font-weight: var(--font-weight-hv);
   text-transform: uppercase;
