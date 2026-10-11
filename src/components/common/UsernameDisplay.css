@@ -5,6 +5,12 @@
   font-size: 1.1rem;
 }
 
+.username-display__icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
 .username-display__icon {
   display: inline-flex;
   align-items: center;

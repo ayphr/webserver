@@ -326,7 +326,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={setActivePage} username={user.username} role={user.role} country={user.country} isSuspended={isSuspended} />
+      <Sidebar activeTab={activePage} onChange={setActivePage} username={user.username} badges={user.badges} country={user.country} isSuspended={isSuspended} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
           <Card className="dashboard-page__card" elevated>
@@ -393,7 +393,7 @@ export const DashboardPage = () => {
                 <CardBody>
                   <UsernameDisplay
                     username={user.username}
-                    role={user.role}
+                    badges={user.badges}
                     country={user.country}
                     className="dashboard-page__user-row"
                   />

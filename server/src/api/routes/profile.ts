@@ -1,6 +1,6 @@
-import type { User } from '@common';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '../../lib/country';
+import { toPublicUser } from '../../lib/user';
 import { isSocialLinkType, normalizeSocialHandle } from '@common/utils/social';
 import {
   BIO_MAX_LENGTH,
@@ -24,14 +24,8 @@ function json(body: unknown, status = 200) {
   return Response.json(body, { status });
 }
 
-function publicUser(user: User) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { auth, ...rest } = user;
-  return rest;
-}
-
 const handleMe = requireAuth((_request, user) => {
-  return json({ user: publicUser(user) });
+  return json({ user: toPublicUser(user) });
 }, { allowSuspended: true });
 
 const handleCountries = requireAuth(() => {
@@ -59,7 +53,7 @@ const handleCountryUpdate = requireAuth(async (request, user) => {
   user.country = countryCode;
   await updateUser(user);
 
-  return json({ user: publicUser(user) });
+  return json({ user: toPublicUser(user) });
 }, { allowSuspended: true });
 
 const handleProfileEdit = requireAuth(async (request, user, params) => {
@@ -150,7 +144,7 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
 
   await updateUser(targetUser, unsetKeys);
 
-  return json({ user: publicUser(targetUser) });
+  return json({ user: toPublicUser(targetUser) });
 }, { allowSuspended: true });
 
 export { handleMe, handleCountries, handleCountryUpdate, handleProfileEdit };

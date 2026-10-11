@@ -46,7 +46,7 @@ export const ProfilePage = () => {
   if (!userUuid) {
     return (
       <div className="profile-layout">
-        <Sidebar activeTab={activePage} onChange={setActivePage} username={currentUser?.username ?? '...'} />
+        <Sidebar activeTab={activePage} onChange={setActivePage} username={currentUser?.username ?? '...'} badges={currentUser?.badges} />
         <main className="profile-main">
           <Card className="profile-page__card" elevated>
             <CardBody>
@@ -64,7 +64,7 @@ export const ProfilePage = () => {
 
   return (
     <div className="profile-layout">
-      <Sidebar activeTab={activePage} onChange={setActivePage} username={currentUser?.username ?? '...'} />
+      <Sidebar activeTab={activePage} onChange={setActivePage} username={currentUser?.username ?? '...'} badges={currentUser?.badges} />
       <main className="profile-main">
         <Card className="profile-page__card" elevated>
           <CardHeader>

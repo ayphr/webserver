@@ -2,7 +2,7 @@ import React from 'react';
 import './Sidebar.css';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
-import type { UserRole } from '../../../common/types/user';
+import type { BadgeId } from '../../../common/types';
 
 type Tab = { id: string; name: string };
 
@@ -29,12 +29,12 @@ type Props = {
   activeTab: string;
   onChange: (id: string) => void;
   username?: string;
-  role?: UserRole;
+  badges?: BadgeId[];
   country?: string | null;
   isSuspended?: boolean;
 };
 
-export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', role, country, isSuspended = false }) => {
+export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, isSuspended = false }) => {
   return (
     <aside className="n-sidebar" aria-label="Sidebar">
       <div className="n-sidebar__top">
@@ -89,7 +89,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unkn
         </nav>
 
         <div className="n-sidebar__accountDisplay">
-          <UsernameDisplay username={username} role={role ?? 'user'} country={country ?? undefined} />
+          <UsernameDisplay username={username} badges={badges} country={country ?? undefined} />
         </div>
       </div>
     </aside>

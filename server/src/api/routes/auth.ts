@@ -18,6 +18,7 @@ import {
 } from '../../workers/dbWriter';
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
+import { toPublicUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
@@ -42,12 +43,6 @@ const loginLimiter = createRateLimiter(15 * 60 * 1000, 20);
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
-}
-
-function publicUser(user: User) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { auth, ...rest } = user;
-  return rest;
 }
 
 async function readJsonBody(request: Request): Promise<AuthPayload | null> {
@@ -140,7 +135,7 @@ async function handleRegister(request: Request) {
 
   const policyStatus = await getPolicyStatus(user);
 
-  return json({ user: publicUser(user), token, policyStatus }, 201);
+  return json({ user: toPublicUser(user), token, policyStatus }, 201);
 }
 
 async function handleLogin(request: Request) {
@@ -171,7 +166,7 @@ async function handleLogin(request: Request) {
   const policyStatus = await getPolicyStatus(user);
 
   return json({
-    user: publicUser(user),
+    user: toPublicUser(user),
     token,
     suspension: activeSuspension,
     policyStatus,
@@ -183,7 +178,7 @@ const handleMe = requireAuth(async (_request, user) => {
   const policyStatus = await getPolicyStatus(user);
 
   return json({
-    user: publicUser(user),
+    user: toPublicUser(user),
     suspension: activeSuspension,
     policyStatus,
   });
@@ -213,7 +208,7 @@ const handleAcceptPolicies = requireAuth(async (_request, user) => {
 
   const policyStatus = await getPolicyStatus(user);
 
-  return json({ user: publicUser(user), policyStatus });
+  return json({ user: toPublicUser(user), policyStatus });
 }, { allowSuspended: true, allowPolicyPending: true });
 
 const handleDeleteAccount = requireAuth(async (request, user) => {

@@ -1,23 +1,17 @@
 import { requireAuth } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid } from '../../workers/dbWriter';
 import { getPolicyStatus } from '../../lib/policies';
-import type { User } from '@common';
+import { toPublicUser } from '../../lib/user';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
-}
-
-function publicUser(user: User) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { auth, ...rest } = user;
-  return rest;
 }
 
 const handleMe = requireAuth(async (_request, user) => {
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
   const policyStatus = await getPolicyStatus(user);
   return json({
-    user: publicUser(user),
+    user: toPublicUser(user),
     activeSuspension,
     policyStatus,
   });
@@ -35,7 +29,7 @@ const handleUserByUuid = requireAuth(async (_request, user, params) => {
     return json({ error: 'user not found' }, 404);
   }
 
-  return json({ user: publicUser(targetUser), requestedBy: publicUser(user) });
+  return json({ user: toPublicUser(targetUser), requestedBy: toPublicUser(user) });
 }, { allowSuspended: true });
 
 export { handleMe, handleUserByUuid };
