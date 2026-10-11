@@ -1,0 +1,50 @@
+.ayphr-tooltip-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ayphr-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9999;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-md);
+  line-height: 1.25;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--container-shadow);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 0);
+  transition: opacity 0.12s ease;
+}
+
+.ayphr-tooltip--visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.ayphr-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--bg-elevated);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.ayphr-tooltip[data-placement='top']::after {
+  top: calc(100% - 0.25rem);
+}
+
+.ayphr-tooltip[data-placement='bottom']::after {
+  bottom: calc(100% - 0.25rem);
+}
