@@ -123,10 +123,6 @@ async function setupCollections(db: Db): Promise<Collections> {
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ ownerUuid: 1 })],
-    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ id: 1 }, { unique: true })],
-    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ tokenHash: 1 }, { unique: true })],
-    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ userUuid: 1 })],
-    [SESSIONS_COLLECTION, () => cols.sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
   ];
 
   await Promise.all(
@@ -136,7 +132,63 @@ async function setupCollections(db: Db): Promise<Collections> {
     })
   ).catch((error) => log.warn({ error }, 'failed to ensure indexes'));
 
+  try {
+    await ensureSessionIndexes(cols.sessions);
+  } catch (error) {
+    log.warn({ error }, 'failed to ensure sessions indexes');
+  }
+
   return cols;
+}
+
+/**
+ * Reconciles the sessions collection indexes with the current schema.
+ *
+ * Older deployments carried unique indexes on the legacy `token` field (and a
+ * non-partial `tokenHash` index) that break inserts after the schema moved to
+ * `tokenHash`. Unique indexes treat a missing field as `null`, so multiple
+ * documents without the field produce `E11000 duplicate key` errors on build
+ * and on write. Those stale indexes are dropped here and rebuilt as a partial
+ * unique index so legacy documents (which have no `tokenHash`) are excluded.
+ */
+async function ensureSessionIndexes(sessions: Collection<Session>) {
+  trackMongoOperation('listIndexes', SESSIONS_COLLECTION);
+  const existing = await sessions.listIndexes().toArray();
+
+  const stale: string[] = [];
+  for (const index of existing) {
+    const fields = Object.keys(index.key ?? {});
+    if (fields.length !== 1) continue;
+
+    const [field] = fields;
+    if (field === 'token') {
+      stale.push(index.name);
+    } else if (field === 'tokenHash' && !index.partialFilterExpression) {
+      stale.push(index.name);
+    }
+  }
+
+  for (const name of stale) {
+    trackMongoOperation('dropIndex', SESSIONS_COLLECTION);
+    await sessions.dropIndex(name);
+  }
+
+  const indexSpecs: Array<() => Promise<unknown>> = [
+    () => sessions.createIndex({ id: 1 }, { unique: true }),
+    () => sessions.createIndex(
+      { tokenHash: 1 },
+      { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
+    ),
+    () => sessions.createIndex({ userUuid: 1 }),
+    () => sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+  ];
+
+  await Promise.all(
+    indexSpecs.map(async (createIndex) => {
+      trackMongoOperation('createIndex', SESSIONS_COLLECTION);
+      return createIndex();
+    })
+  );
 }
 
 export async function connect(): Promise<Collections> {
