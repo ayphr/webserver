@@ -3,6 +3,11 @@ import type {
   StaffPunishmentsPayload,
   StaffRoleUpdatePayload,
   StaffRoleUpdateRequest,
+  StaffSubscriptionAttachRequest,
+  StaffSubscriptionListPayload,
+  StaffSubscriptionPayload,
+  StaffSubscriptionUpdatePayload,
+  StaffSubscriptionUpdateRequest,
   StaffSummary,
   StaffUsersPayload,
 } from '../../../common';
@@ -41,6 +46,33 @@ export function createStaffApi(client: RequestClient) {
           method: 'POST',
         });
         return response.punishment;
+      },
+    },
+    subscriptions: {
+      async list(userUuid: string) {
+        const response = await client.requestJson<StaffSubscriptionListPayload>(`/api/staff/subscriptions/${userUuid}`);
+        return response.subscriptions;
+      },
+      async attach(userUuid: string, input: StaffSubscriptionAttachRequest) {
+        const response = await client.requestJson<StaffSubscriptionPayload>(`/api/staff/subscriptions/${userUuid}`, {
+          method: 'POST',
+          body: input,
+        });
+        return response.user;
+      },
+      async update(userUuid: string, subscriptionId: string, input: StaffSubscriptionUpdateRequest) {
+        const response = await client.requestJson<StaffSubscriptionUpdatePayload>(
+          `/api/staff/subscriptions/${userUuid}/${subscriptionId}`,
+          { method: 'PATCH', body: input },
+        );
+        return response.subscription;
+      },
+      async detach(userUuid: string, subscriptionId: string) {
+        const response = await client.requestJson<StaffSubscriptionPayload>(
+          `/api/staff/subscriptions/${userUuid}/${subscriptionId}`,
+          { method: 'DELETE' },
+        );
+        return response.user;
       },
     },
   };

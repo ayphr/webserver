@@ -1,17 +1,20 @@
 import type { Device } from './device';
 import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
+import type {
+  AttachedSubscription,
+  BillingInterval,
+  PaidSubscription,
+  ResolvedSubscription,
+  SubscriptionPlan,
+  SubscriptionTier,
+} from './subscription';
 import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, UserRole } from './user';
 
-/**
- * Whether a user has agreed to the latest published policies.
- * `null` when the latest versions could not be determined.
- */
 export type PolicyStatus = {
   upToDate: boolean;
   pending: PolicyKey[];
   current: PolicyVersions;
-  /** Human-readable updated dates (e.g. "October 2026") for the latest versions. */
   updatedDates: Partial<Record<PolicyKey, string>>;
   accepted: PolicyAgreements;
 };
@@ -133,4 +136,57 @@ export type StaffRoleUpdatePayload = {
 
 export type StaffRoleUpdateRequest = {
   role: UserRole;
+};
+
+export type StaffSubscriptionAttachRequest = {
+  tier: SubscriptionTier;
+  expiresAt?: string | null;
+  reason?: string;
+};
+
+export type StaffSubscriptionUpdateRequest = {
+  tier?: SubscriptionTier;
+  expiresAt?: string | null;
+  reason?: string;
+};
+
+export type StaffSubscriptionPayload = {
+  user: PublicUser;
+};
+
+export type StaffSubscriptionListPayload = {
+  subscriptions: AttachedSubscription[];
+};
+
+export type StaffSubscriptionUpdatePayload = {
+  subscription: AttachedSubscription;
+};
+
+export type SubscriptionMePayload = {
+  subscription: ResolvedSubscription | null;
+  paidSubscription: PaidSubscription | null;
+  attachedSubscriptions: AttachedSubscription[];
+  plans: SubscriptionPlan[];
+  trialDays: number;
+};
+
+export type SubscriptionCheckoutRequest = {
+  tier: SubscriptionTier;
+  interval: BillingInterval;
+};
+
+export type SubscriptionCheckoutPayload = {
+  url: string;
+};
+
+export type SubscriptionAutoRenewRequest = {
+  autoRenew: boolean;
+};
+
+export type SubscriptionAutoRenewPayload = {
+  paidSubscription: PaidSubscription;
+};
+
+export type SubscriptionPortalPayload = {
+  url: string;
 };

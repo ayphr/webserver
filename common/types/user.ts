@@ -1,5 +1,10 @@
 import type { MarkdownFormat } from '../utils/markdown';
 import type { BadgeId } from './badges';
+import type {
+  AttachedSubscription,
+  PaidSubscription,
+  PublicSubscription,
+} from './subscription';
 
 export type UserRole = 'user' | 'staff';
 export type SocialLinkType = 'website' | 'youtube' | 'github' | 'bluesky' | 'reddit' | 'x' | 'facebook' | 'instagram' | 'tiktok';
@@ -31,8 +36,15 @@ export type User = {
   createdAt: Date;
   lastActive: Date;
   country?: string;
+  stripeCustomerId?: string;
+  paidSubscriptions?: PaidSubscription[];
+  attachedSubscriptions?: AttachedSubscription[];
 };
 
-export type PublicUser = Omit<User, 'auth'> & {
+export type PublicUser = Omit<
+  User,
+  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions'
+> & {
   badges: BadgeId[];
+  subscription: PublicSubscription | null;
 };

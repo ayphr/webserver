@@ -16,6 +16,7 @@ import { BioEditor, BioText, Button, UsernameDisplay } from './index';
 import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '../../../common/utils/country';
 import { PunishModal } from './PunishModal';
+import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
 import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
 import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '../../../common';
 import {
@@ -107,6 +108,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [selectedSocialValue, setSelectedSocialValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isPunishModalOpen, setIsPunishModalOpen] = useState(false);
+  const [isSubscriptionsModalOpen, setIsSubscriptionsModalOpen] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -136,7 +139,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     };
 
     void load();
-  }, [userUuid]);
+  }, [userUuid, reloadToken]);
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -213,6 +216,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           {canPunishThisProfile && !isEditingProfile && (
             <Button onClick={() => setIsPunishModalOpen(true)} variant="danger">
               Punish
+            </Button>
+          )}
+          {isStaff && !isEditingProfile && (
+            <Button onClick={() => setIsSubscriptionsModalOpen(true)} variant="secondary">
+              Subscriptions
             </Button>
           )}
           {isEditingProfile && (
@@ -439,6 +447,16 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           onPunish={() => setIsPunishModalOpen(false)}
           isSelfPunishment={viewerUuid === userUuid}
           onSelfPunishment={onPunishSelf}
+        />
+      )}
+
+      {isStaff && user && (
+        <ManageSubscriptionsModal
+          isOpen={isSubscriptionsModalOpen}
+          userUuid={user.uuid}
+          username={user.username}
+          onClose={() => setIsSubscriptionsModalOpen(false)}
+          onChanged={() => setReloadToken((token) => token + 1)}
         />
       )}
     </div>

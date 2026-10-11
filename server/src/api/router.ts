@@ -18,11 +18,22 @@ import {
   handleStaffPunishmentLift,
   handleStaffPunishments,
   handleStaffRoleUpdate,
+  handleStaffSubscriptionAttach,
+  handleStaffSubscriptionDetach,
+  handleStaffSubscriptionList,
+  handleStaffSubscriptionUpdate,
   handleStaffUsers,
   handleUsersSummary,
 } from './routes/staff';
 import { handleGetBySerial, handleListMine, handleRegister as handleDeviceRegister } from './routes/devices';
 import { handleUserByUuid, handleMe as handleUsersMe } from './routes/users';
+import {
+  handleStripeWebhook,
+  handleSubscriptionAutoRenew,
+  handleSubscriptionCheckout,
+  handleSubscriptionMe,
+  handleSubscriptionPortal,
+} from './routes/subscriptions';
 import { handleListMine as handleSessionsListMine, handleRevoke as handleSessionRevoke } from './routes/sessions';
 import {
   handleCountries,
@@ -58,6 +69,12 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/users/me', handle: handleUsersMe },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
 
+  { method: 'POST', path: '/api/subscriptions/stripe/webhook', handle: handleStripeWebhook },
+  { method: 'GET', path: '/api/subscriptions/me', handle: handleSubscriptionMe },
+  { method: 'POST', path: '/api/subscriptions/checkout', handle: handleSubscriptionCheckout },
+  { method: 'POST', path: '/api/subscriptions/auto-renew', handle: handleSubscriptionAutoRenew },
+  { method: 'POST', path: '/api/subscriptions/portal', handle: handleSubscriptionPortal },
+
   { method: 'GET', path: '/api/sessions', handle: handleSessionsListMine },
   { method: 'DELETE', path: '/api/sessions/:id', handle: handleSessionRevoke },
 
@@ -81,6 +98,10 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/staff/punishments/:id/lift', handle: handleStaffPunishmentLift },
   { method: 'GET', path: '/api/staff/punishments', handle: handleStaffPunishments },
   { method: 'POST', path: '/api/staff/punishments', handle: handleStaffPunishments },
+  { method: 'POST', path: '/api/staff/subscriptions/:uuid', handle: handleStaffSubscriptionAttach },
+  { method: 'GET', path: '/api/staff/subscriptions/:uuid', handle: handleStaffSubscriptionList },
+  { method: 'DELETE', path: '/api/staff/subscriptions/:uuid/:id', handle: handleStaffSubscriptionDetach },
+  { method: 'PATCH', path: '/api/staff/subscriptions/:uuid/:id', handle: handleStaffSubscriptionUpdate },
 ];
 
 const UNMATCHED_API_TEMPLATE = '/api/other';

@@ -10,4 +10,5 @@ export { BioEditor, type BioEditorProps } from './BioEditor';
 export { BioText, type BioTextProps } from './BioText';
 export { ProfileCard, type ProfileCardProps } from './ProfileCard';
 export { PunishModal, type PunishModalProps } from './PunishModal';
+export { ManageSubscriptionsModal, type ManageSubscriptionsModalProps } from './ManageSubscriptionsModal';
 export { Tooltip, type TooltipProps } from './Tooltip';

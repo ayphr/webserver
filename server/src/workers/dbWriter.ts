@@ -2,13 +2,14 @@ import { Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../lib/logger';
 import { recordMongoOperation } from '../lib/metrics';
 import type { TelemetryRecord } from '../lib/telemetry';
-import { type Device, type Punishment, type Session, type User, type UserRole } from '@common';
+import { type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription } from '@common';
 import {
   TELEMETRY_COLLECTION,
   USERS_COLLECTION,
   PUNISHMENTS_COLLECTION,
   DEVICES_COLLECTION,
   SESSIONS_COLLECTION,
+  STRIPE_EVENTS_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME
 } from '../env';
@@ -27,6 +28,7 @@ interface Collections {
   punishments: Collection<Punishment>;
   devices: Collection<Device>;
   sessions: Collection<Session>;
+  stripeEvents: Collection<{ id: string; type: string; createdAt: Date }>;
 }
 
 let collections: Collections | null = null;
@@ -112,17 +114,21 @@ async function setupCollections(db: Db): Promise<Collections> {
     users: db.collection<User>(USERS_COLLECTION),
     punishments: db.collection<Punishment>(PUNISHMENTS_COLLECTION),
     devices: db.collection<Device>(DEVICES_COLLECTION),
-    sessions: db.collection<Session>(SESSIONS_COLLECTION)
+    sessions: db.collection<Session>(SESSIONS_COLLECTION),
+    stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
     [TELEMETRY_COLLECTION, () => cols.telemetry.createIndex({ deviceId: 1 })],
     [USERS_COLLECTION, () => cols.users.createIndex({ uuid: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ username: 1 }, { unique: true })],
+    [USERS_COLLECTION, () => cols.users.createIndex({ stripeCustomerId: 1 }, { sparse: true })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1 })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ ownerUuid: 1 })],
+    [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
+    [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 })],
   ];
 
   await Promise.all(
@@ -161,9 +167,7 @@ async function ensureSessionIndexes(sessions: Collection<Session>) {
     if (fields.length !== 1) continue;
 
     const [field] = fields;
-    if (field === 'token') {
-      stale.push(index.name);
-    } else if (field === 'tokenHash' && !index.partialFilterExpression) {
+    if (field === 'token' || (field === 'tokenHash' && !index.partialFilterExpression)) {
       stale.push(index.name);
     }
   }
@@ -317,6 +321,121 @@ export async function updateUserRole(userUuid: string, role: UserRole) {
     { returnDocument: 'after' }
   );
   return result;
+}
+
+export async function getPaidSubscriptionsForUserUuid(userUuid: string) {
+  const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
+  const user = await users.findOne({ uuid: userUuid }, { projection: { paidSubscriptions: 1 } });
+  return user?.paidSubscriptions ?? [];
+}
+
+export async function getAttachedSubscriptionsForUserUuid(userUuid: string) {
+  const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
+  const user = await users.findOne({ uuid: userUuid }, { projection: { attachedSubscriptions: 1 } });
+  return user?.attachedSubscriptions ?? [];
+}
+
+export async function getUserUuidByStripeCustomerId(stripeCustomerId: string) {
+  const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
+  const user = await users.findOne(
+    { stripeCustomerId },
+    { projection: { uuid: 1 } }
+  );
+  return user?.uuid ?? null;
+}
+
+export async function getUserByStripeCustomerId(stripeCustomerId: string) {
+  const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
+  return users.findOne({ stripeCustomerId });
+}
+
+export async function setUserStripeCustomerId(userUuid: string, stripeCustomerId: string) {
+  const { users } = await getCols();
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne({ uuid: userUuid }, { $set: { stripeCustomerId } });
+}
+
+export async function recordStripeEvent(eventId: string, type: string) {
+  const { stripeEvents } = await getCols();
+  trackMongoOperation('updateOne', STRIPE_EVENTS_COLLECTION);
+
+  const result = await stripeEvents.updateOne(
+    { id: eventId },
+    { $setOnInsert: { id: eventId, type, createdAt: new Date() } },
+    { upsert: true }
+  );
+
+  return result.upsertedCount > 0;
+}
+
+export async function upsertPaidSubscription(userUuid: string, subscription: PaidSubscription) {
+  const { users } = await getCols();
+  const normalizedSubscription = normalizeDateValues(subscription);
+
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne(
+    { uuid: userUuid },
+    { $pull: { paidSubscriptions: { stripeSubscriptionId: subscription.stripeSubscriptionId } } }
+  );
+
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne(
+    { uuid: userUuid },
+    { $push: { paidSubscriptions: normalizedSubscription } }
+  );
+
+  return normalizedSubscription;
+}
+
+export async function removePaidSubscription(userUuid: string, stripeSubscriptionId: string) {
+  const { users } = await getCols();
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne(
+    { uuid: userUuid },
+    { $pull: { paidSubscriptions: { stripeSubscriptionId } } }
+  );
+}
+
+export async function addAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
+  const { users } = await getCols();
+  const normalizedSubscription = normalizeDateValues(subscription);
+
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne(
+    { uuid: userUuid },
+    { $push: { attachedSubscriptions: normalizedSubscription } }
+  );
+
+  return normalizedSubscription;
+}
+
+export async function removeAttachedSubscription(userUuid: string, subscriptionId: string) {
+  const { users } = await getCols();
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne(
+    { uuid: userUuid },
+    { $pull: { attachedSubscriptions: { id: subscriptionId } } }
+  );
+}
+
+export async function updateAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
+  const { users } = await getCols();
+  const normalizedSubscription = normalizeDateValues(subscription);
+
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  const result = await users.updateOne(
+    {
+      uuid: userUuid,
+      'attachedSubscriptions.id': subscription.id,
+    },
+    { $set: { 'attachedSubscriptions.$': normalizedSubscription } }
+  );
+
+  return result.matchedCount > 0 ? normalizedSubscription : null;
 }
 
 export async function createPunishment(punishment: Punishment) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLogout, IconLogout2, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type { Punishment, PublicUser } from '../../../common';
@@ -7,7 +7,10 @@ import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SettingsPanel, SessionsModal } from '../../components/settings';
+import { SubscriptionPanel } from '../../components/subscriptions';
 import './DashboardPage.css';
+
+const VALID_TABS = new Set(['overview', 'devices', 'profile', 'settings', 'account-settings', 'subscription']);
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -113,7 +116,11 @@ function getStoredDefaultTab(): string {
 export const DashboardPage = () => {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
-  const [activePage, setActivePage] = useState<string>(getStoredDefaultTab);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activePage, setActivePage] = useState<string>(() => {
+    const tab = searchParams.get('tab');
+    return tab && VALID_TABS.has(tab) ? tab : getStoredDefaultTab();
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
@@ -150,7 +157,7 @@ export const DashboardPage = () => {
       const userData = await api.users.me();
       setUser(userData.user);
       setActiveSuspension(userData.activeSuspension);
-      setActivePage('overview');
+      changeTab('overview');
     } catch (err) {
       console.error('Failed to refresh user data after punishment:', err);
     }
@@ -163,7 +170,7 @@ export const DashboardPage = () => {
     try {
       await api.staff.punishments.lift(activeSuspension.id);
       setActiveSuspension(null);
-      setActivePage('overview');
+      changeTab('overview');
     } catch (err) {
       console.error('Failed to lift suspension:', err);
     } finally {
@@ -172,6 +179,15 @@ export const DashboardPage = () => {
   };
 
   const navigate = useNavigate();
+
+  const changeTab = (value: string) => {
+    setActivePage(value);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', value);
+      return next;
+    }, { replace: true });
+  };
 
   const setDefaultTabPref = (value: string) => {
     setDefaultTab(value);
@@ -297,7 +313,7 @@ export const DashboardPage = () => {
   if (isLoading) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={setActivePage} username={user?.username ?? '...'} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
             <CardBody>
@@ -312,7 +328,7 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={setActivePage} username={'guest'} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
             <CardBody>
@@ -326,7 +342,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={setActivePage} username={user.username} badges={user.badges} country={user.country} isSuspended={isSuspended} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} isSuspended={isSuspended} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
           <Card className="dashboard-page__card" elevated>
@@ -451,6 +467,18 @@ export const DashboardPage = () => {
                 </CardHeader>
                 <CardBody>
                   <SettingsPanel sections={settingsSections} />
+                </CardBody>
+              </Card>
+            )}
+
+            {activePage === 'subscription' && (
+              <Card className="dashboard-page__card" elevated>
+                <CardHeader>
+                  <h2>Subscription</h2>
+                  <p>Manage your Ayphr subscription and billing</p>
+                </CardHeader>
+                <CardBody>
+                  <SubscriptionPanel />
                 </CardBody>
               </Card>
             )}
