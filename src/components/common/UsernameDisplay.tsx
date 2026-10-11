@@ -1,9 +1,9 @@
 import './UsernameDisplay.css';
 import type { BadgeId } from '../../../common';
-import { BADGES } from '../../../common';
-import { countryCodeToFlag } from '../../../common';
+import { BADGES, countryCodeToFlag } from '../../../common';
 import { EmojiText } from './EmojiText';
 import { getBadgeIcon } from '../../lib/badges';
+import { Tooltip } from './Tooltip';
 
 export interface UsernameDisplayProps {
   username: string;
@@ -28,9 +28,11 @@ export const UsernameDisplay = ({
           {badges.map((badgeId) => {
             const name = BADGES.find((badge) => badge.id === badgeId)?.name ?? badgeId;
             return (
-              <span key={badgeId} className="username-display__icon" aria-label={name} title={name}>
-                {getBadgeIcon(badgeId)}
-              </span>
+              <Tooltip key={badgeId} content={name}>
+                <span className="username-display__icon" aria-label={name}>
+                  {getBadgeIcon(badgeId)}
+                </span>
+              </Tooltip>
             );
           })}
         </span>
