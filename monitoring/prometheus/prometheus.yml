@@ -5,8 +5,5 @@ global:
 scrape_configs:
   - job_name: ayphr-server
     metrics_path: /metrics
-    scheme: https
-    tls_config:
-      insecure_skip_verify: true
     static_configs:
-      - targets: ['server:7233']
+      - targets: ['server:80']

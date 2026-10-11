@@ -64,9 +64,8 @@ services:
       test:
         - CMD-SHELL
         - >-
-          node -e "const p = process.env.ENABLE_TLS === 'true' ? require('https') :
-          require('http'); const req = p.get({hostname:'127.0.0.1', port:process.env.API_PORT ||
-          7233, path:'/api/status', rejectUnauthorized:false}, res => { let b='';
+          node -e "const req = require('http').get({hostname:'127.0.0.1',
+          port:process.env.API_PORT || 80, path:'/api/status'}, res => { let b='';
           res.on('data', c => b += c); res.on('end', () => { try { if
           (res.statusCode !== 200) process.exit(1);
           } catch { process.exit(1); } }); }); req.on('error', () => process.exit(1));"
