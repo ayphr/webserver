@@ -172,9 +172,10 @@ export async function handleStripeWebhook(request: Request) {
 
   let event: Stripe.Event;
   try {
-    event = constructStripeEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
+    event = await constructStripeEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
   } catch (error) {
-    log.warn({ error }, 'failed to verify Stripe webhook signature');
+    const message = error instanceof Error ? error.message : String(error);
+    log.warn({ message, payloadLength: payload.length }, 'failed to verify Stripe webhook signature');
     return Response.json({ error: 'invalid signature' }, { status: 400 });
   }
 
