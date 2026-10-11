@@ -32,6 +32,10 @@
   margin: auto;
 }
 
+.dashboard-page__card--wide {
+  max-width: 960px;
+}
+
 .dashboard-page__user-row {
   display: flex;
   align-items: center;

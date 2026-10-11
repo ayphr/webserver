@@ -431,7 +431,7 @@ export const DashboardPage = () => {
             )}
 
             {activePage === 'profile' && (
-              <Card className="dashboard-page__card" elevated>
+              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
                 <CardHeader>
                   <h2>Profile</h2>
                   <p>Your profile information</p>

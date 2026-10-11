@@ -266,6 +266,10 @@ const handleSubscriptionAutoRenew = requireAuth(async (request, user) => {
     return json({ error: 'No active paid subscription' }, 404);
   }
 
+  if (paid.status === 'trialing' && !autoRenew) {
+    return json({ error: 'Auto-renew cannot be disabled during a free trial' }, 400);
+  }
+
   const updated = await setStripeSubscriptionAutoRenew(paid.stripeSubscriptionId, autoRenew);
   if (!updated) {
     return json({ error: 'Stripe is not configured' }, 503);
