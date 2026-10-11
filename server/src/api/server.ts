@@ -2,6 +2,7 @@ import type { Server } from 'bun';
 import { resolveRoute } from './router';
 import { addCorsHeaders, SECURITY_HEADERS } from './routes/util';
 import { setClientIp } from '../lib/requestContext';
+import { createLogger } from '../lib/logger';
 import {
   httpRequestDuration,
   httpRequestsTotal,
@@ -9,6 +10,8 @@ import {
   metricsText,
   registry,
 } from '../lib/metrics';
+
+const log = createLogger('http');
 
 function getRequestBaseOrigin(request: Request): string {
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
@@ -52,7 +55,12 @@ export function setupServer(port: number, callback: () => void): Server<undefine
         return addCorsHeaders(response, request);
       } catch (error) {
         httpRequestsTotal.inc({ method, route: template, status: '500' });
-        throw error;
+        log.error({ error, method, route: template }, 'unhandled request error');
+        const response = Response.json(
+          { error: 'Internal Server Error' },
+          { status: 500, headers: SECURITY_HEADERS },
+        );
+        return addCorsHeaders(response, request);
       } finally {
         httpRequestsInFlight.dec();
         endTimer();
