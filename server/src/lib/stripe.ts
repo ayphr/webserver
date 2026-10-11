@@ -151,13 +151,13 @@ export function mapStripeSubscription(
   };
 }
 
-export function constructStripeEvent(payload: string | Buffer, signature: string, secret: string): Stripe.Event {
+export async function constructStripeEvent(payload: string | Buffer, signature: string, secret: string): Promise<Stripe.Event> {
   const stripe = getStripe();
   if (!stripe) {
     throw new Error('Stripe is not configured');
   }
 
-  return stripe.webhooks.constructEvent(payload, signature, secret);
+  return stripe.webhooks.constructEventAsync(payload, signature, secret);
 }
 
 export async function createStripeCustomer(params: {
