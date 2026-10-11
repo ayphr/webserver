@@ -29,3 +29,13 @@ export {
   getUsernameValidationError,
 } from './username';
 export { POLICIES_VERSIONS_URL } from './policies';
+export {
+  ENTITLED_PAID_STATUSES,
+  getActivePaidSubscription,
+  getSubscriptionTier,
+  isAttachedSubscriptionActive,
+  isBetterSubscription,
+  isPaidSubscriptionActive,
+  pickBestSubscription,
+  resolveSubscription,
+} from './subscriptions';

@@ -1,6 +1,6 @@
 import React from 'react';
 import './Sidebar.css';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import type { BadgeId } from '../../../common/types';
 
@@ -85,6 +85,14 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unkn
           >
             <span className="n-sidebar__menuIcon"><IconSettings size={16} strokeWidth={1.5} /></span>
             <span>Settings</span>
+          </button>
+          <button
+            className={`n-sidebar__menuItem ${activeTab === 'subscription' ? 'active' : ''}`}
+            type="button"
+            onClick={() => onChange('subscription')}
+          >
+            <span className="n-sidebar__menuIcon"><IconCreditCard size={16} strokeWidth={1.5} /></span>
+            <span>Subscription</span>
           </button>
         </nav>
 

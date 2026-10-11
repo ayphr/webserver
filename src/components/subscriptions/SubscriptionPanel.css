@@ -1,0 +1,328 @@
+.subscription {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.subscription__loading {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.subscription__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  background: rgba(255, 100, 100, 0.08);
+  color: var(--status-error);
+  font-size: 0.85rem;
+}
+
+.subscription__notice {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-input-off);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.subscription__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.subscription__empty h3 {
+  margin: 0.5rem 0 0;
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  font-weight: var(--font-weight-md);
+}
+
+.subscription__empty p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* Current subscription --------------------------------------------------- */
+
+.subscription__current {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.subscription__current--paid {
+  border-color: var(--accent-green);
+}
+
+.subscription__current-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.subscription__current-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.subscription__current-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.subscription__current-heading h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-hv);
+  color: var(--text-primary);
+}
+
+.subscription__source,
+.subscription__status {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-md);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.subscription__source--paid {
+  background: rgba(60, 200, 100, 0.16);
+  color: var(--status-success);
+}
+
+.subscription__source--attached {
+  background: rgba(120, 120, 255, 0.16);
+  color: hsl(240, 90%, 78%);
+}
+
+.subscription__status {
+  background: var(--bg-input);
+  color: var(--text-muted);
+}
+
+.subscription__meta {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.subscription__meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.subscription__meta-row dt {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.subscription__meta-row dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.subscription__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.subscription__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.subscription__toggle small {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.subscription__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Plans ------------------------------------------------------------------ */
+
+.subscription__plans {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.subscription__plans-header h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: var(--font-weight-md);
+  color: var(--text-primary);
+}
+
+.subscription__plans-header p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.subscription__interval-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-self: flex-start;
+  margin-top: 0.75rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-base);
+}
+
+.subscription__interval-option {
+  padding: 0.4rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-md);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.subscription__interval-option:hover {
+  color: var(--text-primary);
+}
+
+.subscription__interval-option.is-active {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.subscription__plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 1rem;
+}
+
+.subscription__plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.subscription__plan--featured {
+  border-color: var(--accent-green);
+}
+
+.subscription__plan--current {
+  border-color: var(--border-focus);
+  opacity: 0.85;
+}
+
+.subscription__plan-tag {
+  position: absolute;
+  top: -0.6rem;
+  left: 1rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-green);
+  color: hsl(129, 80%, 12%);
+  font-size: 0.65rem;
+  font-weight: var(--font-weight-hv);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.subscription__plan-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.subscription__plan-icon {
+  display: inline-flex;
+}
+
+.subscription__plan-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-md);
+  color: var(--text-primary);
+}
+
+.subscription__plan-price {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: var(--font-weight-hv);
+  color: var(--text-primary);
+}
+
+.subscription__plan-description {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.subscription__plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.subscription__plan-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}

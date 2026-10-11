@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { requireRole } from '../auth';
-import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsers, getUsersByRole, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid } from '../../workers/dbWriter';
-import type { Punishment, UserRole } from '@common';
+import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsers, getUsersByRole, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../workers/dbWriter';
+import type { AttachedSubscription, Punishment, UserRole } from '@common';
+import { isSubscriptionTier } from '@common';
 import { toPublicUser } from '../../lib/user';
 
 const MAX_REASON_LENGTH = 500;
@@ -164,10 +165,165 @@ const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params
   return json({ user: toPublicUser(updatedUser) });
 });
 
+const handleStaffSubscriptionAttach = requireRole('staff', async (request, staffUser, params) => {
+  const targetUuid = params.uuid;
+  if (!targetUuid) {
+    return json({ error: 'user uuid is required' }, 400);
+  }
+
+  const body = await readJsonBody(request);
+  const tier = body?.tier;
+  if (!isSubscriptionTier(tier)) {
+    return json({ error: 'tier must be a valid subscription tier' }, 400);
+  }
+
+  const reason = typeof body?.reason === 'string' ? body.reason.trim() : undefined;
+  if (reason && reason.length > MAX_REASON_LENGTH) {
+    return json({ error: `reason must be at most ${MAX_REASON_LENGTH} characters` }, 400);
+  }
+
+  let expiresAt: Date | null = null;
+  if (body?.expiresAt !== undefined && body.expiresAt !== null) {
+    if (typeof body.expiresAt !== 'string') {
+      return json({ error: 'expiresAt must be an ISO 8601 date string or null' }, 400);
+    }
+    const parsed = new Date(body.expiresAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return json({ error: 'expiresAt must be a valid ISO 8601 date string' }, 400);
+    }
+    if (parsed.getTime() <= Date.now()) {
+      return json({ error: 'expiresAt must be in the future' }, 400);
+    }
+    expiresAt = parsed;
+  }
+
+  const targetUser = await getUserFromUuid(targetUuid);
+  if (!targetUser) {
+    return json({ error: 'user not found' }, 404);
+  }
+
+  const subscription: AttachedSubscription = {
+    id: randomUUID(),
+    tier,
+    createdAt: new Date(),
+    expiresAt,
+    addedByUuid: staffUser.uuid,
+    addedByUsername: staffUser.username,
+    reason,
+  };
+
+  await addAttachedSubscription(targetUuid, subscription);
+
+  return json({
+    user: toPublicUser({
+      ...targetUser,
+      attachedSubscriptions: [...(targetUser.attachedSubscriptions ?? []), subscription],
+    }),
+  }, 201);
+});
+
+const handleStaffSubscriptionDetach = requireRole('staff', async (_request, _staffUser, params) => {
+  const targetUuid = params.uuid;
+  const subscriptionId = params.id;
+
+  if (!targetUuid || !subscriptionId) {
+    return json({ error: 'user uuid and subscription id are required' }, 400);
+  }
+
+  const targetUser = await getUserFromUuid(targetUuid);
+  if (!targetUser) {
+    return json({ error: 'user not found' }, 404);
+  }
+
+  const existing = (targetUser.attachedSubscriptions ?? []).some((subscription) => subscription.id === subscriptionId);
+  if (!existing) {
+    return json({ error: 'subscription not found' }, 404);
+  }
+
+  await removeAttachedSubscription(targetUuid, subscriptionId);
+
+  return json({
+    user: toPublicUser({
+      ...targetUser,
+      attachedSubscriptions: (targetUser.attachedSubscriptions ?? []).filter((subscription) => subscription.id !== subscriptionId),
+    }),
+  });
+});
+
+const handleStaffSubscriptionList = requireRole('staff', async (_request, _staffUser, params) => {
+  const targetUuid = params.uuid;
+  if (!targetUuid) {
+    return json({ error: 'user uuid is required' }, 400);
+  }
+
+  const subscriptions = await getAttachedSubscriptionsForUserUuid(targetUuid);
+  return json({ subscriptions });
+});
+
+const handleStaffSubscriptionUpdate = requireRole('staff', async (request, _staffUser, params) => {
+  const targetUuid = params.uuid;
+  const subscriptionId = params.id;
+
+  if (!targetUuid || !subscriptionId) {
+    return json({ error: 'user uuid and subscription id are required' }, 400);
+  }
+
+  const body = await readJsonBody(request);
+  if (!body) {
+    return json({ error: 'invalid request body' }, 400);
+  }
+
+  const subscriptions = await getAttachedSubscriptionsForUserUuid(targetUuid);
+  const existing = subscriptions.find((subscription) => subscription.id === subscriptionId);
+  if (!existing) {
+    return json({ error: 'subscription not found' }, 404);
+  }
+
+  if (body.tier !== undefined) {
+    if (!isSubscriptionTier(body.tier)) {
+      return json({ error: 'tier must be a valid subscription tier' }, 400);
+    }
+    existing.tier = body.tier;
+  }
+
+  if (body.reason !== undefined) {
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length > MAX_REASON_LENGTH) {
+      return json({ error: `reason must be at most ${MAX_REASON_LENGTH} characters` }, 400);
+    }
+    existing.reason = reason || undefined;
+  }
+
+  if (body.expiresAt !== undefined) {
+    if (body.expiresAt === null) {
+      existing.expiresAt = null;
+    } else if (typeof body.expiresAt === 'string') {
+      const parsed = new Date(body.expiresAt);
+      if (Number.isNaN(parsed.getTime())) {
+        return json({ error: 'expiresAt must be a valid ISO 8601 date string' }, 400);
+      }
+      existing.expiresAt = parsed;
+    } else {
+      return json({ error: 'expiresAt must be an ISO 8601 date string or null' }, 400);
+    }
+  }
+
+  const updated = await updateAttachedSubscription(targetUuid, existing);
+  if (!updated) {
+    return json({ error: 'subscription not found' }, 404);
+  }
+
+  return json({ subscription: updated });
+});
+
 export {
   handleUsersSummary,
   handleStaffUsers,
   handleStaffPunishments,
   handleStaffPunishmentLift,
   handleStaffRoleUpdate,
+  handleStaffSubscriptionAttach,
+  handleStaffSubscriptionDetach,
+  handleStaffSubscriptionList,
+  handleStaffSubscriptionUpdate,
 };
