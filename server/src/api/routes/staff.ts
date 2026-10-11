@@ -3,6 +3,9 @@ import { requireRole } from '../auth';
 import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsers, getUsersByRole, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid } from '../../workers/dbWriter';
 import type { Punishment, User, UserRole } from '@common';
 
+const MAX_REASON_LENGTH = 500;
+const MAX_DURATION_MINUTES = 5 * 365 * 24 * 60;
+
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
 }
@@ -53,10 +56,21 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
     const targetUsername = typeof body?.username === 'string' ? body.username : undefined;
     const targetUuid = typeof body?.userUuid === 'string' ? body.userUuid : undefined;
     const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
-    const durationMinutes = typeof body?.durationMinutes === 'number' ? body.durationMinutes : 60;
 
-    if (!reason) {
-      return json({ error: 'reason is required' }, 400);
+    if (!reason || reason.length > MAX_REASON_LENGTH) {
+      return json({ error: `reason is required and must be at most ${MAX_REASON_LENGTH} characters` }, 400);
+    }
+
+    let durationMinutes = 60;
+    if (body?.durationMinutes !== undefined) {
+      if (typeof body.durationMinutes !== 'number' || !Number.isInteger(body.durationMinutes)) {
+        return json({ error: 'durationMinutes must be an integer' }, 400);
+      }
+      durationMinutes = body.durationMinutes;
+    }
+
+    if (durationMinutes !== -1 && (durationMinutes < 1 || durationMinutes > MAX_DURATION_MINUTES)) {
+      return json({ error: 'durationMinutes must be between 1 and 2628000 minutes, or -1 for permanent' }, 400);
     }
 
     const targetUser = await (async () => {
@@ -70,10 +84,6 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
 
     if (!targetUser) {
       return json({ error: 'target user not found' }, 404);
-    }
-
-    if (!Number.isFinite(durationMinutes) || durationMinutes < -1) {
-      return json({ error: 'durationMinutes must be a positive number or -1 for permanent' }, 400);
     }
 
     const now = new Date();
@@ -131,15 +141,14 @@ const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params
     return json({ error: 'user uuid is required' }, 400);
   }
 
-  // eslint-disable-next-line no-useless-assignment
-  let body: { role?: UserRole } | null = null;
+  let body: { role?: UserRole } | null;
   try {
     body = await request.json() as { role?: UserRole };
   } catch {
     body = null;
   }
 
-  if (!body?.role || !body.role) {
+  if (!body?.role) {
     return json({ error: 'role is required' }, 400);
   }
 

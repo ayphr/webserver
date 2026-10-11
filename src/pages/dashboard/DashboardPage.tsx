@@ -198,7 +198,7 @@ export const DashboardPage = () => {
           variant: 'secondary',
           action: async () => {
             await api.auth.logout();
-            navigate('/auth', { replace: true });
+            await navigate('/auth', { replace: true });
           },
         },
         {
@@ -216,7 +216,7 @@ export const DashboardPage = () => {
           },
           action: async () => {
             await api.auth.logoutAll();
-            navigate('/auth', { replace: true });
+            await navigate('/auth', { replace: true });
           },
         },
       ],
@@ -252,12 +252,14 @@ export const DashboardPage = () => {
           danger: true,
           confirm: {
             title: 'Delete Account',
-            message: 'This will permanently delete your account and all associated data. This action cannot be undone.',
+            message: 'This will permanently delete your account and all associated data. This action cannot be undone. Confirm your password to continue.',
             confirmText: 'Delete account',
+            dangerous: true,
+            requirePassword: true,
           },
-          action: async () => {
-            await api.auth.deleteAccount();
-            navigate('/auth', { replace: true });
+          action: async ({ password }) => {
+            await api.auth.deleteAccount({ password: password ?? '' });
+            await navigate('/auth', { replace: true });
           },
         },
       ],

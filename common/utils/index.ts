@@ -23,4 +23,9 @@ export {
   getPasswordValidationErrors,
   type PasswordValidationChecks,
 } from './password';
+export {
+  USERNAME_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  getUsernameValidationError,
+} from './username';
 export { POLICIES_VERSIONS_URL } from './policies';

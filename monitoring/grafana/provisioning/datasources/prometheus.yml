@@ -7,3 +7,7 @@ datasources:
     url: http://prometheus:7444
     isDefault: true
     editable: false
+    basicAuth: true
+    basicAuthUser: admin
+    secureJsonData:
+      basicAuthPassword: $PROMETHEUS_PASSWORD

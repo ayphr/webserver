@@ -5,6 +5,7 @@ import { createLogger } from './logger';
 const log = createLogger('policies');
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 5_000;
 
 type PolicyVersionsFile = {
   policies: Record<PolicyKey, { version: number; updated_date_formatted?: string }>;
@@ -14,7 +15,7 @@ let cached: { data: PolicyVersionsData; fetchedAt: number } | null = null;
 let inflight: Promise<PolicyVersionsData | null> | null = null;
 
 async function fetchPolicyData(): Promise<PolicyVersionsData> {
-  const response = await fetch(POLICIES_VERSIONS_URL);
+  const response = await fetch(POLICIES_VERSIONS_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!response.ok) {
     throw new Error(`unexpected status ${response.status}`);
   }

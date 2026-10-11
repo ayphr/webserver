@@ -6,10 +6,6 @@ const log = createLogger('db-worker-entry');
 
 if (!parentPort) throw new Error('db worker must be run as worker thread');
 
-/**
- * This thread's prom-client registry is never scraped, so replay the operation
- * tallies into the main thread's registry that `/metrics` actually serves.
- */
 function forwardMongoOperations() {
   const drained = drainMongoOperations();
 
@@ -20,8 +16,16 @@ function forwardMongoOperations() {
 
 parentPort.on('message', async (message) => {
   if (message?.action !== 'flush' || !Array.isArray(message.records)) return;
-  await flushRecords(message.records, (payload) => parentPort!.postMessage(payload));
-  forwardMongoOperations();
+
+  try {
+    const insertedCount = await flushRecords(message.records);
+    parentPort!.postMessage({ action: 'flushResult', id: message.id, ok: true, insertedCount });
+  } catch (error) {
+    log.error({ error }, 'failed to flush records');
+    parentPort!.postMessage({ action: 'flushResult', id: message.id, ok: false, error: String(error) });
+  } finally {
+    forwardMongoOperations();
+  }
 });
 
 parentPort.on('error', (error) => {

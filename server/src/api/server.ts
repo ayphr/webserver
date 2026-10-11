@@ -1,7 +1,14 @@
 import type { Server } from 'bun';
 import { resolveRoute } from './router';
-import { addCorsHeaders } from './routes/util';
-import { httpRequestDuration, httpRequestsTotal, httpRequestsInFlight } from '../lib/metrics';
+import { addCorsHeaders, SECURITY_HEADERS } from './routes/util';
+import { setClientIp } from '../lib/requestContext';
+import {
+  httpRequestDuration,
+  httpRequestsTotal,
+  httpRequestsInFlight,
+  metricsText,
+  registry,
+} from '../lib/metrics';
 
 function getRequestBaseOrigin(request: Request): string {
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
@@ -31,12 +38,9 @@ export function setupServer(port: number, callback: () => void): Server<undefine
 
     async fetch(request) {
       const normalized = normalizeRequest(request);
+      setClientIp(normalized, server.requestIP(request)?.address ?? null);
       const method = normalized.method;
       const { template, dispatch } = resolveRoute(normalized);
-
-      if (method === 'GET' && template === '/metrics') {
-        return addCorsHeaders(await dispatch(), request);
-      }
 
       const endTimer = httpRequestDuration.startTimer({ method, route: template });
       httpRequestsInFlight.inc();
@@ -53,6 +57,30 @@ export function setupServer(port: number, callback: () => void): Server<undefine
         httpRequestsInFlight.dec();
         endTimer();
       }
+    },
+  });
+
+  callback();
+
+  return server;
+}
+
+export function setupMetricsServer(port: number, callback: () => void): Server<undefined> {
+  const server = Bun.serve({
+    port,
+
+    async fetch(request) {
+      const pathname = new URL(request.url).pathname;
+
+      if (pathname !== '/metrics') {
+        return new Response('Not Found', { status: 404, headers: SECURITY_HEADERS });
+      }
+
+      const metrics = await metricsText();
+      return new Response(metrics, {
+        status: 200,
+        headers: { 'Content-Type': registry.contentType, ...SECURITY_HEADERS },
+      });
     },
   });
 

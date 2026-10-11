@@ -11,13 +11,7 @@ import { REDIS_BUFFER_KEY, REDIS_URL } from '../env';
 
 const log = createLogger('redis-buffer');
 
-const drainScript = `
-  local items = redis.call('LRANGE', KEYS[1], 0, -1)
-  if #items > 0 then
-    redis.call('DEL', KEYS[1])
-  end
-  return items
-`;
+const MAX_BUFFER_LENGTH = 100_000;
 
 let client: RedisClientType | null = null;
 let connectPromise: Promise<RedisClientType> | null = null;
@@ -59,6 +53,7 @@ export async function enqueueTelemetryRecord(record: TelemetryRecord) {
   try {
     const redis = await getClient();
     await redis.rPush(REDIS_BUFFER_KEY, JSON.stringify(record));
+    await redis.lTrim(REDIS_BUFFER_KEY, -MAX_BUFFER_LENGTH, -1);
     telemetryRecordsBufferedTotal.inc();
   } catch (error) {
     telemetryEnqueueErrorsTotal.inc();
@@ -66,17 +61,18 @@ export async function enqueueTelemetryRecord(record: TelemetryRecord) {
   }
 }
 
-export async function drainTelemetryBuffer() {
+export type TelemetryBatch = {
+  records: TelemetryRecord[];
+  rawCount: number;
+};
+
+export async function readTelemetryBatch(limit: number): Promise<TelemetryBatch> {
   try {
     const redis = await getClient();
-    const rawRecords = (await redis.eval(drainScript, {
-      keys: [REDIS_BUFFER_KEY]
-    })) as string[] | null;
+    const rawRecords = (await redis.lRange(REDIS_BUFFER_KEY, 0, limit - 1)) as string[];
 
-    // The drain script already deleted the batch, so a single malformed entry
-    // must not discard the records that parsed successfully.
     const records: TelemetryRecord[] = [];
-    for (const payload of rawRecords || []) {
+    for (const payload of rawRecords) {
       try {
         records.push(parseRecord(payload));
       } catch (error) {
@@ -84,15 +80,26 @@ export async function drainTelemetryBuffer() {
       }
     }
 
-    // The script drains atomically, so this is the backlog depth that built up
-    // since the previous flush. Non-zero over time means the sink is behind.
-    telemetryBufferLength.set(records.length);
+    telemetryBufferLength.set(rawRecords.length);
 
-    return records;
+    return { records, rawCount: rawRecords.length };
   } catch (error) {
     telemetryDrainErrorsTotal.inc();
-    log.error({ error }, 'failed to drain telemetry buffer');
-    return [];
+    log.error({ error }, 'failed to read telemetry buffer');
+    return { records: [], rawCount: 0 };
+  }
+}
+
+export async function ackTelemetryBatch(count: number) {
+  if (count <= 0) return;
+
+  try {
+    const redis = await getClient();
+    await redis.lTrim(REDIS_BUFFER_KEY, count, -1);
+    telemetryBufferLength.set(0);
+  } catch (error) {
+    telemetryDrainErrorsTotal.inc();
+    log.error({ error }, 'failed to acknowledge telemetry batch');
   }
 }
 

@@ -6,6 +6,24 @@ function json(body: unknown, status = 200) {
   return Response.json(body, { status });
 }
 
+const MAX_SERIAL = 0xFFFFFFFF;
+
+function parseSerial(value: unknown): number | null {
+  let serial: number;
+
+  if (typeof value === 'number') {
+    serial = value;
+  } else if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    serial = Number(value.trim());
+  } else {
+    return null;
+  }
+
+  if (!Number.isInteger(serial) || serial < 0 || serial > MAX_SERIAL) return null;
+
+  return serial;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function readJsonBody(request: Request): Promise<any> {
   if (!request.headers.get('content-type')?.includes('application/json')) return null;
@@ -18,9 +36,9 @@ async function readJsonBody(request: Request): Promise<any> {
 
 const handleRegister = requireAuth(async (request, user: User) => {
   const body = await readJsonBody(request);
-  const serial = typeof body?.serial === 'number' ? body.serial : typeof body?.serial === 'string' ? Number(body.serial) : NaN;
+  const serial = parseSerial(body?.serial);
 
-  if (!Number.isFinite(serial) || serial < 0 || serial > 0xFFFFFFFF) {
+  if (serial === null) {
     return json({ error: 'invalid serial' }, 400);
   }
 
@@ -46,8 +64,8 @@ const handleListMine = requireAuth(async (_request, user: User) => {
 });
 
 const handleGetBySerial = requireAuth(async (_request, user: User, params) => {
-  const serial = Number(params.serial);
-  if (!Number.isFinite(serial)) return json({ error: 'invalid serial' }, 400);
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
 
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);

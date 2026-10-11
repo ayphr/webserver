@@ -48,6 +48,7 @@ export interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   isDangerous?: boolean;
+  confirmDisabled?: boolean;
 }
 
 export const ConfirmDialog = ({
@@ -59,6 +60,7 @@ export const ConfirmDialog = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   isDangerous = false,
+  confirmDisabled = false,
 }: ConfirmDialogProps) => {
   return (
     <Modal
@@ -70,6 +72,7 @@ export const ConfirmDialog = ({
       cancelText={cancelText}
       showCancel={true}
       isDangerous={isDangerous}
+      confirmDisabled={confirmDisabled}
       size="sm"
     >
       {children}

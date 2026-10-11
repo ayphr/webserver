@@ -1,23 +1,30 @@
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import type { Session, User, UserRole } from '@common';
 import {
   createSession,
   deleteSession,
   deleteSessionsForUserUuid,
-  deleteSessionByToken,
+  deleteSessionByTokenHash,
   getActiveSuspensionForUserUuid,
-  getSessionByToken,
-  getUserFromToken,
+  getSessionByTokenHash,
   getUserFromUuid,
   updateSessionLastActive,
   updateUser,
+  updateUserLastActive,
 } from '../workers/dbWriter';
 import { getPolicyStatus } from '../lib/policies';
+import { hashToken } from '../lib/tokens';
 import { isSessionDeviceType, parseUserAgent, resolveLocationFromClient } from '../lib/session';
 import type { RouteParams } from './types';
 
+const scrypt = promisify(scryptCallback) as (
+  password: string,
+  salt: string,
+  keylen: number,
+) => Promise<Buffer>;
+
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
-export type TokenVerificationResult = 'invalid' | 'expired' | 'success';
 
 const SESSION_ACTIVITY_THRESHOLD_MS = 60 * 1000;
 
@@ -46,20 +53,20 @@ export function getAuthError(message: string, status = 401): Response {
   return Response.json({ error: message } satisfies AuthErrorBody, { status });
 }
 
-export function createPasswordHash(password: string): string {
+export async function createPasswordHash(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
-  const derived = scryptSync(password, salt, PASSWORD_HASH_LENGTH).toString('hex');
-  return `${PASSWORD_HASH_ALGORITHM}$${salt}$${derived}`;
+  const derived = await scrypt(password, salt, PASSWORD_HASH_LENGTH);
+  return `${PASSWORD_HASH_ALGORITHM}$${salt}$${derived.toString('hex')}`;
 }
 
-export function verifyPassword(password: string, passwordHash?: string): boolean {
+export async function verifyPassword(password: string, passwordHash?: string): Promise<boolean> {
   if (!passwordHash) return false;
 
   const [algorithm, salt, derivedHash] = passwordHash.split('$');
   if (algorithm !== PASSWORD_HASH_ALGORITHM || !salt || !derivedHash) return false;
 
-  const computed = scryptSync(password, salt, PASSWORD_HASH_LENGTH);
   const stored = Buffer.from(derivedHash, 'hex');
+  const computed = await scrypt(password, salt, PASSWORD_HASH_LENGTH);
 
   if (computed.length !== stored.length) return false;
 
@@ -75,7 +82,7 @@ export async function startSession(user: User, request: Request, meta: ClientSes
   const session: Session = {
     id: crypto.randomUUID(),
     userUuid: user.uuid,
-    token,
+    tokenHash: hashToken(token),
     createdAt: now,
     lastActive: now,
     expiresAt: getExpiryDate(now),
@@ -88,65 +95,29 @@ export async function startSession(user: User, request: Request, meta: ClientSes
 
   await createSession(session);
 
-  delete user.auth.token;
-  delete user.auth.issuedAt;
   user.lastActive = now;
-  await updateUser(user);
+  await updateUserLastActive(user.uuid, now);
 
   return token;
 }
 
-export async function endCurrentSession(request: Request, user?: User) {
+export async function endCurrentSession(request: Request) {
   const token = getBearerToken(request);
-  if (token) await deleteSessionByToken(token);
-
-  if (user && (user.auth.token || user.auth.issuedAt)) {
-    clearToken(user);
-    await updateUser(user);
-  }
+  if (token) await deleteSessionByTokenHash(hashToken(token));
 }
 
 export async function endAllSessions(user: User) {
   await deleteSessionsForUserUuid(user.uuid);
-  clearToken(user);
-  await updateUser(user);
-}
-
-export function clearToken(user: User) {
-  delete user.auth.token;
-  delete user.auth.issuedAt;
 }
 
 export async function createUserRecord(user: User, password: string) {
-  user.auth.passwordHash = createPasswordHash(password);
+  user.auth.passwordHash = await createPasswordHash(password);
   await updateUser(user);
   return user;
 }
 
 export function getExpiryDate(date: Date): Date {
   return new Date(date.getTime() + TOKEN_EXPIRE_DURATION_SECONDS * 1000);
-}
-
-export function verifyToken(user: User, token: string): TokenVerificationResult {
-  if (!user.auth.issuedAt || !user.auth.token) return 'invalid';
-
-  const tokenExpiresAt = getExpiryDate(user.auth.issuedAt);
-  if (Date.now() > tokenExpiresAt.getTime()) {
-    return 'expired';
-  }
-
-  if (!safeTokenEqual(user.auth.token, token)) return 'invalid';
-
-  return 'success';
-}
-
-function safeTokenEqual(expected: string, provided: string): boolean {
-  const expectedBuffer = Buffer.from(expected);
-  const providedBuffer = Buffer.from(provided);
-
-  if (expectedBuffer.length !== providedBuffer.length) return false;
-
-  return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
 export function getBearerToken(request: Request): string | null {
@@ -162,58 +133,30 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
 
   if (!token) return null;
 
-  const session = await getSessionByToken(token);
+  const session = await getSessionByTokenHash(hashToken(token));
+  if (!session) return null;
 
-  if (session) {
-    if (Date.now() > session.expiresAt.getTime()) {
-      await deleteSession(session.id);
-      return null;
-    }
-
-    const user = await getUserFromUuid(session.userUuid);
-    if (!user) {
-      await deleteSession(session.id);
-      return null;
-    }
-
-    const now = new Date();
-    if (now.getTime() - session.lastActive.getTime() > SESSION_ACTIVITY_THRESHOLD_MS) {
-      await updateSessionLastActive(session.id, now);
-    }
-
-    user.lastActive = now;
-    await updateUser(user);
-
-    return user;
+  if (Date.now() > session.expiresAt.getTime()) {
+    await deleteSession(session.id);
+    return null;
   }
 
-  const user = await getUserFromToken(token);
-
-  if (!user) return null;
-
-  const verificationResult = verifyToken(user, token);
-  if (verificationResult !== 'success') {
+  const user = await getUserFromUuid(session.userUuid);
+  if (!user) {
+    await deleteSession(session.id);
     return null;
   }
 
   const now = new Date();
-  const issuedAt = user.auth.issuedAt ?? now;
-  const userAgent = request.headers.get('user-agent') ?? undefined;
 
-  await createSession({
-    id: crypto.randomUUID(),
-    userUuid: user.uuid,
-    token,
-    createdAt: issuedAt,
-    lastActive: now,
-    expiresAt: getExpiryDate(issuedAt),
-    userAgent,
-    ...parseUserAgent(userAgent),
-    location: {},
-  });
+  if (now.getTime() - session.lastActive.getTime() > SESSION_ACTIVITY_THRESHOLD_MS) {
+    await updateSessionLastActive(session.id, now);
+  }
 
-  user.lastActive = now;
-  await updateUser(user);
+  if (now.getTime() - user.lastActive.getTime() > SESSION_ACTIVITY_THRESHOLD_MS) {
+    user.lastActive = now;
+    await updateUserLastActive(user.uuid, now);
+  }
 
   return user;
 }
@@ -248,7 +191,14 @@ export function requireAuth(handler: AuthenticatedHandler, options: AuthGuardOpt
 
     if (!options.allowPolicyPending) {
       const policyStatus = await getPolicyStatus(user);
-      if (policyStatus && !policyStatus.upToDate) {
+      if (!policyStatus) {
+        return Response.json(
+          { error: 'Unable to verify policy status, please try again later' },
+          { status: 503 },
+        );
+      }
+
+      if (!policyStatus.upToDate) {
         return Response.json(
           {
             error: 'Policy acceptance required',

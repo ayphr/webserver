@@ -6,14 +6,15 @@ import './SettingsPanel.css';
 export const SettingsPanel = ({ sections }: { sections: SettingsSection[] }) => {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [confirmOption, setConfirmOption] = useState<ButtonSettingsOption | null>(null);
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const runButton = async (option: ButtonSettingsOption) => {
+  const runButton = async (option: ButtonSettingsOption, password?: string) => {
     setError(null);
     setPendingId(option.id);
 
     try {
-      await option.action();
+      await option.action({ password });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong, please try again');
     } finally {
@@ -21,8 +22,14 @@ export const SettingsPanel = ({ sections }: { sections: SettingsSection[] }) => 
     }
   };
 
+  const closeConfirm = () => {
+    setConfirmOption(null);
+    setConfirmPassword('');
+  };
+
   const handlePress = (option: ButtonSettingsOption) => {
     if (option.confirm) {
+      setConfirmPassword('');
       setConfirmOption(option);
       return;
     }
@@ -32,8 +39,10 @@ export const SettingsPanel = ({ sections }: { sections: SettingsSection[] }) => 
   const handleConfirm = () => {
     const option = confirmOption;
     if (!option) return;
-    setConfirmOption(null);
-    void runButton(option);
+    if (option.confirm?.requirePassword && !confirmPassword) return;
+    const password = confirmPassword;
+    closeConfirm();
+    void runButton(option, password);
   };
 
   const renderControl = (option: SettingsSection['options'][number]) => {
@@ -130,10 +139,20 @@ export const SettingsPanel = ({ sections }: { sections: SettingsSection[] }) => 
         confirmText={confirmOption?.confirm?.confirmText ?? 'Confirm'}
         cancelText={confirmOption?.confirm?.cancelText ?? 'Cancel'}
         isDangerous={confirmOption?.confirm?.dangerous ?? confirmOption?.danger ?? false}
+        confirmDisabled={Boolean(confirmOption?.confirm?.requirePassword) && !confirmPassword}
         onConfirm={handleConfirm}
-        onCancel={() => setConfirmOption(null)}
+        onCancel={closeConfirm}
       >
         {confirmOption?.confirm?.message && <p>{confirmOption.confirm.message}</p>}
+        {confirmOption?.confirm?.requirePassword && (
+          <Input
+            type="password"
+            value={confirmPassword}
+            placeholder="Enter your password"
+            className="settings-option__input"
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        )}
       </ConfirmDialog>
     </div>
   );

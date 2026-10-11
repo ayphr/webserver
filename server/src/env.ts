@@ -12,3 +12,9 @@ export const REDIS_BUFFER_KEY = process.env.REDIS_BUFFER_KEY || 'ayphr:telemetry
 
 export const TCP_PORT = Number(process.env.TCP_PORT || 7232);
 export const API_PORT = Number(process.env.API_PORT || 7233);
+export const METRICS_PORT = Number(process.env.METRICS_PORT || 7234);
+
+export const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'https://ayphr.com,https://www.ayphr.com')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);

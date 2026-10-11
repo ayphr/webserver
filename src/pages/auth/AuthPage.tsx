@@ -5,6 +5,7 @@ import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input } from '../../components/common';
 import { api } from '../../lib/api';
 import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '../../../common/utils/password';
+import { getUsernameValidationError } from '../../../common/utils/username';
 
 type AuthMode = 'login' | 'signup';
 
@@ -46,14 +47,15 @@ export const AuthPage = () => {
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};
 
-    // Username validation
     if (!formData.username.trim()) {
       newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
+    } else if (mode === 'signup') {
+      const usernameError = getUsernameValidationError(formData.username.trim());
+      if (usernameError) {
+        newErrors.username = usernameError;
+      }
     }
 
-    // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
     }

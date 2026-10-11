@@ -19,7 +19,9 @@ export async function handlePacketMessage(message: Uint8Array, emit: (payload: u
         return;
       }
 
-      void updateDeviceLastBroadcast(serial, new Date());
+      void updateDeviceLastBroadcast(serial, new Date()).catch((error) => {
+        log.error({ error, serial }, 'failed to update device last broadcast');
+      });
 
       const record: TelemetryRecord = {
         deviceId: packet.serial,
