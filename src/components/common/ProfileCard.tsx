@@ -199,7 +199,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     <div className="profile-card">
       <div className="profile-card__header">
         <div className="profile-card__identity">
-          <UsernameDisplay username={user.username} role={user.role} country={user.country} />
+          <UsernameDisplay username={user.username} badges={user.badges} country={user.country} />
         </div>
         <div className="profile-card__actions">
           {canEditThisProfile && !isEditingProfile && (

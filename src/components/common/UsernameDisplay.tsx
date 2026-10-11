@@ -1,29 +1,20 @@
 import './UsernameDisplay.css';
-import { IconTools } from '@tabler/icons-react';
-import type { PublicUser } from '../../../common';
+import type { BadgeId } from '../../../common';
+import { BADGES } from '../../../common';
 import { countryCodeToFlag } from '../../../common';
-import type { ReactNode } from 'react';
 import { EmojiText } from './EmojiText';
+import { getBadgeIcon } from '../../lib/badges';
 
 export interface UsernameDisplayProps {
   username: string;
-  role?: PublicUser['role'];
+  badges?: BadgeId[];
   country?: string;
   className?: string;
 }
 
-function RoleIcon({ role }: Readonly<{ role?: PublicUser['role'] }>): ReactNode | null {
-
-  if (role === 'staff') {
-    return <IconTools size={18} stroke={2} aria-label="Staff" />;
-  }
-
-  return null;
-}
-
 export const UsernameDisplay = ({
   username,
-  role,
+  badges = [],
   country,
   className = '',
 }: UsernameDisplayProps) => {
@@ -31,12 +22,19 @@ export const UsernameDisplay = ({
 
   return (
     <div className={`username-display ${className}`}>
-      {role && (
-        <span className="username-display__icon">
-          <RoleIcon role={role} />
+      <span className="username-display__username">{username}</span>
+      {badges.length > 0 && (
+        <span className="username-display__icons">
+          {badges.map((badgeId) => {
+            const name = BADGES.find((badge) => badge.id === badgeId)?.name ?? badgeId;
+            return (
+              <span key={badgeId} className="username-display__icon" aria-label={name} title={name}>
+                {getBadgeIcon(badgeId)}
+              </span>
+            );
+          })}
         </span>
       )}
-      <span className="username-display__username">{username}</span>
       {flag && (
         <span className="username-display__flag">
           <EmojiText>{flag}</EmojiText>

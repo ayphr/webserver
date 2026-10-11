@@ -1,19 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { requireRole } from '../auth';
 import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsers, getUsersByRole, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid } from '../../workers/dbWriter';
-import type { Punishment, User, UserRole } from '@common';
+import type { Punishment, UserRole } from '@common';
+import { toPublicUser } from '../../lib/user';
 
 const MAX_REASON_LENGTH = 500;
 const MAX_DURATION_MINUTES = 5 * 365 * 24 * 60;
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
-}
-
-function publicUser(user: User) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { auth, ...rest } = user;
-  return rest;
 }
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
@@ -42,7 +37,7 @@ const handleUsersSummary = requireRole('staff', async () => {
 
 const handleStaffUsers = requireRole('staff', async () => {
   const users = await getUsers();
-  return json({ users: users.map(publicUser) });
+  return json({ users: users.map(toPublicUser) });
 });
 
 const handleStaffPunishments = requireRole('staff', async (request, staffUser) => {
@@ -166,7 +161,7 @@ const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params
     return json({ error: 'user not found' }, 404);
   }
 
-  return json({ user: updatedUser });
+  return json({ user: toPublicUser(updatedUser) });
 });
 
 export {

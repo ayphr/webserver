@@ -1,15 +1,9 @@
 import { requireAuth } from '../auth';
 import { getPunishmentById, getPunishmentsForUserUuid } from '../../workers/dbWriter';
-import type { User } from '@common';
+import { toPublicUser } from '../../lib/user';
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
-}
-
-function publicUser(user: User) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { auth, ...rest } = user;
-  return rest;
 }
 
 const handleMe = requireAuth(async (_request, user) => {
@@ -25,7 +19,7 @@ const handleMe = requireAuth(async (_request, user) => {
   }) ?? null;
 
   return json({
-    user: publicUser(user),
+    user: toPublicUser(user),
     activeSuspension,
     punishments,
   });

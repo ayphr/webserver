@@ -1,4 +1,5 @@
 import type { MarkdownFormat } from '../utils/markdown';
+import type { BadgeId } from './badges';
 
 export type UserRole = 'user' | 'staff';
 export type SocialLinkType = 'website' | 'youtube' | 'github' | 'bluesky' | 'reddit' | 'x' | 'facebook' | 'instagram' | 'tiktok';
@@ -32,4 +33,6 @@ export type User = {
   country?: string;
 };
 
-export type PublicUser = Omit<User, 'auth'>;
+export type PublicUser = Omit<User, 'auth'> & {
+  badges: BadgeId[];
+};
