@@ -1,18 +1,18 @@
-FROM oven/bun:1 AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
 
-COPY server/package.json server/bun.lock ./
-RUN bun install --frozen-lockfile --production
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev
 
-FROM oven/bun:1 AS runtime
+FROM node:22-slim AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY server/package.json server/bun.lock server/tsconfig.json ./
+COPY server/package.json server/package-lock.json server/tsconfig.json ./
 COPY server/src ./src
 
 COPY common /common
 
-CMD ["bun", "run", "src/index.ts"]
+CMD ["npm", "start"]
