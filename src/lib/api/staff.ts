@@ -10,6 +10,7 @@ import type {
   StaffSubscriptionUpdateRequest,
   StaffSummary,
   StaffUsersPayload,
+  StaffUsersQuery,
 } from '../../../common';
 import type { RequestClient } from './client';
 
@@ -18,9 +19,19 @@ export function createStaffApi(client: RequestClient) {
     async summary() {
       return client.requestJson<StaffSummary>('/api/staff/summary');
     },
-    async listUsers() {
-      const response = await client.requestJson<StaffUsersPayload>('/api/staff/users');
-      return response.users;
+    async listUsers(query: StaffUsersQuery = {}) {
+      const params = new URLSearchParams();
+
+      if (query.search?.trim()) params.set('q', query.search.trim());
+      if (query.role) params.set('role', query.role);
+      if (query.tier) params.set('tier', query.tier);
+      if (query.source) params.set('source', query.source);
+      if (query.status) params.set('status', query.status);
+      if (query.page) params.set('page', String(query.page));
+      if (query.pageSize) params.set('pageSize', String(query.pageSize));
+
+      const search = params.toString();
+      return client.requestJson<StaffUsersPayload>(`/api/staff/users${search ? `?${search}` : ''}`);
     },
     async updateRole(userUuid: string, input: StaffRoleUpdateRequest) {
       const response = await client.requestJson<StaffRoleUpdatePayload>(`/api/staff/role/${userUuid}`, {

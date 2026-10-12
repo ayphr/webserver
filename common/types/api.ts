@@ -7,6 +7,7 @@ import type {
   PaidSubscription,
   ResolvedSubscription,
   SubscriptionPlan,
+  SubscriptionSource,
   SubscriptionTier,
 } from './subscription';
 import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, UserRole } from './user';
@@ -122,8 +123,24 @@ export type SessionListPayload = {
   sessions: SessionInfo[];
 };
 
+export type StaffUserSubscriptionStatus = 'active' | 'expired' | 'none';
+
+export type StaffUsersQuery = {
+  search?: string;
+  role?: UserRole;
+  tier?: SubscriptionTier;
+  source?: SubscriptionSource;
+  status?: StaffUserSubscriptionStatus;
+  page?: number;
+  pageSize?: number;
+};
+
 export type StaffUsersPayload = {
   users: PublicUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };
 
 export type StaffPunishmentsPayload = {

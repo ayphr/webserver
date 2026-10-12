@@ -8,9 +8,10 @@ import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from
 import { Sidebar } from '../../components/layout';
 import { SettingsPanel, SessionsModal } from '../../components/settings';
 import { SubscriptionPanel } from '../../components/subscriptions';
+import { UsersPanel } from '../../components/staff';
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'profile', 'settings', 'account-settings', 'subscription']);
+const VALID_TABS = new Set(['overview', 'devices', 'profile', 'settings', 'account-settings', 'subscription', 'users']);
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -110,7 +111,7 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 
 function getStoredDefaultTab(): string {
   const stored = localStorage.getItem('ayphr-pref-default-tab');
-  return stored === 'overview' || stored === 'devices' ? stored : 'overview';
+  return stored === 'overview' || stored === 'devices' || stored === 'users' ? stored : 'overview';
 }
 
 export const DashboardPage = () => {
@@ -188,6 +189,13 @@ export const DashboardPage = () => {
       return next;
     }, { replace: true });
   };
+
+  useEffect(() => {
+    if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
+      changeTab('overview');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, user, activePage]);
 
   const setDefaultTabPref = (value: string) => {
     setDefaultTab(value);
@@ -294,6 +302,7 @@ export const DashboardPage = () => {
           options: [
             { value: 'overview', label: 'Overview' },
             { value: 'devices', label: 'Devices' },
+            ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
           ],
           onChange: setDefaultTabPref,
         },
@@ -308,7 +317,7 @@ export const DashboardPage = () => {
         },
       ],
     },
-  ], [defaultTab, compactLayout, navigate]);
+  ], [defaultTab, compactLayout, navigate, isStaff]);
 
   if (isLoading) {
     return (
@@ -342,7 +351,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} isSuspended={isSuspended} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} isSuspended={isSuspended} isStaff={isStaff} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
           <Card className="dashboard-page__card" elevated>
@@ -479,6 +488,18 @@ export const DashboardPage = () => {
                 </CardHeader>
                 <CardBody>
                   <SubscriptionPanel />
+                </CardBody>
+              </Card>
+            )}
+
+            {activePage === 'users' && isStaff && (
+              <Card className="dashboard-page__card dashboard-page__card--full" elevated>
+                <CardHeader>
+                  <h2>Users</h2>
+                  <p>Search and manage Ayphr users</p>
+                </CardHeader>
+                <CardBody>
+                  <UsersPanel />
                 </CardBody>
               </Card>
             )}
