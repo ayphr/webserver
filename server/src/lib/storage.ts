@@ -41,18 +41,26 @@ export function isStorageConfigured(): boolean {
 function resolveCredentials(): Record<string, unknown> | undefined {
   if (!GCS_CREDENTIALS_JSON) return undefined;
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(GCS_CREDENTIALS_JSON) as Record<string, unknown>;
-  } catch {
-    throw new Error('GCS_CREDENTIALS_JSON is set but is not valid JSON');
-  }
+  const raw = GCS_CREDENTIALS_JSON.trim();
 
-  if (typeof parsed.client_email !== 'string' || typeof parsed.private_key !== 'string') {
-    throw new Error('GCS_CREDENTIALS_JSON must contain client_email and private_key');
-  }
+  const tryParse = (value: string): Record<string, unknown> | null => {
+    try {
+      return JSON.parse(value) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  };
 
-  return parsed;
+  let parsed = tryParse(raw);
+  if (parsed) return parsed;
+
+  parsed = tryParse(raw.replace(/\\n/g, '\n'));
+  if (parsed) return parsed;
+
+  parsed = tryParse(raw.replace(/\n/g, '\\n'));
+  if (parsed) return parsed;
+
+  throw new Error('GCS_CREDENTIALS_JSON is set but is not valid JSON');
 }
 
 function getBucket() {
