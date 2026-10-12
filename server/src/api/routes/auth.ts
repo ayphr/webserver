@@ -8,6 +8,7 @@ import {
 } from '../auth';
 import {
   createUser,
+  deleteAvatar,
   deleteDevicesForOwnerUuid,
   deletePunishmentsForUserUuid,
   deleteSessionsForUserUuid,
@@ -25,8 +26,6 @@ import { getUsernameValidationError } from '@common/utils/username';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
-import { deleteObject } from '../../lib/storage';
-import { avatarObjectKey } from '../../lib/avatars';
 
 type AuthPayload = {
   username?: string;
@@ -262,10 +261,8 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
     deletePunishmentsForUserUuid(user.uuid),
     deleteDevicesForOwnerUuid(user.uuid),
     deleteSessionsForUserUuid(user.uuid),
+    deleteAvatar(user.uuid),
   ]);
-  if (user.avatar) {
-    await deleteObject(avatarObjectKey(user.uuid));
-  }
   await deleteUser(user.uuid);
 
   return new Response(null, { status: 204 });
