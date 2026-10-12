@@ -1,15 +1,23 @@
 import { randomUUID } from 'node:crypto';
 import { requireRole } from '../auth';
-import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsers, getUsersByRole, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../workers/dbWriter';
-import type { AttachedSubscription, Punishment, UserRole } from '@common';
-import { isSubscriptionTier } from '@common';
+import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../workers/dbWriter';
+import type { AttachedSubscription, Punishment, SubscriptionSource, SubscriptionTier, User, UserRole } from '@common';
+import { isSubscriptionTier, resolveSubscription } from '@common';
 import { toPublicUser } from '../../lib/user';
 
 const MAX_REASON_LENGTH = 500;
 const MAX_DURATION_MINUTES = 5 * 365 * 24 * 60;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
+}
+
+function parsePositiveInt(value: string | null, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
@@ -36,9 +44,110 @@ const handleUsersSummary = requireRole('staff', async () => {
   });
 });
 
-const handleStaffUsers = requireRole('staff', async () => {
-  const users = await getUsers();
-  return json({ users: users.map(toPublicUser) });
+type SubscriptionState = 'active' | 'expired' | 'none';
+
+function getSubscriptionState(user: User): SubscriptionState {
+  const resolved = resolveSubscription(user);
+  if (resolved) return 'active';
+
+  const hasAnySubscription =
+    (user.paidSubscriptions?.length ?? 0) > 0 || (user.attachedSubscriptions?.length ?? 0) > 0;
+
+  return hasAnySubscription ? 'expired' : 'none';
+}
+
+function matchesSubscriptionFilters(
+  user: User,
+  filters: { tier?: SubscriptionTier; source?: SubscriptionSource; status?: SubscriptionState },
+) {
+  const resolved = resolveSubscription(user);
+
+  if (filters.status && getSubscriptionState(user) !== filters.status) {
+    return false;
+  }
+
+  if (filters.tier) {
+    const hasTier =
+      resolved?.tier === filters.tier ||
+      (user.paidSubscriptions ?? []).some((subscription) => subscription.tier === filters.tier) ||
+      (user.attachedSubscriptions ?? []).some((subscription) => subscription.tier === filters.tier);
+    if (!hasTier) return false;
+  }
+
+  if (filters.source) {
+    const hasSource =
+      resolved?.source === filters.source ||
+      (filters.source === 'paid' && (user.paidSubscriptions?.length ?? 0) > 0) ||
+      (filters.source === 'attached' && (user.attachedSubscriptions?.length ?? 0) > 0);
+    if (!hasSource) return false;
+  }
+
+  return true;
+}
+
+const handleStaffUsers = requireRole('staff', async (request) => {
+  const params = new URL(request.url).searchParams;
+
+  const search = params.get('q')?.trim() || undefined;
+
+  const roleParam = params.get('role');
+  if (roleParam && roleParam !== 'user' && roleParam !== 'staff') {
+    return json({ error: 'role must be user or staff' }, 400);
+  }
+  const role = (roleParam as UserRole | null) ?? undefined;
+
+  const tierParam = params.get('tier');
+  let tier: SubscriptionTier | undefined;
+  if (tierParam) {
+    if (!isSubscriptionTier(tierParam)) {
+      return json({ error: 'tier must be a valid subscription tier' }, 400);
+    }
+    tier = tierParam;
+  }
+
+  const sourceParam = params.get('source');
+  if (sourceParam && sourceParam !== 'paid' && sourceParam !== 'attached') {
+    return json({ error: 'source must be paid or attached' }, 400);
+  }
+  const source = (sourceParam as SubscriptionSource | null) ?? undefined;
+
+  const statusParam = params.get('status');
+  if (statusParam && statusParam !== 'active' && statusParam !== 'expired' && statusParam !== 'none') {
+    return json({ error: 'status must be active, expired or none' }, 400);
+  }
+  const status = (statusParam as SubscriptionState | null) ?? undefined;
+
+  const page = parsePositiveInt(params.get('page'), 1);
+  const pageSize = Math.min(parsePositiveInt(params.get('pageSize'), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE);
+  const skip = (page - 1) * pageSize;
+
+  const baseFilter = { search, role };
+  const hasSubscriptionFilter = Boolean(tier || source || status);
+
+  let pageUsers: User[];
+  let total: number;
+
+  if (hasSubscriptionFilter) {
+    const allMatching = await listUsers(baseFilter);
+    const filtered = allMatching.filter((user) => matchesSubscriptionFilters(user, { tier, source, status }));
+    total = filtered.length;
+    pageUsers = filtered.slice(skip, skip + pageSize);
+  } else {
+    const [users, count] = await Promise.all([
+      listUsers(baseFilter, { skip, limit: pageSize }),
+      countUsers(baseFilter),
+    ]);
+    pageUsers = users;
+    total = count;
+  }
+
+  return json({
+    users: pageUsers.map(toPublicUser),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  });
 });
 
 const handleStaffPunishments = requireRole('staff', async (request, staffUser) => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import './Sidebar.css';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import type { BadgeId } from '../../../common/types';
 
@@ -11,12 +11,18 @@ const tabs: Tab[] = [
   { id: 'devices', name: 'Devices' },
 ];
 
+const staffTabs: Tab[] = [
+  { id: 'users', name: 'Users' },
+];
+
 const iconFor = (id: string) => {
   switch (id) {
     case 'overview':
       return <IconGauge size={18} />;
     case 'devices':
       return <IconDatabase size={18} />;
+    case 'users':
+      return <IconUsers size={18} />;
     case 'jail':
       return <IconBan
         size={18} />;
@@ -32,9 +38,12 @@ type Props = {
   badges?: BadgeId[];
   country?: string | null;
   isSuspended?: boolean;
+  isStaff?: boolean;
 };
 
-export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, isSuspended = false }) => {
+export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, isSuspended = false, isStaff = false }) => {
+  const visibleTabs = isStaff ? [...tabs, ...staffTabs] : tabs;
+
   return (
     <aside className="n-sidebar" aria-label="Sidebar">
       <div className="n-sidebar__top">
@@ -52,7 +61,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unkn
             <span className="n-sidebar__label">Jail</span>
           </button>
         ) : (
-          tabs.map((t) => (
+          visibleTabs.map((t) => (
             <button
               key={t.id}
               className={`n-sidebar__tab ${activeTab === t.id ? 'active' : ''}`}

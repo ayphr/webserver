@@ -1,4 +1,4 @@
-import { Collection, Db, MongoClient } from 'mongodb';
+import { Collection, Db, MongoClient, type Filter } from 'mongodb';
 import { createLogger } from '../lib/logger';
 import { recordMongoOperation } from '../lib/metrics';
 import type { TelemetryRecord } from '../lib/telemetry';
@@ -278,6 +278,51 @@ export async function getUsers() {
   const { users } = await getCols();
   trackMongoOperation('find', USERS_COLLECTION);
   return users.find({}).sort({ createdAt: -1 }).toArray();
+}
+
+export type UserListFilter = {
+  search?: string;
+  role?: UserRole;
+};
+
+export type UserListOptions = {
+  skip?: number;
+  limit?: number;
+};
+
+function buildUserListQuery(filter: UserListFilter): Filter<User> {
+  const query: Filter<User> = {};
+
+  if (filter.role) {
+    query.role = filter.role;
+  }
+
+  const search = filter.search?.trim();
+  if (search) {
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    query.$or = [{ username: regex }, { uuid: regex }];
+  }
+
+  return query;
+}
+
+export async function listUsers(filter: UserListFilter = {}, options: UserListOptions = {}) {
+  const { users } = await getCols();
+  const query = buildUserListQuery(filter);
+  let cursor = users.find(query).sort({ createdAt: -1 });
+
+  if (options.skip) cursor = cursor.skip(options.skip);
+  if (options.limit !== undefined) cursor = cursor.limit(options.limit);
+
+  trackMongoOperation('find', USERS_COLLECTION);
+  return cursor.toArray();
+}
+
+export async function countUsers(filter: UserListFilter = {}) {
+  const { users } = await getCols();
+  trackMongoOperation('countDocuments', USERS_COLLECTION);
+  return users.countDocuments(buildUserListQuery(filter));
 }
 
 export async function getUsersByRole(role: UserRole) {
