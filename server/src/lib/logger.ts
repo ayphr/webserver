@@ -3,6 +3,28 @@ import pino from 'pino';
 const isProduction = process.env.NODE_ENV === 'production';
 const level = process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug');
 
+function serializeError(value: unknown) {
+  if (value instanceof Error) {
+    const { name, message, stack } = value;
+    return {
+      type: name,
+      message,
+      stack,
+      ...Object.fromEntries(
+        Object.entries(value as unknown as Record<string, unknown>).filter(
+          ([key]) => !['name', 'message', 'stack'].includes(key),
+        ),
+      ),
+    };
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    return value;
+  }
+
+  return { message: String(value) };
+}
+
 const transport = pino.transport({
   target: 'pino-pretty',
   options: {
@@ -17,6 +39,10 @@ export const logger = pino(
   {
     level,
     timestamp: pino.stdTimeFunctions.isoTime,
+    serializers: {
+      error: serializeError,
+      err: serializeError,
+    },
   },
   transport
 );

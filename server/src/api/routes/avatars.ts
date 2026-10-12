@@ -2,6 +2,7 @@ import { requireAuth } from '../auth';
 import type { RouteParams } from '../types';
 import { getUserFromUuid, updateUser } from '../../workers/dbWriter';
 import { toPublicUser } from '../../lib/user';
+import { createLogger } from '../../lib/logger';
 import { deleteObject, getObject, isStorageConfigured, putObject } from '../../lib/storage';
 import {
   AVATAR_MAX_BYTES,
@@ -9,6 +10,8 @@ import {
   isAllowedAvatarContentType,
 } from '../../lib/avatars';
 import type { User } from '@common';
+
+const log = createLogger('avatars');
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -67,17 +70,27 @@ const handleAvatarUpload = requireAuth(async (request, user) => {
 
   const bytes = new Uint8Array(await file.arrayBuffer());
 
-  await putObject(avatarObjectKey(target.user.uuid), bytes, {
-    contentType,
-    cacheControl: 'public, max-age=31536000, immutable',
-  });
+  try {
+    await putObject(avatarObjectKey(target.user.uuid), bytes, {
+      contentType,
+      cacheControl: 'public, max-age=31536000, immutable',
+    });
+  } catch (error) {
+    log.warn({ error, userUuid: target.user.uuid }, 'failed to upload avatar to storage');
+    return json({ error: 'Failed to upload avatar' }, 500);
+  }
 
   target.user.avatar = {
     contentType,
     size: bytes.byteLength,
     updatedAt: new Date(),
   };
-  await updateUser(target.user);
+  try {
+    await updateUser(target.user);
+  } catch (error) {
+    log.warn({ error, userUuid: target.user.uuid }, 'failed to persist avatar metadata');
+    return json({ error: 'Failed to update profile' }, 500);
+  }
 
   return json({ user: toPublicUser(target.user) });
 }, { allowSuspended: true });

@@ -1,5 +1,7 @@
 .n-sidebar {
-  width: 220px;
+  width: fit-content;
+  min-width: 220px;
+  flex-shrink: 0;
   height: 100vh;
   box-sizing: border-box;
   padding: 1.5rem;

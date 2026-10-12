@@ -14,7 +14,9 @@
 }
 
 .dashboard-layout--compact .n-sidebar {
-  width: 188px;
+  width: fit-content;
+  min-width: 188px;
+  flex-shrink: 0;
   padding: 1rem;
 }
 

@@ -1,4 +1,4 @@
-import { Storage } from '@google-cloud/storage';
+import { Storage, type SaveOptions } from '@google-cloud/storage';
 import { createLogger } from './logger';
 import { GCS_BUCKET, GCS_PROJECT_ID, GCS_PUBLIC_BASE_URL } from '../env';
 
@@ -54,14 +54,25 @@ export async function putObject(
     throw new Error('Object storage is not configured (GCS_BUCKET is unset)');
   }
 
-  await getBucket().file(key).save(toBuffer(data), {
-    contentType: options.contentType,
-    resumable: false,
-    metadata: {
-      cacheControl: options.cacheControl,
-      metadata: options.metadata,
-    },
-  });
+  const metadata: Record<string, string> = {};
+  if (options.cacheControl) {
+    metadata.cacheControl = options.cacheControl;
+  }
+  if (options.metadata) {
+    for (const [metaKey, metaValue] of Object.entries(options.metadata)) {
+      metadata[metaKey] = metaValue;
+    }
+  }
+
+  const saveOptions: SaveOptions = { resumable: false };
+  if (options.contentType) {
+    saveOptions.contentType = options.contentType;
+  }
+  if (Object.keys(metadata).length > 0) {
+    saveOptions.metadata = metadata;
+  }
+
+  await getBucket().file(key).save(toBuffer(data), saveOptions);
 }
 
 export async function deleteObject(key: string): Promise<void> {
