@@ -64,7 +64,7 @@ export async function putObject(
     }
   }
 
-  const saveOptions: SaveOptions = { resumable: false };
+  const saveOptions: SaveOptions = { resumable: false, validation: false };
   if (options.contentType) {
     saveOptions.contentType = options.contentType;
   }
