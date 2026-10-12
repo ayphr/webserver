@@ -37,11 +37,12 @@ type Props = {
   username?: string;
   badges?: BadgeId[];
   country?: string | null;
+  avatarUrl?: string;
   isSuspended?: boolean;
   isStaff?: boolean;
 };
 
-export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, isSuspended = false, isStaff = false }) => {
+export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, avatarUrl, isSuspended = false, isStaff = false }) => {
   const visibleTabs = isStaff ? [...tabs, ...staffTabs] : tabs;
 
   return (
@@ -106,7 +107,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unkn
         </nav>
 
         <div className="n-sidebar__accountDisplay">
-          <UsernameDisplay username={username} badges={badges} country={country ?? undefined} />
+          <UsernameDisplay username={username} badges={badges} country={country ?? undefined} avatarUrl={avatarUrl} />
         </div>
       </div>
     </aside>

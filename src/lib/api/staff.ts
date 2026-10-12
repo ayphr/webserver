@@ -1,5 +1,7 @@
 import type {
   Punishment,
+  StaffPasswordUpdatePayload,
+  StaffPasswordUpdateRequest,
   StaffPunishmentsPayload,
   StaffRoleUpdatePayload,
   StaffRoleUpdateRequest,
@@ -35,6 +37,13 @@ export function createStaffApi(client: RequestClient) {
     },
     async updateRole(userUuid: string, input: StaffRoleUpdateRequest) {
       const response = await client.requestJson<StaffRoleUpdatePayload>(`/api/staff/role/${userUuid}`, {
+        method: 'POST',
+        body: input,
+      });
+      return response.user;
+    },
+    async setPassword(userUuid: string, input: StaffPasswordUpdateRequest) {
+      const response = await client.requestJson<StaffPasswordUpdatePayload>(`/api/staff/password/${userUuid}`, {
         method: 'POST',
         body: input,
       });

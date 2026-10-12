@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   IconBrandGithub,
   IconBrandBluesky,
@@ -12,11 +12,12 @@ import {
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { api } from '../../lib/api';
-import { BioEditor, BioText, Button, UsernameDisplay } from './index';
+import { BioEditor, BioText, Button, UsernameDisplay, Avatar } from './index';
 import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '../../../common/utils/country';
 import { PunishModal } from './PunishModal';
 import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
+import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
 import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
 import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '../../../common';
 import {
@@ -109,6 +110,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [selectedSocialKey, setSelectedSocialKey] = useState<SocialLinkType>('website');
   const [selectedSocialValue, setSelectedSocialValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [isPunishModalOpen, setIsPunishModalOpen] = useState(false);
   const [isSubscriptionsModalOpen, setIsSubscriptionsModalOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
@@ -165,6 +169,47 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     }
   };
 
+  const handleAvatarFileChange = async (file: File | undefined) => {
+    if (!user || !file) return;
+
+    const validateError = validateAvatarFile(file);
+    if (validateError) {
+      setAvatarError(validateError);
+      return;
+    }
+
+    setIsUpdatingAvatar(true);
+    setAvatarError(null);
+
+    try {
+      const prepared = await prepareAvatarFile(file);
+      const updated = await api.profile.uploadAvatar(prepared, userUuid);
+      setUser(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to upload avatar';
+      setAvatarError(message);
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!user) return;
+
+    setIsUpdatingAvatar(true);
+    setAvatarError(null);
+
+    try {
+      const updated = await api.profile.removeAvatar(userUuid);
+      setUser(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to remove avatar';
+      setAvatarError(message);
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
+
   const isStaff = viewerRole === 'staff';
   const isSelfProfile = viewerUuid === user?.uuid;
   const canEditThisProfile = canEditProfile || isSelfProfile || isStaff;
@@ -204,7 +249,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     <div className="profile-card">
       <div className="profile-card__header">
         <div className="profile-card__identity">
-          <UsernameDisplay username={user.username} badges={user.badges} country={user.country} />
+          <UsernameDisplay username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} avatarSize={56} />
         </div>
         <div className="profile-card__actions">
           {canEditThisProfile && !isEditingProfile && (
@@ -299,6 +344,45 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </>
         ) : (
           <div className="profile-card__edit-form">
+            <div className="profile-card__form-group profile-card__avatar-group">
+              <label className="profile-card__form-label">Avatar</label>
+              <div className="profile-card__avatar-row">
+                <Avatar username={user.username} avatarUrl={user.avatarUrl} size={72} />
+                <div className="profile-card__avatar-actions">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="profile-card__avatar-input"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      void handleAvatarFileChange(file);
+                    }}
+                    disabled={isUpdatingAvatar}
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={() => avatarInputRef.current?.click()}
+                    isLoading={isUpdatingAvatar}
+                    disabled={isUpdatingAvatar}
+                  >
+                    Change photo
+                  </Button>
+                  {user.avatarUrl && (
+                    <Button
+                      variant="danger"
+                      onClick={() => void handleAvatarRemove()}
+                      disabled={isUpdatingAvatar}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {avatarError && <p className="profile-card__form-error">{avatarError}</p>}
+            </div>
+
             <div className="profile-card__form-group">
               <label id="bio-label" htmlFor="bio" className="profile-card__form-label">
                 Bio

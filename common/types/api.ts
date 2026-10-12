@@ -155,6 +155,19 @@ export type StaffRoleUpdateRequest = {
   role: UserRole;
 };
 
+export type StaffPasswordUpdateRequest = {
+  password: string;
+};
+
+export type StaffPasswordUpdatePayload = {
+  user: PublicUser;
+};
+
+export type ChangePasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+
 export type StaffSubscriptionAttachRequest = {
   tier: SubscriptionTier;
   expiresAt?: string | null;

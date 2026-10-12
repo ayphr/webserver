@@ -1,4 +1,4 @@
-import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession, SessionDeviceType } from '../../../common';
+import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession, ChangePasswordRequest, SessionDeviceType } from '../../../common';
 import type { RequestClient } from './client';
 
 function getClientDeviceType(): SessionDeviceType | undefined {
@@ -90,6 +90,15 @@ export function createAuthApi(client: RequestClient) {
       await client.requestJson<null>('/api/auth/account', {
         method: 'DELETE',
         body: { password: input.password },
+      });
+      client.clearAuthToken();
+    },
+    async changePassword(input: ChangePasswordRequest) {
+      // All sessions (including this one) are revoked when the password changes,
+      // so the client clears its token and lets the user sign back in.
+      await client.requestJson<null>('/api/auth/password', {
+        method: 'POST',
+        body: input,
       });
       client.clearAuthToken();
     },

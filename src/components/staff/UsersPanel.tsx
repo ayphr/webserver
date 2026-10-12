@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconChevronLeft, IconChevronRight, IconEdit, IconFilter, IconSearch } from '@tabler/icons-react';
+import { IconChevronLeft, IconChevronRight, IconEdit, IconFilter, IconKey, IconSearch } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type {
   PublicUser,
@@ -11,6 +11,7 @@ import type {
 } from '../../../common';
 import { BADGES, SUBSCRIPTION_TIERS } from '../../../common';
 import { Button, Input, ManageSubscriptionsModal, PunishModal, Select, UsernameDisplay } from '../common';
+import { SetPasswordModal } from './SetPasswordModal';
 import { getBadgeIcon } from '../../lib/badges';
 import './UsersPanel.css';
 
@@ -71,6 +72,7 @@ export const UsersPanel = () => {
   const [reloadToken, setReloadToken] = useState(0);
   const [punishTarget, setPunishTarget] = useState<PublicUser | null>(null);
   const [subsTarget, setSubsTarget] = useState<PublicUser | null>(null);
+  const [passwordTarget, setPasswordTarget] = useState<PublicUser | null>(null);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
 
   useEffect(() => {
@@ -228,7 +230,7 @@ export const UsersPanel = () => {
           {data.users.map((user) => (
             <li key={user.uuid} className="users-panel__item">
               <div className="users-panel__identity">
-                <UsernameDisplay username={user.username} badges={user.badges} country={user.country} />
+                <UsernameDisplay username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} />
                 <span className="users-panel__uuid">{user.uuid}</span>
                 <div className="users-panel__meta">
                   <span className={`users-panel__roleTag users-panel__roleTag--${user.role}`}>
@@ -270,6 +272,9 @@ export const UsersPanel = () => {
                 </Button>
                 <Button variant="secondary" onClick={() => setSubsTarget(user)}>
                   Subscriptions
+                </Button>
+                <Button variant="secondary" onClick={() => setPasswordTarget(user)}>
+                  <IconKey size={16} /> Password
                 </Button>
                 <Button variant="danger" onClick={() => setPunishTarget(user)}>
                   Punish
@@ -322,6 +327,19 @@ export const UsersPanel = () => {
           onChanged={(updated) => {
             if (updated) replaceUser(updated);
             setReloadToken((token) => token + 1);
+          }}
+        />
+      )}
+
+      {passwordTarget && (
+        <SetPasswordModal
+          isOpen={!!passwordTarget}
+          userUuid={passwordTarget.uuid}
+          username={passwordTarget.username}
+          onClose={() => setPasswordTarget(null)}
+          onChanged={(updated) => {
+            if (updated) replaceUser(updated);
+            setPasswordTarget(null);
           }}
         />
       )}

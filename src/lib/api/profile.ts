@@ -36,5 +36,22 @@ export function createProfileApi(client: RequestClient) {
       });
       return response.user;
     },
+    async uploadAvatar(file: File, userUuid?: string) {
+      const form = new FormData();
+      form.append('avatar', file);
+      const query = userUuid ? `?userUuid=${encodeURIComponent(userUuid)}` : '';
+      const response = await client.requestJson<{ user: PublicUser }>(`/api/profile/avatar${query}`, {
+        method: 'POST',
+        body: form,
+      });
+      return response.user;
+    },
+    async removeAvatar(userUuid?: string) {
+      const query = userUuid ? `?userUuid=${encodeURIComponent(userUuid)}` : '';
+      const response = await client.requestJson<{ user: PublicUser }>(`/api/profile/avatar${query}`, {
+        method: 'DELETE',
+      });
+      return response.user;
+    },
   };
 }

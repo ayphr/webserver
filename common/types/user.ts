@@ -22,10 +22,17 @@ export type PolicyVersionsData = {
   updatedDates: Partial<Record<PolicyKey, string>>;
 };
 
+export type UserAvatar = {
+  contentType: string;
+  size: number;
+  updatedAt: Date;
+};
+
 export type User = {
   uuid: string;
   username: string;
   role: UserRole;
+  avatar?: UserAvatar;
   bio?: string;
   bioFormat?: MarkdownFormat;
   socialLinks?: SocialLinks;
@@ -43,8 +50,9 @@ export type User = {
 
 export type PublicUser = Omit<
   User,
-  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions'
+  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar'
 > & {
   badges: BadgeId[];
+  avatarUrl?: string;
   subscription: PublicSubscription | null;
 };

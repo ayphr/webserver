@@ -1,5 +1,6 @@
 import {
   handleAcceptPolicies,
+  handleChangePassword,
   handleDeleteAccount,
   handleLogin,
   handleLogout,
@@ -17,6 +18,7 @@ import { handlePunishment, handleMe as handlePunishmentsMe } from './routes/puni
 import {
   handleStaffPunishmentLift,
   handleStaffPunishments,
+  handleStaffPasswordUpdate,
   handleStaffRoleUpdate,
   handleStaffSubscriptionAttach,
   handleStaffSubscriptionDetach,
@@ -26,6 +28,7 @@ import {
   handleUsersSummary,
 } from './routes/staff';
 import { handleGetBySerial, handleListMine, handleRegister as handleDeviceRegister } from './routes/devices';
+import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
 import { handleUserByUuid, handleMe as handleUsersMe } from './routes/users';
 import {
   handleStripeWebhook,
@@ -64,10 +67,13 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/auth/logout', handle: handleLogout },
   { method: 'POST', path: '/api/auth/logout-all', handle: handleLogoutAll },
   { method: 'POST', path: '/api/auth/policies/accept', handle: handleAcceptPolicies },
+  { method: 'POST', path: '/api/auth/password', handle: handleChangePassword },
   { method: 'DELETE', path: '/api/auth/account', handle: handleDeleteAccount },
 
   { method: 'GET', path: '/api/users/me', handle: handleUsersMe },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
+
+  { method: 'GET', path: '/api/avatars/:uuid', handle: handleAvatarGet },
 
   { method: 'POST', path: '/api/subscriptions/stripe/webhook', handle: handleStripeWebhook },
   { method: 'GET', path: '/api/subscriptions/me', handle: handleSubscriptionMe },
@@ -91,10 +97,13 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/profile/countries', handle: handleCountries },
   { method: 'PATCH', path: '/api/profile/country', handle: handleCountryUpdate },
   { method: 'PATCH', path: '/api/profile/:uuid', handle: handleProfileEdit },
+  { method: 'POST', path: '/api/profile/avatar', handle: handleAvatarUpload },
+  { method: 'DELETE', path: '/api/profile/avatar', handle: handleAvatarDelete },
 
   { method: 'GET', path: '/api/staff/summary', handle: handleUsersSummary },
   { method: 'GET', path: '/api/staff/users', handle: handleStaffUsers },
   { method: 'POST', path: '/api/staff/role/:uuid', handle: handleStaffRoleUpdate },
+  { method: 'POST', path: '/api/staff/password/:uuid', handle: handleStaffPasswordUpdate },
   { method: 'POST', path: '/api/staff/punishments/:id/lift', handle: handleStaffPunishmentLift },
   { method: 'GET', path: '/api/staff/punishments', handle: handleStaffPunishments },
   { method: 'POST', path: '/api/staff/punishments', handle: handleStaffPunishments },

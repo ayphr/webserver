@@ -25,10 +25,14 @@ import { getUsernameValidationError } from '@common/utils/username';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
+import { deleteObject } from '../../lib/storage';
+import { avatarObjectKey } from '../../lib/avatars';
 
 type AuthPayload = {
   username?: string;
   password?: string;
+  currentPassword?: string;
+  newPassword?: string;
   country?: string;
   acceptPolicies?: boolean;
   timezone?: string;
@@ -211,6 +215,38 @@ const handleAcceptPolicies = requireAuth(async (_request, user) => {
   return json({ user: toPublicUser(user), policyStatus });
 }, { allowSuspended: true, allowPolicyPending: true });
 
+const handleChangePassword = requireAuth(async (request, user) => {
+  const body = await readJsonBody(request);
+
+  const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : undefined;
+  const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : undefined;
+
+  if (!currentPassword) {
+    return json({ error: 'current password is required' }, 400);
+  }
+
+  if (!newPassword) {
+    return json({ error: 'new password is required' }, 400);
+  }
+
+  if (!(await verifyPassword(currentPassword, user.auth.passwordHash))) {
+    return json({ error: 'invalid current password' }, 401);
+  }
+
+  const passwordValidationErrors = getPasswordValidationErrors(newPassword);
+  if (passwordValidationErrors.length > 0) {
+    return json({ error: passwordValidationErrors[0] }, 400);
+  }
+
+  user.auth.passwordHash = await createPasswordHash(newPassword);
+  await updateUser(user);
+
+  // Changing the password signs out every device, including this one.
+  await endAllSessions(user);
+
+  return new Response(null, { status: 204 });
+}, { allowSuspended: true, allowPolicyPending: true });
+
 const handleDeleteAccount = requireAuth(async (request, user) => {
   const body = await readJsonBody(request);
 
@@ -227,9 +263,12 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
     deleteDevicesForOwnerUuid(user.uuid),
     deleteSessionsForUserUuid(user.uuid),
   ]);
+  if (user.avatar) {
+    await deleteObject(avatarObjectKey(user.uuid));
+  }
   await deleteUser(user.uuid);
 
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
-export { handleRegister, handleLogin, handleMe, handleLogout, handleLogoutAll, handleAcceptPolicies, handleDeleteAccount };
+export { handleRegister, handleLogin, handleMe, handleLogout, handleLogoutAll, handleAcceptPolicies, handleChangePassword, handleDeleteAccount };
