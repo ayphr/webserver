@@ -5,12 +5,12 @@
   flex-shrink: 0;
   border-radius: 50%;
   object-fit: cover;
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-subtle);
   overflow: hidden;
 }
 
 .avatar--fallback {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-weight: var(--font-weight-hv);
   line-height: 1;
