@@ -1,6 +1,6 @@
 import { Storage } from '@google-cloud/storage';
 import { createLogger } from './logger';
-import { GCS_BUCKET, GCS_PROJECT_ID, GCS_PUBLIC_BASE_URL } from '../env';
+import { GCS_BUCKET, GCS_CREDENTIALS_JSON, GCS_PROJECT_ID, GCS_PUBLIC_BASE_URL } from '../env';
 
 const log = createLogger('storage');
 
@@ -38,9 +38,30 @@ export function isStorageConfigured(): boolean {
   return GCS_BUCKET.length > 0;
 }
 
+function resolveCredentials(): Record<string, unknown> | undefined {
+  if (!GCS_CREDENTIALS_JSON) return undefined;
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(GCS_CREDENTIALS_JSON) as Record<string, unknown>;
+  } catch {
+    throw new Error('GCS_CREDENTIALS_JSON is set but is not valid JSON');
+  }
+
+  if (typeof parsed.client_email !== 'string' || typeof parsed.private_key !== 'string') {
+    throw new Error('GCS_CREDENTIALS_JSON must contain client_email and private_key');
+  }
+
+  return parsed;
+}
+
 function getBucket() {
   if (!client) {
-    client = new Storage(GCS_PROJECT_ID ? { projectId: GCS_PROJECT_ID } : {});
+    const credentials = resolveCredentials();
+    const options: { projectId?: string; credentials?: Record<string, unknown> } = {};
+    if (GCS_PROJECT_ID) options.projectId = GCS_PROJECT_ID;
+    if (credentials) options.credentials = credentials;
+    client = new Storage(options);
   }
   return client.bucket(GCS_BUCKET);
 }
