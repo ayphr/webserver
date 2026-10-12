@@ -4,7 +4,7 @@ export type Badge = {
   iconId: IconId;
 };
 
-export type IconId = 'plus' | 'star' | 'filled-star' | 'staff';
+export type IconId = 'plus' | 'star' | 'stars' | '3-stars' | 'staff';
 
 export type BadgeId =
   | 'lite'
@@ -30,22 +30,22 @@ export const BADGES: Badge[] = [
   {
     id: 'ultra',
     name: 'Ultra',
-    iconId: 'filled-star',
+    iconId: 'stars',
   },
   {
     id: 'team-lite',
     name: 'Team Lite',
-    iconId: 'plus',
+    iconId: '3-stars',
   },
   {
     id: 'team-plus',
     name: 'Team Plus',
-    iconId: 'star',
+    iconId: '3-stars',
   },
   {
     id: 'team-ultra',
     name: 'Team Ultra',
-    iconId: 'filled-star',
+    iconId: '3-stars',
   },
 
   // Roles
