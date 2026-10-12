@@ -1,4 +1,4 @@
-import { Collection, Db, MongoClient, type Filter } from 'mongodb';
+import { Binary, Collection, Db, MongoClient, type Filter } from 'mongodb';
 import { createLogger } from '../lib/logger';
 import { recordMongoOperation } from '../lib/metrics';
 import type { TelemetryRecord } from '../lib/telemetry';
@@ -10,6 +10,7 @@ import {
   DEVICES_COLLECTION,
   SESSIONS_COLLECTION,
   STRIPE_EVENTS_COLLECTION,
+  AVATARS_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME
 } from '../env';
@@ -29,6 +30,15 @@ interface Collections {
   devices: Collection<Device>;
   sessions: Collection<Session>;
   stripeEvents: Collection<{ id: string; type: string; createdAt: Date }>;
+  avatars: Collection<StoredAvatar>;
+}
+
+export interface StoredAvatar {
+  userUuid: string;
+  contentType: string;
+  size: number;
+  updatedAt: Date;
+  data: Binary;
 }
 
 let collections: Collections | null = null;
@@ -115,7 +125,8 @@ async function setupCollections(db: Db): Promise<Collections> {
     punishments: db.collection<Punishment>(PUNISHMENTS_COLLECTION),
     devices: db.collection<Device>(DEVICES_COLLECTION),
     sessions: db.collection<Session>(SESSIONS_COLLECTION),
-    stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION)
+    stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION),
+    avatars: db.collection<StoredAvatar>(AVATARS_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -123,6 +134,7 @@ async function setupCollections(db: Db): Promise<Collections> {
     [USERS_COLLECTION, () => cols.users.createIndex({ uuid: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ username: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ stripeCustomerId: 1 }, { sparse: true })],
+    [AVATARS_COLLECTION, () => cols.avatars.createIndex({ userUuid: 1 }, { unique: true })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1 })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
@@ -248,6 +260,43 @@ export async function deleteUser(uuid: string) {
   const { users } = await getCols();
   trackMongoOperation('deleteOne', USERS_COLLECTION);
   await users.deleteOne({ uuid });
+}
+
+export type AvatarMetadata = {
+  contentType: string;
+  size: number;
+  updatedAt: Date;
+};
+
+export async function putAvatar(userUuid: string, data: Uint8Array, contentType: string): Promise<AvatarMetadata> {
+  const { avatars } = await getCols();
+  const bytes = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  const metadata: AvatarMetadata = {
+    contentType,
+    size: bytes.byteLength,
+    updatedAt: new Date(),
+  };
+
+  trackMongoOperation('updateOne', AVATARS_COLLECTION);
+  await avatars.updateOne(
+    { userUuid },
+    { $set: { ...metadata, userUuid, data: new Binary(bytes) } },
+    { upsert: true }
+  );
+
+  return metadata;
+}
+
+export async function getAvatar(userUuid: string) {
+  const { avatars } = await getCols();
+  trackMongoOperation('findOne', AVATARS_COLLECTION);
+  return avatars.findOne({ userUuid });
+}
+
+export async function deleteAvatar(userUuid: string) {
+  const { avatars } = await getCols();
+  trackMongoOperation('deleteOne', AVATARS_COLLECTION);
+  await avatars.deleteOne({ userUuid });
 }
 
 export async function deletePunishmentsForUserUuid(userUuid: string) {

@@ -15,10 +15,6 @@ export function isAllowedAvatarContentType(value: string): value is AvatarConten
   return (ALLOWED_AVATAR_CONTENT_TYPES as readonly string[]).includes(value);
 }
 
-export function avatarObjectKey(userUuid: string): string {
-  return `avatars/${userUuid}`;
-}
-
 /** Builds a cache-busted, client-resolvable URL for a user's avatar. */
 export function buildAvatarUrl(user: Pick<User, 'uuid' | 'avatar'>): string | undefined {
   if (!user.avatar) return undefined;

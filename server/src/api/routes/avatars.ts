@@ -1,14 +1,10 @@
 import { requireAuth } from '../auth';
 import type { RouteParams } from '../types';
-import { getUserFromUuid, updateUser } from '../../workers/dbWriter';
+import { deleteAvatar, getAvatar, getUserFromUuid, putAvatar, updateUser } from '../../workers/dbWriter';
+import type { AvatarMetadata } from '../../workers/dbWriter';
 import { toPublicUser } from '../../lib/user';
 import { createLogger } from '../../lib/logger';
-import { deleteObject, getObject, isStorageConfigured, putObject } from '../../lib/storage';
-import {
-  AVATAR_MAX_BYTES,
-  avatarObjectKey,
-  isAllowedAvatarContentType,
-} from '../../lib/avatars';
+import { AVATAR_MAX_BYTES, isAllowedAvatarContentType } from '../../lib/avatars';
 import type { User } from '@common';
 
 const log = createLogger('avatars');
@@ -41,10 +37,6 @@ async function resolveTargetUser(request: Request, actor: User): Promise<Resolve
 }
 
 const handleAvatarUpload = requireAuth(async (request, user) => {
-  if (!isStorageConfigured()) {
-    return json({ error: 'File storage is not configured' }, 503);
-  }
-
   const target = await resolveTargetUser(request, user);
   if ('error' in target) return target.error;
 
@@ -70,21 +62,15 @@ const handleAvatarUpload = requireAuth(async (request, user) => {
 
   const bytes = new Uint8Array(await file.arrayBuffer());
 
+  let avatar: AvatarMetadata;
   try {
-    await putObject(avatarObjectKey(target.user.uuid), bytes, {
-      contentType,
-      cacheControl: 'public, max-age=31536000, immutable',
-    });
+    avatar = await putAvatar(target.user.uuid, bytes, contentType);
   } catch (error) {
-    log.warn({ error, userUuid: target.user.uuid }, 'failed to upload avatar to storage');
+    log.warn({ error, userUuid: target.user.uuid }, 'failed to store avatar');
     return json({ error: 'Failed to upload avatar' }, 500);
   }
 
-  target.user.avatar = {
-    contentType,
-    size: bytes.byteLength,
-    updatedAt: new Date(),
-  };
+  target.user.avatar = avatar;
   try {
     await updateUser(target.user);
   } catch (error) {
@@ -103,7 +89,7 @@ const handleAvatarDelete = requireAuth(async (request, user) => {
     return json({ user: toPublicUser(target.user) });
   }
 
-  await deleteObject(avatarObjectKey(target.user.uuid));
+  await deleteAvatar(target.user.uuid);
 
   delete target.user.avatar;
   await updateUser(target.user, ['avatar']);
@@ -122,22 +108,18 @@ const handleAvatarGet = async (_request: Request, params: RouteParams) => {
     return json({ error: 'avatar not found' }, 404);
   }
 
-  const object = await getObject(avatarObjectKey(uuid));
-  if (!object) {
+  const avatar = await getAvatar(uuid);
+  if (!avatar) {
     return json({ error: 'avatar not found' }, 404);
   }
 
   const headers: Record<string, string> = {
-    'Content-Type': object.contentType ?? user.avatar.contentType,
-    'Content-Length': String(object.data.byteLength),
+    'Content-Type': avatar.contentType,
+    'Content-Length': String(avatar.size),
     'Cache-Control': 'public, max-age=31536000, immutable',
   };
 
-  if (object.etag) {
-    headers.ETag = object.etag;
-  }
-
-  return new Response(object.data, { status: 200, headers });
+  return new Response(avatar.data.value(), { status: 200, headers });
 };
 
 export { handleAvatarUpload, handleAvatarDelete, handleAvatarGet };
