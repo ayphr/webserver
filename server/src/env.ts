@@ -32,6 +32,9 @@ export const GCS_BUCKET = process.env.GCS_BUCKET || '';
 export const GCS_PROJECT_ID = process.env.GCS_PROJECT_ID || '';
 // Optional CDN / custom domain used to build public object URLs (e.g. https://cdn.ayphr.com).
 export const GCS_PUBLIC_BASE_URL = (process.env.GCS_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+// Optional: the full service-account key (JSON) as a string, e.g. set in Docker
+// via an env secret. Takes precedence over GOOGLE_APPLICATION_CREDENTIALS.
+export const GCS_CREDENTIALS_JSON = process.env.GCS_CREDENTIALS_JSON || '';
 // Base URL used when building absolute URLs to objects proxied through the API.
 export const API_PUBLIC_BASE_URL = (process.env.API_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
 
