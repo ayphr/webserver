@@ -6,6 +6,7 @@ export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Modal, type ModalProps } from './Modal';
 export { Alert, ConfirmDialog, type AlertProps, type ConfirmDialogProps } from './Dialog';
 export { UsernameDisplay, type UsernameDisplayProps } from './UsernameDisplay';
+export { Avatar, type AvatarProps } from './Avatar';
 export { EmojiText } from './EmojiText';
 export { BioEditor, type BioEditorProps } from './BioEditor';
 export { BioText, type BioTextProps } from './BioText';

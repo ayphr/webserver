@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type { PublicUser } from '../../../common';
 import { Card, CardBody, CardHeader, ProfileCard } from '../../components/common';
@@ -8,9 +8,9 @@ import './ProfilePage.css';
 
 export const ProfilePage = () => {
   const { userUuid } = useParams<{ userUuid: string }>();
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [isLoadingCurrent, setIsLoadingCurrent] = useState(true);
-  const [activePage, setActivePage] = useState('profile');
 
   useEffect(() => {
     const load = async () => {
@@ -28,10 +28,14 @@ export const ProfilePage = () => {
     void load();
   }, []);
 
+  const handleTabChange = (id: string) => {
+    navigate(`/dashboard?tab=${encodeURIComponent(id)}`);
+  };
+
   if (isLoadingCurrent) {
     return (
       <div className="profile-layout">
-        <Sidebar activeTab={activePage} onChange={setActivePage} username="..." />
+        <Sidebar activeTab="profile" onChange={handleTabChange} username="..." />
         <main className="profile-main">
           <Card className="profile-page__card" elevated>
             <CardBody>
@@ -46,7 +50,7 @@ export const ProfilePage = () => {
   if (!userUuid) {
     return (
       <div className="profile-layout">
-        <Sidebar activeTab={activePage} onChange={setActivePage} username={currentUser?.username ?? '...'} badges={currentUser?.badges} />
+        <Sidebar activeTab="profile" onChange={handleTabChange} username={currentUser?.username ?? '...'} badges={currentUser?.badges} avatarUrl={currentUser?.avatarUrl} />
         <main className="profile-main">
           <Card className="profile-page__card" elevated>
             <CardBody>
@@ -64,7 +68,7 @@ export const ProfilePage = () => {
 
   return (
     <div className="profile-layout">
-      <Sidebar activeTab={activePage} onChange={setActivePage} username={currentUser?.username ?? '...'} badges={currentUser?.badges} />
+      <Sidebar activeTab="profile" onChange={handleTabChange} username={currentUser?.username ?? '...'} badges={currentUser?.badges} avatarUrl={currentUser?.avatarUrl} />
       <main className="profile-main">
         <Card className="profile-page__card" elevated>
           <CardHeader>

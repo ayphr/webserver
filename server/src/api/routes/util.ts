@@ -38,6 +38,11 @@ export function addCorsHeaders(response: Response, request: Request) {
   }
 
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    // Allow handlers to opt out of the blanket no-store policy (e.g. static
+    // objects like avatars that are served with their own cache headers).
+    if (key === 'Cache-Control' && headers.has('Cache-Control')) {
+      continue;
+    }
     headers.set(key, value);
   }
 

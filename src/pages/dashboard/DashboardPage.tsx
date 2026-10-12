@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLogout, IconLogout2, IconShieldLock, IconTrash } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type { Punishment, PublicUser } from '../../../common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
-import { SettingsPanel, SessionsModal } from '../../components/settings';
+import { SettingsPanel, SessionsModal, ChangePasswordModal } from '../../components/settings';
 import { SubscriptionPanel } from '../../components/subscriptions';
 import { UsersPanel } from '../../components/staff';
 import './DashboardPage.css';
@@ -125,6 +125,7 @@ export const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   const [compactLayout, setCompactLayout] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-compact') === '1',
@@ -250,6 +251,16 @@ export const DashboardPage = () => {
       title: 'Security',
       options: [
         {
+          id: 'change-password',
+          optionType: 'button',
+          icon: <IconLock size={18} strokeWidth={1.75} />,
+          title: 'Change password',
+          description: 'Set a new password. All devices will be signed out.',
+          label: 'Change password',
+          variant: 'secondary',
+          action: () => setIsChangePasswordOpen(true),
+        },
+        {
           id: 'sessions',
           optionType: 'button',
           icon: <IconShieldLock size={18} strokeWidth={1.75} />,
@@ -351,7 +362,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} isSuspended={isSuspended} isStaff={isStaff} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
           <Card className="dashboard-page__card" elevated>
@@ -420,6 +431,8 @@ export const DashboardPage = () => {
                     username={user.username}
                     badges={user.badges}
                     country={user.country}
+                    avatarUrl={user.avatarUrl}
+                    avatarSize={40}
                     className="dashboard-page__user-row"
                   />
                   <p>Welcome to your dashboard!</p>
@@ -507,6 +520,16 @@ export const DashboardPage = () => {
         )}
       </main>
       <SessionsModal isOpen={isSessionsOpen} onClose={() => setIsSessionsOpen(false)} />
+      {isChangePasswordOpen && (
+        <ChangePasswordModal
+          isOpen={isChangePasswordOpen}
+          onClose={() => setIsChangePasswordOpen(false)}
+          onChanged={() => {
+            setIsChangePasswordOpen(false);
+            void navigate('/auth', { replace: true });
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { requireRole } from '../auth';
-import { createPunishment, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../workers/dbWriter';
+import { createPasswordHash, requireRole } from '../auth';
+import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../workers/dbWriter';
 import type { AttachedSubscription, Punishment, SubscriptionSource, SubscriptionTier, User, UserRole } from '@common';
 import { isSubscriptionTier, resolveSubscription } from '@common';
+import { getPasswordValidationErrors } from '@common/utils/password';
 import { toPublicUser } from '../../lib/user';
 
 const MAX_REASON_LENGTH = 500;
@@ -274,6 +275,39 @@ const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params
   return json({ user: toPublicUser(updatedUser) });
 });
 
+const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUser, params) => {
+  const targetUuid = params.uuid;
+
+  if (!targetUuid) {
+    return json({ error: 'user uuid is required' }, 400);
+  }
+
+  const body = await readJsonBody(request);
+  const password = typeof body?.password === 'string' ? body.password : undefined;
+
+  if (!password) {
+    return json({ error: 'password is required' }, 400);
+  }
+
+  const passwordValidationErrors = getPasswordValidationErrors(password);
+  if (passwordValidationErrors.length > 0) {
+    return json({ error: passwordValidationErrors[0] }, 400);
+  }
+
+  const targetUser = await getUserFromUuid(targetUuid);
+  if (!targetUser) {
+    return json({ error: 'user not found' }, 404);
+  }
+
+  targetUser.auth.passwordHash = await createPasswordHash(password);
+  await updateUser(targetUser);
+
+  // Setting a password signs the user out of every device.
+  await deleteSessionsForUserUuid(targetUser.uuid);
+
+  return json({ user: toPublicUser(targetUser) });
+});
+
 const handleStaffSubscriptionAttach = requireRole('staff', async (request, staffUser, params) => {
   const targetUuid = params.uuid;
   if (!targetUuid) {
@@ -431,6 +465,7 @@ export {
   handleStaffPunishments,
   handleStaffPunishmentLift,
   handleStaffRoleUpdate,
+  handleStaffPasswordUpdate,
   handleStaffSubscriptionAttach,
   handleStaffSubscriptionDetach,
   handleStaffSubscriptionList,

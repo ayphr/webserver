@@ -110,8 +110,12 @@ export function createRequestClient(config: ApiClientConfig = {}) {
 
     let body: BodyInit | undefined;
     if (options.body !== undefined) {
-      headers.set('content-type', 'application/json');
-      body = JSON.stringify(options.body);
+      if (options.body instanceof FormData) {
+        body = options.body;
+      } else {
+        headers.set('content-type', 'application/json');
+        body = JSON.stringify(options.body);
+      }
     }
 
     const response = await fetch(buildUrl(baseUrl, path), {
