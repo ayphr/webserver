@@ -1,4 +1,4 @@
-import { Storage, type SaveOptions } from '@google-cloud/storage';
+import { Storage } from '@google-cloud/storage';
 import { createLogger } from './logger';
 import { GCS_BUCKET, GCS_PROJECT_ID, GCS_PUBLIC_BASE_URL } from '../env';
 
@@ -10,6 +10,12 @@ const log = createLogger('storage');
  * Backed by Google Cloud Storage but exposed through a small provider-agnostic
  * surface so it can be reused for any uploaded file (avatars, exports, etc.)
  * and swapped for another provider later without touching call sites.
+ *
+ * Object transfers use V4 signed URLs (signed locally from the service-account
+ * key, no network) combined with the platform fetch API. The @google-cloud/storage
+ * client's streaming write path is incompatible with Bun and throws
+ * "Cannot call write after a stream was destroyed", so it is only used for
+ * offline URL signing here.
  */
 
 export type PutObjectOptions = {
@@ -45,6 +51,27 @@ function toBuffer(data: Uint8Array | ArrayBuffer): Buffer {
   return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
 }
 
+const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
+
+async function fileSignedUrl(
+  key: string,
+  action: 'read' | 'write' | 'delete',
+  options: { contentType?: string } = {},
+): Promise<string> {
+  const [url] = await getBucket().file(key).getSignedUrl({
+    action,
+    version: 'v4',
+    expires: Date.now() + SIGNED_URL_TTL_MS,
+    contentType: options.contentType,
+  });
+  return url;
+}
+
+async function readErrorDetail(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  return text.trim().slice(0, 512);
+}
+
 export async function putObject(
   key: string,
   data: Uint8Array | ArrayBuffer,
@@ -54,32 +81,32 @@ export async function putObject(
     throw new Error('Object storage is not configured (GCS_BUCKET is unset)');
   }
 
-  const metadata: Record<string, string> = {};
+  const contentType = options.contentType ?? 'application/octet-stream';
+  const headers: Record<string, string> = { 'Content-Type': contentType };
   if (options.cacheControl) {
-    metadata.cacheControl = options.cacheControl;
-  }
-  if (options.metadata) {
-    for (const [metaKey, metaValue] of Object.entries(options.metadata)) {
-      metadata[metaKey] = metaValue;
-    }
+    headers['Cache-Control'] = options.cacheControl;
   }
 
-  const saveOptions: SaveOptions = { resumable: false, validation: false };
-  if (options.contentType) {
-    saveOptions.contentType = options.contentType;
-  }
-  if (Object.keys(metadata).length > 0) {
-    saveOptions.metadata = metadata;
-  }
+  const url = await fileSignedUrl(key, 'write', { contentType });
 
-  await getBucket().file(key).save(toBuffer(data), saveOptions);
+  const response = await fetch(url, { method: 'PUT', headers, body: toBuffer(data) });
+  if (!response.ok) {
+    throw new Error(`Object upload failed (${response.status}): ${await readErrorDetail(response)}`);
+  }
 }
 
 export async function deleteObject(key: string): Promise<void> {
   if (!isStorageConfigured()) return;
 
   try {
-    await getBucket().file(key).delete({ ignoreNotFound: true });
+    const url = await fileSignedUrl(key, 'delete');
+    const response = await fetch(url, { method: 'DELETE' });
+    if (!response.ok && response.status !== 404) {
+      log.warn(
+        { status: response.status, detail: await readErrorDetail(response), key },
+        'delete returned an unexpected status',
+      );
+    }
   } catch (error) {
     log.warn({ error, key }, 'failed to delete object');
   }
@@ -88,21 +115,22 @@ export async function deleteObject(key: string): Promise<void> {
 export async function getObject(key: string): Promise<StoredObject | null> {
   if (!isStorageConfigured()) return null;
 
-  const file = getBucket().file(key);
-
   try {
-    const [exists] = await file.exists();
-    if (!exists) return null;
+    const url = await fileSignedUrl(key, 'read');
+    const response = await fetch(url);
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      log.warn({ status: response.status, detail: await readErrorDetail(response), key }, 'object read failed');
+      return null;
+    }
 
-    const [data] = await file.download();
-    const [metadata] = await file.getMetadata();
-
+    const data = new Uint8Array(await response.arrayBuffer());
     return {
       data,
-      contentType: typeof metadata.contentType === 'string' ? metadata.contentType : undefined,
+      contentType: response.headers.get('Content-Type') ?? undefined,
       size: data.byteLength,
-      updatedAt: metadata.updated ? new Date(metadata.updated) : undefined,
-      etag: typeof metadata.etag === 'string' ? metadata.etag : undefined,
+      updatedAt: undefined,
+      etag: response.headers.get('ETag') ?? undefined,
     };
   } catch (error) {
     log.warn({ error, key }, 'failed to download object');
@@ -111,15 +139,8 @@ export async function getObject(key: string): Promise<StoredObject | null> {
 }
 
 export async function objectExists(key: string): Promise<boolean> {
-  if (!isStorageConfigured()) return false;
-
-  try {
-    const [exists] = await getBucket().file(key).exists();
-    return exists;
-  } catch (error) {
-    log.warn({ error, key }, 'failed to check object existence');
-    return false;
-  }
+  const object = await getObject(key);
+  return object !== null;
 }
 
 /**
