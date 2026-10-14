@@ -1,0 +1,1 @@
+export { DevicesPanel } from './DevicesPanel';

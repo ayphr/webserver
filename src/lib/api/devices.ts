@@ -1,14 +1,12 @@
-import type { DeviceListPayload, DevicePayload } from '../../../common';
+import type { DeviceListPayload, DevicePayload, DeviceTokenPayload } from '../../../common';
 import type { RequestClient } from './client';
 
 export function createDevicesApi(client: RequestClient) {
   return {
-    async register(input: { serial: number; location: { lat: number; lon: number } }) {
-      const response = await client.requestJson<DevicePayload>('/api/devices/register', {
+    async createToken() {
+      return client.requestJson<DeviceTokenPayload>('/api/devices/token', {
         method: 'POST',
-        body: input,
       });
-      return response.device;
     },
     async listMine() {
       const response = await client.requestJson<DeviceListPayload>('/api/devices/mine');

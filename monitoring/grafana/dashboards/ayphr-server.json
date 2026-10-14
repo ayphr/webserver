@@ -23,11 +23,11 @@
     },
     {
       "type": "stat",
-      "title": "Packets / second",
+      "title": "Data points / second",
       "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
       "targets": [
-        { "expr": "sum(rate(ayphr_packets_received_total[5m]))", "legendFormat": "pkt/s" }
+        { "expr": "sum(rate(ayphr_telemetry_records_persisted_total[5m]))", "legendFormat": "points/s" }
       ]
     },
     {
@@ -118,129 +118,79 @@
     },
     {
       "type": "row",
-      "title": "TCP / devices",
+      "title": "Devices / telemetry",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
       "collapsed": false,
       "panels": []
     },
     {
       "type": "timeseries",
-      "title": "TCP connections / second",
+      "title": "Data points accepted / second",
+      "description": "Data points accepted from authenticated device uploads before persistence.",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
-      "targets": [
-        { "expr": "sum(rate(ayphr_tcp_connections_total[5m]))", "legendFormat": "connections/s" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "TCP bytes received / second",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
-      "targets": [
-        { "expr": "sum(rate(ayphr_tcp_bytes_received_total[5m]))", "legendFormat": "bytes/s" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Connection duration percentiles",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 1, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
-      "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_tcp_connection_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.90, sum(rate(ayphr_tcp_connection_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p90" },
-        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_tcp_connection_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Connection errors / second",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
-      "targets": [
-        { "expr": "sum(rate(ayphr_tcp_connection_errors_total[5m])) or vector(0)", "legendFormat": "errors/s" }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "Telemetry pipeline",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "Telemetry throughput",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
-      "targets": [
-        { "expr": "sum(rate(ayphr_telemetry_records_buffered_total[5m]))", "legendFormat": "buffered/s" },
-        { "expr": "sum(rate(ayphr_telemetry_records_flushed_total[5m]))", "legendFormat": "flushed/s" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Redis buffer backlog",
-      "description": "Records waiting in Redis at the last drain. A sustained climb means the database sink is falling behind.",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
       "targets": [
-        { "expr": "ayphr_telemetry_buffer_length", "legendFormat": "backlog" }
+        { "expr": "sum(rate(ayphr_telemetry_records_accepted_total[5m]))", "legendFormat": "accepted/s" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Flush batch size percentiles",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
+      "title": "Data points persisted / second",
+      "description": "Data points written to the database. Uploads replace existing values for the same device and second.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
+      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "targets": [
+        { "expr": "sum(rate(ayphr_telemetry_records_persisted_total[5m]))", "legendFormat": "persisted/s" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Upload batch size percentiles",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_flush_batch_size_bucket[5m])) by (le))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_flush_batch_size_bucket[5m])) by (le))", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_flush_batch_size_bucket[5m])) by (le))", "legendFormat": "p99" }
+        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_upload_batch_size_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_upload_batch_size_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_upload_batch_size_bucket[5m])) by (le))", "legendFormat": "p99" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Flush duration percentiles",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 49 },
+      "title": "Upload duration percentiles",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_flush_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_flush_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_flush_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Telemetry pipeline errors / second",
-      "description": "Enqueue failures lose individual records; drain failures can drop a whole batch.",
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 57 },
+      "title": "Upload errors / second",
+      "description": "Authenticated device uploads that failed to persist.",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 40 },
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "sum(rate(ayphr_telemetry_enqueue_errors_total[5m])) or vector(0)", "legendFormat": "enqueue errors/s" },
-        { "expr": "sum(rate(ayphr_telemetry_drain_errors_total[5m])) or vector(0)", "legendFormat": "drain errors/s" }
+        { "expr": "sum(rate(ayphr_telemetry_upload_errors_total[5m])) or vector(0)", "legendFormat": "errors/s" }
       ]
     },
     {
       "type": "row",
       "title": "System",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 64 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
       "collapsed": false,
       "panels": []
     },
     {
       "type": "timeseries",
       "title": "CPU usage",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 65 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 48 },
       "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
       "targets": [
@@ -250,7 +200,7 @@
     {
       "type": "timeseries",
       "title": "Memory usage",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 65 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 48 },
       "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -261,7 +211,7 @@
     {
       "type": "timeseries",
       "title": "Event loop lag",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 65 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 48 },
       "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -272,7 +222,7 @@
     {
       "type": "timeseries",
       "title": "MongoDB operations",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 73 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
       "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
       "targets": [
@@ -294,5 +244,5 @@
   "timezone": "",
   "title": "ayphr Server",
   "uid": "ayphr-server",
-  "version": 3
+  "version": 4
 }

@@ -8,7 +8,7 @@ import {
   DEFAULT_BIO,
   Markdown,
 } from '@common/utils/markdown';
-import { updateUser, getUserFromUuid } from '../../workers/dbWriter';
+import { updateUser, getUserFromUuid } from '../../lib/db';
 
 type CountryUpdatePayload = {
   country?: string;

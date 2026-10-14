@@ -16,7 +16,7 @@ import {
   getActiveSuspensionForUserUuid,
   getUserFromUsername,
   updateUser,
-} from '../../workers/dbWriter';
+} from '../../lib/db';
 import type { User } from '@common';
 import { normalizeCountryCode } from '../../lib/country';
 import { toPublicUser } from '../../lib/user';

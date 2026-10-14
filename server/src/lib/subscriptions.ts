@@ -1,6 +1,6 @@
 import type { ResolvedSubscription, User } from '@common';
 import { resolveSubscription, getSubscriptionTier } from '@common';
-import { getUserFromUuid } from '../workers/dbWriter';
+import { getUserFromUuid } from './db';
 
 export function getUserSubscription(user: Pick<User, 'paidSubscriptions' | 'attachedSubscriptions'>): ResolvedSubscription | null {
   return resolveSubscription(user);

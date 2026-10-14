@@ -25,7 +25,7 @@ import {
   removePaidSubscription,
   setUserStripeCustomerId,
   upsertPaidSubscription,
-} from '../../workers/dbWriter';
+} from '../../lib/db';
 
 const log = createLogger('stripe-webhook');
 

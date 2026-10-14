@@ -30,82 +30,39 @@ export const httpRequestsInFlight = new Gauge({
 
 export const activeDevices = new Gauge({
   name: 'ayphr_active_devices',
-  help: 'Number of devices currently connected over the TCP listener.',
+  help: 'Devices that uploaded data in the last 24 hours.',
   registers: [registry],
 });
 
-export const packetsReceivedTotal = new Counter({
-  name: 'ayphr_packets_received_total',
-  help: 'Total packets received by the server over the TCP listener.',
+export const telemetryRecordsAcceptedTotal = new Counter({
+  name: 'ayphr_telemetry_records_accepted_total',
+  help: 'Data points accepted from authenticated device uploads.',
   registers: [registry],
 });
 
-export const tcpConnectionsTotal = new Counter({
-  name: 'ayphr_tcp_connections_total',
-  help: 'Total TCP connections accepted by the device listener.',
+export const telemetryRecordsPersistedTotal = new Counter({
+  name: 'ayphr_telemetry_records_persisted_total',
+  help: 'Data points written to the database.',
   registers: [registry],
 });
 
-export const tcpConnectionErrorsTotal = new Counter({
-  name: 'ayphr_tcp_connection_errors_total',
-  help: 'Total socket errors observed on the device listener.',
-  registers: [registry],
-});
-
-export const tcpBytesReceivedTotal = new Counter({
-  name: 'ayphr_tcp_bytes_received_total',
-  help: 'Total raw bytes received over the device listener.',
-  registers: [registry],
-});
-
-export const tcpConnectionDuration = new Histogram({
-  name: 'ayphr_tcp_connection_duration_seconds',
-  help: 'Lifetime of device TCP connections, from accept to close.',
-  buckets: DURATION_BUCKETS,
-  registers: [registry],
-});
-
-export const telemetryRecordsBufferedTotal = new Counter({
-  name: 'ayphr_telemetry_records_buffered_total',
-  help: 'Total telemetry records successfully buffered in Redis.',
-  registers: [registry],
-});
-
-export const telemetryEnqueueErrorsTotal = new Counter({
-  name: 'ayphr_telemetry_enqueue_errors_total',
-  help: 'Total failures buffering a telemetry record in Redis.',
-  registers: [registry],
-});
-
-export const telemetryDrainErrorsTotal = new Counter({
-  name: 'ayphr_telemetry_drain_errors_total',
-  help: 'Total failures draining the telemetry buffer, which risk dropping records.',
-  registers: [registry],
-});
-
-export const telemetryBufferLength = new Gauge({
-  name: 'ayphr_telemetry_buffer_length',
-  help: 'Telemetry records found waiting in the Redis buffer at the last drain.',
-  registers: [registry],
-});
-
-export const telemetryRecordsFlushedTotal = new Counter({
-  name: 'ayphr_telemetry_records_flushed_total',
-  help: 'Total telemetry records handed to the database worker.',
-  registers: [registry],
-});
-
-export const telemetryFlushBatchSize = new Histogram({
-  name: 'ayphr_telemetry_flush_batch_size',
-  help: 'Number of telemetry records per database flush.',
+export const telemetryUploadBatchSize = new Histogram({
+  name: 'ayphr_telemetry_upload_batch_size',
+  help: 'Number of data points per device upload.',
   buckets: COUNT_BUCKETS,
   registers: [registry],
 });
 
-export const telemetryFlushDuration = new Histogram({
-  name: 'ayphr_telemetry_flush_duration_seconds',
-  help: 'Time taken to drain the Redis buffer and dispatch it to the database worker.',
+export const telemetryUploadDuration = new Histogram({
+  name: 'ayphr_telemetry_upload_duration_seconds',
+  help: 'Time taken to persist a device upload.',
   buckets: DURATION_BUCKETS,
+  registers: [registry],
+});
+
+export const telemetryUploadErrorsTotal = new Counter({
+  name: 'ayphr_telemetry_upload_errors_total',
+  help: 'Device uploads that failed to persist.',
   registers: [registry],
 });
 
@@ -120,8 +77,8 @@ export function recordMongoOperation(operation: string, collection: string, coun
   mongoOperationsTotal.inc({ operation, collection }, count);
 }
 
-export function recordActiveDevices(delta: number) {
-  activeDevices.inc(delta);
+export function setActiveDevices(count: number) {
+  activeDevices.set(count);
 }
 
 export async function metricsText(): Promise<string> {

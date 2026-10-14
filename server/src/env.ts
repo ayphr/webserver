@@ -1,20 +1,21 @@
 export const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 export const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'ayphr';
 
-export const TELEMETRY_COLLECTION = 'telemetry';
+export const DATA_POINTS_COLLECTION = 'data_points';
 export const USERS_COLLECTION = 'users';
 export const PUNISHMENTS_COLLECTION = 'punishments';
 export const DEVICES_COLLECTION = 'devices';
+export const DEVICE_CLAIMS_COLLECTION = 'device_claims';
 export const SESSIONS_COLLECTION = 'sessions';
 export const STRIPE_EVENTS_COLLECTION = 'stripe_events';
 export const AVATARS_COLLECTION = 'avatars';
 
-export const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-export const REDIS_BUFFER_KEY = process.env.REDIS_BUFFER_KEY || 'ayphr:telemetry:buffer';
-
-export const TCP_PORT = Number(process.env.TCP_PORT || 7232);
 export const API_PORT = Number(process.env.API_PORT || 7233);
 export const METRICS_PORT = Number(process.env.METRICS_PORT || 7234);
+
+/** How long a freshly generated device claim token stays valid, in minutes. */
+export const DEVICE_TOKEN_TTL_MINUTES = Number(process.env.DEVICE_TOKEN_TTL_MINUTES || 60);
+export const DEVICE_TOKEN_TTL_MS = DEVICE_TOKEN_TTL_MINUTES * 60 * 1000;
 
 export const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'https://ayphr.com,https://www.ayphr.com')
   .split(',')

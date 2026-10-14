@@ -1,4 +1,4 @@
-import type { Device } from './device';
+import type { Device, DeviceSummary } from './device';
 import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
 import type {
@@ -108,11 +108,16 @@ export type PunishmentsMePayload = {
 };
 
 export type DeviceListPayload = {
-  devices: Device[];
+  devices: DeviceSummary[];
 };
 
 export type DevicePayload = {
   device: Device;
+};
+
+export type DeviceTokenPayload = {
+  token: string;
+  expiresAt: Date;
 };
 
 export type PunishmentPayload = {
