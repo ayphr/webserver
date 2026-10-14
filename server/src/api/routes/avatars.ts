@@ -1,7 +1,7 @@
 import { requireAuth } from '../auth';
 import type { RouteParams } from '../types';
-import { deleteAvatar, getAvatar, getUserFromUuid, putAvatar, updateUser } from '../../workers/dbWriter';
-import type { AvatarMetadata } from '../../workers/dbWriter';
+import { deleteAvatar, getAvatar, getUserFromUuid, putAvatar, updateUser } from '../../lib/db';
+import type { AvatarMetadata } from '../../lib/db';
 import { toPublicUser } from '../../lib/user';
 import { createLogger } from '../../lib/logger';
 import { AVATAR_MAX_BYTES, isAllowedAvatarContentType } from '../../lib/avatars';

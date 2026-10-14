@@ -1,5 +1,5 @@
 import { requireAuth } from '../auth';
-import { getPunishmentById, getPunishmentsForUserUuid } from '../../workers/dbWriter';
+import { getPunishmentById, getPunishmentsForUserUuid } from '../../lib/db';
 import { toPublicUser } from '../../lib/user';
 
 function json(body: unknown, status = 200) {

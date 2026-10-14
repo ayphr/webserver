@@ -24,23 +24,6 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  redis:
-    container_name: ayphr-redis
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --maxmemory 512mb --maxmemory-policy noeviction
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - redis_data:/data
-
   server:
     container_name: ayphr-server
     init: true
@@ -59,7 +42,7 @@ services:
     env_file:
       - .env
     ports:
-      - '7232:7232'
+      - '7233:7233'
     healthcheck:
       test:
         - CMD-SHELL
@@ -79,8 +62,6 @@ services:
         hard: 65536
     depends_on:
       mongodb:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   prometheus:
@@ -139,6 +120,5 @@ services:
 
 volumes:
   mongo_data: {}
-  redis_data: {}
   prometheus_data: {}
   grafana_data: {}

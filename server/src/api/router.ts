@@ -27,7 +27,7 @@ import {
   handleStaffUsers,
   handleUsersSummary,
 } from './routes/staff';
-import { handleGetBySerial, handleListMine, handleRegister as handleDeviceRegister } from './routes/devices';
+import { handleCreateToken, handleGetBySerial, handleListMine, handleUpload } from './routes/devices';
 import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
 import { handleUserByUuid, handleMe as handleUsersMe } from './routes/users';
 import {
@@ -87,8 +87,8 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/punishments/me', handle: handlePunishmentsMe },
   { method: 'GET', path: '/api/punishments/:id', handle: handlePunishment },
 
-  { method: 'POST', path: '/api/devices', handle: handleDeviceRegister },
-  { method: 'POST', path: '/api/devices/register', handle: handleDeviceRegister },
+  { method: 'POST', path: '/api/devices/token', handle: handleCreateToken },
+  { method: 'POST', path: '/api/devices/data', handle: handleUpload },
   { method: 'GET', path: '/api/devices', handle: handleListMine },
   { method: 'GET', path: '/api/devices/mine', handle: handleListMine },
   { method: 'GET', path: '/api/devices/:serial', handle: handleGetBySerial },

@@ -1,5 +1,5 @@
 import { requireAuth } from '../auth';
-import { getActiveSuspensionForUserUuid, getUserFromUuid } from '../../workers/dbWriter';
+import { getActiveSuspensionForUserUuid, getUserFromUuid } from '../../lib/db';
 import { getPolicyStatus } from '../../lib/policies';
 import { toPublicUser } from '../../lib/user';
 

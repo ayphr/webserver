@@ -6,6 +6,7 @@ import type { Punishment, PublicUser } from '../../../common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
+import { DevicesPanel } from '../../components/devices';
 import { SettingsPanel, SessionsModal, ChangePasswordModal } from '../../components/settings';
 import { SubscriptionPanel } from '../../components/subscriptions';
 import { UsersPanel } from '../../components/staff';
@@ -447,7 +448,7 @@ export const DashboardPage = () => {
                   <p>Ayphr devices registered to your account</p>
                 </CardHeader>
                 <CardBody>
-                  <p>No devices registered.</p>
+                  <DevicesPanel />
                 </CardBody>
               </Card>
             )}

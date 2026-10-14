@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
-import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../workers/dbWriter';
+import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../lib/db';
 import type { AttachedSubscription, Punishment, SubscriptionSource, SubscriptionTier, User, UserRole } from '@common';
 import { isSubscriptionTier, resolveSubscription } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';

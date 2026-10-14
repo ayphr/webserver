@@ -1,5 +1,5 @@
 import { getBearerToken, requireAuth } from '../auth';
-import { deleteSession, getSessionById, getSessionsForUserUuid } from '../../workers/dbWriter';
+import { deleteSession, getSessionById, getSessionsForUserUuid } from '../../lib/db';
 import { hashToken } from '../../lib/tokens';
 import type { SessionInfo } from '@common';
 

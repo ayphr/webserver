@@ -12,7 +12,7 @@ import {
   updateSessionLastActive,
   updateUser,
   updateUserLastActive,
-} from '../workers/dbWriter';
+} from '../lib/db';
 import { getPolicyStatus } from '../lib/policies';
 import { hashToken } from '../lib/tokens';
 import { isSessionDeviceType, parseUserAgent, resolveLocationFromClient } from '../lib/session';

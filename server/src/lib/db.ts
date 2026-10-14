@@ -1,13 +1,13 @@
 import { Binary, Collection, Db, MongoClient, type Filter } from 'mongodb';
-import { createLogger } from '../lib/logger';
-import { recordMongoOperation } from '../lib/metrics';
-import type { TelemetryRecord } from '../lib/telemetry';
-import { type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription } from '@common';
+import { createLogger } from './logger';
+import { recordMongoOperation } from './metrics';
+import { type DataPoint, type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription } from '@common';
 import {
-  TELEMETRY_COLLECTION,
+  DATA_POINTS_COLLECTION,
   USERS_COLLECTION,
   PUNISHMENTS_COLLECTION,
   DEVICES_COLLECTION,
+  DEVICE_CLAIMS_COLLECTION,
   SESSIONS_COLLECTION,
   STRIPE_EVENTS_COLLECTION,
   AVATARS_COLLECTION,
@@ -15,19 +15,43 @@ import {
   MONGO_DB_NAME
 } from '../env';
 
-const log = createLogger('db-worker');
+const log = createLogger('db');
 
 const ISO_8601_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/;
+
+/** A data point as stored, keyed by device serial and timestamp. */
+export type DataPointDocument = DataPoint & {
+  deviceSerial: number;
+};
+
+/** A device as stored, including the secret token hash that is never exposed. */
+export type DeviceDocument = Device & {
+  tokenHash: string;
+  tokenCreatedAt: Date;
+};
+
+/**
+ * A one-time token generated from the dashboard so a device can claim itself on
+ * first upload. Only one claim may be pending per account at a time.
+ */
+export type DeviceClaim = {
+  ownerUuid: string;
+  ownerUsername: string;
+  tokenHash: string;
+  createdAt: Date;
+  expiresAt: Date;
+};
 
 let client: MongoClient | null = null;
 let database: Db | null = null;
 let connectPromise: Promise<Db> | null = null;
 
 interface Collections {
-  telemetry: Collection<TelemetryRecord>;
+  dataPoints: Collection<DataPointDocument>;
   users: Collection<User>;
   punishments: Collection<Punishment>;
-  devices: Collection<Device>;
+  devices: Collection<DeviceDocument>;
+  deviceClaims: Collection<DeviceClaim>;
   sessions: Collection<Session>;
   stripeEvents: Collection<{ id: string; type: string; createdAt: Date }>;
   avatars: Collection<StoredAvatar>;
@@ -43,32 +67,8 @@ export interface StoredAvatar {
 
 let collections: Collections | null = null;
 
-type MongoOperationTally = { operation: string; collection: string; count: number };
-
-let pendingMongoOperations = new Map<string, MongoOperationTally>();
-
 function trackMongoOperation(operation: string, collection: string) {
   recordMongoOperation(operation, collection);
-
-  const key = `${operation}\u0000${collection}`;
-  const existing = pendingMongoOperations.get(key);
-
-  if (existing) {
-    existing.count += 1;
-  } else {
-    pendingMongoOperations.set(key, { operation, collection, count: 1 });
-  }
-}
-
-/**
- * The db worker thread keeps its own prom-client registry that is never scraped,
- * so operations issued there are forwarded to the main thread and replayed into
- * the registry that `/metrics` actually serves.
- */
-export function drainMongoOperations(): MongoOperationTally[] {
-  const drained = [...pendingMongoOperations.values()];
-  pendingMongoOperations = new Map();
-  return drained;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -106,31 +106,31 @@ async function setupCollections(db: Db): Promise<Collections> {
   const existingCollections = await db.collections();
   const existingNames = new Set(existingCollections.map((c) => c.collectionName));
 
-  // Initialize time-series telemetry collection if missing
-  if (!existingNames.has(TELEMETRY_COLLECTION)) {
+  if (!existingNames.has(DATA_POINTS_COLLECTION)) {
     try {
-      trackMongoOperation('createCollection', TELEMETRY_COLLECTION);
-      await db.createCollection(TELEMETRY_COLLECTION, {
-        timeseries: { timeField: 'timestamp', metaField: 'deviceId', granularity: 'seconds' }
-      });
-      log.info({ collection: TELEMETRY_COLLECTION }, 'created timeseries collection');
+      trackMongoOperation('createCollection', DATA_POINTS_COLLECTION);
+      await db.createCollection(DATA_POINTS_COLLECTION);
+      log.info({ collection: DATA_POINTS_COLLECTION }, 'created data points collection');
     } catch (error) {
-      log.warn({ error, collection: TELEMETRY_COLLECTION }, 'could not create collection');
+      log.warn({ error, collection: DATA_POINTS_COLLECTION }, 'could not create collection');
     }
   }
 
   const cols: Collections = {
-    telemetry: db.collection<TelemetryRecord>(TELEMETRY_COLLECTION),
+    dataPoints: db.collection<DataPointDocument>(DATA_POINTS_COLLECTION),
     users: db.collection<User>(USERS_COLLECTION),
     punishments: db.collection<Punishment>(PUNISHMENTS_COLLECTION),
-    devices: db.collection<Device>(DEVICES_COLLECTION),
+    devices: db.collection<DeviceDocument>(DEVICES_COLLECTION),
+    deviceClaims: db.collection<DeviceClaim>(DEVICE_CLAIMS_COLLECTION),
     sessions: db.collection<Session>(SESSIONS_COLLECTION),
     stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION),
     avatars: db.collection<StoredAvatar>(AVATARS_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
-    [TELEMETRY_COLLECTION, () => cols.telemetry.createIndex({ deviceId: 1 })],
+    // One document per device per second; uploads replace the value at that second.
+    [DATA_POINTS_COLLECTION, () => cols.dataPoints.createIndex({ deviceSerial: 1, timestamp: 1 }, { unique: true })],
+    [DATA_POINTS_COLLECTION, () => cols.dataPoints.createIndex({ timestamp: -1 })],
     [USERS_COLLECTION, () => cols.users.createIndex({ uuid: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ username: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ stripeCustomerId: 1 }, { sparse: true })],
@@ -139,6 +139,16 @@ async function setupCollections(db: Db): Promise<Collections> {
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ ownerUuid: 1 })],
+    [DEVICES_COLLECTION, () => cols.devices.createIndex(
+      { tokenHash: 1 },
+      { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
+    )],
+    [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex({ ownerUuid: 1 }, { unique: true })],
+    [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex(
+      { tokenHash: 1 },
+      { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
+    )],
+    [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 })],
   ];
@@ -237,15 +247,76 @@ async function getCols(): Promise<Collections> {
   return collections ?? connect();
 }
 
-export async function flushRecords(records: TelemetryRecord[]): Promise<number> {
-  const { telemetry } = await getCols();
-  const documents = records.map((record) => normalizeDateValues(record));
+export async function upsertDataPoints(deviceSerial: number, points: DataPoint[]): Promise<number> {
+  if (points.length === 0) return 0;
 
-  if (documents.length === 0) return 0;
+  const { dataPoints } = await getCols();
+  const operations = points.map((point) => ({
+    updateOne: {
+      filter: { deviceSerial, timestamp: point.timestamp },
+      update: {
+        $set: {
+          temperature: point.temperature,
+          humidity: point.humidity,
+          airPressure: point.airPressure,
+        },
+      },
+      upsert: true,
+    },
+  }));
 
-  trackMongoOperation('insertMany', TELEMETRY_COLLECTION);
-  const result = await telemetry.insertMany(documents);
-  return result.insertedCount;
+  trackMongoOperation('bulkWrite', DATA_POINTS_COLLECTION);
+  await dataPoints.bulkWrite(operations);
+  return points.length;
+}
+
+export type DataPointStats = {
+  count: number;
+  latest: DataPoint | null;
+};
+
+export async function getDataPointStats(serials: number[]): Promise<Map<number, DataPointStats>> {
+  if (serials.length === 0) return new Map();
+
+  const { dataPoints } = await getCols();
+  trackMongoOperation('aggregate', DATA_POINTS_COLLECTION);
+
+  const rows = await dataPoints
+    .aggregate<{ _id: number; count: number; latest: DataPointDocument }>([
+      { $match: { deviceSerial: { $in: serials } } },
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: '$deviceSerial',
+          count: { $sum: 1 },
+          latest: { $first: '$$ROOT' },
+        },
+      },
+    ])
+    .toArray();
+
+  const stats = new Map<number, DataPointStats>();
+  for (const row of rows) {
+    stats.set(row._id, {
+      count: row.count,
+      latest: row.latest
+        ? {
+            timestamp: row.latest.timestamp,
+            temperature: row.latest.temperature,
+            humidity: row.latest.humidity,
+            airPressure: row.latest.airPressure,
+          }
+        : null,
+    });
+  }
+
+  return stats;
+}
+
+export async function countActiveDevices(since: Date): Promise<number> {
+  const { devices } = await getCols();
+  trackMongoOperation('countDocuments', DEVICES_COLLECTION);
+  return devices.countDocuments({ lastUploadAt: { $gte: since } });
 }
 
 export async function createUser(user: User) {
@@ -306,9 +377,11 @@ export async function deletePunishmentsForUserUuid(userUuid: string) {
 }
 
 export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
-  const { devices } = await getCols();
+  const { devices, deviceClaims } = await getCols();
   trackMongoOperation('deleteMany', DEVICES_COLLECTION);
   await devices.deleteMany({ ownerUuid });
+  trackMongoOperation('deleteOne', DEVICE_CLAIMS_COLLECTION);
+  await deviceClaims.deleteOne({ ownerUuid });
 }
 
 export async function getUserFromUuid(uuid: string) {
@@ -583,7 +656,7 @@ export async function updatePunishment(punishment: Punishment) {
   return normalizedPunishment;
 }
 
-export async function createDevice(device: Device) {
+export async function createDevice(device: DeviceDocument) {
   const { devices } = await getCols();
   const normalizedDevice = normalizeDateValues(device);
   trackMongoOperation('insertOne', DEVICES_COLLECTION);
@@ -597,24 +670,48 @@ export async function getDeviceBySerial(serial: number) {
   return devices.findOne({ serial });
 }
 
-export async function updateDevice(device: Device) {
-  const { devices } = await getCols();
-  const normalizedDevice = normalizeDateValues(device);
-  trackMongoOperation('updateOne', DEVICES_COLLECTION);
-  await devices.updateOne({ serial: device.serial }, { $set: normalizedDevice });
-  return normalizedDevice;
-}
-
 export async function getDevicesForOwnerUuid(ownerUuid: string) {
   const { devices } = await getCols();
   trackMongoOperation('find', DEVICES_COLLECTION);
   return devices.find({ ownerUuid }).sort({ registeredAt: -1 }).toArray();
 }
 
-export async function updateDeviceLastBroadcast(serial: number, when: Date) {
+export async function updateDeviceLastUpload(serial: number, when: Date) {
   const { devices } = await getCols();
   trackMongoOperation('updateOne', DEVICES_COLLECTION);
-  await devices.updateOne({ serial }, { $set: { lastBroadcastedAt: when } as Record<string, unknown> });
+  await devices.updateOne({ serial }, { $set: { lastUploadAt: when } });
+}
+
+/** Strips the secret token fields before a device is returned to a client. */
+export function toPublicDevice(device: DeviceDocument): Device {
+  const publicDevice: Device & { tokenHash?: string; tokenCreatedAt?: Date } = { ...device };
+  delete publicDevice.tokenHash;
+  delete publicDevice.tokenCreatedAt;
+  return publicDevice;
+}
+
+export async function setDeviceClaim(claim: DeviceClaim) {
+  const { deviceClaims } = await getCols();
+  const normalizedClaim = normalizeDateValues(claim);
+  trackMongoOperation('updateOne', DEVICE_CLAIMS_COLLECTION);
+  await deviceClaims.updateOne(
+    { ownerUuid: claim.ownerUuid },
+    { $set: normalizedClaim },
+    { upsert: true }
+  );
+  return normalizedClaim;
+}
+
+export async function getDeviceClaimByTokenHash(tokenHash: string) {
+  const { deviceClaims } = await getCols();
+  trackMongoOperation('findOne', DEVICE_CLAIMS_COLLECTION);
+  return deviceClaims.findOne({ tokenHash });
+}
+
+export async function deleteDeviceClaim(ownerUuid: string) {
+  const { deviceClaims } = await getCols();
+  trackMongoOperation('deleteOne', DEVICE_CLAIMS_COLLECTION);
+  await deviceClaims.deleteOne({ ownerUuid });
 }
 
 export async function createSession(session: Session) {
