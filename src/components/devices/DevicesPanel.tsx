@@ -91,9 +91,6 @@ export const DevicesPanel = () => {
   return (
     <div className="devices">
       <div className="devices__toolbar">
-        <p className="devices__hint">
-          Devices upload their readings over the API using a device token.
-        </p>
         <div className="devices__actions">
           <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
             <IconRefresh size={16} strokeWidth={1.75} />
@@ -119,7 +116,7 @@ export const DevicesPanel = () => {
         <div className="devices__empty">
           <IconDatabase size={28} strokeWidth={1.5} />
           <h3>No devices yet</h3>
-          <p>Click “Add device” to generate a token and register your first device.</p>
+          <p>Click "Add device" to generate a token and register your first device.</p>
         </div>
       ) : (
         <ul className="devices__list">
@@ -148,8 +145,7 @@ export const DevicesPanel = () => {
       >
         <div className="devices__token">
           <p>
-            Enter this one-time token on your device. The device is registered to your
-            account the first time it uploads data with it.
+            Enter this one-time token in device setup. It will be registered the first time it uploads data.
           </p>
           <div className="devices__token-row">
             <code className="devices__token-value">{token?.token}</code>
@@ -160,8 +156,7 @@ export const DevicesPanel = () => {
           </div>
           {token && (
             <p className="devices__token-expiry">
-              Expires {formatDateTime(token.expiresAt)}. Only one token can be pending per
-              account, so generating a new one replaces this.
+              Expires {formatDateTime(token.expiresAt)}
             </p>
           )}
         </div>
