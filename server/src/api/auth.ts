@@ -15,6 +15,7 @@ import {
 } from '../lib/db';
 import { getPolicyStatus } from '../lib/policies';
 import { hashToken } from '../lib/tokens';
+import { getAuthEntry, setAuthEntry } from '../lib/authCache';
 import { isSessionDeviceType, parseUserAgent, resolveLocationFromClient } from '../lib/session';
 import type { RouteParams } from './types';
 
@@ -98,6 +99,10 @@ export async function startSession(user: User, request: Request, meta: ClientSes
   user.lastActive = now;
   await updateUserLastActive(user.uuid, now);
 
+  // Warm the auth cache so the client's first authenticated request does not
+  // have to round-trip to MongoDB.
+  await setAuthEntry(session.tokenHash, { session, user });
+
   return token;
 }
 
@@ -133,30 +138,52 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
 
   if (!token) return null;
 
-  const session = await getSessionByTokenHash(hashToken(token));
-  if (!session) return null;
+  const tokenHash = hashToken(token);
+  const cached = await getAuthEntry(tokenHash);
 
-  if (Date.now() > session.expiresAt.getTime()) {
-    await deleteSession(session.id);
-    return null;
-  }
+  let session: Session;
+  let user: User;
 
-  const user = await getUserFromUuid(session.userUuid);
-  if (!user) {
-    await deleteSession(session.id);
-    return null;
+  if (cached) {
+    ({ session, user } = cached);
+
+    if (Date.now() > session.expiresAt.getTime()) return null;
+  } else {
+    const storedSession = await getSessionByTokenHash(tokenHash);
+    if (!storedSession) return null;
+
+    if (Date.now() > storedSession.expiresAt.getTime()) {
+      await deleteSession(storedSession.id);
+      return null;
+    }
+
+    const storedUser = await getUserFromUuid(storedSession.userUuid);
+    if (!storedUser) {
+      await deleteSession(storedSession.id);
+      return null;
+    }
+
+    session = storedSession;
+    user = storedUser;
+    await setAuthEntry(tokenHash, { session, user });
   }
 
   const now = new Date();
+  let cacheDirty = false;
 
   if (now.getTime() - session.lastActive.getTime() > SESSION_ACTIVITY_THRESHOLD_MS) {
+    session.lastActive = now;
     await updateSessionLastActive(session.id, now);
+    cacheDirty = true;
   }
 
   if (now.getTime() - user.lastActive.getTime() > SESSION_ACTIVITY_THRESHOLD_MS) {
     user.lastActive = now;
     await updateUserLastActive(user.uuid, now);
+    cacheDirty = true;
   }
+
+  if (cacheDirty) await setAuthEntry(tokenHash, { session, user });
 
   return user;
 }

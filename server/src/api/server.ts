@@ -3,6 +3,7 @@ import { resolveRoute } from './router';
 import { addCorsHeaders, SECURITY_HEADERS } from './routes/util';
 import { setClientIp } from '../lib/requestContext';
 import { createLogger } from '../lib/logger';
+import { TRUST_PROXY } from '../env';
 import {
   httpRequestDuration,
   httpRequestsTotal,
@@ -12,6 +13,14 @@ import {
 } from '../lib/metrics';
 
 const log = createLogger('http');
+
+function resolveClientIp(request: Request, socketIp: string | null): string | null {
+  if (!TRUST_PROXY) return socketIp;
+
+  const forwarded = request.headers.get('x-forwarded-for');
+  const first = forwarded?.split(',')[0]?.trim();
+  return first || socketIp;
+}
 
 function getRequestBaseOrigin(request: Request): string {
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
@@ -41,7 +50,7 @@ export function setupServer(port: number, callback: () => void): Server<undefine
 
     async fetch(request) {
       const normalized = normalizeRequest(request);
-      setClientIp(normalized, server.requestIP(request)?.address ?? null);
+      setClientIp(normalized, resolveClientIp(request, server.requestIP(request)?.address ?? null));
       const method = normalized.method;
       const { template, dispatch } = resolveRoute(normalized);
 

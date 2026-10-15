@@ -73,6 +73,13 @@ export const mongoOperationsTotal = new Counter({
   registers: [registry],
 });
 
+export const cacheOperationsTotal = new Counter({
+  name: 'ayphr_cache_operations_total',
+  help: 'Redis cache operations by result (hit, miss, set, del, error).',
+  labelNames: ['cache', 'result'],
+  registers: [registry],
+});
+
 export function recordMongoOperation(operation: string, collection: string, count = 1) {
   mongoOperationsTotal.inc({ operation, collection }, count);
 }

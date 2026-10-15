@@ -1,4 +1,5 @@
 import { createLogger } from './logger';
+import { redisFixedWindow } from './redis';
 
 const log = createLogger('rate-limit');
 
@@ -8,7 +9,7 @@ export type RateLimitResult = {
 };
 
 export type RateLimiter = {
-  check: (key: string) => RateLimitResult;
+  check: (key: string) => Promise<RateLimitResult>;
 };
 
 type Bucket = {
@@ -18,8 +19,11 @@ type Bucket = {
 
 const CLEANUP_INTERVAL_MS = 60_000;
 
+const NAMESPACE = 'ayphr:cache:ratelimit';
+
 export function createRateLimiter(windowMs: number, max: number): RateLimiter {
   const buckets = new Map<string, Bucket>();
+  const prefix = `${NAMESPACE}:${windowMs}:${max}`;
 
   const cleanup = setInterval(() => {
     const now = Date.now();
@@ -30,22 +34,36 @@ export function createRateLimiter(windowMs: number, max: number): RateLimiter {
 
   cleanup.unref?.();
 
-  return {
-    check(key: string): RateLimitResult {
-      const now = Date.now();
-      const bucket = buckets.get(key);
+  function checkLocal(key: string): RateLimitResult {
+    const now = Date.now();
+    const bucket = buckets.get(key);
 
-      if (!bucket || now >= bucket.resetAt) {
-        buckets.set(key, { count: 1, resetAt: now + windowMs });
-        return { allowed: true, retryAfterMs: 0 };
-      }
-
-      if (bucket.count >= max) {
-        return { allowed: false, retryAfterMs: bucket.resetAt - now };
-      }
-
-      bucket.count += 1;
+    if (!bucket || now >= bucket.resetAt) {
+      buckets.set(key, { count: 1, resetAt: now + windowMs });
       return { allowed: true, retryAfterMs: 0 };
+    }
+
+    if (bucket.count >= max) {
+      return { allowed: false, retryAfterMs: bucket.resetAt - now };
+    }
+
+    bucket.count += 1;
+    return { allowed: true, retryAfterMs: 0 };
+  }
+
+  return {
+    async check(key: string): Promise<RateLimitResult> {
+      try {
+        const { count, retryAfterMs } = await redisFixedWindow(`${prefix}:${key}`, windowMs);
+
+        if (count > max) {
+          return { allowed: false, retryAfterMs };
+        }
+
+        return { allowed: true, retryAfterMs: 0 };
+      } catch {
+        return checkLocal(key);
+      }
     },
   };
 }

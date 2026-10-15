@@ -1,12 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { requireAuth } from '../auth';
 import {
+  cacheDevice,
   createDevice,
   deleteDeviceClaim,
   getDataPointStats,
   getDeviceBySerial,
   getDeviceClaimByTokenHash,
   getDevicesForOwnerUuid,
+  invalidateDeviceCachesForOwner,
   setDeviceClaim,
   toPublicDevice,
   updateDeviceLastUpload,
@@ -143,7 +145,7 @@ const handleCreateToken = requireAuth(async (_request, user: User) => {
 
 const handleListMine = requireAuth(async (_request, user: User) => {
   const devices = await getDevicesForOwnerUuid(user.uuid);
-  const stats = await getDataPointStats(devices.map((device) => device.serial));
+  const stats = await getDataPointStats(devices.map((device) => device.serial), user.uuid);
 
   const summaries: DeviceSummary[] = devices.map((device) => {
     const stat = stats.get(device.serial);
@@ -229,8 +231,14 @@ async function handleUpload(request: Request): Promise<Response> {
       }
     }
 
-    const accepted = await upsertDataPoints(serial, points);
-    await updateDeviceLastUpload(serial, now);
+    const [accepted] = await Promise.all([
+      upsertDataPoints(serial, points),
+      updateDeviceLastUpload(serial, now),
+    ]);
+
+    device.lastUploadAt = now;
+    await cacheDevice(device);
+    await invalidateDeviceCachesForOwner(device.ownerUuid);
 
     telemetryRecordsAcceptedTotal.inc(points.length);
     telemetryRecordsPersistedTotal.inc(accepted);

@@ -65,7 +65,7 @@ function isDuplicateKeyError(error: unknown): boolean {
 }
 
 async function handleRegister(request: Request) {
-  const ipCheck = registerLimiter.check(`ip:${getClientIp(request)}`);
+  const ipCheck = await registerLimiter.check(`ip:${getClientIp(request)}`);
   if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
 
   const body = await readJsonBody(request);
@@ -142,7 +142,7 @@ async function handleRegister(request: Request) {
 }
 
 async function handleLogin(request: Request) {
-  const ipCheck = loginLimiter.check(`ip:${getClientIp(request)}`);
+  const ipCheck = await loginLimiter.check(`ip:${getClientIp(request)}`);
   if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
 
   const body = await readJsonBody(request);
@@ -154,7 +154,7 @@ async function handleLogin(request: Request) {
   const username = body.username.trim();
   const password = body.password.trim();
 
-  const userCheck = loginLimiter.check(`user:${username.toLowerCase()}`);
+  const userCheck = await loginLimiter.check(`user:${username.toLowerCase()}`);
   if (!userCheck.allowed) return tooManyRequests(userCheck.retryAfterMs);
 
   const user = await getUserFromUsername(username);

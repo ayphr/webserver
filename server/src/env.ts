@@ -1,5 +1,10 @@
 export const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 export const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'ayphr';
+export const MONGO_MAX_POOL_SIZE = Number(process.env.MONGO_MAX_POOL_SIZE || 100);
+
+export const REDIS_URL = process.env.REDIS_URL || '';
+
+export const TRUST_PROXY = process.env.TRUST_PROXY === 'true';
 
 export const DATA_POINTS_COLLECTION = 'data_points';
 export const USERS_COLLECTION = 'users';
@@ -13,7 +18,6 @@ export const AVATARS_COLLECTION = 'avatars';
 export const API_PORT = Number(process.env.API_PORT || 7233);
 export const METRICS_PORT = Number(process.env.METRICS_PORT || 7234);
 
-/** How long a freshly generated device claim token stays valid, in minutes. */
 export const DEVICE_TOKEN_TTL_MINUTES = Number(process.env.DEVICE_TOKEN_TTL_MINUTES || 60);
 export const DEVICE_TOKEN_TTL_MS = DEVICE_TOKEN_TTL_MINUTES * 60 * 1000;
 
