@@ -12,8 +12,11 @@ import {
   STRIPE_EVENTS_COLLECTION,
   AVATARS_COLLECTION,
   MONGO_URI,
-  MONGO_DB_NAME
+  MONGO_DB_NAME,
+  MONGO_MAX_POOL_SIZE
 } from '../env';
+import { cacheDel, cacheGet, cacheSet } from './cache';
+import { invalidateAuthEntries } from './authCache';
 
 const log = createLogger('db');
 
@@ -69,6 +72,43 @@ let collections: Collections | null = null;
 
 function trackMongoOperation(operation: string, collection: string) {
   recordMongoOperation(operation, collection);
+}
+
+// ---------------------------------------------------------------------------
+// Redis cache integration.
+//
+// Reads are cache-through: Redis first, MongoDB on a miss. Every write path in
+// this module invalidates or refreshes the keys it affects. All cache helpers
+// are fail-soft, so a Redis outage degrades to uncached MongoDB access.
+// ---------------------------------------------------------------------------
+
+const USER_CACHE = 'user';
+const USER_CACHE_TTL_SECONDS = 60;
+
+const SUSPENSION_CACHE = 'suspension';
+const SUSPENSION_CACHE_TTL_SECONDS = 15;
+
+const DEVICE_CACHE = 'device';
+const DEVICE_CACHE_TTL_SECONDS = 60;
+const DEVICE_NEGATIVE_TTL_SECONDS = 5;
+
+const DEVICE_LIST_CACHE = 'device_list';
+const DEVICE_LIST_CACHE_TTL_SECONDS = 30;
+
+const DEVICE_STATS_CACHE = 'device_stats';
+const DEVICE_STATS_CACHE_TTL_SECONDS = 30;
+
+/** Sentinel cached in place of a null result so negative lookups are cached too. */
+const NONE = 'none';
+
+const userCacheKey = (uuid: string) => `user:${uuid}`;
+const suspensionCacheKey = (uuid: string) => `suspension:${uuid}`;
+const deviceCacheKey = (serial: number) => `device:${serial}`;
+const deviceListCacheKey = (ownerUuid: string) => `device_list:${ownerUuid}`;
+const deviceStatsCacheKey = (ownerUuid: string) => `device_stats:${ownerUuid}`;
+
+async function invalidateUserCache(uuid: string): Promise<void> {
+  await cacheDel(USER_CACHE, userCacheKey(uuid));
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -221,7 +261,7 @@ export async function connect(): Promise<Collections> {
   if (collections) return collections;
 
   connectPromise ??= (async () => {
-      client = new MongoClient(MONGO_URI);
+      client = new MongoClient(MONGO_URI, { maxPoolSize: MONGO_MAX_POOL_SIZE });
       await client.connect();
       database = client.db(MONGO_DB_NAME);
       collections = await setupCollections(database);
@@ -275,8 +315,19 @@ export type DataPointStats = {
   latest: DataPoint | null;
 };
 
-export async function getDataPointStats(serials: number[]): Promise<Map<number, DataPointStats>> {
+export async function getDataPointStats(
+  serials: number[],
+  ownerCacheKey?: string,
+): Promise<Map<number, DataPointStats>> {
   if (serials.length === 0) return new Map();
+
+  if (ownerCacheKey) {
+    const cached = await cacheGet<Array<[number, DataPointStats]>>(
+      DEVICE_STATS_CACHE,
+      deviceStatsCacheKey(ownerCacheKey),
+    );
+    if (cached) return new Map(cached);
+  }
 
   const { dataPoints } = await getCols();
   trackMongoOperation('aggregate', DATA_POINTS_COLLECTION);
@@ -310,6 +361,15 @@ export async function getDataPointStats(serials: number[]): Promise<Map<number, 
     });
   }
 
+  if (ownerCacheKey) {
+    await cacheSet(
+      DEVICE_STATS_CACHE,
+      deviceStatsCacheKey(ownerCacheKey),
+      [...stats],
+      DEVICE_STATS_CACHE_TTL_SECONDS,
+    );
+  }
+
   return stats;
 }
 
@@ -331,6 +391,8 @@ export async function deleteUser(uuid: string) {
   const { users } = await getCols();
   trackMongoOperation('deleteOne', USERS_COLLECTION);
   await users.deleteOne({ uuid });
+  await invalidateUserCache(uuid);
+  await invalidateAuthEntries();
 }
 
 export type AvatarMetadata = {
@@ -374,20 +436,40 @@ export async function deletePunishmentsForUserUuid(userUuid: string) {
   const { punishments } = await getCols();
   trackMongoOperation('deleteMany', PUNISHMENTS_COLLECTION);
   await punishments.deleteMany({ userUuid });
+  await cacheDel(SUSPENSION_CACHE, suspensionCacheKey(userUuid));
 }
 
 export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
   const { devices, deviceClaims } = await getCols();
+
+  // Collect serials before deleting so their cache entries can be dropped.
+  trackMongoOperation('find', DEVICES_COLLECTION);
+  const existing = await devices.find({ ownerUuid }, { projection: { serial: 1, _id: 0 } }).toArray();
+
   trackMongoOperation('deleteMany', DEVICES_COLLECTION);
   await devices.deleteMany({ ownerUuid });
   trackMongoOperation('deleteOne', DEVICE_CLAIMS_COLLECTION);
   await deviceClaims.deleteOne({ ownerUuid });
+
+  await cacheDel(
+    DEVICE_CACHE,
+    ...existing.map((device) => deviceCacheKey(device.serial)),
+    deviceListCacheKey(ownerUuid),
+    deviceStatsCacheKey(ownerUuid),
+  );
 }
 
 export async function getUserFromUuid(uuid: string) {
+  const cached = await cacheGet<User>(USER_CACHE, userCacheKey(uuid));
+  if (cached) return cached;
+
   const { users } = await getCols();
   trackMongoOperation('findOne', USERS_COLLECTION);
-  return users.findOne({ uuid });
+  const user = await users.findOne({ uuid });
+  if (user) {
+    await cacheSet(USER_CACHE, userCacheKey(uuid), user, USER_CACHE_TTL_SECONDS);
+  }
+  return user;
 }
 
 export async function getUserFromUsername(username: string) {
@@ -470,6 +552,9 @@ export async function updateUser(user: User, unsetKeys: string[] = []) {
 
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid: user.uuid }, update);
+  // Profile/role/password mutations must be visible to every instance at once.
+  await invalidateUserCache(user.uuid);
+  await invalidateAuthEntries();
   return normalizedUser;
 }
 
@@ -477,6 +562,9 @@ export async function updateUserLastActive(uuid: string, when: Date) {
   const { users } = await getCols();
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid }, { $set: { lastActive: when } });
+  // Hot path (once per user per minute): refresh only that user's cached copy,
+  // never the global auth generation.
+  await invalidateUserCache(uuid);
 }
 
 export async function updateUserRole(userUuid: string, role: UserRole) {
@@ -487,6 +575,8 @@ export async function updateUserRole(userUuid: string, role: UserRole) {
     { $set: { role } },
     { returnDocument: 'after' }
   );
+  await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
   return result;
 }
 
@@ -524,6 +614,7 @@ export async function setUserStripeCustomerId(userUuid: string, stripeCustomerId
   const { users } = await getCols();
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid: userUuid }, { $set: { stripeCustomerId } });
+  await invalidateUserCache(userUuid);
 }
 
 export async function recordStripeEvent(eventId: string, type: string) {
@@ -555,6 +646,8 @@ export async function upsertPaidSubscription(userUuid: string, subscription: Pai
     { $push: { paidSubscriptions: normalizedSubscription } }
   );
 
+  await invalidateUserCache(userUuid);
+
   return normalizedSubscription;
 }
 
@@ -565,6 +658,7 @@ export async function removePaidSubscription(userUuid: string, stripeSubscriptio
     { uuid: userUuid },
     { $pull: { paidSubscriptions: { stripeSubscriptionId } } }
   );
+  await invalidateUserCache(userUuid);
 }
 
 export async function addAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
@@ -577,6 +671,8 @@ export async function addAttachedSubscription(userUuid: string, subscription: At
     { $push: { attachedSubscriptions: normalizedSubscription } }
   );
 
+  await invalidateUserCache(userUuid);
+
   return normalizedSubscription;
 }
 
@@ -587,6 +683,7 @@ export async function removeAttachedSubscription(userUuid: string, subscriptionI
     { uuid: userUuid },
     { $pull: { attachedSubscriptions: { id: subscriptionId } } }
   );
+  await invalidateUserCache(userUuid);
 }
 
 export async function updateAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
@@ -602,7 +699,12 @@ export async function updateAttachedSubscription(userUuid: string, subscription:
     { $set: { 'attachedSubscriptions.$': normalizedSubscription } }
   );
 
-  return result.matchedCount > 0 ? normalizedSubscription : null;
+  if (result.matchedCount > 0) {
+    await invalidateUserCache(userUuid);
+    return normalizedSubscription;
+  }
+
+  return null;
 }
 
 export async function createPunishment(punishment: Punishment) {
@@ -610,6 +712,7 @@ export async function createPunishment(punishment: Punishment) {
   const normalizedPunishment = normalizeDateValues(punishment);
   trackMongoOperation('insertOne', PUNISHMENTS_COLLECTION);
   await punishments.insertOne(normalizedPunishment);
+  await cacheDel(SUSPENSION_CACHE, suspensionCacheKey(punishment.userUuid));
   return normalizedPunishment;
 }
 
@@ -626,17 +729,34 @@ export async function getPunishmentsForUserUuid(userUuid: string) {
 }
 
 export async function getActiveSuspensionForUserUuid(userUuid: string) {
+  const cacheKey = suspensionCacheKey(userUuid);
+  const cached = await cacheGet<Punishment | typeof NONE>(SUSPENSION_CACHE, cacheKey);
+
+  if (cached === NONE) return null;
+  if (cached) return cached;
+
   const { punishments } = await getCols();
   const now = new Date();
 
   trackMongoOperation('findOne', PUNISHMENTS_COLLECTION);
-  return punishments.findOne({
+  const suspension = await punishments.findOne({
     userUuid,
     type: 'suspension',
     liftedAt: { $exists: false },
     startsAt: { $lte: now },
     $or: [{ endsAt: null }, { endsAt: { $exists: false } }, { endsAt: { $gt: now } }]
   } as Record<string, unknown>);
+
+  // Cache the negative case too: most users are never suspended, and this
+  // query previously ran on every single authenticated request.
+  await cacheSet(
+    SUSPENSION_CACHE,
+    cacheKey,
+    suspension ?? NONE,
+    SUSPENSION_CACHE_TTL_SECONDS,
+  );
+
+  return suspension;
 }
 
 export async function getPunishmentsByType(type: Punishment['type']) {
@@ -653,6 +773,7 @@ export async function updatePunishment(punishment: Punishment) {
     { id: punishment.id } as Record<string, unknown>,
     { $set: normalizedPunishment }
   );
+  await cacheDel(SUSPENSION_CACHE, suspensionCacheKey(punishment.userUuid));
   return normalizedPunishment;
 }
 
@@ -661,19 +782,67 @@ export async function createDevice(device: DeviceDocument) {
   const normalizedDevice = normalizeDateValues(device);
   trackMongoOperation('insertOne', DEVICES_COLLECTION);
   await devices.insertOne(normalizedDevice);
+
+  await cacheDevice(normalizedDevice);
+  // The owner's device list no longer matches.
+  await cacheDel(DEVICE_LIST_CACHE, deviceListCacheKey(normalizedDevice.ownerUuid));
+
   return normalizedDevice;
 }
 
+/**
+ * Writes a device document into the cache. Used on creation and after uploads so
+ * the hot upload path never has to re-read the device from MongoDB.
+ */
+export async function cacheDevice(device: DeviceDocument): Promise<void> {
+  await cacheSet(DEVICE_CACHE, deviceCacheKey(device.serial), device, DEVICE_CACHE_TTL_SECONDS);
+}
+
 export async function getDeviceBySerial(serial: number) {
+  const cacheKey = deviceCacheKey(serial);
+  const cached = await cacheGet<DeviceDocument | typeof NONE>(DEVICE_CACHE, cacheKey);
+
+  if (cached === NONE) return null;
+  if (cached) return cached;
+
   const { devices } = await getCols();
   trackMongoOperation('findOne', DEVICES_COLLECTION);
-  return devices.findOne({ serial });
+  const device = await devices.findOne({ serial });
+
+  if (device) {
+    await cacheSet(DEVICE_CACHE, cacheKey, device, DEVICE_CACHE_TTL_SECONDS);
+  } else {
+    // Short negative TTL keeps invalid-serial uploads from hammering MongoDB.
+    await cacheSet(DEVICE_CACHE, cacheKey, NONE, DEVICE_NEGATIVE_TTL_SECONDS);
+  }
+
+  return device;
 }
 
 export async function getDevicesForOwnerUuid(ownerUuid: string) {
+  const cacheKey = deviceListCacheKey(ownerUuid);
+  const cached = await cacheGet<DeviceDocument[]>(DEVICE_LIST_CACHE, cacheKey);
+  if (cached) return cached;
+
   const { devices } = await getCols();
   trackMongoOperation('find', DEVICES_COLLECTION);
-  return devices.find({ ownerUuid }).sort({ registeredAt: -1 }).toArray();
+  const list = await devices.find({ ownerUuid }).sort({ registeredAt: -1 }).toArray();
+
+  await cacheSet(DEVICE_LIST_CACHE, cacheKey, list, DEVICE_LIST_CACHE_TTL_SECONDS);
+
+  return list;
+}
+
+/**
+ * Drops the per-owner device list and statistics caches after an upload changes
+ * the underlying data.
+ */
+export async function invalidateDeviceCachesForOwner(ownerUuid: string): Promise<void> {
+  await cacheDel(
+    DEVICE_LIST_CACHE,
+    deviceListCacheKey(ownerUuid),
+    deviceStatsCacheKey(ownerUuid),
+  );
 }
 
 export async function updateDeviceLastUpload(serial: number, when: Date) {
@@ -750,16 +919,19 @@ export async function deleteSession(id: string) {
   const { sessions } = await getCols();
   trackMongoOperation('deleteOne', SESSIONS_COLLECTION);
   await sessions.deleteOne({ id } as Record<string, unknown>);
+  await invalidateAuthEntries();
 }
 
 export async function deleteSessionByTokenHash(tokenHash: string) {
   const { sessions } = await getCols();
   trackMongoOperation('deleteOne', SESSIONS_COLLECTION);
   await sessions.deleteOne({ tokenHash });
+  await invalidateAuthEntries();
 }
 
 export async function deleteSessionsForUserUuid(userUuid: string) {
   const { sessions } = await getCols();
   trackMongoOperation('deleteMany', SESSIONS_COLLECTION);
   await sessions.deleteMany({ userUuid });
+  await invalidateAuthEntries();
 }

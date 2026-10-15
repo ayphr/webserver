@@ -127,20 +127,44 @@ function countParams(path: string): number {
   return path.split('/').filter((segment) => segment.startsWith(':')).length;
 }
 
-const MATCH_ORDER: readonly RouteDefinition[] = [...ROUTES].sort((a, b) => countParams(a.path) - countParams(b.path));
+type CompiledRoute = RouteDefinition & {
+  segments: readonly string[];
+  params: number;
+};
+
+const COMPILED_ROUTES: readonly CompiledRoute[] = ROUTES.map((route) => ({
+  ...route,
+  segments: route.path.split('/'),
+  params: countParams(route.path),
+}));
+
+const EXACT_ROUTES = new Map<string, CompiledRoute>();
+const PARAM_ROUTES = new Map<string, CompiledRoute[]>();
+
+for (const route of COMPILED_ROUTES) {
+  if (route.params === 0) {
+    EXACT_ROUTES.set(`${route.method} ${route.path}`, route);
+    continue;
+  }
+
+  const list = PARAM_ROUTES.get(route.method);
+  if (list) {
+    list.push(route);
+  } else {
+    PARAM_ROUTES.set(route.method, [route]);
+  }
+}
+
+// Fewer parameters first, preserving the original declaration order for ties.
+for (const list of PARAM_ROUTES.values()) {
+  list.sort((a, b) => a.params - b.params);
+}
 
 function isApiPath(pathname: string): boolean {
   return pathname === '/api' || pathname.startsWith('/api/');
 }
 
-function matchPath(pattern: string, pathname: string): RouteParams | null {
-  const patternSegments = pattern.split('/');
-  const pathSegments = pathname.split('/');
-
-  if (patternSegments.length !== pathSegments.length) {
-    return null;
-  }
-
+function matchPath(patternSegments: readonly string[], pathSegments: string[]): RouteParams | null {
   const params: RouteParams = {};
 
   for (let index = 0; index < patternSegments.length; index += 1) {
@@ -163,12 +187,20 @@ function matchPath(pattern: string, pathname: string): RouteParams | null {
 export function matchRoute(method: string, pathname: string): RouteMatch | null {
   const normalized = cleanPathname(pathname);
 
-  for (const route of MATCH_ORDER) {
-    if (route.method !== method) {
-      continue;
-    }
+  const exact = EXACT_ROUTES.get(`${method} ${normalized}`);
+  if (exact) {
+    return { template: exact.path, params: {}, handle: exact.handle };
+  }
 
-    const params = matchPath(route.path, normalized);
+  const candidates = PARAM_ROUTES.get(method);
+  if (!candidates) return null;
+
+  const pathSegments = normalized.split('/');
+
+  for (const route of candidates) {
+    if (route.segments.length !== pathSegments.length) continue;
+
+    const params = matchPath(route.segments, pathSegments);
     if (params) {
       return { template: route.path, params, handle: route.handle };
     }
