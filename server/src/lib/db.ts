@@ -465,7 +465,7 @@ export async function getUserFromUuid(uuid: string) {
 
   const { users } = await getCols();
   trackMongoOperation('findOne', USERS_COLLECTION);
-  const user = await users.findOne({ uuid });
+  const user = await users.findOne({ uuid }, { projection: { _id: 0 } });
   if (user) {
     await cacheSet(USER_CACHE, userCacheKey(uuid), user, USER_CACHE_TTL_SECONDS);
   }
@@ -475,7 +475,7 @@ export async function getUserFromUuid(uuid: string) {
 export async function getUserFromUsername(username: string) {
   const { users } = await getCols();
   trackMongoOperation('findOne', USERS_COLLECTION);
-  return users.findOne({ username });
+  return users.findOne({ username }, { projection: { _id: 0 } });
 }
 
 export async function getUsers() {
@@ -544,7 +544,11 @@ export async function getUserCount() {
 export async function updateUser(user: User, unsetKeys: string[] = []) {
   const { users } = await getCols();
   const normalizedUser = normalizeDateValues(user);
-  const update: Record<string, unknown> = { $set: normalizedUser };
+  // Mongo documents carry an immutable `_id`; including it in $set makes the
+  // update fail with "would modify the immutable field '_id'".
+  const settableFields: Record<string, unknown> = { ...normalizedUser };
+  delete settableFields._id;
+  const update: Record<string, unknown> = { $set: settableFields };
 
   if (unsetKeys.length > 0) {
     update.$unset = Object.fromEntries(unsetKeys.map((key) => [key, '']));
