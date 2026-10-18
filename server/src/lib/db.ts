@@ -1,6 +1,6 @@
 import { Binary, Collection, Db, MongoClient, type Filter } from 'mongodb';
 import { createLogger } from './logger';
-import { recordMongoOperation } from './metrics';
+import { recordMongoOperation, sessionsTotal } from './metrics';
 import { type DataPoint, type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription } from '@common';
 import {
   DATA_POINTS_COLLECTION,
@@ -377,6 +377,12 @@ export async function countActiveDevices(since: Date): Promise<number> {
   const { devices } = await getCols();
   trackMongoOperation('countDocuments', DEVICES_COLLECTION);
   return devices.countDocuments({ lastUploadAt: { $gte: since } });
+}
+
+export async function countDevices(): Promise<number> {
+  const { devices } = await getCols();
+  trackMongoOperation('countDocuments', DEVICES_COLLECTION);
+  return devices.countDocuments({});
 }
 
 export async function createUser(user: User) {
@@ -923,6 +929,7 @@ export async function deleteSession(id: string) {
   const { sessions } = await getCols();
   trackMongoOperation('deleteOne', SESSIONS_COLLECTION);
   await sessions.deleteOne({ id } as Record<string, unknown>);
+  sessionsTotal.inc({ event: 'revoked' });
   await invalidateAuthEntries();
 }
 
@@ -930,12 +937,14 @@ export async function deleteSessionByTokenHash(tokenHash: string) {
   const { sessions } = await getCols();
   trackMongoOperation('deleteOne', SESSIONS_COLLECTION);
   await sessions.deleteOne({ tokenHash });
+  sessionsTotal.inc({ event: 'logout' });
   await invalidateAuthEntries();
 }
 
 export async function deleteSessionsForUserUuid(userUuid: string) {
   const { sessions } = await getCols();
   trackMongoOperation('deleteMany', SESSIONS_COLLECTION);
-  await sessions.deleteMany({ userUuid });
+  const result = await sessions.deleteMany({ userUuid });
+  sessionsTotal.inc({ event: 'revoked_all' }, result.deletedCount);
   await invalidateAuthEntries();
 }

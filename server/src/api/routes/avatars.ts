@@ -5,6 +5,7 @@ import type { AvatarMetadata } from '../../lib/db';
 import { toPublicUser } from '../../lib/user';
 import { createLogger } from '../../lib/logger';
 import { AVATAR_MAX_BYTES, isAllowedAvatarContentType } from '../../lib/avatars';
+import { avatarEventsTotal } from '../../lib/metrics';
 import type { User } from '@common';
 
 const log = createLogger('avatars');
@@ -78,6 +79,8 @@ const handleAvatarUpload = requireAuth(async (request, user) => {
     return json({ error: 'Failed to update profile' }, 500);
   }
 
+  avatarEventsTotal.inc({ event: 'uploaded' });
+
   return json({ user: toPublicUser(target.user) });
 }, { allowSuspended: true });
 
@@ -93,6 +96,8 @@ const handleAvatarDelete = requireAuth(async (request, user) => {
 
   delete target.user.avatar;
   await updateUser(target.user, ['avatar']);
+
+  avatarEventsTotal.inc({ event: 'deleted' });
 
   return json({ user: toPublicUser(target.user) });
 }, { allowSuspended: true });

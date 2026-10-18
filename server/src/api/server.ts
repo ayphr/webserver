@@ -8,6 +8,7 @@ import {
   httpRequestDuration,
   httpRequestsTotal,
   httpRequestsInFlight,
+  httpResponseSize,
   metricsText,
   registry,
 } from '../lib/metrics';
@@ -61,6 +62,15 @@ export function setupServer(port: number, callback: () => void): Server<undefine
         const response = await dispatch();
 
         httpRequestsTotal.inc({ method, route: template, status: response.status.toString() });
+
+        const contentLength = response.headers.get('content-length');
+        if (contentLength !== null) {
+          const size = Number(contentLength);
+          if (Number.isFinite(size) && size >= 0) {
+            httpResponseSize.observe({ method, route: template }, size);
+          }
+        }
+
         return addCorsHeaders(response, request);
       } catch (error) {
         httpRequestsTotal.inc({ method, route: template, status: '500' });

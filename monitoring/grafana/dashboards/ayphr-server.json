@@ -2,240 +2,6639 @@
   "annotations": {
     "list": []
   },
+  "description": "Full-stack observability for the Ayphr API, device fleet, accounts, billing and runtime.",
   "editable": true,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
+  "links": [],
   "panels": [
     {
       "type": "row",
       "title": "Overview",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "description": "Live headline numbers for the Ayphr API and device fleet.",
       "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "panels": []
     },
     {
       "type": "stat",
       "title": "Requests / second",
-      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
       "targets": [
-        { "expr": "sum(rate(ayphr_http_requests_total[5m]))", "legendFormat": "req/s" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_http_requests_total[$__rate_interval]))",
+          "legendFormat": "req/s"
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      }
     },
     {
       "type": "stat",
       "title": "Data points / second",
-      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
       "targets": [
-        { "expr": "sum(rate(ayphr_telemetry_records_persisted_total[5m]))", "legendFormat": "points/s" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_telemetry_records_persisted_total[$__rate_interval]))",
+          "legendFormat": "points/s"
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      }
     },
     {
       "type": "stat",
-      "title": "Active devices",
-      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "title": "Error rate",
+      "description": "Share of responses in the 5xx range.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percent",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
       "targets": [
-        { "expr": "ayphr_active_devices", "legendFormat": "devices" }
-      ]
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(ayphr_http_requests_total{status=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(ayphr_http_requests_total[$__rate_interval])), 0.0001)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      }
     },
     {
       "type": "stat",
-      "title": "Requests in flight",
-      "gridPos": { "h": 4, "w": 5, "x": 15, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "title": "Latency p95",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "s",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
       "targets": [
-        { "expr": "ayphr_http_requests_in_flight", "legendFormat": "in flight" }
-      ]
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Active devices (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_active_devices",
+          "legendFormat": "devices"
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Total devices",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_devices_total",
+          "legendFormat": "devices"
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Total users",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_users_total",
+          "legendFormat": "users"
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 5
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Uptime",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - ayphr_process_start_time_seconds",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 5
+      }
     },
     {
       "type": "stat",
       "title": "5xx / second",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
       "fieldConfig": {
         "defaults": {
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          },
           "unit": "reqps",
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.01 }] }
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
       "targets": [
-        { "expr": "sum(rate(ayphr_http_requests_total{status=~\"5..\"}[5m])) or vector(0)", "legendFormat": "5xx/s" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_http_requests_total{status=~\"5..\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 5
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Cache hit ratio",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              }
+            ]
+          },
+          "unit": "percent",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(ayphr_cache_operations_total{result=\"hit\"}[$__rate_interval])) / clamp_min(sum(rate(ayphr_cache_operations_total{result=~\"hit|miss\"}[$__rate_interval])), 0.0001)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 5
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Upload errors / second",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          },
+          "unit": "ops",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_telemetry_upload_errors_total[$__rate_interval])) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 5
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Registrations (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_auth_events_total{event=\"register\", result=\"success\"}[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 5
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Requests in flight",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 50,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_http_requests_in_flight",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 9
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "CPU utilisation",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.7
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(ayphr_process_cpu_user_seconds_total[$__rate_interval]) + rate(ayphr_process_cpu_system_seconds_total[$__rate_interval])",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 9
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Memory utilisation",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 2000000000,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1500000000
+              }
+            ]
+          },
+          "unit": "bytes",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_process_resident_memory_bytes",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 9
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Event loop lag p99",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 0.5,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.05
+              }
+            ]
+          },
+          "unit": "s",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_nodejs_eventloop_lag_p99_seconds",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 9
+      }
     },
     {
       "type": "row",
       "title": "HTTP",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "description": "Traffic, latency and status-code behaviour across every API route.",
       "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
       "panels": []
     },
     {
       "type": "timeseries",
-      "title": "HTTP latency percentiles",
-      "description": "Request duration quantiles computed from ayphr_http_request_duration_seconds across all routes.",
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "title": "Latency percentiles",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.75, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p75" },
-        { "expr": "histogram_quantile(0.90, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p90" },
-        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" },
-        { "expr": "sum(rate(ayphr_http_request_duration_seconds_sum[5m])) / sum(rate(ayphr_http_request_duration_seconds_count[5m]))", "legendFormat": "avg" }
-      ]
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.75, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p75"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.90, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p90"
+        },
+        {
+          "refId": "D",
+          "expr": "histogram_quantile(0.95, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "E",
+          "expr": "histogram_quantile(0.99, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
+          "legendFormat": "p99"
+        },
+        {
+          "refId": "F",
+          "expr": "sum(rate(ayphr_http_request_duration_seconds_sum{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) / clamp_min(sum(rate(ayphr_http_request_duration_seconds_count{method=~\"$method\", route=~\"$route\"}[$__rate_interval])), 0.0001)",
+          "legendFormat": "avg"
+        }
+      ],
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      }
     },
     {
       "type": "timeseries",
       "title": "Requests by status",
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 6 },
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 40,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "sum(rate(ayphr_http_requests_total[5m])) by (status)", "legendFormat": "{{status}}" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(ayphr_http_requests_total{method=~\"$method\", route=~\"$route\"}[$__rate_interval]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests by method",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method) (rate(ayphr_http_requests_total{method=~\"$method\", route=~\"$route\"}[$__rate_interval]))",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Traffic share by method",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method) (increase(ayphr_http_requests_total{method=~\"$method\", route=~\"$route\"}[$__range]))",
+          "legendFormat": "{{method}}",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 24
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Busiest routes",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "valueMode": "color",
+        "namePlacement": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (route) (rate(ayphr_http_requests_total{method=~\"$method\", route=~\"$route\"}[$__rate_interval])))",
+          "legendFormat": "{{route}}",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 24
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "Latency distribution",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size",
+            "value": "10s"
+          },
+          "yBuckets": {
+            "mode": "count",
+            "value": 20
+          }
+        },
+        "cellGap": 2,
+        "cellValues": {
+          "unit": "s"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Spectral",
+          "steps": 64,
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "reverse": false
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": true
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "s",
+          "reverse": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "Response size distribution",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size",
+            "value": "10s"
+          },
+          "yBuckets": {
+            "mode": "count",
+            "value": 20
+          }
+        },
+        "cellGap": 2,
+        "cellValues": {
+          "unit": "bytes"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "YlOrRd",
+          "steps": 64,
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "reverse": false
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": true
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "bytes",
+          "reverse": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_http_response_size_bytes_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      }
     },
     {
       "type": "timeseries",
       "title": "Latency p95 by route",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum by (route, le) (rate(ayphr_http_request_duration_seconds_bucket[5m])))", "legendFormat": "{{route}}" }
-      ]
+        {
+          "refId": "A",
+          "expr": "topk(8, histogram_quantile(0.95, sum by (route, le) (rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\"}[$__rate_interval]))))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      }
     },
     {
       "type": "timeseries",
-      "title": "Busiest routes",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "title": "Response size p95 by route",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "topk(5, sum by (route) (rate(ayphr_http_requests_total[5m])))", "legendFormat": "{{route}}" }
-      ]
+        {
+          "refId": "A",
+          "expr": "topk(8, histogram_quantile(0.95, sum by (route, le) (rate(ayphr_http_response_size_bytes_bucket{method=~\"$method\"}[$__rate_interval]))))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 41
+      }
+    },
+    {
+      "type": "status-history",
+      "title": "Status codes over time",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          },
+          "custom": {
+            "fillOpacity": 70,
+            "lineWidth": 1,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colWidth": 0.9,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "timeZone": "browser",
+        "alignValue": "left",
+        "mergeValues": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (increase(ayphr_http_requests_total{method=~\"$method\", route=~\"$route\"}[$__rate_interval]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 49
+      }
+    },
+    {
+      "type": "state-timeline",
+      "title": "Errors by status class",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(ayphr_http_requests_total{status=~\"[45]..\", method=~\"$method\", route=~\"$route\"}[$__rate_interval]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 49
+      }
+    },
+    {
+      "type": "table",
+      "title": "Route breakdown",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "enablePagination": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (rate(ayphr_http_requests_total[$__rate_interval]))",
+          "legendFormat": "{{route}}",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (route) (rate(ayphr_http_requests_total{status=~\"5..\"}[$__rate_interval]))",
+          "legendFormat": "{{route}}",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum by (route, le) (rate(ayphr_http_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{route}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 57
+      }
+    },
+    {
+      "type": "trend",
+      "title": "Requests in flight (trend)",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_http_requests_in_flight",
+          "legendFormat": "in flight"
+        },
+        {
+          "refId": "B",
+          "expr": "max_over_time(ayphr_http_requests_in_flight[$__rate_interval])",
+          "legendFormat": "window max"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 57
+      }
     },
     {
       "type": "row",
-      "title": "Devices / telemetry",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "title": "Devices & telemetry",
+      "description": "Upload volume, batch shape, persistence and raw sensor distributions.",
       "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      },
       "panels": []
     },
     {
       "type": "timeseries",
-      "title": "Data points accepted / second",
-      "description": "Data points accepted from authenticated device uploads before persistence.",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "title": "Data points accepted vs persisted",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "sum(rate(ayphr_telemetry_records_accepted_total[5m]))", "legendFormat": "accepted/s" }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Data points persisted / second",
-      "description": "Data points written to the database. Uploads replace existing values for the same device and second.",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
-      "targets": [
-        { "expr": "sum(rate(ayphr_telemetry_records_persisted_total[5m]))", "legendFormat": "persisted/s" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_telemetry_records_accepted_total[$__rate_interval]))",
+          "legendFormat": "accepted/s"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(ayphr_telemetry_records_persisted_total[$__rate_interval]))",
+          "legendFormat": "persisted/s"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 66
+      }
     },
     {
       "type": "timeseries",
       "title": "Upload batch size percentiles",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_upload_batch_size_bucket[5m])) by (le))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_upload_batch_size_bucket[5m])) by (le))", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_upload_batch_size_bucket[5m])) by (le))", "legendFormat": "p99" }
-      ]
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_upload_batch_size_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_upload_batch_size_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_upload_batch_size_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p99"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 66
+      }
     },
     {
       "type": "timeseries",
       "title": "Upload duration percentiles",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
-      ]
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum(rate(ayphr_telemetry_upload_duration_seconds_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p99"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 74
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "Upload batch size distribution",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size",
+            "value": "10s"
+          },
+          "yBuckets": {
+            "mode": "count",
+            "value": 20
+          }
+        },
+        "cellGap": 2,
+        "cellValues": {
+          "unit": "short"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "YlGnBu",
+          "steps": 64,
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "reverse": false
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": true
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "short",
+          "reverse": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_telemetry_upload_batch_size_bucket[$__rate_interval])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 74
+      }
     },
     {
       "type": "timeseries",
-      "title": "Upload errors / second",
-      "description": "Authenticated device uploads that failed to persist.",
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 40 },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "title": "Average temperature",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "sum(rate(ayphr_telemetry_upload_errors_total[5m])) or vector(0)", "legendFormat": "errors/s" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_telemetry_temperature_celsius_sum[$__rate_interval])) / clamp_min(sum(rate(ayphr_telemetry_temperature_celsius_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "avg °C"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.10, sum(rate(ayphr_telemetry_temperature_celsius_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p10"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.90, sum(rate(ayphr_telemetry_temperature_celsius_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p90"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 82
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Average humidity",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "humidity"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_telemetry_humidity_percent_sum[$__rate_interval])) / clamp_min(sum(rate(ayphr_telemetry_humidity_percent_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "avg %"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.10, sum(rate(ayphr_telemetry_humidity_percent_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p10"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.90, sum(rate(ayphr_telemetry_humidity_percent_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p90"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 82
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Average air pressure",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "pressurehpa"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_telemetry_air_pressure_hpa_sum[$__rate_interval])) / clamp_min(sum(rate(ayphr_telemetry_air_pressure_hpa_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "avg hPa"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.10, sum(rate(ayphr_telemetry_air_pressure_hpa_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p10"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.90, sum(rate(ayphr_telemetry_air_pressure_hpa_bucket[$__rate_interval])) by (le))",
+          "legendFormat": "p90"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 82
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "Temperature distribution",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size",
+            "value": "10s"
+          },
+          "yBuckets": {
+            "mode": "count",
+            "value": 20
+          }
+        },
+        "cellGap": 2,
+        "cellValues": {
+          "unit": "celsius"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "RdBu",
+          "steps": 64,
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "reverse": false
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": true
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "celsius",
+          "reverse": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_telemetry_temperature_celsius_bucket[$__rate_interval])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 90
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "Humidity distribution",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "humidity",
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size",
+            "value": "10s"
+          },
+          "yBuckets": {
+            "mode": "count",
+            "value": 20
+          }
+        },
+        "cellGap": 2,
+        "cellValues": {
+          "unit": "humidity"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Blues",
+          "steps": 64,
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "reverse": false
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": true
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "humidity",
+          "reverse": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_telemetry_humidity_percent_bucket[$__rate_interval])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 90
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Devices registered (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_devices_registered_total[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 98
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Claim tokens created (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_device_claims_total{event=\"created\"}[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 98
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Claims completed (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_device_claims_total{event=\"claimed\"}[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 98
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Upload errors (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_telemetry_upload_errors_total[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 98
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Points persisted (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "si",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_telemetry_records_persisted_total[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 98
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Avg batch size",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_telemetry_upload_batch_size_sum[$__range])) / clamp_min(sum(increase(ayphr_telemetry_upload_batch_size_count[$__range])), 0.0001)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 98
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Upload errors",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_telemetry_upload_errors_total[$__rate_interval])) or vector(0)",
+          "legendFormat": "errors/s"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(ayphr_telemetry_upload_errors_total[$__rate_interval]))",
+          "legendFormat": "errors"
+        }
+      ],
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 102
+      }
     },
     {
       "type": "row",
-      "title": "System",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "title": "Accounts & auth",
+      "description": "Registrations, logins, sessions and rate-limit pressure.",
       "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 109
+      },
       "panels": []
     },
     {
       "type": "timeseries",
-      "title": "CPU usage",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 48 },
-      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "title": "Registrations by outcome",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "rate(ayphr_process_cpu_user_seconds_total[5m]) + rate(ayphr_process_cpu_system_seconds_total[5m])", "legendFormat": "CPU" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(ayphr_auth_events_total{event=\"register\"}[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 110
+      }
     },
     {
       "type": "timeseries",
-      "title": "Memory usage",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 48 },
-      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "title": "Logins by outcome",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "ayphr_process_resident_memory_bytes", "legendFormat": "RSS" },
-        { "expr": "ayphr_nodejs_heap_size_used_bytes", "legendFormat": "Heap used" }
-      ]
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(ayphr_auth_events_total{event=\"login\"}[$__rate_interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 110
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Auth events (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (event) (increase(ayphr_auth_events_total{result=\"success\"}[24h]))",
+          "legendFormat": "{{event}}",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 118
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Session lifecycle",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (event) (rate(ayphr_sessions_total[$__rate_interval]))",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 118
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate limit decisions",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (limiter, result) (rate(ayphr_rate_limit_checks_total[$__rate_interval]))",
+          "legendFormat": "{{limiter}} · {{result}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 118
+      }
+    },
+    {
+      "type": "table",
+      "title": "Staff actions (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "enablePagination": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (action) (increase(ayphr_staff_actions_total[24h]))",
+          "legendFormat": "{{action}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 126
+      }
+    },
+    {
+      "type": "table",
+      "title": "Punishments (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "enablePagination": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (type, action) (increase(ayphr_punishments_total[24h]))",
+          "legendFormat": "{{type}} · {{action}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 126
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Registrations by country",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "valueMode": "color",
+        "namePlacement": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sort_desc(sum by (country) (increase(ayphr_user_registrations_by_country_total[$__range])))",
+          "legendFormat": "{{country}}",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 126
+      }
+    },
+    {
+      "type": "geomap",
+      "title": "Registration map",
+      "options": {
+        "view": {
+          "id": "zero",
+          "lat": 20,
+          "lon": 0,
+          "zoom": 1.4
+        },
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": false,
+          "showAttribution": true,
+          "showScale": false,
+          "showDebug": false
+        },
+        "basemap": {
+          "type": "default",
+          "name": "Layer 0"
+        },
+        "tooltip": {
+          "mode": "details"
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Registrations",
+            "config": {
+              "showLegend": true,
+              "style": {
+                "size": {
+                  "fixed": 6
+                },
+                "color": {
+                  "fixed": "dark-green"
+                },
+                "opacity": 0.85,
+                "text": {
+                  "field": "country"
+                }
+              }
+            },
+            "location": {
+              "mode": "lookup",
+              "lookup": "country",
+              "gazetteer": "countries"
+            },
+            "tooltip": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (country) (increase(ayphr_user_registrations_by_country_total[$__range]))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 134
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Profile & avatar activity",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (field) (rate(ayphr_profile_updates_total[$__rate_interval]))",
+          "legendFormat": "profile · {{field}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (event) (rate(ayphr_avatar_events_total[$__rate_interval]))",
+          "legendFormat": "avatar · {{event}}"
+        }
+      ],
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 134
+      }
+    },
+    {
+      "type": "row",
+      "title": "Billing",
+      "description": "Stripe webhook traffic and subscription funnel activity.",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 144
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Stripe webhook events by type",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (type) (rate(ayphr_stripe_webhook_events_total[$__rate_interval]))",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 145
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Stripe webhook errors by type",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (type) (rate(ayphr_stripe_webhook_errors_total[$__rate_interval])) or vector(0)",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 145
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Checkout started (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_subscription_events_total{event=\"checkout_started\"}[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 153
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Portal opened (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_subscription_events_total{event=\"portal_opened\"}[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 153
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Auto-renew on (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_subscription_events_total{event=\"auto_renew_enabled\"}[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 153
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Auto-renew off (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_subscription_events_total{event=\"auto_renew_disabled\"}[24h]))",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 153
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Webhook errors (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_stripe_webhook_errors_total[24h])) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 153
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Checkout failures (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_subscription_events_total{event=~\"checkout_failed|portal_failed\"}[24h])) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 153
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Subscription events (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "valueMode": "color",
+        "namePlacement": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sort_desc(sum by (event) (increase(ayphr_subscription_events_total[24h])))",
+          "legendFormat": "{{event}}",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 157
+      }
+    },
+    {
+      "type": "row",
+      "title": "Cache & MongoDB",
+      "description": "Redis cache effectiveness and MongoDB workload.",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 165
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache operations by result",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cache, result) (rate(ayphr_cache_operations_total[$__rate_interval]))",
+          "legendFormat": "{{cache}} · {{result}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 166
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Cache hits vs misses (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (increase(ayphr_cache_operations_total{result=~\"hit|miss\"}[24h]))",
+          "legendFormat": "{{result}}",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 166
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Cache hit ratio",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              }
+            ]
+          },
+          "unit": "percent",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(ayphr_cache_operations_total{result=\"hit\"}[$__rate_interval])) / clamp_min(sum(rate(ayphr_cache_operations_total{result=~\"hit|miss\"}[$__rate_interval])), 0.0001)",
+          "legendFormat": ""
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 174
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache errors",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(ayphr_cache_operations_total{result=\"error\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "errors/s"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 174
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Mongo operations by type",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation) (rate(ayphr_mongo_operations_total{collection=~\"$collection\"}[$__rate_interval]))",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 174
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Mongo operations by collection",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (collection) (rate(ayphr_mongo_operations_total{collection=~\"$collection\"}[$__rate_interval])))",
+          "legendFormat": "{{collection}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 180
+      }
+    },
+    {
+      "type": "table",
+      "title": "Mongo operation breakdown (24h)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "enablePagination": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation, collection) (increase(ayphr_mongo_operations_total{collection=~\"$collection\"}[24h]))",
+          "legendFormat": "{{operation}} · {{collection}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 180
+      }
+    },
+    {
+      "type": "row",
+      "title": "Runtime",
+      "description": "Process health exported by the Prometheus default metrics.",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 188
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU: user vs system",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(ayphr_process_cpu_user_seconds_total[$__rate_interval])",
+          "legendFormat": "user"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(ayphr_process_cpu_system_seconds_total[$__rate_interval])",
+          "legendFormat": "system"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 189
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_process_resident_memory_bytes",
+          "legendFormat": "RSS"
+        },
+        {
+          "refId": "B",
+          "expr": "ayphr_nodejs_heap_size_used_bytes",
+          "legendFormat": "heap used"
+        },
+        {
+          "refId": "C",
+          "expr": "ayphr_nodejs_heap_size_total_bytes",
+          "legendFormat": "heap total"
+        },
+        {
+          "refId": "D",
+          "expr": "ayphr_nodejs_external_memory_bytes",
+          "legendFormat": "external"
+        },
+        {
+          "refId": "E",
+          "expr": "ayphr_process_virtual_memory_bytes",
+          "legendFormat": "virtual"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 189
+      }
     },
     {
       "type": "timeseries",
       "title": "Event loop lag",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 48 },
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "axisSoftMin": 0, "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "ayphr_nodejs_eventloop_lag_p50_seconds", "legendFormat": "p50" },
-        { "expr": "ayphr_nodejs_eventloop_lag_p99_seconds", "legendFormat": "p99" }
-      ]
+        {
+          "refId": "A",
+          "expr": "ayphr_nodejs_eventloop_lag_p50_seconds",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "ayphr_nodejs_eventloop_lag_p90_seconds",
+          "legendFormat": "p90"
+        },
+        {
+          "refId": "C",
+          "expr": "ayphr_nodejs_eventloop_lag_p99_seconds",
+          "legendFormat": "p99"
+        },
+        {
+          "refId": "D",
+          "expr": "ayphr_nodejs_eventloop_lag_max_seconds",
+          "legendFormat": "max"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 189
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "GC duration by kind",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "calculation": {
+          "xBuckets": {
+            "mode": "size",
+            "value": "10s"
+          },
+          "yBuckets": {
+            "mode": "count",
+            "value": 20
+          }
+        },
+        "cellGap": 2,
+        "cellValues": {
+          "unit": "s"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Viridis",
+          "steps": 64,
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "reverse": false
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": true
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "s",
+          "reverse": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(ayphr_nodejs_gc_duration_seconds_bucket[$__rate_interval])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 197
+      }
     },
     {
       "type": "timeseries",
-      "title": "MongoDB operations",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }, "overrides": [] },
-      "options": { "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "title": "File descriptors",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "sum(rate(ayphr_mongo_operations_total[5m])) by (operation, collection)", "legendFormat": "{{operation}} {{collection}}" }
-      ]
+        {
+          "refId": "A",
+          "expr": "ayphr_process_open_fds",
+          "legendFormat": "open"
+        },
+        {
+          "refId": "B",
+          "expr": "ayphr_process_max_fds",
+          "legendFormat": "max"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 197
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Active handles & requests",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_nodejs_active_handles_total",
+          "legendFormat": "handles"
+        },
+        {
+          "refId": "B",
+          "expr": "ayphr_nodejs_active_requests_total",
+          "legendFormat": "requests"
+        },
+        {
+          "refId": "C",
+          "expr": "ayphr_nodejs_active_resources_total",
+          "legendFormat": "resources"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 197
+      }
+    },
+    {
+      "type": "table",
+      "title": "Heap spaces",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes",
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "enablePagination": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ayphr_nodejs_heap_space_size_used_bytes",
+          "legendFormat": "{{space}}",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "expr": "ayphr_nodejs_heap_space_size_available_bytes",
+          "legendFormat": "{{space}}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 205
+      }
+    },
+    {
+      "type": "text",
+      "title": "About this dashboard",
+      "options": {
+        "mode": "markdown",
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "### Ayphr server dashboard\n\nEvery panel is backed by the `ayphr_*` metrics exported on the metrics server (`:7234/metrics`) and scraped by Prometheus.\n\n- **Overview** — headline request, telemetry and capacity numbers.\n- **HTTP** — latency, status codes, payload sizes and per-route cost.\n- **Devices & telemetry** — upload throughput plus raw sensor distributions.\n- **Accounts & auth** — registrations, logins, sessions, rate limits and staff actions.\n- **Billing** — Stripe webhook health and the subscription funnel.\n- **Cache & MongoDB** — Redis effectiveness and database workload.\n- **Runtime** — CPU, memory, GC, event-loop and file-descriptor health.\n\nUse the `method`, `route` and `collection` variables above to scope the dashboard."
+      },
+      "transparent": true,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 205
+      }
     }
   ],
-  "refresh": "5s",
+  "refresh": "10s",
   "schemaVersion": 39,
   "tags": [
     "ayphr",
-    "server"
+    "server",
+    "observability"
   ],
+  "templating": {
+    "list": [
+      {
+        "name": "method",
+        "label": "Method",
+        "type": "query",
+        "query": {
+          "query": "label_values(ayphr_http_requests_total, method)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(ayphr_http_requests_total, method)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "refresh": 1,
+        "sort": 1
+      },
+      {
+        "name": "route",
+        "label": "Route",
+        "type": "query",
+        "query": {
+          "query": "label_values(ayphr_http_requests_total, route)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(ayphr_http_requests_total, route)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "refresh": 1,
+        "sort": 1
+      },
+      {
+        "name": "collection",
+        "label": "Mongo collection",
+        "type": "query",
+        "query": {
+          "query": "label_values(ayphr_mongo_operations_total, collection)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(ayphr_mongo_operations_total, collection)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "refresh": 1,
+        "sort": 1
+      }
+    ]
+  },
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -244,5 +6643,5 @@
   "timezone": "",
   "title": "ayphr Server",
   "uid": "ayphr-server",
-  "version": 4
+  "version": 5
 }

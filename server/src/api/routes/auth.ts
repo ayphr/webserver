@@ -25,6 +25,7 @@ import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
+import { authEventsTotal, userRegistrationsByCountry } from '../../lib/metrics';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
 
 type AuthPayload = {
@@ -41,8 +42,8 @@ type AuthPayload = {
 
 const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
 
-const registerLimiter = createRateLimiter(60 * 60 * 1000, 10);
-const loginLimiter = createRateLimiter(15 * 60 * 1000, 20);
+const registerLimiter = createRateLimiter(60 * 60 * 1000, 10, 'register');
+const loginLimiter = createRateLimiter(15 * 60 * 1000, 20, 'login');
 
 function json(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -66,11 +67,15 @@ function isDuplicateKeyError(error: unknown): boolean {
 
 async function handleRegister(request: Request) {
   const ipCheck = await registerLimiter.check(`ip:${getClientIp(request)}`);
-  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+  if (!ipCheck.allowed) {
+    authEventsTotal.inc({ event: 'register', result: 'rate_limited' });
+    return tooManyRequests(ipCheck.retryAfterMs);
+  }
 
   const body = await readJsonBody(request);
 
   if (!body?.username || !body.password) {
+    authEventsTotal.inc({ event: 'register', result: 'invalid' });
     return json({ error: 'username and password are required' }, 400);
   }
 
@@ -79,20 +84,24 @@ async function handleRegister(request: Request) {
 
   const usernameError = getUsernameValidationError(username);
   if (usernameError) {
+    authEventsTotal.inc({ event: 'register', result: 'invalid' });
     return json({ error: usernameError }, 400);
   }
 
   if (body.acceptPolicies !== true) {
+    authEventsTotal.inc({ event: 'register', result: 'invalid' });
     return json({ error: 'You must agree to the Terms of Service and Privacy Policy' }, 400);
   }
 
   const passwordValidationErrors = getPasswordValidationErrors(password);
   if (passwordValidationErrors.length > 0) {
+    authEventsTotal.inc({ event: 'register', result: 'invalid' });
     return json({ error: passwordValidationErrors[0] }, 400);
   }
 
   const policyVersions = await getPolicyVersions();
   if (!policyVersions) {
+    authEventsTotal.inc({ event: 'register', result: 'error' });
     return json({ error: POLICY_FETCH_ERROR }, 503);
   }
 
@@ -100,6 +109,7 @@ async function handleRegister(request: Request) {
   if (typeof body.country === 'string') {
     const countryCode = normalizeCountryCode(body.country);
     if (!countryCode) {
+      authEventsTotal.inc({ event: 'register', result: 'invalid' });
       return json({ error: 'country must be a valid ISO 3166-1 alpha-2 code' }, 400);
     }
     country = countryCode;
@@ -129,10 +139,14 @@ async function handleRegister(request: Request) {
   } catch (error) {
     // The unique username index is the source of truth, closing the check-then-insert race.
     if (isDuplicateKeyError(error) || (await getUserFromUsername(username))) {
+      authEventsTotal.inc({ event: 'register', result: 'conflict' });
       return json({ error: 'username already exists' }, 409);
     }
     throw error;
   }
+
+  authEventsTotal.inc({ event: 'register', result: 'success' });
+  userRegistrationsByCountry.inc({ country: country ?? 'unknown' });
 
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
@@ -143,11 +157,15 @@ async function handleRegister(request: Request) {
 
 async function handleLogin(request: Request) {
   const ipCheck = await loginLimiter.check(`ip:${getClientIp(request)}`);
-  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+  if (!ipCheck.allowed) {
+    authEventsTotal.inc({ event: 'login', result: 'rate_limited' });
+    return tooManyRequests(ipCheck.retryAfterMs);
+  }
 
   const body = await readJsonBody(request);
 
   if (!body?.username || !body.password) {
+    authEventsTotal.inc({ event: 'login', result: 'invalid' });
     return json({ error: 'username and password are required' }, 400);
   }
 
@@ -155,16 +173,22 @@ async function handleLogin(request: Request) {
   const password = body.password.trim();
 
   const userCheck = await loginLimiter.check(`user:${username.toLowerCase()}`);
-  if (!userCheck.allowed) return tooManyRequests(userCheck.retryAfterMs);
+  if (!userCheck.allowed) {
+    authEventsTotal.inc({ event: 'login', result: 'rate_limited' });
+    return tooManyRequests(userCheck.retryAfterMs);
+  }
 
   const user = await getUserFromUsername(username);
   if (!user || !(await verifyPassword(password, user.auth.passwordHash))) {
+    authEventsTotal.inc({ event: 'login', result: 'invalid_credentials' });
     return json({ error: 'invalid username or password' }, 401);
   }
 
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
 
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
+
+  authEventsTotal.inc({ event: 'login', result: 'success' });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -189,17 +213,20 @@ const handleMe = requireAuth(async (_request, user) => {
 
 const handleLogout = requireAuth(async (request) => {
   await endCurrentSession(request);
+  authEventsTotal.inc({ event: 'logout', result: 'success' });
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
 const handleLogoutAll = requireAuth(async (_request, user) => {
   await endAllSessions(user);
+  authEventsTotal.inc({ event: 'logout_all', result: 'success' });
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
 const handleAcceptPolicies = requireAuth(async (_request, user) => {
   const policyVersions = await getPolicyVersions();
   if (!policyVersions) {
+    authEventsTotal.inc({ event: 'policy_accept', result: 'error' });
     return json({ error: POLICY_FETCH_ERROR }, 503);
   }
 
@@ -208,6 +235,7 @@ const handleAcceptPolicies = requireAuth(async (_request, user) => {
     privacy: policyVersions.privacy,
   };
   await updateUser(user);
+  authEventsTotal.inc({ event: 'policy_accept', result: 'success' });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -221,19 +249,23 @@ const handleChangePassword = requireAuth(async (request, user) => {
   const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : undefined;
 
   if (!currentPassword) {
+    authEventsTotal.inc({ event: 'password_change', result: 'invalid' });
     return json({ error: 'current password is required' }, 400);
   }
 
   if (!newPassword) {
+    authEventsTotal.inc({ event: 'password_change', result: 'invalid' });
     return json({ error: 'new password is required' }, 400);
   }
 
   if (!(await verifyPassword(currentPassword, user.auth.passwordHash))) {
+    authEventsTotal.inc({ event: 'password_change', result: 'invalid_credentials' });
     return json({ error: 'invalid current password' }, 401);
   }
 
   const passwordValidationErrors = getPasswordValidationErrors(newPassword);
   if (passwordValidationErrors.length > 0) {
+    authEventsTotal.inc({ event: 'password_change', result: 'invalid' });
     return json({ error: passwordValidationErrors[0] }, 400);
   }
 
@@ -242,6 +274,7 @@ const handleChangePassword = requireAuth(async (request, user) => {
 
   // Changing the password signs out every device, including this one.
   await endAllSessions(user);
+  authEventsTotal.inc({ event: 'password_change', result: 'success' });
 
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
@@ -250,10 +283,12 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
   const body = await readJsonBody(request);
 
   if (!body?.password) {
+    authEventsTotal.inc({ event: 'account_delete', result: 'invalid' });
     return json({ error: 'password is required' }, 400);
   }
 
   if (!(await verifyPassword(body.password, user.auth.passwordHash))) {
+    authEventsTotal.inc({ event: 'account_delete', result: 'invalid_credentials' });
     return json({ error: 'invalid password' }, 401);
   }
 
@@ -264,6 +299,7 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
     deleteAvatar(user.uuid),
   ]);
   await deleteUser(user.uuid);
+  authEventsTotal.inc({ event: 'account_delete', result: 'success' });
 
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });

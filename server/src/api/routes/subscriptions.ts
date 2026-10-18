@@ -2,6 +2,11 @@ import type Stripe from 'stripe';
 import { createLogger } from '../../lib/logger';
 import { requireAuth } from '../auth';
 import {
+  stripeWebhookErrorsTotal,
+  stripeWebhookEventsTotal,
+  subscriptionEventsTotal,
+} from '../../lib/metrics';
+import {
   constructStripeEvent,
   createBillingPortalSession,
   createCheckoutSession,
@@ -165,6 +170,7 @@ export async function handleStripeWebhook(request: Request) {
 
   const signature = request.headers.get('stripe-signature');
   if (!signature) {
+    stripeWebhookErrorsTotal.inc({ type: 'signature_missing' });
     return Response.json({ error: 'missing stripe-signature header' }, { status: 400 });
   }
 
@@ -176,14 +182,18 @@ export async function handleStripeWebhook(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log.warn({ message, payloadLength: payload.length }, 'failed to verify Stripe webhook signature');
+    stripeWebhookErrorsTotal.inc({ type: 'signature_invalid' });
     return Response.json({ error: 'invalid signature' }, { status: 400 });
   }
+
+  stripeWebhookEventsTotal.inc({ type: event.type });
 
   try {
     await handleStripeEvent(event);
     await recordStripeEvent(event.id, event.type);
   } catch (error) {
     log.error({ error, type: event.type }, 'failed to process Stripe webhook');
+    stripeWebhookErrorsTotal.inc({ type: event.type });
     return Response.json({ error: 'webhook processing failed' }, { status: 500 });
   }
 
@@ -248,9 +258,11 @@ const handleSubscriptionCheckout = requireAuth(async (request, user) => {
   });
 
   if (!url) {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed' });
     return json({ error: 'Failed to create checkout session' }, 502);
   }
 
+  subscriptionEventsTotal.inc({ event: 'checkout_started' });
   return json({ url });
 });
 
@@ -280,6 +292,8 @@ const handleSubscriptionAutoRenew = requireAuth(async (request, user) => {
   if (updated.status) paid.status = updated.status as typeof paid.status;
   await upsertPaidSubscription(user.uuid, paid);
 
+  subscriptionEventsTotal.inc({ event: autoRenew ? 'auto_renew_enabled' : 'auto_renew_disabled' });
+
   return json({ paidSubscription: paid });
 }, { allowSuspended: true });
 
@@ -294,9 +308,11 @@ const handleSubscriptionPortal = requireAuth(async (_request, user) => {
   });
 
   if (!url) {
+    subscriptionEventsTotal.inc({ event: 'portal_failed' });
     return json({ error: 'Stripe is not configured' }, 503);
   }
 
+  subscriptionEventsTotal.inc({ event: 'portal_opened' });
   return json({ url });
 }, { allowSuspended: true });
 

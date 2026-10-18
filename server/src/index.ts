@@ -1,6 +1,6 @@
 import { setupMetricsServer, setupServer } from './api/server';
-import { countActiveDevices, disconnect } from './lib/db';
-import { setActiveDevices } from './lib/metrics';
+import { countActiveDevices, countDevices, disconnect, getUserCount } from './lib/db';
+import { setActiveDevices, setTotalDevices, setTotalUsers } from './lib/metrics';
 import { getRedis, closeRedis } from './lib/redis';
 import { createLogger } from './lib/logger';
 import { API_PORT, METRICS_PORT, REDIS_URL } from './env';
@@ -9,6 +9,7 @@ const log = createLogger('server');
 
 const ACTIVE_DEVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const ACTIVE_DEVICE_REFRESH_MS = 60_000;
+const ENTITY_COUNT_REFRESH_MS = 60_000;
 
 if (REDIS_URL) {
   if (getRedis()) {
@@ -32,8 +33,27 @@ async function refreshActiveDevices() {
   }
 }
 
+/** Refreshes the coarse business gauges shown on the dashboard. */
+async function refreshEntityCounts() {
+  const [users, devices] = await Promise.allSettled([getUserCount(), countDevices()]);
+
+  if (users.status === 'fulfilled') {
+    setTotalUsers(users.value);
+  } else {
+    log.warn({ error: users.reason }, 'failed to refresh user count');
+  }
+
+  if (devices.status === 'fulfilled') {
+    setTotalDevices(devices.value);
+  } else {
+    log.warn({ error: devices.reason }, 'failed to refresh device count');
+  }
+}
+
 void refreshActiveDevices();
+void refreshEntityCounts();
 const activeDevicesTimer = setInterval(() => void refreshActiveDevices(), ACTIVE_DEVICE_REFRESH_MS);
+const entityCountTimer = setInterval(() => void refreshEntityCounts(), ENTITY_COUNT_REFRESH_MS);
 
 let shuttingDown = false;
 
@@ -44,6 +64,7 @@ async function shutdown(signal: string) {
   log.info({ signal }, 'shutting down');
 
   clearInterval(activeDevicesTimer);
+  clearInterval(entityCountTimer);
   await httpServer.stop();
   await metricsServer.stop();
   await closeRedis();

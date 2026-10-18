@@ -1,5 +1,6 @@
 import { createLogger } from './logger';
 import { redisFixedWindow } from './redis';
+import { rateLimitChecksTotal } from './metrics';
 
 const log = createLogger('rate-limit');
 
@@ -21,7 +22,7 @@ const CLEANUP_INTERVAL_MS = 60_000;
 
 const NAMESPACE = 'ayphr:cache:ratelimit';
 
-export function createRateLimiter(windowMs: number, max: number): RateLimiter {
+export function createRateLimiter(windowMs: number, max: number, name = 'default'): RateLimiter {
   const buckets = new Map<string, Bucket>();
   const prefix = `${NAMESPACE}:${windowMs}:${max}`;
 
@@ -53,17 +54,22 @@ export function createRateLimiter(windowMs: number, max: number): RateLimiter {
 
   return {
     async check(key: string): Promise<RateLimitResult> {
+      let result: RateLimitResult;
+
       try {
         const { count, retryAfterMs } = await redisFixedWindow(`${prefix}:${key}`, windowMs);
 
         if (count > max) {
-          return { allowed: false, retryAfterMs };
+          result = { allowed: false, retryAfterMs };
+        } else {
+          result = { allowed: true, retryAfterMs: 0 };
         }
-
-        return { allowed: true, retryAfterMs: 0 };
       } catch {
-        return checkLocal(key);
+        result = checkLocal(key);
       }
+
+      rateLimitChecksTotal.inc({ limiter: name, result: result.allowed ? 'allowed' : 'blocked' });
+      return result;
     },
   };
 }

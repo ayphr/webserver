@@ -17,6 +17,7 @@ import { getPolicyStatus } from '../lib/policies';
 import { hashToken } from '../lib/tokens';
 import { getAuthEntry, setAuthEntry } from '../lib/authCache';
 import { isSessionDeviceType, parseUserAgent, resolveLocationFromClient } from '../lib/session';
+import { sessionsTotal } from '../lib/metrics';
 import type { RouteParams } from './types';
 
 const scrypt = promisify(scryptCallback) as (
@@ -95,6 +96,8 @@ export async function startSession(user: User, request: Request, meta: ClientSes
   };
 
   await createSession(session);
+
+  sessionsTotal.inc({ event: 'created' });
 
   user.lastActive = now;
   await updateUserLastActive(user.uuid, now);

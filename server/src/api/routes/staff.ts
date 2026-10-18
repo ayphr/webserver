@@ -5,6 +5,7 @@ import type { AttachedSubscription, Punishment, SubscriptionSource, Subscription
 import { isSubscriptionTier, resolveSubscription } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { toPublicUser } from '../../lib/user';
+import { punishmentsTotal, staffActionsTotal } from '../../lib/metrics';
 
 const MAX_REASON_LENGTH = 500;
 const MAX_DURATION_MINUTES = 5 * 365 * 24 * 60;
@@ -207,6 +208,8 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
     };
 
     await createPunishment(punishment);
+    punishmentsTotal.inc({ type: 'suspension', action: 'created' });
+    staffActionsTotal.inc({ action: 'punishment_create' });
 
     return json({ punishment }, 201);
   }
@@ -236,6 +239,9 @@ const handleStaffPunishmentLift = requireRole('staff', async (_request, staffUse
   punishment.liftedByUuid = staffUser.uuid;
   punishment.liftedByUsername = staffUser.username;
   await updatePunishment(punishment);
+
+  punishmentsTotal.inc({ type: punishment.type, action: 'lifted' });
+  staffActionsTotal.inc({ action: 'punishment_lift' });
 
   return json({ punishment });
 }, { allowSuspended: true });
@@ -272,6 +278,7 @@ const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params
     return json({ error: 'user not found' }, 404);
   }
 
+  staffActionsTotal.inc({ action: 'role_update' });
   return json({ user: toPublicUser(updatedUser) });
 });
 
@@ -304,6 +311,8 @@ const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUse
 
   // Setting a password signs the user out of every device.
   await deleteSessionsForUserUuid(targetUser.uuid);
+
+  staffActionsTotal.inc({ action: 'password_reset' });
 
   return json({ user: toPublicUser(targetUser) });
 });
@@ -357,6 +366,8 @@ const handleStaffSubscriptionAttach = requireRole('staff', async (request, staff
 
   await addAttachedSubscription(targetUuid, subscription);
 
+  staffActionsTotal.inc({ action: 'subscription_attach' });
+
   return json({
     user: toPublicUser({
       ...targetUser,
@@ -384,6 +395,8 @@ const handleStaffSubscriptionDetach = requireRole('staff', async (_request, _sta
   }
 
   await removeAttachedSubscription(targetUuid, subscriptionId);
+
+  staffActionsTotal.inc({ action: 'subscription_detach' });
 
   return json({
     user: toPublicUser({
@@ -455,6 +468,8 @@ const handleStaffSubscriptionUpdate = requireRole('staff', async (request, _staf
   if (!updated) {
     return json({ error: 'subscription not found' }, 404);
   }
+
+  staffActionsTotal.inc({ action: 'subscription_update' });
 
   return json({ subscription: updated });
 });

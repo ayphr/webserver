@@ -9,6 +9,7 @@ import {
   Markdown,
 } from '@common/utils/markdown';
 import { updateUser, getUserFromUuid } from '../../lib/db';
+import { profileUpdatesTotal } from '../../lib/metrics';
 
 type CountryUpdatePayload = {
   country?: string;
@@ -53,6 +54,8 @@ const handleCountryUpdate = requireAuth(async (request, user) => {
   user.country = countryCode;
   await updateUser(user);
 
+  profileUpdatesTotal.inc({ field: 'country' });
+
   return json({ user: toPublicUser(user) });
 }, { allowSuspended: true });
 
@@ -86,6 +89,7 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
   }
 
   const unsetKeys: string[] = [];
+  const changes = new Set<'country' | 'bio' | 'social'>();
 
   if (typeof body.country === 'string') {
     if (body.country.trim() === '') {
@@ -98,6 +102,7 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
       }
       targetUser.country = countryCode;
     }
+    changes.add('country');
   }
 
   if (typeof body.bio === 'string') {
@@ -115,6 +120,7 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
 
     targetUser.bio = bio.length > 0 ? bio : DEFAULT_BIO;
     targetUser.bioFormat = extended ? 'markdown' : 'limited';
+    changes.add('bio');
   }
 
   if (body.socialLinks && typeof body.socialLinks === 'object') {
@@ -140,9 +146,14 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     }
 
     targetUser.socialLinks = nextSocialLinks;
+    changes.add('social');
   }
 
   await updateUser(targetUser, unsetKeys);
+
+  for (const field of changes) {
+    profileUpdatesTotal.inc({ field });
+  }
 
   return json({ user: toPublicUser(targetUser) });
 }, { allowSuspended: true });

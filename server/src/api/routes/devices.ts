@@ -17,6 +17,9 @@ import {
 } from '../../lib/db';
 import { hashToken } from '../../lib/tokens';
 import {
+  deviceClaimsTotal,
+  devicesRegisteredTotal,
+  observeTelemetryValues,
   telemetryRecordsAcceptedTotal,
   telemetryRecordsPersistedTotal,
   telemetryUploadBatchSize,
@@ -139,6 +142,7 @@ const handleCreateToken = requireAuth(async (_request, user: User) => {
     createdAt: now,
     expiresAt,
   });
+  deviceClaimsTotal.inc({ event: 'created' });
 
   return json({ token, expiresAt }, 201);
 });
@@ -243,6 +247,12 @@ async function handleUpload(request: Request): Promise<Response> {
     telemetryRecordsAcceptedTotal.inc(points.length);
     telemetryRecordsPersistedTotal.inc(accepted);
     telemetryUploadBatchSize.observe(points.length);
+    observeTelemetryValues(points);
+
+    if (created) {
+      devicesRegisteredTotal.inc();
+      deviceClaimsTotal.inc({ event: 'claimed' });
+    }
 
     return json({ device: toPublicDevice(device), accepted }, created ? 201 : 200);
   } catch (error) {
