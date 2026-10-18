@@ -101,7 +101,8 @@
         "w": 4,
         "x": 0,
         "y": 1
-      }
+      },
+      "description": "Requests the API is handling each second, summed across every route."
     },
     {
       "type": "stat",
@@ -183,7 +184,8 @@
         "w": 4,
         "x": 4,
         "y": 1
-      }
+      },
+      "description": "Sensor readings written to storage each second. One reading is a single temperature, humidity or pressure value."
     },
     {
       "type": "stat",
@@ -356,7 +358,8 @@
         "w": 4,
         "x": 12,
         "y": 1
-      }
+      },
+      "description": "95% of requests finish faster than this. The slowest 5% take longer, so a rising line means a small number of users are waiting."
     },
     {
       "type": "stat",
@@ -437,7 +440,8 @@
         "w": 4,
         "x": 16,
         "y": 1
-      }
+      },
+      "description": "Devices that uploaded at least one reading in the last 24 hours."
     },
     {
       "type": "stat",
@@ -518,7 +522,8 @@
         "w": 4,
         "x": 20,
         "y": 1
-      }
+      },
+      "description": "Every device record in the database, whether it is claimed by a user or not."
     },
     {
       "type": "stat",
@@ -599,7 +604,8 @@
         "w": 4,
         "x": 0,
         "y": 5
-      }
+      },
+      "description": "Every user account in the database."
     },
     {
       "type": "stat",
@@ -681,7 +687,8 @@
         "w": 4,
         "x": 4,
         "y": 5
-      }
+      },
+      "description": "Seconds since the server process started. Drops to zero when the process restarts."
     },
     {
       "type": "stat",
@@ -767,7 +774,8 @@
         "w": 4,
         "x": 8,
         "y": 5
-      }
+      },
+      "description": "Responses with a 5xx status, per second. These are requests the server failed to handle."
     },
     {
       "type": "stat",
@@ -853,7 +861,8 @@
         "w": 4,
         "x": 12,
         "y": 5
-      }
+      },
+      "description": "Share of cache lookups served from Redis. A falling ratio means more requests are reaching the database."
     },
     {
       "type": "stat",
@@ -939,7 +948,8 @@
         "w": 4,
         "x": 16,
         "y": 5
-      }
+      },
+      "description": "Telemetry uploads that failed, per second."
     },
     {
       "type": "stat",
@@ -1021,7 +1031,8 @@
         "w": 4,
         "x": 20,
         "y": 5
-      }
+      },
+      "description": "New user accounts created in the last 24 hours."
     },
     {
       "type": "gauge",
@@ -1105,7 +1116,8 @@
         "w": 6,
         "x": 0,
         "y": 9
-      }
+      },
+      "description": "Requests being handled right now. A number that climbs and does not come back down means the server is falling behind."
     },
     {
       "type": "gauge",
@@ -1189,7 +1201,8 @@
         "w": 6,
         "x": 6,
         "y": 9
-      }
+      },
+      "description": "CPU time used by the server, measured in cores. A value of 2 means the server is doing two cores' worth of work."
     },
     {
       "type": "gauge",
@@ -1273,7 +1286,8 @@
         "w": 6,
         "x": 12,
         "y": 9
-      }
+      },
+      "description": "Resident memory the process is holding, in bytes. This covers the JavaScript heap and everything around it."
     },
     {
       "type": "gauge",
@@ -1357,7 +1371,8 @@
         "w": 6,
         "x": 18,
         "y": 9
-      }
+      },
+      "description": "How late the event loop runs its timers, at the 99th percentile. High values mean the server is too busy to respond on time."
     },
     {
       "type": "row",
@@ -1473,7 +1488,8 @@
         "w": 12,
         "x": 0,
         "y": 15
-      }
+      },
+      "description": "Response time percentiles. p50 is the median and p99 is the slowest 1%. The average is shown for comparison but hides slow requests."
     },
     {
       "type": "timeseries",
@@ -1549,7 +1565,8 @@
         "w": 12,
         "x": 12,
         "y": 15
-      }
+      },
+      "description": "Requests per second grouped by HTTP status code."
     },
     {
       "type": "timeseries",
@@ -1625,7 +1642,8 @@
         "w": 8,
         "x": 0,
         "y": 24
-      }
+      },
+      "description": "Requests per second grouped by HTTP method."
     },
     {
       "type": "piechart",
@@ -1686,7 +1704,8 @@
         "w": 8,
         "x": 8,
         "y": 24
-      }
+      },
+      "description": "Share of all requests in the selected time range, split by HTTP method."
     },
     {
       "type": "bargauge",
@@ -1769,7 +1788,8 @@
         "w": 8,
         "x": 16,
         "y": 24
-      }
+      },
+      "description": "The ten routes handling the most requests per second."
     },
     {
       "type": "heatmap",
@@ -1818,7 +1838,7 @@
           "color": "rgba(255,0,255,0.7)"
         },
         "filterValues": {
-          "le": 1e-9
+          "le": 1e-09
         },
         "legend": {
           "show": true
@@ -1851,7 +1871,8 @@
         "w": 12,
         "x": 0,
         "y": 32
-      }
+      },
+      "description": "Requests grouped by how long they took. Brighter cells hold more requests in that time bucket."
     },
     {
       "type": "heatmap",
@@ -1900,7 +1921,7 @@
           "color": "rgba(255,0,255,0.7)"
         },
         "filterValues": {
-          "le": 1e-9
+          "le": 1e-09
         },
         "legend": {
           "show": true
@@ -1933,7 +1954,8 @@
         "w": 12,
         "x": 12,
         "y": 32
-      }
+      },
+      "description": "Responses grouped by payload size."
     },
     {
       "type": "timeseries",
@@ -2011,7 +2033,8 @@
         "w": 12,
         "x": 0,
         "y": 41
-      }
+      },
+      "description": "Response time p95 for the busiest routes, so one slow route is not hidden by the rest."
     },
     {
       "type": "timeseries",
@@ -2089,11 +2112,13 @@
         "w": 12,
         "x": 12,
         "y": 41
-      }
+      },
+      "description": "Response size p95 for the busiest routes."
     },
     {
       "type": "status-history",
       "title": "Status codes over time",
+      "maxDataPoints": 60,
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -2154,7 +2179,8 @@
         {
           "refId": "A",
           "expr": "sum by (status) (increase(ayphr_http_requests_total{method=~\"$method\", route=~\"$route\"}[$__rate_interval]))",
-          "legendFormat": "{{status}}"
+          "legendFormat": "{{status}}",
+          "interval": "5m"
         }
       ],
       "gridPos": {
@@ -2162,11 +2188,13 @@
         "w": 12,
         "x": 0,
         "y": 49
-      }
+      },
+      "description": "Each row is a status code and each column is a time bucket. The colour shows how many responses landed in that bucket."
     },
     {
       "type": "state-timeline",
       "title": "Errors by status class",
+      "maxDataPoints": 60,
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -2230,7 +2258,8 @@
         {
           "refId": "A",
           "expr": "sum by (status) (rate(ayphr_http_requests_total{status=~\"[45]..\", method=~\"$method\", route=~\"$route\"}[$__rate_interval]))",
-          "legendFormat": "{{status}}"
+          "legendFormat": "{{status}}",
+          "interval": "5m"
         }
       ],
       "gridPos": {
@@ -2238,7 +2267,8 @@
         "w": 12,
         "x": 12,
         "y": 49
-      }
+      },
+      "description": "Colours each time bucket by the status codes seen in it. Use it to see when errors started and how long they lasted."
     },
     {
       "type": "table",
@@ -2349,7 +2379,8 @@
         "w": 12,
         "x": 0,
         "y": 57
-      }
+      },
+      "description": "Per-route request rate, 5xx rate and p95 latency in one table."
     },
     {
       "type": "trend",
@@ -2414,6 +2445,15 @@
           "sort": "desc"
         }
       },
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        }
+      ],
       "targets": [
         {
           "refId": "A",
@@ -2431,7 +2471,8 @@
         "w": 12,
         "x": 12,
         "y": 57
-      }
+      },
+      "description": "Current requests in flight against the highest value seen in each window."
     },
     {
       "type": "row",
@@ -2749,7 +2790,7 @@
           "color": "rgba(255,0,255,0.7)"
         },
         "filterValues": {
-          "le": 1e-9
+          "le": 1e-09
         },
         "legend": {
           "show": true
@@ -2782,7 +2823,8 @@
         "w": 12,
         "x": 12,
         "y": 74
-      }
+      },
+      "description": "Uploads grouped by how many readings they carried."
     },
     {
       "type": "timeseries",
@@ -2869,7 +2911,8 @@
         "w": 8,
         "x": 0,
         "y": 82
-      }
+      },
+      "description": "Average temperature with the 10th and 90th percentiles, so short spikes do not stretch the scale."
     },
     {
       "type": "timeseries",
@@ -2956,7 +2999,8 @@
         "w": 8,
         "x": 8,
         "y": 82
-      }
+      },
+      "description": "Average relative humidity with the 10th and 90th percentiles."
     },
     {
       "type": "timeseries",
@@ -3043,7 +3087,8 @@
         "w": 8,
         "x": 16,
         "y": 82
-      }
+      },
+      "description": "Average air pressure in hectopascals with the 10th and 90th percentiles."
     },
     {
       "type": "heatmap",
@@ -3092,7 +3137,7 @@
           "color": "rgba(255,0,255,0.7)"
         },
         "filterValues": {
-          "le": 1e-9
+          "le": 1e-09
         },
         "legend": {
           "show": true
@@ -3125,7 +3170,8 @@
         "w": 12,
         "x": 0,
         "y": 90
-      }
+      },
+      "description": "Temperature readings grouped into buckets."
     },
     {
       "type": "heatmap",
@@ -3174,7 +3220,7 @@
           "color": "rgba(255,0,255,0.7)"
         },
         "filterValues": {
-          "le": 1e-9
+          "le": 1e-09
         },
         "legend": {
           "show": true
@@ -3207,7 +3253,8 @@
         "w": 12,
         "x": 12,
         "y": 90
-      }
+      },
+      "description": "Humidity readings grouped into buckets."
     },
     {
       "type": "stat",
@@ -3289,7 +3336,8 @@
         "w": 4,
         "x": 0,
         "y": 98
-      }
+      },
+      "description": "Devices paired to an account in the last 24 hours."
     },
     {
       "type": "stat",
@@ -3371,7 +3419,8 @@
         "w": 4,
         "x": 4,
         "y": 98
-      }
+      },
+      "description": "Claim codes generated so a device can be paired to an account."
     },
     {
       "type": "stat",
@@ -3453,7 +3502,8 @@
         "w": 4,
         "x": 8,
         "y": 98
-      }
+      },
+      "description": "Claim codes that were redeemed in the last 24 hours."
     },
     {
       "type": "stat",
@@ -3539,7 +3589,8 @@
         "w": 4,
         "x": 12,
         "y": 98
-      }
+      },
+      "description": "Telemetry uploads that failed in the last 24 hours."
     },
     {
       "type": "stat",
@@ -3621,7 +3672,8 @@
         "w": 4,
         "x": 16,
         "y": 98
-      }
+      },
+      "description": "Sensor readings written to storage in the last 24 hours."
     },
     {
       "type": "stat",
@@ -3703,7 +3755,8 @@
         "w": 4,
         "x": 20,
         "y": 98
-      }
+      },
+      "description": "Average number of readings per upload."
     },
     {
       "type": "timeseries",
@@ -4014,7 +4067,8 @@
         "w": 8,
         "x": 0,
         "y": 118
-      }
+      },
+      "description": "Successful registrations and logins over the last 24 hours."
     },
     {
       "type": "timeseries",
@@ -4090,7 +4144,8 @@
         "w": 8,
         "x": 8,
         "y": 118
-      }
+      },
+      "description": "Sessions created and destroyed per second. The gap between them is roughly the number of people logged in."
     },
     {
       "type": "timeseries",
@@ -4166,7 +4221,8 @@
         "w": 8,
         "x": 16,
         "y": 118
-      }
+      },
+      "description": "Requests allowed and blocked for each rate limiter."
     },
     {
       "type": "table",
@@ -4258,7 +4314,8 @@
         "w": 8,
         "x": 0,
         "y": 126
-      }
+      },
+      "description": "Staff moderation actions over the last 24 hours."
     },
     {
       "type": "table",
@@ -4350,7 +4407,8 @@
         "w": 8,
         "x": 8,
         "y": 126
-      }
+      },
+      "description": "Punishments issued and lifted over the last 24 hours."
     },
     {
       "type": "bargauge",
@@ -4433,7 +4491,8 @@
         "w": 8,
         "x": 16,
         "y": 126
-      }
+      },
+      "description": "Registrations grouped by country. The country comes from the request IP, so it is approximate."
     },
     {
       "type": "geomap",
@@ -4453,8 +4512,8 @@
           "showDebug": false
         },
         "basemap": {
-          "type": "default",
-          "name": "Layer 0"
+          "type": "osm-standard",
+          "name": "OpenStreetMap"
         },
         "tooltip": {
           "mode": "details"
@@ -4508,7 +4567,8 @@
         "w": 12,
         "x": 0,
         "y": 134
-      }
+      },
+      "description": "Registration counts placed on a world map by country. The location comes from the request IP, so it is approximate."
     },
     {
       "type": "timeseries",
@@ -4589,7 +4649,8 @@
         "w": 12,
         "x": 12,
         "y": 134
-      }
+      },
+      "description": "Profile field edits and avatar changes per second."
     },
     {
       "type": "row",
@@ -4678,7 +4739,8 @@
         "w": 12,
         "x": 0,
         "y": 145
-      }
+      },
+      "description": "Stripe webhook calls grouped by event type."
     },
     {
       "type": "timeseries",
@@ -4758,7 +4820,8 @@
         "w": 12,
         "x": 12,
         "y": 145
-      }
+      },
+      "description": "Stripe webhook calls that failed, grouped by event type."
     },
     {
       "type": "stat",
@@ -5258,7 +5321,8 @@
         "w": 4,
         "x": 20,
         "y": 153
-      }
+      },
+      "description": "Failed checkout and billing portal attempts in the last 24 hours."
     },
     {
       "type": "bargauge",
@@ -5341,7 +5405,8 @@
         "w": 24,
         "x": 0,
         "y": 157
-      }
+      },
+      "description": "Subscription events over the last 24 hours, including checkout and auto-renew changes."
     },
     {
       "type": "row",
@@ -5430,7 +5495,8 @@
         "w": 12,
         "x": 0,
         "y": 166
-      }
+      },
+      "description": "Redis reads and writes split by hit, miss and error."
     },
     {
       "type": "piechart",
@@ -5575,7 +5641,8 @@
         "w": 6,
         "x": 0,
         "y": 174
-      }
+      },
+      "description": "Share of cache lookups served from Redis. A falling ratio means more requests are reaching the database."
     },
     {
       "type": "timeseries",
@@ -5655,7 +5722,8 @@
         "w": 6,
         "x": 6,
         "y": 174
-      }
+      },
+      "description": "Cache reads and writes that failed."
     },
     {
       "type": "timeseries",
@@ -5731,7 +5799,8 @@
         "w": 12,
         "x": 12,
         "y": 174
-      }
+      },
+      "description": "Database commands per second, grouped by operation type."
     },
     {
       "type": "timeseries",
@@ -6184,7 +6253,8 @@
         "w": 8,
         "x": 16,
         "y": 189
-      }
+      },
+      "description": "How late the event loop runs its timers. p99 is the worst 1% of delays and is the one to watch."
     },
     {
       "type": "heatmap",
@@ -6233,7 +6303,7 @@
           "color": "rgba(255,0,255,0.7)"
         },
         "filterValues": {
-          "le": 1e-9
+          "le": 1e-09
         },
         "legend": {
           "show": true
@@ -6266,7 +6336,8 @@
         "w": 12,
         "x": 0,
         "y": 197
-      }
+      },
+      "description": "Time spent collecting garbage, grouped by kind and bucket."
     },
     {
       "type": "timeseries",
@@ -6348,7 +6419,8 @@
         "w": 6,
         "x": 12,
         "y": 197
-      }
+      },
+      "description": "Open file and socket handles against the process limit. Close to the limit, new connections start to fail."
     },
     {
       "type": "timeseries",
@@ -6435,7 +6507,8 @@
         "w": 6,
         "x": 18,
         "y": 197
-      }
+      },
+      "description": "Work the runtime has open right now, such as sockets, timers and pending requests."
     },
     {
       "type": "table",
@@ -6538,27 +6611,8 @@
         "w": 12,
         "x": 0,
         "y": 205
-      }
-    },
-    {
-      "type": "text",
-      "title": "About this dashboard",
-      "options": {
-        "mode": "markdown",
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "### Ayphr server dashboard\n\nEvery panel is backed by the `ayphr_*` metrics exported on the metrics server (`:7234/metrics`) and scraped by Prometheus.\n\n- **Overview** — headline request, telemetry and capacity numbers.\n- **HTTP** — latency, status codes, payload sizes and per-route cost.\n- **Devices & telemetry** — upload throughput plus raw sensor distributions.\n- **Accounts & auth** — registrations, logins, sessions, rate limits and staff actions.\n- **Billing** — Stripe webhook health and the subscription funnel.\n- **Cache & MongoDB** — Redis effectiveness and database workload.\n- **Runtime** — CPU, memory, GC, event-loop and file-descriptor health.\n\nUse the `method`, `route` and `collection` variables above to scope the dashboard."
       },
-      "transparent": true,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 205
-      }
+      "description": "Memory used and available inside each JavaScript heap space."
     }
   ],
   "refresh": "10s",
