@@ -127,12 +127,15 @@ services:
     restart: unless-stopped
     environment:
       GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SERVER_HTTP_PORT: '2435'
       GF_SERVER_ROOT_URL: '${GRAFANA_ROOT_URL}'
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
       GF_SECURITY_ADMIN_USER: '${GRAFANA_ADMIN_USER}'
       GF_SECURITY_ADMIN_PASSWORD: '${GRAFANA_ADMIN_PASSWORD}'
       PROMETHEUS_PASSWORD: '${PROMETHEUS_PASSWORD}'
       ALERT_WEBHOOK_URL: '${ALERT_WEBHOOK_URL:-}'
+    ports:
+      - '2435:2435'
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
