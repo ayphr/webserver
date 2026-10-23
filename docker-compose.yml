@@ -134,8 +134,6 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: '${GRAFANA_ADMIN_PASSWORD}'
       PROMETHEUS_PASSWORD: '${PROMETHEUS_PASSWORD}'
       ALERT_WEBHOOK_URL: '${ALERT_WEBHOOK_URL:-}'
-    ports:
-      - '2435:2435'
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
