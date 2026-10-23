@@ -107,13 +107,11 @@ services:
       - '--web.config.file=/etc/prometheus/web.config.yml'
       - '--storage.tsdb.retention.time=7d'
       - '--storage.tsdb.wal-compression'
-      - '--web.listen-address=:7444'
+      - '--web.listen-address=:80'
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/web.config.yml:/etc/prometheus/web.config.yml:ro
       - prometheus_data:/prometheus
-    ports:
-      - '7444:7444'
     depends_on:
       server:
         condition: service_healthy
@@ -129,7 +127,8 @@ services:
     restart: unless-stopped
     environment:
       GF_USERS_ALLOW_SIGN_UP: 'false'
-      GF_SERVER_HTTP_PORT: 7443
+      GF_SERVER_ROOT_URL: '${GRAFANA_ROOT_URL}'
+      GF_SERVER_HTTP_PORT: 80
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
       GF_SECURITY_ADMIN_USER: '${GRAFANA_ADMIN_USER}'
       GF_SECURITY_ADMIN_PASSWORD: '${GRAFANA_ADMIN_PASSWORD}'
@@ -139,8 +138,6 @@ services:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports:
-      - '7443:7443'
     depends_on:
       prometheus:
         condition: service_started
