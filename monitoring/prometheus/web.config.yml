@@ -1,6 +1,5 @@
-# The default username is admin. Change the password by regenerating the hash
-# below and setting the matching PROMETHEUS_PASSWORD in the environment used by
-# docker compose (Grafana reads it for the datasource):
+# The default username is admin. The hash below is for the password stored in
+# your private .env as PROMETHEUS_PASSWORD. Keep that value secret. To rotate it:
 #
 #   htpasswd -bnBC 10 "" "$PROMETHEUS_PASSWORD" | tr -d ':\n'
 #

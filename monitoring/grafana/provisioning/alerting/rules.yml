@@ -1,0 +1,1437 @@
+apiVersion: 1
+
+# Provisioned Grafana alert rules for the ayphr Server dashboard.
+# Thresholds are starting points. Tune them against your own baseline.
+# Queries return 1 when the alert condition is true, so every rule
+# uses the same threshold expression (> 0) in condition C.
+groups:
+  - orgId: 1
+    name: ayphr-critical
+    folder: Ayphr
+    interval: 1m
+    rules:
+      - uid: ayphr_api_scrape_down
+        title: Ayphr API scrape down
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                absent(up{job="ayphr-server"})
+                or
+                (up{job="ayphr-server"} == bool 0)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: |-
+            Prometheus has not been able to scrape the Ayphr API for 1 minute.
+          description: |-
+            The API and its metrics listener run in the same process, so this
+            usually means the server is down, crash-looping, or unreachable from
+            Prometheus. Check "docker compose ps server", the server logs, and the
+            /metrics listener on port 7234. See the "Uptime" panel on the ayphr
+            Server dashboard.
+        labels:
+          severity: critical
+          service: ayphr-api
+          category: availability
+        isPaused: false
+      - uid: ayphr_http_5xx_ratio
+        title: Ayphr API 5xx rate above 5%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  sum(rate(ayphr_http_requests_total{status=~"5.."}[5m]))
+                  /
+                  clamp_min(sum(rate(ayphr_http_requests_total[5m])), 0.001)
+                  > bool 0.05
+                )
+                *
+                (
+                  sum(rate(ayphr_http_requests_total[5m])) > bool 0.2
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            More than 5% of API responses are 5xx.
+          description: |-
+            Users are seeing server errors. Check the "Error rate", "Requests by
+            status", and "Route breakdown" panels to find the affected route, then
+            inspect the server logs for the failing request.
+        labels:
+          severity: critical
+          service: ayphr-api
+          category: availability
+        isPaused: false
+      - uid: ayphr_http_latency_p95
+        title: Ayphr API p95 latency above 1s
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  histogram_quantile(
+                    0.95,
+                    sum by (le) (rate(ayphr_http_request_duration_seconds_bucket[10m]))
+                  )
+                  > bool 1
+                )
+                *
+                (
+                  sum(rate(ayphr_http_request_duration_seconds_count[10m])) > bool 0.2
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            95% of API requests are taking longer than 1 second.
+          description: |-
+            Check "Latency percentiles" and "Latency p95 by route" to find the
+            slow route. Correlate with CPU, memory, event loop lag, MongoDB and
+            cache panels. A rising average alone is not enough; this rule uses p95
+            so a small number of slow requests still page.
+        labels:
+          severity: critical
+          service: ayphr-api
+          category: performance
+        isPaused: false
+      - uid: ayphr_requests_in_flight
+        title: Ayphr API requests in flight saturated
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                max_over_time(ayphr_http_requests_in_flight[5m]) > bool 50
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Requests in flight stayed above 50 for 10 minutes.
+          description: |-
+            Slow handlers or an upstream dependency can cause requests to pile up.
+            Check the "Requests in flight (trend)" panel, latency, and the slowest
+            routes. The threshold is a starting point: raise it to 2-3x your normal
+            peak once you have a baseline.
+        labels:
+          severity: critical
+          service: ayphr-api
+          category: capacity
+        isPaused: false
+      - uid: ayphr_event_loop_lag_p99
+        title: Ayphr API event loop lag p99 above 200ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                ayphr_nodejs_eventloop_lag_p99_seconds > bool 0.2
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            The event loop is running at least 200ms late at p99.
+          description: |-
+            The Node/Bun event loop is blocked or overloaded, so requests queue
+            even when CPU looks moderate. Check "Event loop lag", "GC duration by
+            kind", and any synchronous work on hot routes. Sustained lag usually
+            precedes a latency spike.
+        labels:
+          severity: critical
+          service: ayphr-api
+          category: performance
+        isPaused: false
+      - uid: ayphr_memory_rss
+        title: Ayphr API memory above 1.6 GB
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                ayphr_process_resident_memory_bytes > bool 1.6e9
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Resident memory is approaching the 2 GB container limit.
+          description: |-
+            An OOM kill will show up as a scrape gap and a restart. Check "Memory"
+            and "Heap spaces". If the heap is stable but RSS keeps growing, look
+            for native or external memory growth rather than JavaScript objects.
+        labels:
+          severity: critical
+          service: ayphr-api
+          category: capacity
+        isPaused: false
+      - uid: ayphr_file_descriptors
+        title: Ayphr API file descriptors above 80%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  ayphr_process_open_fds / clamp_min(ayphr_process_max_fds, 1)
+                ) > bool 0.8
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Open file and socket handles are close to the process limit.
+          description: |-
+            When the limit is reached, new connections fail. Check "File
+            descriptors" and whether requests in flight are stuck. Connection leaks
+            usually come from an upstream client that never closes sockets.
+        labels:
+          severity: critical
+          service: ayphr-api
+          category: capacity
+        isPaused: false
+
+  - orgId: 1
+    name: ayphr-warning
+    folder: Ayphr
+    interval: 1m
+    rules:
+      - uid: ayphr_cpu_saturation
+        title: Ayphr API CPU above 80% of limit
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  sum(rate(ayphr_process_cpu_user_seconds_total[5m]))
+                  +
+                  sum(rate(ayphr_process_cpu_system_seconds_total[5m]))
+                ) > bool 1.6
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            The process is using more than 1.6 of its 2 CPU cores.
+          description: |-
+            Check "CPU: user vs system" and the busiest routes. Sustained CPU
+            saturation raises latency and event loop lag. If system time dominates,
+            look for syscall-heavy work; if user time dominates, profile the hot
+            code path.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: capacity
+        isPaused: false
+      - uid: ayphr_heap_pressure
+        title: Ayphr API heap above 90%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  ayphr_nodejs_heap_size_used_bytes
+                  /
+                  clamp_min(ayphr_nodejs_heap_size_total_bytes, 1)
+                ) > bool 0.9
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            The JavaScript heap is almost full.
+          description: |-
+            GC time will rise and latency will follow. Check "Heap spaces" and "GC
+            duration by kind". If it stays above 90%, capture a heap profile before
+            the process is killed.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: capacity
+        isPaused: false
+      - uid: ayphr_process_restarts
+        title: Ayphr API restarted repeatedly
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                changes(ayphr_process_start_time_seconds[15m]) > bool 1
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        annotations:
+          summary: |-
+            The Ayphr API process restarted more than once in 15 minutes.
+          description: |-
+            A single restart is usually a deploy. Repeated restarts suggest a crash
+            loop, OOM kill, or failed health check. Check "Uptime", container
+            status, and the server logs.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: availability
+        isPaused: false
+      - uid: ayphr_telemetry_upload_errors
+        title: Ayphr telemetry upload errors above 3/min
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(rate(ayphr_telemetry_upload_errors_total[5m])) > bool 0.05
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Devices are failing to upload readings.
+          description: |-
+            Check "Upload errors" and the server logs. A spike across many devices
+            usually means a storage or validation problem; a spike on one device
+            points to bad firmware or payloads.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: telemetry
+        isPaused: false
+      - uid: ayphr_telemetry_persist_stall
+        title: Ayphr telemetry accepted but not persisted
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  sum(rate(ayphr_telemetry_records_persisted_total[15m])) == bool 0
+                )
+                *
+                (
+                  sum(rate(ayphr_telemetry_records_accepted_total[15m])) > bool 0
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            The API is accepting readings but writing none to MongoDB.
+          description: |-
+            Check "Data points accepted vs persisted", MongoDB health, and the
+            server logs. This is data loss if it continues.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: telemetry
+        isPaused: false
+      - uid: ayphr_telemetry_upload_duration_p95
+        title: Ayphr telemetry upload p95 above 2s
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                histogram_quantile(
+                  0.95,
+                  sum by (le) (rate(ayphr_telemetry_upload_duration_seconds_bucket[10m]))
+                ) > bool 2
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Device uploads are taking longer than 2 seconds at p95.
+          description: |-
+            Check "Upload duration percentiles", MongoDB operation rate, and batch
+            size. Slow uploads cause devices to retry and amplify load.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: telemetry
+        isPaused: false
+      - uid: ayphr_cache_errors
+        title: Ayphr cache errors
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(rate(ayphr_cache_operations_total{result="error"}[5m])) > bool 0.05
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Redis reads or writes are failing.
+          description: |-
+            Check "Cache errors" and the Redis container. The API can run without
+            cache, but database load will rise.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: cache
+        isPaused: false
+      - uid: ayphr_cache_hit_ratio
+        title: Ayphr cache hit ratio below 40%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  100 * sum(rate(ayphr_cache_operations_total{result="hit"}[15m]))
+                  /
+                  clamp_min(sum(rate(ayphr_cache_operations_total{result=~"hit|miss"}[15m])), 0.001)
+                  < bool 40
+                )
+                *
+                (
+                  sum(rate(ayphr_cache_operations_total{result=~"hit|miss"}[5m])) > bool 0.1
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 30m
+        annotations:
+          summary: |-
+            Most cache lookups are missing and reaching MongoDB.
+          description: |-
+            Redis runs with maxmemory 512mb and allkeys-lru, so a falling ratio
+            often means eviction. Check "Cache hit ratio", "Cache operations by
+            result", and Redis logs.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: cache
+        isPaused: false
+      - uid: ayphr_stripe_webhook_errors
+        title: Ayphr Stripe webhook errors
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(increase(ayphr_stripe_webhook_errors_total[15m])) > bool 3
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Stripe webhook processing is failing.
+          description: |-
+            Check "Stripe webhook errors by type" and the server logs. Failed
+            events can leave subscriptions out of sync until Stripe retries.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: billing
+        isPaused: false
+      - uid: ayphr_billing_checkout_failures
+        title: Ayphr checkout or portal failures
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(increase(ayphr_subscription_events_total{event=~"checkout_failed|portal_failed"}[30m])) > bool 5
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: |-
+            Checkout or billing portal creation failed repeatedly.
+          description: |-
+            Check "Checkout failures", the Stripe configuration, and the server
+            logs.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: billing
+        isPaused: false
+      - uid: ayphr_login_failure_ratio
+        title: Ayphr login failure ratio above 50%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  sum(rate(ayphr_auth_events_total{event="login",result!="success"}[10m]))
+                  /
+                  clamp_min(sum(rate(ayphr_auth_events_total{event="login"}[10m])), 0.001)
+                  > bool 0.5
+                )
+                *
+                (
+                  sum(rate(ayphr_auth_events_total{event="login"}[10m])) > bool 0.05
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            More than half of login attempts are failing.
+          description: |-
+            This includes invalid credentials, rate limiting, and errors, so it can
+            be credential stuffing or a broken auth path. Check "Logins by
+            outcome" and "Rate limit decisions".
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: security
+        isPaused: false
+      - uid: ayphr_rate_limit_blocks
+        title: Ayphr rate limit blocks spiking
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum by (limiter) (
+                  rate(ayphr_rate_limit_checks_total{result="blocked"}[10m])
+                ) > bool 1
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            A rate limiter is blocking more than 1 request per second.
+          description: |-
+            Check "Rate limit decisions" and whether a client is retrying too
+            aggressively or an attack is in progress. The alert fires once per
+            limiter.
+        labels:
+          severity: warning
+          service: ayphr-api
+          category: security
+        isPaused: false
+
+  - orgId: 1
+    name: ayphr-info
+    folder: Ayphr
+    interval: 1m
+    rules:
+      - uid: ayphr_no_telemetry_1h
+        title: Ayphr no telemetry persisted for 1 hour
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  sum(increase(ayphr_telemetry_records_persisted_total[1h])) == bool 0
+                )
+                *
+                (
+                  sum(ayphr_devices_total) > bool 0
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            No sensor readings have been persisted for an hour.
+          description: |-
+            Check "Data points / second", "Points persisted (24h)", device
+            connectivity, and the upload pipeline. Ignore during planned
+            maintenance.
+        labels:
+          severity: info
+          service: ayphr-api
+          category: telemetry
+        isPaused: false
+      - uid: ayphr_active_devices_drop
+        title: Ayphr active devices dropped 40%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  ayphr_active_devices
+                  < bool (0.6 * scalar(max_over_time(ayphr_active_devices[7d])))
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 1h
+        annotations:
+          summary: |-
+            Active devices are below 60% of their 7-day peak.
+          description: |-
+            This can be a real fleet outage or a daily pattern. Check "Active
+            devices (24h)" and upload volume. The rule needs about 7 days of
+            history to be meaningful.
+        labels:
+          severity: info
+          service: ayphr-api
+          category: telemetry
+        isPaused: false
+      - uid: ayphr_stripe_signature_failures
+        title: Ayphr Stripe signature verification failures
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(increase(ayphr_stripe_webhook_errors_total{type=~"signature_missing|signature_invalid"}[15m])) > bool 0
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            Stripe webhook signatures failed to verify.
+          description: |-
+            Usually this means the webhook secret is wrong or was rotated.
+            Repeated failures can also indicate forged requests. Check the Stripe
+            webhook configuration and the server logs.
+        labels:
+          severity: info
+          service: ayphr-api
+          category: security
+        isPaused: false
+      - uid: ayphr_registration_failure_ratio
+        title: Ayphr registration failure ratio above 25%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (
+                  sum(rate(ayphr_auth_events_total{event="register",result!="success"}[10m]))
+                  /
+                  clamp_min(sum(rate(ayphr_auth_events_total{event="register"}[10m])), 0.001)
+                  > bool 0.25
+                )
+                *
+                (
+                  sum(rate(ayphr_auth_events_total{event="register"}[10m])) > bool 0.02
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: |-
+            A quarter of registration attempts are failing.
+          description: |-
+            Some failures are normal (validation, duplicate usernames), but a
+            sustained spike may indicate a broken form, policy fetch error, or
+            abuse. Check "Registrations by outcome".
+        labels:
+          severity: info
+          service: ayphr-api
+          category: auth
+        isPaused: false

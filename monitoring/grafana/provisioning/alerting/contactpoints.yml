@@ -1,0 +1,12 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: ayphr-alerts
+    receivers:
+      - uid: ayphr_alerts_webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: $ALERT_WEBHOOK_URL
+          httpMethod: POST
