@@ -9,7 +9,7 @@ datasources:
     uid: prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:7444
+    url: http://prometheus:80
     isDefault: true
     editable: false
     basicAuth: true
