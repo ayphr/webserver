@@ -5,8 +5,11 @@ contactPoints:
     name: ayphr-alerts
     receivers:
       - uid: ayphr_alerts_webhook
-        type: webhook
+        type: slack
         disableResolveMessage: false
         settings:
           url: $ALERT_WEBHOOK_URL
-          httpMethod: POST
+          title: |
+            {{ template "slack.default.title" . }}
+          text: |
+            {{ template "slack.default.text" . }}
