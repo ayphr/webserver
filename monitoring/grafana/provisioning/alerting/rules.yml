@@ -1,6 +1,6 @@
 apiVersion: 1
 
-# Provisioned Grafana alert rules for the ayphr Server dashboard.
+# Provisioned Grafana alert rules for the Ayphr observability dashboards.
 # Thresholds are starting points. Tune them against your own baseline.
 # Queries return 1 when the alert condition is true, so every rule
 # uses the same threshold expression (> 0) in condition C.
@@ -66,7 +66,7 @@ groups:
             usually means the server is down, crash-looping, or unreachable from
             Prometheus. Check "docker compose ps server", the server logs, and the
             /metrics listener on port 7234. See the "Uptime" panel on the ayphr
-            Server dashboard.
+            Overview dashboard.
         labels:
           severity: critical
           service: ayphr-api
@@ -131,9 +131,10 @@ groups:
           summary: |-
             More than 5% of API responses are 5xx.
           description: |-
-            Users are seeing server errors. Check the "Error rate", "Requests by
-            status", and "Route breakdown" panels to find the affected route, then
-            inspect the server logs for the failing request.
+            Users are seeing server errors. Check the "Error rate" panel on the
+            ayphr Overview dashboard, then the "Requests by status" and "Route
+            breakdown" panels on the ayphr HTTP dashboard to find the affected
+            route, then inspect the server logs for the failing request.
         labels:
           severity: critical
           service: ayphr-api
@@ -199,10 +200,11 @@ groups:
           summary: |-
             95% of API requests are taking longer than 1 second.
           description: |-
-            Check "Latency percentiles" and "Latency p95 by route" to find the
-            slow route. Correlate with CPU, memory, event loop lag, MongoDB and
-            cache panels. A rising average alone is not enough; this rule uses p95
-            so a small number of slow requests still page.
+            Check the "Latency percentiles" and "Latency p95 by route" panels on
+            the ayphr HTTP dashboard to find the slow route. Correlate with the
+            ayphr Runtime and Cache & MongoDB dashboards. A rising average alone is
+            not enough; this rule uses p95 so a small number of slow requests still
+            page.
         labels:
           severity: critical
           service: ayphr-api
@@ -259,8 +261,8 @@ groups:
             Requests in flight stayed above 50 for 10 minutes.
           description: |-
             Slow handlers or an upstream dependency can cause requests to pile up.
-            Check the "Requests in flight (trend)" panel, latency, and the slowest
-            routes. The threshold is a starting point: raise it to 2-3x your normal
+            Check the "Requests in flight (trend)" panel on the ayphr HTTP
+            dashboard, latency, and the slowest routes. The threshold is a starting point: raise it to 2-3x your normal
             peak once you have a baseline.
         labels:
           severity: critical
@@ -318,9 +320,10 @@ groups:
             The event loop is running at least 200ms late at p99.
           description: |-
             The Node/Bun event loop is blocked or overloaded, so requests queue
-            even when CPU looks moderate. Check "Event loop lag", "GC duration by
-            kind", and any synchronous work on hot routes. Sustained lag usually
-            precedes a latency spike.
+            even when CPU looks moderate. Check the "Event loop lag" and "GC
+            duration by kind" panels on the ayphr Runtime dashboard, and any
+            synchronous work on hot routes. Sustained lag usually precedes a
+            latency spike.
         labels:
           severity: critical
           service: ayphr-api
@@ -376,9 +379,10 @@ groups:
           summary: |-
             Resident memory is approaching the 2 GB container limit.
           description: |-
-            An OOM kill will show up as a scrape gap and a restart. Check "Memory"
-            and "Heap spaces". If the heap is stable but RSS keeps growing, look
-            for native or external memory growth rather than JavaScript objects.
+            An OOM kill will show up as a scrape gap and a restart. Check the
+            "Memory" and "Heap spaces" panels on the ayphr Runtime dashboard. If
+            the heap is stable but RSS keeps growing, look for native or external
+            memory growth rather than JavaScript objects.
         labels:
           severity: critical
           service: ayphr-api
@@ -436,9 +440,10 @@ groups:
           summary: |-
             Open file and socket handles are close to the process limit.
           description: |-
-            When the limit is reached, new connections fail. Check "File
-            descriptors" and whether requests in flight are stuck. Connection leaks
-            usually come from an upstream client that never closes sockets.
+            When the limit is reached, new connections fail. Check the "File
+            descriptors" panel on the ayphr Runtime dashboard and whether requests
+            in flight are stuck. Connection leaks usually come from an upstream
+            client that never closes sockets.
         labels:
           severity: critical
           service: ayphr-api
@@ -504,8 +509,9 @@ groups:
           summary: |-
             The process is using more than 1.6 of its 2 CPU cores.
           description: |-
-            Check "CPU: user vs system" and the busiest routes. Sustained CPU
-            saturation raises latency and event loop lag. If system time dominates,
+            Check "CPU: user vs system" on the ayphr Runtime dashboard and the
+            busiest routes on the ayphr HTTP dashboard. Sustained CPU saturation
+            raises latency and event loop lag. If system time dominates,
             look for syscall-heavy work; if user time dominates, profile the hot
             code path.
         labels:
@@ -567,9 +573,9 @@ groups:
           summary: |-
             The JavaScript heap is almost full.
           description: |-
-            GC time will rise and latency will follow. Check "Heap spaces" and "GC
-            duration by kind". If it stays above 90%, capture a heap profile before
-            the process is killed.
+            GC time will rise and latency will follow. Check the "Heap spaces" and
+            "GC duration by kind" panels on the ayphr Runtime dashboard. If it
+            stays above 90%, capture a heap profile before the process is killed.
         labels:
           severity: warning
           service: ayphr-api
@@ -626,8 +632,8 @@ groups:
             The Ayphr API process restarted more than once in 15 minutes.
           description: |-
             A single restart is usually a deploy. Repeated restarts suggest a crash
-            loop, OOM kill, or failed health check. Check "Uptime", container
-            status, and the server logs.
+            loop, OOM kill, or failed health check. Check the "Uptime" panel on
+            the ayphr Overview dashboard, container status, and the server logs.
         labels:
           severity: warning
           service: ayphr-api
@@ -683,7 +689,8 @@ groups:
           summary: |-
             Devices are failing to upload readings.
           description: |-
-            Check "Upload errors" and the server logs. A spike across many devices
+            Check the "Upload errors" panel on the ayphr Devices & Telemetry
+            dashboard and the server logs. A spike across many devices
             usually means a storage or validation problem; a spike on one device
             points to bad firmware or payloads.
         labels:
@@ -747,8 +754,9 @@ groups:
           summary: |-
             The API is accepting readings but writing none to MongoDB.
           description: |-
-            Check "Data points accepted vs persisted", MongoDB health, and the
-            server logs. This is data loss if it continues.
+            Check the "Data points accepted vs persisted" panel on the ayphr
+            Devices & Telemetry dashboard, MongoDB health, and the server logs.
+            This is data loss if it continues.
         labels:
           severity: warning
           service: ayphr-api
@@ -807,8 +815,9 @@ groups:
           summary: |-
             Device uploads are taking longer than 2 seconds at p95.
           description: |-
-            Check "Upload duration percentiles", MongoDB operation rate, and batch
-            size. Slow uploads cause devices to retry and amplify load.
+            Check the "Upload duration percentiles" panel on the ayphr Devices &
+            Telemetry dashboard, MongoDB operation rate, and batch size. Slow
+            uploads cause devices to retry and amplify load.
         labels:
           severity: warning
           service: ayphr-api
@@ -864,8 +873,9 @@ groups:
           summary: |-
             Redis reads or writes are failing.
           description: |-
-            Check "Cache errors" and the Redis container. The API can run without
-            cache, but database load will rise.
+            Check the "Cache errors" panel on the ayphr Cache & MongoDB dashboard
+            and the Redis container. The API can run without cache, but database
+            load will rise.
         labels:
           severity: warning
           service: ayphr-api
@@ -931,8 +941,9 @@ groups:
             Most cache lookups are missing and reaching MongoDB.
           description: |-
             Redis runs with maxmemory 512mb and allkeys-lru, so a falling ratio
-            often means eviction. Check "Cache hit ratio", "Cache operations by
-            result", and Redis logs.
+            often means eviction. Check the "Cache hit ratio" and "Cache operations
+            by result" panels on the ayphr Cache & MongoDB dashboard, and the Redis
+            logs.
         labels:
           severity: warning
           service: ayphr-api
@@ -988,8 +999,9 @@ groups:
           summary: |-
             Stripe webhook processing is failing.
           description: |-
-            Check "Stripe webhook errors by type" and the server logs. Failed
-            events can leave subscriptions out of sync until Stripe retries.
+            Check the "Stripe webhook errors by type" panel on the ayphr Billing
+            dashboard and the server logs. Failed events can leave subscriptions
+            out of sync until Stripe retries.
         labels:
           severity: warning
           service: ayphr-api
@@ -1045,8 +1057,8 @@ groups:
           summary: |-
             Checkout or billing portal creation failed repeatedly.
           description: |-
-            Check "Checkout failures", the Stripe configuration, and the server
-            logs.
+            Check the "Checkout failures" panel on the ayphr Billing dashboard, the
+            Stripe configuration, and the server logs.
         labels:
           severity: warning
           service: ayphr-api
@@ -1112,8 +1124,9 @@ groups:
             More than half of login attempts are failing.
           description: |-
             This includes invalid credentials, rate limiting, and errors, so it can
-            be credential stuffing or a broken auth path. Check "Logins by
-            outcome" and "Rate limit decisions".
+            be credential stuffing or a broken auth path. Check the "Logins by
+            outcome" and "Rate limit decisions" panels on the ayphr Accounts & Auth
+            dashboard.
         labels:
           severity: warning
           service: ayphr-api
@@ -1171,9 +1184,9 @@ groups:
           summary: |-
             A rate limiter is blocking more than 1 request per second.
           description: |-
-            Check "Rate limit decisions" and whether a client is retrying too
-            aggressively or an attack is in progress. The alert fires once per
-            limiter.
+            Check the "Rate limit decisions" panel on the ayphr Accounts & Auth
+            dashboard and whether a client is retrying too aggressively or an
+            attack is in progress. The alert fires once per limiter.
         labels:
           severity: warning
           service: ayphr-api
@@ -1241,7 +1254,8 @@ groups:
           summary: |-
             No sensor readings have been persisted for an hour.
           description: |-
-            Check "Data points / second", "Points persisted (24h)", device
+            Check "Data points / second" on the ayphr Overview dashboard, "Points
+            persisted (24h)" on the ayphr Devices & Telemetry dashboard, device
             connectivity, and the upload pipeline. Ignore during planned
             maintenance.
         labels:
@@ -1303,8 +1317,8 @@ groups:
             Active devices are below 60% of their 7-day peak.
           description: |-
             This can be a real fleet outage or a daily pattern. Check "Active
-            devices (24h)" and upload volume. The rule needs about 7 days of
-            history to be meaningful.
+            devices (24h)" on the ayphr Overview dashboard and upload volume. The
+            rule needs about 7 days of history to be meaningful.
         labels:
           severity: info
           service: ayphr-api
@@ -1429,7 +1443,8 @@ groups:
           description: |-
             Some failures are normal (validation, duplicate usernames), but a
             sustained spike may indicate a broken form, policy fetch error, or
-            abuse. Check "Registrations by outcome".
+            abuse. Check the "Registrations by outcome" panel on the ayphr Accounts
+            & Auth dashboard.
         labels:
           severity: info
           service: ayphr-api
