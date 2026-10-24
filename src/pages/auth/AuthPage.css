@@ -39,8 +39,17 @@
   }
 }
 
-.auth-page__card {
+.auth-page__card.card {
   width: 100%;
+  cursor: default;
+
+  &:hover,
+  &:has(a),
+  &:has(a):hover {
+    box-shadow: none;
+    border-color: hsl(0, 0%, 16%);
+    cursor: default;
+  }
 }
 
 .auth-form {

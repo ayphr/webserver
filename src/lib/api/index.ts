@@ -29,8 +29,8 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     baseUrl: API_BASE_URL,
     onUnauthorized: () => {
       if (globalThis.window === undefined) return;
-      if (globalThis.location.pathname !== '/auth') {
-        globalThis.location.assign('/auth');
+      if (!globalThis.location.pathname.startsWith('/auth')) {
+        globalThis.location.assign('/auth/login');
       }
     },
     ...config,

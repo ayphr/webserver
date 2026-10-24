@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { IconCheck, IconX } from '@tabler/icons-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input } from '../../components/common';
 import { api } from '../../lib/api';
@@ -15,9 +15,15 @@ interface FormData {
   confirmPassword?: string;
 }
 
-export const AuthPage = () => {
+export interface AuthPageProps {
+  initialMode?: AuthMode;
+}
+
+export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<AuthMode>('login');
+  const location = useLocation();
+  const mode: AuthMode = initialMode ?? (location.pathname.includes('register') ? 'signup' : 'login');
+
   const [formData, setFormData] = useState<FormData>({
     username: '',
     password: '',
@@ -111,7 +117,6 @@ export const AuthPage = () => {
   };
 
   const toggleMode = () => {
-    setMode(mode === 'login' ? 'signup' : 'login');
     setFormData({
       username: '',
       password: '',
@@ -120,10 +125,17 @@ export const AuthPage = () => {
     setAcceptedPolicies(false);
     setPolicyError(null);
     setAuthError(null);
+    void navigate(mode === 'login' ? '/auth/register' : '/auth/login');
   };
 
   const isSignup = mode === 'signup';
   const hasEnteredPassword = formData.password.length > 0;
+  const hasUnsatisfiedPasswordRequirements =
+    !passwordChecks.minLength ||
+    !passwordChecks.lowercase ||
+    !passwordChecks.uppercase ||
+    !passwordChecks.number ||
+    !passwordChecks.symbol;
 
   return (
     <div className="auth-page">
@@ -167,48 +179,48 @@ export const AuthPage = () => {
                 fullWidth
               />
 
-              {isSignup && (
+              {isSignup && hasEnteredPassword && hasUnsatisfiedPasswordRequirements && (
                 <ul className="auth-form__password-checklist">
-                  <li className={hasEnteredPassword ? (passwordChecks.minLength ? 'is-valid' : 'is-invalid') : ''}>
-                    <span className="auth-form__password-rule-icon" aria-hidden="true">
-                      {hasEnteredPassword && !passwordChecks.minLength
-                        ? <IconX size={14} strokeWidth={2} />
-                        : <IconCheck size={14} strokeWidth={2} />}
-                    </span>
-                    At least {PASSWORD_MIN_LENGTH} characters
-                  </li>
-                  <li className={hasEnteredPassword ? (passwordChecks.lowercase ? 'is-valid' : 'is-invalid') : ''}>
-                    <span className="auth-form__password-rule-icon" aria-hidden="true">
-                      {hasEnteredPassword && !passwordChecks.lowercase
-                        ? <IconX size={14} strokeWidth={2} />
-                        : <IconCheck size={14} strokeWidth={2} />}
-                    </span>
-                    One lowercase letter
-                  </li>
-                  <li className={hasEnteredPassword ? (passwordChecks.uppercase ? 'is-valid' : 'is-invalid') : ''}>
-                    <span className="auth-form__password-rule-icon" aria-hidden="true">
-                      {hasEnteredPassword && !passwordChecks.uppercase
-                        ? <IconX size={14} strokeWidth={2} />
-                        : <IconCheck size={14} strokeWidth={2} />}
-                    </span>
-                    One uppercase letter
-                  </li>
-                  <li className={hasEnteredPassword ? (passwordChecks.number ? 'is-valid' : 'is-invalid') : ''}>
-                    <span className="auth-form__password-rule-icon" aria-hidden="true">
-                      {hasEnteredPassword && !passwordChecks.number
-                        ? <IconX size={14} strokeWidth={2} />
-                        : <IconCheck size={14} strokeWidth={2} />}
-                    </span>
-                    One number
-                  </li>
-                  <li className={hasEnteredPassword ? (passwordChecks.symbol ? 'is-valid' : 'is-invalid') : ''}>
-                    <span className="auth-form__password-rule-icon" aria-hidden="true">
-                      {hasEnteredPassword && !passwordChecks.symbol
-                        ? <IconX size={14} strokeWidth={2} />
-                        : <IconCheck size={14} strokeWidth={2} />}
-                    </span>
-                    One special character
-                  </li>
+                  {!passwordChecks.minLength && (
+                    <li className="is-invalid">
+                      <span className="auth-form__password-rule-icon" aria-hidden="true">
+                        <IconX size={14} strokeWidth={2} />
+                      </span>
+                      At least {PASSWORD_MIN_LENGTH} characters
+                    </li>
+                  )}
+                  {!passwordChecks.lowercase && (
+                    <li className="is-invalid">
+                      <span className="auth-form__password-rule-icon" aria-hidden="true">
+                        <IconX size={14} strokeWidth={2} />
+                      </span>
+                      One lowercase letter
+                    </li>
+                  )}
+                  {!passwordChecks.uppercase && (
+                    <li className="is-invalid">
+                      <span className="auth-form__password-rule-icon" aria-hidden="true">
+                        <IconX size={14} strokeWidth={2} />
+                      </span>
+                      One uppercase letter
+                    </li>
+                  )}
+                  {!passwordChecks.number && (
+                    <li className="is-invalid">
+                      <span className="auth-form__password-rule-icon" aria-hidden="true">
+                        <IconX size={14} strokeWidth={2} />
+                      </span>
+                      One number
+                    </li>
+                  )}
+                  {!passwordChecks.symbol && (
+                    <li className="is-invalid">
+                      <span className="auth-form__password-rule-icon" aria-hidden="true">
+                        <IconX size={14} strokeWidth={2} />
+                      </span>
+                      One special character
+                    </li>
+                  )}
                 </ul>
               )}
 

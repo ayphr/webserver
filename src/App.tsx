@@ -1,5 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthPage, DashboardPage, ProfilePage, PoliciesPage, TermsPage, PrivacyPage, RefundPage } from './pages';
+import {
+  AuthPage,
+  DashboardPage,
+  ProfilePage,
+  PoliciesPage,
+  TermsPage,
+  PrivacyPage,
+  RefundPage,
+  LandingPage,
+} from './pages';
 import { PolicyGate } from './components/policy';
 import { ModalProvider, TooltipProvider } from './context';
 
@@ -9,7 +18,10 @@ function App() {
       <ModalProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+            <Route path="/auth/login" element={<AuthPage initialMode="login" />} />
+            <Route path="/auth/register" element={<AuthPage initialMode="signup" />} />
             <Route path="/policies" element={<PoliciesPage />} />
             <Route path="/policies/terms" element={<TermsPage />} />
             <Route path="/policies/privacy" element={<PrivacyPage />} />
@@ -17,7 +29,6 @@ function App() {
             <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
             <Route path="/dashboard" element={<PolicyGate><DashboardPage /></PolicyGate>} />
             <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><ProfilePage /></PolicyGate>} />
-            <Route path="/" element={<Navigate to="/auth" replace />} />
           </Routes>
         </BrowserRouter>
       </ModalProvider>

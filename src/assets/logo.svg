@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 1400 1400" version="1.1" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;" fill="rgb(255 255 255)"><g transform="matrix(4,0,0,4,0,-4200)">
+        <path d="M262.5,1312.5L350,1312.5L262.5,1400L262.5,1312.5ZM175,1400L0,1400L350,1050L350,1225L262.5,1312.5L262.5,1225L175,1312.5L262.5,1312.5L175,1400Z" />
+    </g>
+    <path d="M0,350L350,0L700,0L700,354L350,700L0,700L0,350Z" />
+</svg>
