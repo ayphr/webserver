@@ -520,7 +520,7 @@ groups:
           category: capacity
         isPaused: false
       - uid: ayphr_heap_pressure
-        title: Ayphr API heap above 90%
+        title: Ayphr API heap above 1.4 GB
         condition: C
         data:
           - refId: A
@@ -531,11 +531,7 @@ groups:
             model:
               editorMode: code
               expr: |-
-                (
-                  ayphr_nodejs_heap_size_used_bytes
-                  /
-                  clamp_min(ayphr_nodejs_heap_size_total_bytes, 1)
-                ) > bool 0.9
+                ayphr_nodejs_heap_size_used_bytes > bool 1.4e9
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -571,11 +567,12 @@ groups:
         for: 15m
         annotations:
           summary: |-
-            The JavaScript heap is almost full.
+            The JavaScript heap is approaching the container memory limit.
           description: |-
-            GC time will rise and latency will follow. Check the "Heap spaces" and
-            "GC duration by kind" panels on the ayphr Runtime dashboard. If it
-            stays above 90%, capture a heap profile before the process is killed.
+            JavaScript heap used has exceeded 1.4 GB (70% of the 2 GB container
+            limit). Check the "Memory" panel on the ayphr Runtime dashboard and
+            inspect heap allocations before the process runs out of memory or hits
+            the 1.6 GB RSS critical threshold.
         labels:
           severity: warning
           service: ayphr-api
