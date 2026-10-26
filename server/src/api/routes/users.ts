@@ -1,5 +1,5 @@
 import { requireAuth } from '../auth';
-import { getActiveSuspensionForUserUuid, getUserFromUuid } from '../../lib/db';
+import { getActiveSuspensionForUserUuid, getUserFromUuid, updateUser } from '../../lib/db';
 import { getPolicyStatus } from '../../lib/policies';
 import { toPublicUser } from '../../lib/user';
 
@@ -32,4 +32,14 @@ const handleUserByUuid = requireAuth(async (_request, user, params) => {
   return json({ user: toPublicUser(targetUser), requestedBy: toPublicUser(user) });
 }, { allowSuspended: true });
 
-export { handleMe, handleUserByUuid };
+
+
+const handleDeveloperToggle = requireAuth(async (request, user) => {
+  const body = await request.json().catch(() => null) as { enabled?: boolean } | null;
+  const enabled = body?.enabled === true;
+  user.developerAccount = enabled;
+  await updateUser(user);
+  return json({ user: toPublicUser(user) });
+}, { allowSuspended: true, allowPolicyPending: true });
+
+export { handleMe, handleUserByUuid, handleDeveloperToggle };

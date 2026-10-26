@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type { Punishment, PublicUser } from '../../../common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { DevicesPanel } from '../../components/devices';
+import { MyAppsPanel } from '../../components/developer/MyAppsPanel';
+import { ConnectionsPanel } from '../../components/connections/ConnectionsPanel';
 import { SettingsPanel, SessionsModal, ChangePasswordModal } from '../../components/settings';
 import { SubscriptionPanel } from '../../components/subscriptions';
 import { UsersPanel } from '../../components/staff';
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'profile', 'settings', 'account-settings', 'subscription', 'users']);
+const VALID_TABS = new Set(['overview', 'devices', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections']);
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -153,6 +155,7 @@ export const DashboardPage = () => {
 
   const isSuspended = activeSuspension !== null;
   const isStaff = user?.role === 'staff';
+  const isDeveloper = user?.developerAccount === true;
 
   const handleSelfPunishment = async () => {
     // Refresh user data to get the updated suspension status.
@@ -301,6 +304,28 @@ export const DashboardPage = () => {
       ],
     },
     {
+      id: 'developer',
+      title: 'Developer',
+      options: [
+        {
+          id: 'developer-account',
+          optionType: 'checkbox',
+          icon: <IconApps size={18} strokeWidth={1.75} />,
+          title: 'Developer account',
+          description: 'Enable developer features like creating apps.',
+          checked: user?.developerAccount === true,
+          onChange: async (checked) => {
+            try {
+              const updated = await api.users.setDeveloperAccount(checked);
+              setUser(updated);
+            } catch (err) {
+              console.error('Failed to update developer account:', err);
+            }
+          },
+        },
+      ],
+    },
+    {
       id: 'preferences',
       title: 'Preferences',
       options: [
@@ -329,12 +354,12 @@ export const DashboardPage = () => {
         },
       ],
     },
-  ], [defaultTab, compactLayout, navigate, isStaff]);
+  ], [defaultTab, compactLayout, navigate, isStaff, isDeveloper, user]);
 
   if (isLoading) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} isDeveloper={isDeveloper} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
             <CardBody>
@@ -349,7 +374,7 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
             <CardBody>
@@ -363,7 +388,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
           <Card className="dashboard-page__card" elevated>
@@ -502,6 +527,30 @@ export const DashboardPage = () => {
                 </CardHeader>
                 <CardBody>
                   <SubscriptionPanel />
+                </CardBody>
+              </Card>
+            )}
+
+            {activePage === 'my-apps' && isDeveloper && (
+              <Card className="dashboard-page__card dashboard-page__card--full" elevated>
+                <CardHeader>
+                  <h2>My Apps</h2>
+                  <p>Create and manage your Ayphr apps</p>
+                </CardHeader>
+                <CardBody>
+                  <MyAppsPanel />
+                </CardBody>
+              </Card>
+            )}
+
+            {activePage === 'connections' && (
+              <Card className="dashboard-page__card" elevated>
+                <CardHeader>
+                  <h2>Connections</h2>
+                  <p>Apps connected to your account</p>
+                </CardHeader>
+                <CardBody>
+                  <ConnectionsPanel />
                 </CardBody>
               </Card>
             )}

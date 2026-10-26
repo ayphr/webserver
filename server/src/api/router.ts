@@ -28,8 +28,25 @@ import {
   handleUsersSummary,
 } from './routes/staff';
 import { handleCreateToken, handleGetBySerial, handleListMine, handleUpload } from './routes/devices';
+import {
+  handleListApps,
+  handleCreateApp,
+  handleGetApp,
+  handleUpdateApp,
+  handleDeleteApp,
+  handleRegenerateSecret,
+} from './routes/developer';
+import {
+  handlePublicApp,
+  handleAuthorize,
+  handleToken,
+  handleUserinfo,
+  handleOAuthDevices,
+  handleConnectionsList,
+  handleRevokeConnection,
+} from './routes/oauth';
 import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
-import { handleUserByUuid, handleMe as handleUsersMe } from './routes/users';
+import { handleUserByUuid, handleMe as handleUsersMe, handleDeveloperToggle } from './routes/users';
 import {
   handleStripeWebhook,
   handleSubscriptionAutoRenew,
@@ -72,6 +89,7 @@ const ROUTES: readonly RouteDefinition[] = [
 
   { method: 'GET', path: '/api/users/me', handle: handleUsersMe },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
+  { method: 'PATCH', path: '/api/users/me/developer', handle: handleDeveloperToggle },
 
   { method: 'GET', path: '/api/avatars/:uuid', handle: handleAvatarGet },
 
@@ -99,6 +117,22 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'PATCH', path: '/api/profile/:uuid', handle: handleProfileEdit },
   { method: 'POST', path: '/api/profile/avatar', handle: handleAvatarUpload },
   { method: 'DELETE', path: '/api/profile/avatar', handle: handleAvatarDelete },
+
+  { method: 'GET', path: '/api/developer/apps', handle: handleListApps },
+  { method: 'POST', path: '/api/developer/apps', handle: handleCreateApp },
+  { method: 'GET', path: '/api/developer/apps/:id', handle: handleGetApp },
+  { method: 'PATCH', path: '/api/developer/apps/:id', handle: handleUpdateApp },
+  { method: 'DELETE', path: '/api/developer/apps/:id', handle: handleDeleteApp },
+  { method: 'POST', path: '/api/developer/apps/:id/regenerate-secret', handle: handleRegenerateSecret },
+
+  { method: 'GET', path: '/api/oauth/apps/:clientId', handle: handlePublicApp },
+  { method: 'POST', path: '/api/oauth/authorize', handle: handleAuthorize },
+  { method: 'POST', path: '/api/oauth/token', handle: handleToken },
+  { method: 'GET', path: '/api/oauth/userinfo', handle: handleUserinfo },
+  { method: 'GET', path: '/api/oauth/devices', handle: handleOAuthDevices },
+
+  { method: 'GET', path: '/api/connections', handle: handleConnectionsList },
+  { method: 'DELETE', path: '/api/connections/:id', handle: handleRevokeConnection },
 
   { method: 'GET', path: '/api/staff/summary', handle: handleUsersSummary },
   { method: 'GET', path: '/api/staff/users', handle: handleStaffUsers },

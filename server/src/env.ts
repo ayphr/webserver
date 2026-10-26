@@ -14,6 +14,10 @@ export const DEVICE_CLAIMS_COLLECTION = 'device_claims';
 export const SESSIONS_COLLECTION = 'sessions';
 export const STRIPE_EVENTS_COLLECTION = 'stripe_events';
 export const AVATARS_COLLECTION = 'avatars';
+export const APPS_COLLECTION = 'apps';
+export const OAUTH_CODES_COLLECTION = 'oauth_codes';
+export const OAUTH_TOKENS_COLLECTION = 'oauth_tokens';
+export const CONNECTIONS_COLLECTION = 'connections';
 
 export const API_PORT = Number(process.env.API_PORT || 7233);
 export const METRICS_PORT = Number(process.env.METRICS_PORT || 7234);

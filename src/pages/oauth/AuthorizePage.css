@@ -1,0 +1,4 @@
+.authorize-page { max-width: 480px; margin: 2rem auto; }
+.authorize-page__error { color: #ef4444; }
+.authorize-page__logo { width: 64px; height: 64px; object-fit: contain; }
+.authorize-page__actions { display: flex; gap: 0.5rem; margin-top: 1rem; }

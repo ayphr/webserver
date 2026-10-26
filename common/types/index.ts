@@ -5,3 +5,4 @@ export * from './session';
 export * from './user';
 export * from './badges';
 export * from './subscription';
+export * from './app';

@@ -1,7 +1,7 @@
 import { Binary, Collection, Db, MongoClient, type Filter } from 'mongodb';
 import { createLogger } from './logger';
 import { recordMongoOperation, sessionsTotal } from './metrics';
-import { type DataPoint, type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription } from '@common';
+import { type DataPoint, type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection } from '@common';
 import {
   DATA_POINTS_COLLECTION,
   USERS_COLLECTION,
@@ -11,6 +11,10 @@ import {
   SESSIONS_COLLECTION,
   STRIPE_EVENTS_COLLECTION,
   AVATARS_COLLECTION,
+  APPS_COLLECTION,
+  OAUTH_CODES_COLLECTION,
+  OAUTH_TOKENS_COLLECTION,
+  CONNECTIONS_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
@@ -58,6 +62,10 @@ interface Collections {
   sessions: Collection<Session>;
   stripeEvents: Collection<{ id: string; type: string; createdAt: Date }>;
   avatars: Collection<StoredAvatar>;
+  apps: Collection<App>;
+  oauthCodes: Collection<OAuthAuthorizationCode>;
+  oauthTokens: Collection<OAuthAccessToken>;
+  connections: Collection<Connection>;
 }
 
 export interface StoredAvatar {
@@ -164,7 +172,11 @@ async function setupCollections(db: Db): Promise<Collections> {
     deviceClaims: db.collection<DeviceClaim>(DEVICE_CLAIMS_COLLECTION),
     sessions: db.collection<Session>(SESSIONS_COLLECTION),
     stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION),
-    avatars: db.collection<StoredAvatar>(AVATARS_COLLECTION)
+    avatars: db.collection<StoredAvatar>(AVATARS_COLLECTION),
+    apps: db.collection<App>(APPS_COLLECTION),
+    oauthCodes: db.collection<OAuthAuthorizationCode>(OAUTH_CODES_COLLECTION),
+    oauthTokens: db.collection<OAuthAccessToken>(OAUTH_TOKENS_COLLECTION),
+    connections: db.collection<Connection>(CONNECTIONS_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -947,4 +959,167 @@ export async function deleteSessionsForUserUuid(userUuid: string) {
   const result = await sessions.deleteMany({ userUuid });
   sessionsTotal.inc({ event: 'revoked_all' }, result.deletedCount);
   await invalidateAuthEntries();
+}
+
+// ---------------------------------------------------------------------------
+// Apps
+// ---------------------------------------------------------------------------
+
+export async function createApp(app: App): Promise<App> {
+  const { apps } = await getCols();
+  const normalized = normalizeDateValues(app);
+  trackMongoOperation('insertOne', APPS_COLLECTION);
+  await apps.insertOne(normalized);
+  return normalized;
+}
+
+export async function getAppById(id: string): Promise<App | null> {
+  const { apps } = await getCols();
+  trackMongoOperation('findOne', APPS_COLLECTION);
+  return apps.findOne({ id } as Record<string, unknown>, { projection: { _id: 0 } });
+}
+
+export async function getAppByClientId(clientId: string): Promise<App | null> {
+  const { apps } = await getCols();
+  trackMongoOperation('findOne', APPS_COLLECTION);
+  return apps.findOne({ clientId }, { projection: { _id: 0 } });
+}
+
+export async function getAppsByOwner(ownerUuid: string): Promise<App[]> {
+  const { apps } = await getCols();
+  trackMongoOperation('find', APPS_COLLECTION);
+  return apps.find({ ownerId: ownerUuid }).sort({ createdAt: -1 }).toArray();
+}
+
+export async function updateApp(id: string, updates: Partial<App>): Promise<App | null> {
+  const { apps } = await getCols();
+  const normalized = normalizeDateValues(updates);
+  trackMongoOperation('findOneAndUpdate', APPS_COLLECTION);
+  const result = await apps.findOneAndUpdate(
+    { id } as Record<string, unknown>,
+    { $set: normalized },
+    { returnDocument: 'after', projection: { _id: 0 } },
+  );
+  return result;
+}
+
+export async function deleteApp(id: string): Promise<void> {
+  const { apps, oauthCodes, oauthTokens, connections } = await getCols();
+  trackMongoOperation('deleteOne', APPS_COLLECTION);
+  await apps.deleteOne({ id } as Record<string, unknown>);
+  trackMongoOperation('deleteMany', OAUTH_CODES_COLLECTION);
+  await oauthCodes.deleteMany({ appId: id } as Record<string, unknown>);
+  trackMongoOperation('deleteMany', OAUTH_TOKENS_COLLECTION);
+  await oauthTokens.deleteMany({ appId: id } as Record<string, unknown>);
+  trackMongoOperation('deleteMany', CONNECTIONS_COLLECTION);
+  await connections.deleteMany({ appId: id } as Record<string, unknown>);
+}
+
+// ---------------------------------------------------------------------------
+// OAuth authorization codes
+// ---------------------------------------------------------------------------
+
+export async function createOAuthCode(code: OAuthAuthorizationCode): Promise<OAuthAuthorizationCode> {
+  const { oauthCodes } = await getCols();
+  const normalized = normalizeDateValues(code);
+  trackMongoOperation('insertOne', OAUTH_CODES_COLLECTION);
+  await oauthCodes.insertOne(normalized);
+  return normalized;
+}
+
+export async function getOAuthCodeByHash(codeHash: string): Promise<OAuthAuthorizationCode | null> {
+  const { oauthCodes } = await getCols();
+  trackMongoOperation('findOne', OAUTH_CODES_COLLECTION);
+  return oauthCodes.findOne({ codeHash }, { projection: { _id: 0 } });
+}
+
+export async function markOAuthCodeUsed(codeHash: string): Promise<void> {
+  const { oauthCodes } = await getCols();
+  trackMongoOperation('updateOne', OAUTH_CODES_COLLECTION);
+  await oauthCodes.updateOne({ codeHash }, { $set: { used: true } });
+}
+
+// ---------------------------------------------------------------------------
+// OAuth access tokens
+// ---------------------------------------------------------------------------
+
+export async function createOAuthToken(token: OAuthAccessToken): Promise<OAuthAccessToken> {
+  const { oauthTokens } = await getCols();
+  const normalized = normalizeDateValues(token);
+  trackMongoOperation('insertOne', OAUTH_TOKENS_COLLECTION);
+  await oauthTokens.insertOne(normalized);
+  return normalized;
+}
+
+export async function getOAuthTokenByHash(tokenHash: string): Promise<OAuthAccessToken | null> {
+  const { oauthTokens } = await getCols();
+  trackMongoOperation('findOne', OAUTH_TOKENS_COLLECTION);
+  return oauthTokens.findOne({ tokenHash }, { projection: { _id: 0 } });
+}
+
+export async function revokeOAuthToken(tokenHash: string): Promise<void> {
+  const { oauthTokens } = await getCols();
+  trackMongoOperation('updateOne', OAUTH_TOKENS_COLLECTION);
+  await oauthTokens.updateOne({ tokenHash }, { $set: { revokedAt: new Date() } });
+}
+
+export async function getOAuthTokensForUser(userId: string): Promise<OAuthAccessToken[]> {
+  const { oauthTokens } = await getCols();
+  trackMongoOperation('find', OAUTH_TOKENS_COLLECTION);
+  return oauthTokens.find({ userId, revokedAt: { $exists: false } } as Record<string, unknown>).toArray();
+}
+
+export async function revokeOAuthTokensForConnection(connectionId: string): Promise<void> {
+  const { oauthTokens } = await getCols();
+  trackMongoOperation('updateMany', OAUTH_TOKENS_COLLECTION);
+  await oauthTokens.updateMany({ connectionId } as Record<string, unknown>, { $set: { revokedAt: new Date() } });
+}
+
+// ---------------------------------------------------------------------------
+// Connections
+// ---------------------------------------------------------------------------
+
+export async function createConnection(connection: Connection): Promise<Connection> {
+  const { connections } = await getCols();
+  const normalized = normalizeDateValues(connection);
+  trackMongoOperation('insertOne', CONNECTIONS_COLLECTION);
+  await connections.insertOne(normalized);
+  return normalized;
+}
+
+export async function getConnectionById(id: string): Promise<Connection | null> {
+  const { connections } = await getCols();
+  trackMongoOperation('findOne', CONNECTIONS_COLLECTION);
+  return connections.findOne({ id } as Record<string, unknown>, { projection: { _id: 0 } });
+}
+
+export async function getConnectionsForUser(userId: string): Promise<Connection[]> {
+  const { connections } = await getCols();
+  trackMongoOperation('find', CONNECTIONS_COLLECTION);
+  return connections.find({ userId, revokedAt: { $exists: false } } as Record<string, unknown>).sort({ createdAt: -1 }).toArray();
+}
+
+export async function getConnectionByUserAndApp(userId: string, appId: string): Promise<Connection | null> {
+  const { connections } = await getCols();
+  trackMongoOperation('findOne', CONNECTIONS_COLLECTION);
+  return connections.findOne({ userId, appId, revokedAt: { $exists: false } } as Record<string, unknown>, { projection: { _id: 0 } });
+}
+
+export async function revokeConnection(id: string, userId: string): Promise<boolean> {
+  const { connections } = await getCols();
+  trackMongoOperation('updateOne', CONNECTIONS_COLLECTION);
+  const result = await connections.updateOne(
+    { id, userId } as Record<string, unknown>,
+    { $set: { revokedAt: new Date() } },
+  );
+  if (result.matchedCount > 0) {
+    await revokeOAuthTokensForConnection(id);
+  }
+  return result.matchedCount > 0;
+}
+
+export async function updateConnectionScopes(id: string, scopes: string[]): Promise<void> {
+  const { connections } = await getCols();
+  trackMongoOperation('updateOne', CONNECTIONS_COLLECTION);
+  await connections.updateOne({ id } as Record<string, unknown>, { $set: { scopes } });
 }

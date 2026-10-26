@@ -18,5 +18,12 @@ export function createUsersApi(client: RequestClient) {
         requestedBy: response.requestedBy,
       };
     },
+    async setDeveloperAccount(enabled: boolean) {
+      const response = await client.requestJson<{ user: PublicUser }>('/api/users/me/developer', {
+        method: 'PATCH',
+        body: { enabled },
+      });
+      return response.user;
+    },
   };
 }

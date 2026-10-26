@@ -43,6 +43,7 @@ export type User = {
   createdAt: Date;
   lastActive: Date;
   country?: string;
+  developerAccount?: boolean;
   stripeCustomerId?: string;
   paidSubscriptions?: PaidSubscription[];
   attachedSubscriptions?: AttachedSubscription[];

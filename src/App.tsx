@@ -10,6 +10,7 @@ import {
   LandingPage,
 } from './pages';
 import { PolicyGate } from './components/policy';
+import { AuthorizePage } from './pages/oauth';
 import { ModalProvider, TooltipProvider } from './context';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
             <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
             <Route path="/dashboard" element={<PolicyGate><DashboardPage /></PolicyGate>} />
             <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><ProfilePage /></PolicyGate>} />
+            <Route path="/oauth/authorize" element={<AuthorizePage />} />
           </Routes>
         </BrowserRouter>
       </ModalProvider>

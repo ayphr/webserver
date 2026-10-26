@@ -1,6 +1,6 @@
 import React from 'react';
 import './Sidebar.css';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import type { BadgeId } from '../../../common/types';
 
@@ -15,6 +15,10 @@ const staffTabs: Tab[] = [
   { id: 'users', name: 'Users' },
 ];
 
+const developerTabs: Tab[] = [
+  { id: 'my-apps', name: 'My Apps' },
+];
+
 const iconFor = (id: string) => {
   switch (id) {
     case 'overview':
@@ -23,9 +27,10 @@ const iconFor = (id: string) => {
       return <IconDatabase size={18} />;
     case 'users':
       return <IconUsers size={18} />;
+    case 'my-apps':
+      return <IconApps size={18} />;
     case 'jail':
-      return <IconBan
-        size={18} />;
+      return <IconBan size={18} />;
     default:
       return <IconPlaceholder size={18} />;
   }
@@ -40,10 +45,15 @@ type Props = {
   avatarUrl?: string;
   isSuspended?: boolean;
   isStaff?: boolean;
+  isDeveloper?: boolean;
 };
 
-export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, avatarUrl, isSuspended = false, isStaff = false }) => {
-  const visibleTabs = isStaff ? [...tabs, ...staffTabs] : tabs;
+export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, avatarUrl, isSuspended = false, isStaff = false, isDeveloper = false }) => {
+  const visibleTabs = [
+    ...tabs,
+    ...(isDeveloper ? developerTabs : []),
+    ...(isStaff ? staffTabs : []),
+  ];
 
   return (
     <aside className="n-sidebar" aria-label="Sidebar">
@@ -87,6 +97,14 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unkn
           >
             <span className="n-sidebar__menuIcon"><IconUser size={16} strokeWidth={1.5} /></span>
             <span>Profile</span>
+          </button>
+          <button
+            className={`n-sidebar__menuItem ${activeTab === 'connections' ? 'active' : ''}`}
+            type="button"
+            onClick={() => onChange('connections')}
+          >
+            <span className="n-sidebar__menuIcon"><IconPlugConnected size={16} strokeWidth={1.5} /></span>
+            <span>Connections</span>
           </button>
           <button
             className={`n-sidebar__menuItem ${activeTab === 'account-settings' ? 'active' : ''}`}

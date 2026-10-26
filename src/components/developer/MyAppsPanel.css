@@ -1,0 +1,9 @@
+.my-apps { display: flex; flex-direction: column; gap: 1rem; }
+.my-apps__header { display: flex; justify-content: space-between; align-items: center; }
+.my-apps__error { color: #ef4444; }
+.my-apps__warning { color: #f59e0b; font-size: 0.85rem; }
+.my-apps__form { display: flex; flex-direction: column; gap: 0.75rem; }
+.my-apps__label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+.my-apps__textarea { min-height: 80px; }
+.my-apps__list { display: flex; flex-direction: column; gap: 1rem; }
+.my-apps__actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
