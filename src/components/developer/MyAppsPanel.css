@@ -123,3 +123,6 @@
   height: 48px;
   object-fit: contain;
 }
+
+.my-apps { user-select: text; }
+.my-apps code { user-select: text; cursor: text; }
