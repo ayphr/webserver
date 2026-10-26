@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { IconCheck } from '@tabler/icons-react';
 import './ToggleDropdown.css';
 
 export interface ToggleDropdownProps {
@@ -50,7 +51,7 @@ export const ToggleDropdown = ({ label, options, value, onChange, placeholder = 
                 className={`toggle-dropdown__item ${enabled ? 'toggle-dropdown__item--active' : ''}`}
                 onClick={() => toggle(opt)}
               >
-                <span className="toggle-dropdown__tick">{enabled ? '✓' : ''}</span>
+                <span className="toggle-dropdown__tick">{enabled ? <IconCheck size={16} /> : null}</span>
                 {opt}
               </button>
             );
