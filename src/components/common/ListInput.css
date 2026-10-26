@@ -1,0 +1,7 @@
+.list-input { display: flex; flex-direction: column; gap: 0.5rem; }
+.list-input__label { font-size: 0.9rem; }
+.list-input__items { display: flex; flex-direction: column; gap: 0.5rem; }
+.list-input__row { display: flex; gap: 0.5rem; align-items: center; }
+.list-input__input { flex: 1; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+.list-input__remove, .list-input__add { padding: 0.5rem 0.75rem; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 4px; }
+.list-input__add-row { display: flex; gap: 0.5rem; align-items: center; }

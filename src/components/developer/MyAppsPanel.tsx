@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { AppSummary } from '../../../common';
 import { KNOWN_APP_SCOPES } from '../../../common';
-import { Card, CardBody, CardHeader, Button, Input } from '../common';
+import { Card, CardBody, CardHeader, Button, Input, ListInput, ToggleDropdown } from '../common';
 import './MyAppsPanel.css';
 
 type CreatedSecret = { clientId: string; clientSecret: string };
@@ -21,10 +21,9 @@ export const MyAppsPanel = () => {
     tosUrl: '',
     privacyUrl: '',
   });
-  const [redirectUris, setRedirectUris] = useState<string[]>(['']);
+  const [redirectUris, setRedirectUris] = useState<string[]>([]);
   const [allowedScopes, setAllowedScopes] = useState<string[]>(['identify']);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
-  const [scopesOpen, setScopesOpen] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -74,7 +73,7 @@ export const MyAppsPanel = () => {
       setCreatedSecret({ clientId: res.clientId, clientSecret: res.clientSecret });
       setIsCreating(false);
       setForm({ name: '', description: '', homepageUrl: '', tosUrl: '', privacyUrl: '' });
-      setRedirectUris(['']);
+      setRedirectUris([]);
       setAllowedScopes(['identify']);
       setLogoDataUrl(null);
       await load();
@@ -101,12 +100,6 @@ export const MyAppsPanel = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to regenerate secret');
     }
-  };
-
-  const toggleScope = (scope: string) => {
-    setAllowedScopes((prev) =>
-      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
-    );
   };
 
   return (
@@ -150,49 +143,19 @@ export const MyAppsPanel = () => {
               <Input label="Terms of Service URL" value={form.tosUrl} onChange={(e) => setForm({ ...form, tosUrl: e.target.value })} />
               <Input label="Privacy Policy URL" value={form.privacyUrl} onChange={(e) => setForm({ ...form, privacyUrl: e.target.value })} />
 
-              <div className="my-apps__redirects">
-                <label className="my-apps__label">Redirect URIs</label>
-                {redirectUris.map((uri, idx) => (
-                  <div key={idx} className="my-apps__redirect-row">
-                    <Input
-                      value={uri}
-                      onChange={(e) => {
-                        const next = [...redirectUris];
-                        next[idx] = e.target.value;
-                        setRedirectUris(next);
-                      }}
-                      placeholder="https://example.com/callback"
-                    />
-                    <Button type="button" variant="secondary" onClick={() => setRedirectUris(redirectUris.filter((_, i) => i !== idx))}>
-                      −
-                    </Button>
-                  </div>
-                ))}
-                <Button type="button" variant="secondary" onClick={() => setRedirectUris([...redirectUris, ''])}>
-                  + Add redirect URI
-                </Button>
-              </div>
+              <ListInput
+                label="Redirect URIs"
+                value={redirectUris}
+                onChange={setRedirectUris}
+                placeholder="https://example.com/callback"
+              />
 
-              <div className="my-apps__scopes">
-                <label className="my-apps__label">Allowed scopes</label>
-                <button type="button" className="my-apps__scopes-toggle" onClick={() => setScopesOpen((v) => !v)}>
-                  {allowedScopes.length ? allowedScopes.join(', ') : 'Select scopes'} ▾
-                </button>
-                {scopesOpen && (
-                  <div className="my-apps__scopes-list">
-                    {KNOWN_APP_SCOPES.map((scope) => (
-                      <label key={scope} className="my-apps__scope-item">
-                        <input
-                          type="checkbox"
-                          checked={allowedScopes.includes(scope)}
-                          onChange={() => toggleScope(scope)}
-                        />
-                        {scope}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ToggleDropdown
+                label="Allowed scopes"
+                options={[...KNOWN_APP_SCOPES]}
+                value={allowedScopes}
+                onChange={setAllowedScopes}
+              />
 
               <Button type="submit" variant="primary">Create</Button>
             </form>
