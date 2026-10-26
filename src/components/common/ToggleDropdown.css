@@ -50,6 +50,9 @@
 }
 
 .toggle-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   background: none;
   border: none;
   width: 100%;
