@@ -46,12 +46,11 @@ export const LandingPage = () => {
         <section className="landing-hero" aria-labelledby="hero-title">
           <h1 id="hero-title" className="landing-hero__title">
             Precision Telemetry &amp;{' '}
-            <span className="landing-hero__gradient-text">Device Intelligence</span>
+            <span className="landing-hero__gradient-text">Sensor Networks</span>
           </h1>
 
           <p className="landing-hero__subtitle">
-            Real-time environmental sensor pipelines, hardware telemetry ingestion, and secure
-            fleet management engineered for continuous observability.
+            Reliable environmental ingestion, device telemetry, and hardware fleet management built for teams who need clean data without the overhead.
           </p>
 
           <div className="landing-hero__actions">
@@ -65,7 +64,7 @@ export const LandingPage = () => {
               rel="noopener noreferrer"
               variant="secondary"
             >
-              Shop Now
+              Shop Hardware
             </Button>
           </div>
         </section>
@@ -74,10 +73,10 @@ export const LandingPage = () => {
         <section className="landing-features" aria-labelledby="features-title">
           <div className="landing-features__header">
             <h2 id="features-title" className="landing-features__heading">
-              Engineered for telemetry at scale
+              Built for real-world deployments
             </h2>
             <p className="landing-features__desc">
-              Everything required to orchestrate devices, record telemetry, and inspect environmental readings.
+              Everything you need to stream, monitor, and manage your environmental hardware fleet from one dashboard.
             </p>
           </div>
 
@@ -87,12 +86,11 @@ export const LandingPage = () => {
                 <div className="landing-feature-card__icon-wrap">
                   <IconActivity size={24} aria-hidden="true" />
                 </div>
-                <h3 className="landing-feature-card__title">Real-time Telemetry</h3>
+                <h3 className="landing-feature-card__title">Live Data Streams</h3>
               </CardHeader>
               <CardBody>
                 <p className="landing-feature-card__desc">
-                  Collect and visualize high-frequency sensor readings including temperature, humidity, and barometric
-                  pressure with zero-friction streaming.
+                  Track high-frequency sensor readings, including temperature, humidity, and barometric pressure, with instant updates and clean charts.
                 </p>
               </CardBody>
             </Card>
@@ -102,12 +100,11 @@ export const LandingPage = () => {
                 <div className="landing-feature-card__icon-wrap">
                   <IconCpu size={24} aria-hidden="true" />
                 </div>
-                <h3 className="landing-feature-card__title">Fleet &amp; Token Provisioning</h3>
+                <h3 className="landing-feature-card__title">Token Provisioning</h3>
               </CardHeader>
               <CardBody>
                 <p className="landing-feature-card__desc">
-                  Register devices effortlessly using cryptographically signed authorization tokens and monitor fleet
-                  health from a centralized console.
+                  Register new hardware instantly using cryptographic tokens. Keep track of device health, firmware status, and connectivity offline states.
                 </p>
               </CardBody>
             </Card>
@@ -117,12 +114,11 @@ export const LandingPage = () => {
                 <div className="landing-feature-card__icon-wrap">
                   <IconShieldCheck size={24} aria-hidden="true" />
                 </div>
-                <h3 className="landing-feature-card__title">Secure &amp; Policy-Governed</h3>
+                <h3 className="landing-feature-card__title">Secure Access Control</h3>
               </CardHeader>
               <CardBody>
                 <p className="landing-feature-card__desc">
-                  Enterprise session management, granular policy enforcement gates, and transparent data privacy controls
-                  built directly into the core.
+                  Manage team access with granular permissions. All device traffic is encrypted over TLS with strict token validation out of the box.
                 </p>
               </CardBody>
             </Card>
@@ -132,8 +128,8 @@ export const LandingPage = () => {
         {/* CTA Banner */}
         <Card elevated className="landing-cta-banner">
           <div className="landing-cta-banner__content">
-            <h2>Ready to monitor your environment?</h2>
-            <p>Access your live devices, analyze sensor data, and manage your account.</p>
+            <h2>Ready to hook up your sensors?</h2>
+            <p>Access your live feeds, analyze sensor history, and provision your hardware fleet.</p>
           </div>
           <Button to="/auth/register" variant="primary">
             <span>Get Started</span>
