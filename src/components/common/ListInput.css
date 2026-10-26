@@ -1,7 +1,75 @@
-.list-input { display: flex; flex-direction: column; gap: 0.5rem; }
-.list-input__label { font-size: 0.9rem; }
-.list-input__items { display: flex; flex-direction: column; gap: 0.5rem; }
-.list-input__row { display: flex; gap: 0.5rem; align-items: center; }
-.list-input__input { flex: 1; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
-.list-input__remove, .list-input__add { padding: 0.5rem 0.75rem; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 4px; }
-.list-input__add-row { display: flex; gap: 0.5rem; align-items: center; }
+.list-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.list-input__label {
+  display: block;
+  color: hsl(180, 67%, 99%, 0.6);
+  font-weight: 500;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.list-input__items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.list-input__row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.list-input__input {
+  flex: 1;
+  background-color: hsl(0, 0%, 10%);
+  border: 1px solid hsl(0, 0%, 16%);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 1rem;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  &::placeholder {
+    color: hsl(0, 0%, 40%);
+  }
+
+  &:focus {
+    background-color: hsl(0, 0%, 12%);
+    border-color: hsl(0, 0%, 28%);
+    box-shadow: none;
+    outline: none;
+  }
+}
+
+.list-input__remove,
+.list-input__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid hsl(0, 0%, 16%);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+  }
+}
+
+.list-input__add-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}

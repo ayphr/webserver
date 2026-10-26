@@ -135,11 +135,14 @@ export const MyAppsPanel = () => {
               <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               <Input label="Homepage URL" value={form.homepageUrl} onChange={(e) => setForm({ ...form, homepageUrl: e.target.value })} required />
               <Input label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-              <label className="my-apps__label">
-                Logo
-                <input type="file" accept="image/*" onChange={handleLogoChange} />
+              <div className="my-apps__field">
+                <label className="my-apps__label">Logo</label>
+                <label className="my-apps__file-button">
+                  Browse
+                  <input type="file" accept="image/*" onChange={handleLogoChange} hidden />
+                </label>
                 {logoDataUrl && <img src={logoDataUrl} alt="logo preview" className="my-apps__logo-preview" />}
-              </label>
+              </div>
               <Input label="Terms of Service URL" value={form.tosUrl} onChange={(e) => setForm({ ...form, tosUrl: e.target.value })} />
               <Input label="Privacy Policy URL" value={form.privacyUrl} onChange={(e) => setForm({ ...form, privacyUrl: e.target.value })} />
 

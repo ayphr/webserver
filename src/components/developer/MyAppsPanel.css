@@ -1,19 +1,125 @@
-.my-apps { display: flex; flex-direction: column; gap: 1rem; }
-.my-apps__header { display: flex; justify-content: space-between; align-items: center; }
-.my-apps__error { color: #ef4444; }
-.my-apps__warning { color: #f59e0b; font-size: 0.85rem; }
-.my-apps__form { display: flex; flex-direction: column; gap: 0.75rem; }
-.my-apps__label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
-.my-apps__textarea { min-height: 80px; }
-.my-apps__list { display: flex; flex-direction: column; gap: 1rem; }
-.my-apps__actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.my-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.my-apps__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.my-apps__error {
+  color: #ef4444;
+}
+.my-apps__warning {
+  color: #f59e0b;
+  font-size: 0.85rem;
+}
+.my-apps__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.my-apps__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+.my-apps__textarea {
+  min-height: 80px;
+}
+.my-apps__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.my-apps__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
 
-.my-apps__redirects { display: flex; flex-direction: column; gap: 0.5rem; }
-.my-apps__redirect-row { display: flex; gap: 0.5rem; align-items: center; }
-.my-apps__redirect-row .input-wrapper { flex: 1; }
-.my-apps__scopes { position: relative; }
-.my-apps__scopes-toggle { padding: 0.5rem 0.75rem; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 4px; width: 100%; text-align: left; }
-.my-apps__scopes-list { position: absolute; z-index: 10; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; width: 100%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-.my-apps__scope-item { display: flex; gap: 0.5rem; align-items: center; font-size: 0.85rem; }
-.my-apps__logo-preview { max-width: 80px; max-height: 80px; object-fit: contain; margin-top: 0.5rem; }
-.my-apps__app-logo { width: 48px; height: 48px; object-fit: contain; }
+.my-apps__redirects {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.my-apps__redirect-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.my-apps__redirect-row .input-wrapper {
+  flex: 1;
+}
+.my-apps__scopes {
+  position: relative;
+}
+.my-apps__scopes-toggle {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+  width: 100%;
+  text-align: left;
+}
+.my-apps__scopes-list {
+  position: absolute;
+  z-index: 10;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.my-apps__scope-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.my-apps__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.my-apps__file-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border: 1px solid hsl(0, 0%, 16%);
+  border-radius: var(--radius-md);
+  background-color: hsl(0, 0%, 10%);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+  width: fit-content;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background-color: hsl(0, 0%, 12%);
+    border-color: hsl(0, 0%, 28%);
+  }
+}
+.my-apps__logo-preview {
+  max-width: 80px;
+  max-height: 80px;
+  object-fit: contain;
+  margin-top: 0.5rem;
+  border-radius: var(--radius-md);
+}
+.my-apps__app-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
