@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { AppSummary } from '../../../common';
+import { KNOWN_APP_SCOPES } from '../../../common';
 import { Card, CardBody, CardHeader, Button, Input } from '../common';
 import './MyAppsPanel.css';
 
@@ -17,12 +18,13 @@ export const MyAppsPanel = () => {
     name: '',
     description: '',
     homepageUrl: '',
-    logoUrl: '',
     tosUrl: '',
     privacyUrl: '',
-    redirectUris: '',
-    allowedScopes: 'identify',
   });
+  const [redirectUris, setRedirectUris] = useState<string[]>(['']);
+  const [allowedScopes, setAllowedScopes] = useState<string[]>(['identify']);
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
+  const [scopesOpen, setScopesOpen] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -41,25 +43,40 @@ export const MyAppsPanel = () => {
     void load();
   }, []);
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setLogoDataUrl(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setLogoDataUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
-      const redirectUris = form.redirectUris.split(/\n|,/).map((s) => s.trim()).filter(Boolean);
-      const allowedScopes = form.allowedScopes.split(/[ ,]+/).map((s) => s.trim()).filter(Boolean);
+      const uris = redirectUris.map((s) => s.trim()).filter(Boolean);
       const res = await api.developer.createApp({
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         homepageUrl: form.homepageUrl.trim(),
-        logoUrl: form.logoUrl.trim() || undefined,
+        logoUrl: logoDataUrl || undefined,
         tosUrl: form.tosUrl.trim() || undefined,
         privacyUrl: form.privacyUrl.trim() || undefined,
-        redirectUris,
+        redirectUris: uris,
         allowedScopes,
       });
       setCreatedSecret({ clientId: res.clientId, clientSecret: res.clientSecret });
       setIsCreating(false);
-      setForm({ name: '', description: '', homepageUrl: '', logoUrl: '', tosUrl: '', privacyUrl: '', redirectUris: '', allowedScopes: 'identify' });
+      setForm({ name: '', description: '', homepageUrl: '', tosUrl: '', privacyUrl: '' });
+      setRedirectUris(['']);
+      setAllowedScopes(['identify']);
+      setLogoDataUrl(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create app');
@@ -84,6 +101,12 @@ export const MyAppsPanel = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to regenerate secret');
     }
+  };
+
+  const toggleScope = (scope: string) => {
+    setAllowedScopes((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
+    );
   };
 
   return (
@@ -119,14 +142,58 @@ export const MyAppsPanel = () => {
               <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               <Input label="Homepage URL" value={form.homepageUrl} onChange={(e) => setForm({ ...form, homepageUrl: e.target.value })} required />
               <Input label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-              <Input label="Logo URL" value={form.logoUrl} onChange={(e) => setForm({ ...form, logoUrl: e.target.value })} />
+              <label className="my-apps__label">
+                Logo
+                <input type="file" accept="image/*" onChange={handleLogoChange} />
+                {logoDataUrl && <img src={logoDataUrl} alt="logo preview" className="my-apps__logo-preview" />}
+              </label>
               <Input label="Terms of Service URL" value={form.tosUrl} onChange={(e) => setForm({ ...form, tosUrl: e.target.value })} />
               <Input label="Privacy Policy URL" value={form.privacyUrl} onChange={(e) => setForm({ ...form, privacyUrl: e.target.value })} />
-              <label className="my-apps__label">
-                Redirect URIs (one per line)
-                <textarea className="my-apps__textarea" value={form.redirectUris} onChange={(e) => setForm({ ...form, redirectUris: e.target.value })} />
-              </label>
-              <Input label="Allowed scopes (space separated)" value={form.allowedScopes} onChange={(e) => setForm({ ...form, allowedScopes: e.target.value })} />
+
+              <div className="my-apps__redirects">
+                <label className="my-apps__label">Redirect URIs</label>
+                {redirectUris.map((uri, idx) => (
+                  <div key={idx} className="my-apps__redirect-row">
+                    <Input
+                      value={uri}
+                      onChange={(e) => {
+                        const next = [...redirectUris];
+                        next[idx] = e.target.value;
+                        setRedirectUris(next);
+                      }}
+                      placeholder="https://example.com/callback"
+                    />
+                    <Button type="button" variant="secondary" onClick={() => setRedirectUris(redirectUris.filter((_, i) => i !== idx))}>
+                      −
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" variant="secondary" onClick={() => setRedirectUris([...redirectUris, ''])}>
+                  + Add redirect URI
+                </Button>
+              </div>
+
+              <div className="my-apps__scopes">
+                <label className="my-apps__label">Allowed scopes</label>
+                <button type="button" className="my-apps__scopes-toggle" onClick={() => setScopesOpen((v) => !v)}>
+                  {allowedScopes.length ? allowedScopes.join(', ') : 'Select scopes'} ▾
+                </button>
+                {scopesOpen && (
+                  <div className="my-apps__scopes-list">
+                    {KNOWN_APP_SCOPES.map((scope) => (
+                      <label key={scope} className="my-apps__scope-item">
+                        <input
+                          type="checkbox"
+                          checked={allowedScopes.includes(scope)}
+                          onChange={() => toggleScope(scope)}
+                        />
+                        {scope}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <Button type="submit" variant="primary">Create</Button>
             </form>
           </CardBody>
@@ -146,6 +213,7 @@ export const MyAppsPanel = () => {
                 <p>{app.description}</p>
               </CardHeader>
               <CardBody>
+                {app.logoUrl && <img src={app.logoUrl} alt={app.name} className="my-apps__app-logo" />}
                 <p><strong>Client ID:</strong> <code>{app.clientId}</code></p>
                 <p><strong>Homepage:</strong> {app.homepageUrl}</p>
                 <p><strong>Scopes:</strong> {app.allowedScopes.join(', ')}</p>
