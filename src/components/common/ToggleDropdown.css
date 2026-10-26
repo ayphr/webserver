@@ -50,6 +50,10 @@
 }
 
 .toggle-dropdown__item {
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
   display: flex;
   gap: 0.5rem;
   align-items: center;
@@ -62,4 +66,11 @@
   &:hover {
     background-color: hsl(0, 0%, 14%);
   }
+}
+
+.toggle-dropdown__tick {
+  display: inline-block;
+  width: 1rem;
+  color: var(--text-primary);
+  font-weight: 700;
 }
