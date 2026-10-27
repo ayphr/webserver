@@ -8,7 +8,7 @@ import {
   IconMapPin,
   IconAlertCircle,
 } from '@tabler/icons-react';
-import type { SessionInfo } from '../../../common';
+import type { SessionInfo } from '@common';
 import { api } from '../../lib/api';
 import { Button, ConfirmDialog, Modal } from '../common';
 import './SessionsModal.css';

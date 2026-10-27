@@ -1,19 +1,14 @@
+import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import {
   createApp,
   getAppById,
-  getAppByClientId,
   getAppsByOwner,
   updateApp,
   deleteApp,
 } from '../../lib/db';
 import { hashToken } from '../../lib/tokens';
-import type { App, CreateAppRequest, UpdateAppRequest, AppSummary, CreateAppResponse } from '@common';
-import type { RouteParams } from '../types';
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
+import type { App, AppSummary, CreateAppResponse } from '@common';
 
 function toSummary(app: App): AppSummary {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

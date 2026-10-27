@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import type { AppSummary } from '../../../common';
-import { KNOWN_APP_SCOPES } from '../../../common';
+import type { AppSummary } from '@common';
+import { KNOWN_APP_SCOPES } from '@common';
 import { Card, CardBody, CardHeader, Button, Input, ListInput, ToggleDropdown } from '../common';
 import './MyAppsPanel.css';
 
@@ -39,7 +39,10 @@ export const MyAppsPanel = () => {
   };
 
   useEffect(() => {
-    void load();
+    const task = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(task);
   }, []);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {

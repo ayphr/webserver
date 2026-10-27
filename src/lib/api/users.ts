@@ -1,4 +1,4 @@
-import type { UserMePayload, UserMeResponse, PublicUser } from '../../../common';
+import type { UserMePayload, UserMeResponse, PublicUser } from '@common';
 import type { RequestClient } from './client';
 
 export function createUsersApi(client: RequestClient) {

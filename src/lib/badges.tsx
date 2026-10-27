@@ -1,6 +1,6 @@
 import { IconSparkle, IconSparkle2, IconSparkles2, IconSparkles, IconTool } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
-import { BADGES, type BadgeId, type IconId } from '../../common';
+import { BADGES, type BadgeId, type IconId } from '@common';
 
 export const ICONS: Record<IconId, ReactNode> = {
   plus: <IconSparkle size={18} />,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { IconAlertCircle, IconCopy, IconDatabase, IconPlus, IconRefresh } from '@tabler/icons-react';
-import type { DeviceSummary, DeviceToken } from '../../../common';
+import type { DeviceSummary, DeviceToken } from '@common';
 import { api } from '../../lib/api';
 import { Button, Modal } from '../common';
 import './DevicesPanel.css';

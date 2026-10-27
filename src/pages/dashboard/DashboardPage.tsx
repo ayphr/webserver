@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
-import type { Punishment, PublicUser } from '../../../common';
+import type { Punishment, PublicUser } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
@@ -354,7 +354,7 @@ export const DashboardPage = () => {
         },
       ],
     },
-  ], [defaultTab, compactLayout, navigate, isStaff, isDeveloper, user]);
+  ], [defaultTab, compactLayout, navigate, isStaff, user]);
 
   if (isLoading) {
     return (

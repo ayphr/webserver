@@ -6,7 +6,7 @@ import type {
   SubscriptionMePayload,
   SubscriptionPortalPayload,
   SubscriptionTier,
-} from '../../../common';
+} from '@common';
 import type { RequestClient } from './client';
 
 export function createSubscriptionsApi(client: RequestClient) {

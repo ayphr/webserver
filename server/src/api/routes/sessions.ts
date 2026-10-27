@@ -1,11 +1,8 @@
+import { json } from '../../lib/http';
 import { getBearerToken, requireAuth } from '../auth';
 import { deleteSession, getSessionById, getSessionsForUserUuid } from '../../lib/db';
 import { hashToken } from '../../lib/tokens';
 import type { SessionInfo } from '@common';
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
 
 const guardOptions = { allowSuspended: true, allowPolicyPending: true };
 

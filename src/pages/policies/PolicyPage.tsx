@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardBody, CardHeader } from '../../components/common';
-import { Markdown, POLICIES_VERSIONS_URL } from '../../../common';
+import { Markdown, POLICIES_VERSIONS_URL } from '@common';
 import { MarkdownRenderer } from '../../lib/markdown';
 import './Policies.css';
 

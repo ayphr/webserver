@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardBody, CardHeader } from '../../components/common';
-import { POLICIES_VERSIONS_URL } from '../../../common';
+import { POLICIES_VERSIONS_URL } from '@common';
 import './Policies.css';
 
 interface PoliciesVersions {

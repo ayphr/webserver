@@ -1,3 +1,4 @@
+import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import type { RouteParams } from '../types';
 import { deleteAvatar, getAvatar, getUserFromUuid, putAvatar, updateUser } from '../../lib/db';
@@ -9,10 +10,6 @@ import { avatarEventsTotal } from '../../lib/metrics';
 import type { User } from '@common';
 
 const log = createLogger('avatars');
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
 
 const MAX_AVATAR_MB = Math.round(AVATAR_MAX_BYTES / (1024 * 1024));
 

@@ -1,4 +1,4 @@
-import type { AppSummary, CreateAppRequest, CreateAppResponse, UpdateAppRequest } from '../../../common';
+import type { AppSummary, CreateAppRequest, CreateAppResponse, UpdateAppRequest } from '@common';
 import type { RequestClient } from './client';
 
 export function createDeveloperApi(client: RequestClient) {

@@ -1,6 +1,6 @@
 import './UsernameDisplay.css';
-import type { BadgeId } from '../../../common';
-import { BADGES, countryCodeToFlag } from '../../../common';
+import type { BadgeId } from '@common';
+import { BADGES, countryCodeToFlag } from '@common';
 import { EmojiText } from './EmojiText';
 import { getBadgeIcon } from '../../lib/badges';
 import { Tooltip } from './Tooltip';

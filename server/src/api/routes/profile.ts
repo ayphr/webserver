@@ -1,3 +1,4 @@
+import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '../../lib/country';
 import { toPublicUser } from '../../lib/user';
@@ -20,10 +21,6 @@ type ProfileEditPayload = {
   bio?: string;
   socialLinks?: Record<string, string | undefined>;
 };
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
 
 const handleMe = requireAuth((_request, user) => {
   return json({ user: toPublicUser(user) });

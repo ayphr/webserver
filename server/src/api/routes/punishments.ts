@@ -1,10 +1,7 @@
+import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import { getPunishmentById, getPunishmentsForUserUuid } from '../../lib/db';
 import { toPublicUser } from '../../lib/user';
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
 
 const handleMe = requireAuth(async (_request, user) => {
   const punishments = await getPunishmentsForUserUuid(user.uuid);

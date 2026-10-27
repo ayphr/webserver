@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import type { Connection } from '../../../common';
+import type { Connection } from '@common';
 import { Card, CardBody, CardHeader, Button } from '../common';
 import './ConnectionsPanel.css';
 
@@ -23,7 +23,10 @@ export const ConnectionsPanel = () => {
   };
 
   useEffect(() => {
-    void load();
+    const task = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(task);
   }, []);
 
   const handleRevoke = async (id: string) => {

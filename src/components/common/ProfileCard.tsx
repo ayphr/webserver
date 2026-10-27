@@ -14,19 +14,19 @@ import type { ReactNode } from 'react';
 import { api } from '../../lib/api';
 import { BioEditor, BioText, Button, UsernameDisplay, Avatar } from './index';
 import { EmojiText } from './EmojiText';
-import { countryCodeToFlag } from '../../../common/utils/country';
+import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
 import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
 import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
-import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '../../../common';
-import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '../../../common';
+import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '@common';
+import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '@common';
 import {
   SOCIAL_LINK_LABELS,
   SOCIAL_LINK_HANDLE_HINTS,
   SOCIAL_LINK_TYPES,
   buildSocialLinkUrl,
   normalizeSocialHandle,
-} from '../../../common/utils/social';
+} from '@common/utils/social';
 import './ProfileCard.css';
 
 const SOCIAL_LINK_FIELDS: Array<{ key: SocialLinkType; label: string }> = SOCIAL_LINK_TYPES.map((key) => ({

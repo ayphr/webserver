@@ -1,4 +1,4 @@
-import type { DeviceListPayload, DevicePayload, DeviceTokenPayload } from '../../../common';
+import type { DeviceListPayload, DevicePayload, DeviceTokenPayload } from '@common';
 import type { RequestClient } from './client';
 
 export function createDevicesApi(client: RequestClient) {

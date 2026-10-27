@@ -1,3 +1,4 @@
+import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import {
   getAppByClientId,
@@ -20,10 +21,6 @@ import { toPublicUser } from '../../lib/user';
 import { toPublicDevice } from '../../lib/db';
 import type { AppScope } from '@common';
 import type { RouteParams } from '../types';
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
 
 function readBody(request: Request): Promise<Record<string, unknown> | null> {
   if (!request.headers.get('content-type')?.includes('application/json')) return Promise.resolve(null);

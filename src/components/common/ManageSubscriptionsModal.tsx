@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Modal, Button } from './index';
 import { getBadgeIcon } from '../../lib/badges';
-import { BADGES, SUBSCRIPTION_TIERS } from '../../../common';
-import type { AttachedSubscription, PublicUser, SubscriptionTier } from '../../../common';
+import { BADGES, SUBSCRIPTION_TIERS } from '@common';
+import type { AttachedSubscription, PublicUser, SubscriptionTier } from '@common';
 import './ManageSubscriptionsModal.css';
 
 const MAX_REASON_LENGTH = 500;

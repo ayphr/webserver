@@ -13,32 +13,35 @@ export const AuthorizePage = () => {
   const scope = searchParams.get('scope') || '';
   const state = searchParams.get('state') || '';
 
-  const [app, setApp] = useState<any>(null);
+  const [app, setApp] = useState<{ clientId: string; name: string; description?: string; homepageUrl: string; logoUrl?: string; tosUrl?: string; privacyUrl?: string; allowedScopes: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('ayphr-api-token');
-    if (!token) {
-      navigate(`/auth/login?redirect=${encodeURIComponent(window.location.href)}`, { replace: true });
-      return;
-    }
-    if (!clientId || !redirectUri) {
-      setError('Missing client_id or redirect_uri');
-      setIsLoading(false);
-      return;
-    }
-    void (async () => {
-      try {
-        const res = await api.oauth.getPublicApp(clientId);
-        setApp(res.app);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load app');
-      } finally {
-        setIsLoading(false);
+    const task = window.setTimeout(() => {
+      const token = localStorage.getItem('ayphr-api-token');
+      if (!token) {
+        navigate(`/auth/login?redirect=${encodeURIComponent(window.location.href)}`, { replace: true });
+        return;
       }
-    })();
+      if (!clientId || !redirectUri) {
+        setError('Missing client_id or redirect_uri');
+        setIsLoading(false);
+        return;
+      }
+      void (async () => {
+        try {
+          const res = await api.oauth.getPublicApp(clientId);
+          setApp(res.app);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load app');
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+    }, 0);
+    return () => window.clearTimeout(task);
   }, [clientId, redirectUri, navigate]);
 
   const handleApprove = async () => {

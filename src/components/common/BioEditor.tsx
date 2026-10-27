@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { BIO_MAX_LENGTH, Markdown } from '../../../common';
-import type { MarkdownToken } from '../../../common';
+import { BIO_MAX_LENGTH, Markdown } from '@common';
+import type { MarkdownToken } from '@common';
 import './BioEditor.css';
 
 function renderTokens(tokens: MarkdownToken[], keyPrefix: string): ReactNode[] {

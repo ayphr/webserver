@@ -5,7 +5,7 @@ import type {
   ProfileMeResponse,
   PublicUser,
   SocialLinks,
-} from '../../../common';
+} from '@common';
 import type { RequestClient } from './client';
 
 export function createProfileApi(client: RequestClient) {

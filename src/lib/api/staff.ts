@@ -13,7 +13,7 @@ import type {
   StaffSummary,
   StaffUsersPayload,
   StaffUsersQuery,
-} from '../../../common';
+} from '@common';
 import type { RequestClient } from './client';
 
 export function createStaffApi(client: RequestClient) {

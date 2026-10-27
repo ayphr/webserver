@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
-import type { PolicyKey, PolicyStatus } from '../../../common';
+import type { PolicyKey, PolicyStatus } from '@common';
 import { Button, Card, CardBody, CardHeader, ConfirmDialog, Input } from '../common';
 import './PolicyGate.css';
 

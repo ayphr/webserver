@@ -13,8 +13,8 @@ import type {
   SubscriptionMePayload,
   SubscriptionPlan,
   SubscriptionTier,
-} from '../../../common';
-import { BADGES, BILLING_INTERVALS, SUBSCRIPTION_TIERS } from '../../../common';
+} from '@common';
+import { BADGES, BILLING_INTERVALS, SUBSCRIPTION_TIERS } from '@common';
 import { getBadgeIcon } from '../../lib/badges';
 import { api } from '../../lib/api';
 import { Button, Checkbox } from '../common';

@@ -1,4 +1,4 @@
-import type { SessionListPayload } from '../../../common';
+import type { SessionListPayload } from '@common';
 import type { RequestClient } from './client';
 
 export function createSessionsApi(client: RequestClient) {

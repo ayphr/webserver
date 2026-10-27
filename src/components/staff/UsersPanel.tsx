@@ -8,8 +8,8 @@ import type {
   SubscriptionSource,
   SubscriptionTier,
   UserRole,
-} from '../../../common';
-import { BADGES, SUBSCRIPTION_TIERS } from '../../../common';
+} from '@common';
+import { BADGES, SUBSCRIPTION_TIERS } from '@common';
 import { Button, Input, ManageSubscriptionsModal, PunishModal, Select, UsernameDisplay } from '../common';
 import { SetPasswordModal } from './SetPasswordModal';
 import { getBadgeIcon } from '../../lib/badges';

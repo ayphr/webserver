@@ -1,4 +1,4 @@
-import type { PunishmentPayload, PunishmentsMePayload, PunishmentsMeResponse } from '../../../common';
+import type { PunishmentPayload, PunishmentsMePayload, PunishmentsMeResponse } from '@common';
 import type { RequestClient } from './client';
 
 export function createPunishmentsApi(client: RequestClient) {

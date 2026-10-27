@@ -3,7 +3,7 @@ import './Sidebar.css';
 import logo from '../../assets/logo.svg';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
-import type { BadgeId } from '../../../common/types';
+import type { BadgeId } from '@common/types';
 
 type Tab = { id: string; name: string };
 

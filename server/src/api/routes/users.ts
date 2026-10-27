@@ -1,11 +1,8 @@
+import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid, updateUser } from '../../lib/db';
 import { getPolicyStatus } from '../../lib/policies';
 import { toPublicUser } from '../../lib/user';
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
 
 const handleMe = requireAuth(async (_request, user) => {
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);

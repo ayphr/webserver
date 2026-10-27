@@ -1,4 +1,4 @@
-import type { Connection } from '../../../common';
+import type { Connection } from '@common';
 import type { RequestClient } from './client';
 
 export function createConnectionsApi(client: RequestClient) {

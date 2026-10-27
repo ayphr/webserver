@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { Button, Modal } from '../common';
-import { getPasswordValidationChecks } from '../../../common/utils/password';
+import { getPasswordValidationChecks } from '@common/utils/password';
 import './ChangePasswordModal.css';
 
 export interface ChangePasswordModalProps {

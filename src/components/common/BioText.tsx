@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Markdown } from '../../../common';
-import type { MarkdownFormat } from '../../../common';
+import { Markdown } from '@common';
+import type { MarkdownFormat } from '@common';
 import type { MarkdownFeature } from '../../lib/markdown';
 import { MarkdownRenderer } from '../../lib/markdown';
 import './BioText.css';

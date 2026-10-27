@@ -1,3 +1,4 @@
+import { json, readJsonBody } from '../../lib/http';
 import type Stripe from 'stripe';
 import { createLogger } from '../../lib/logger';
 import { requireAuth } from '../auth';
@@ -34,23 +35,6 @@ import {
 } from '../../lib/db';
 
 const log = createLogger('stripe-webhook');
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
-
-async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
-  if (!request.headers.get('content-type')?.includes('application/json')) {
-    return null;
-  }
-
-  try {
-    return await request.json() as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
 export function getStripeCustomerId(
   customer: string | Stripe.Customer | Stripe.DeletedCustomer | null,
 ): string | null {

@@ -1,3 +1,4 @@
+import { isDuplicateKeyError, json, readJsonBody } from '../../lib/http';
 import { randomBytes } from 'node:crypto';
 import { requireAuth } from '../auth';
 import {
@@ -28,10 +29,6 @@ import {
 } from '../../lib/metrics';
 import { DEVICE_TOKEN_TTL_MS } from '../../env';
 import type { DataPoint, DeviceSummary, User } from '@common';
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
 
 const MAX_SERIAL = 0xFFFFFFFF;
 const MAX_NAME_LENGTH = 64;
@@ -114,20 +111,6 @@ function getDeviceToken(request: Request, body: Record<string, unknown> | null):
   }
 
   return null;
-}
-
-function isDuplicateKeyError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { code?: number }).code === 11000;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readJsonBody(request: Request): Promise<any> {
-  if (!request.headers.get('content-type')?.includes('application/json')) return null;
-  try {
-    return await request.json();
-  } catch {
-    return null;
-  }
 }
 
 const handleCreateToken = requireAuth(async (_request, user: User) => {

@@ -12,6 +12,9 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": { "@common": ["./common/index.ts"], "@common/*": ["./common/*"] },
     "noEmit": true,
     "jsx": "react-jsx",
 

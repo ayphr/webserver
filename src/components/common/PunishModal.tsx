@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../lib/api';
 import { Modal, Button } from './index';
 import './PunishModal.css';
-import type { Punishment } from '../../../common';
+import type { Punishment } from '@common';
 
 export interface PunishModalProps {
   userUuid: string;

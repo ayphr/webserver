@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Modal } from '../common';
-import { getPasswordValidationChecks } from '../../../common/utils/password';
+import { getPasswordValidationChecks } from '@common/utils/password';
 import './SetPasswordModal.css';
 
 export interface SetPasswordModalProps {
@@ -9,7 +9,7 @@ export interface SetPasswordModalProps {
   onClose: () => void;
   userUuid: string;
   username: string;
-  onChanged?: (user?: import('../../../common').PublicUser) => void;
+  onChanged?: (user?: import('@common').PublicUser) => void;
 }
 
 const lowercaseLabel = 'At least one lowercase letter';

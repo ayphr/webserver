@@ -1,3 +1,4 @@
+import { isDuplicateKeyError, json, readJsonBody } from '../../lib/http';
 import {
   createPasswordHash,
   endAllSessions,
@@ -44,27 +45,6 @@ const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again
 
 const registerLimiter = createRateLimiter(60 * 60 * 1000, 10, 'register');
 const loginLimiter = createRateLimiter(15 * 60 * 1000, 20, 'login');
-
-function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
-}
-
-async function readJsonBody(request: Request): Promise<AuthPayload | null> {
-  if (!request.headers.get('content-type')?.includes('application/json')) {
-    return null;
-  }
-
-  try {
-    return await request.json() as AuthPayload;
-  } catch {
-    return null;
-  }
-}
-
-function isDuplicateKeyError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { code?: number }).code === 11000;
-}
-
 async function handleRegister(request: Request) {
   const ipCheck = await registerLimiter.check(`ip:${getClientIp(request)}`);
   if (!ipCheck.allowed) {
@@ -72,7 +52,7 @@ async function handleRegister(request: Request) {
     return tooManyRequests(ipCheck.retryAfterMs);
   }
 
-  const body = await readJsonBody(request);
+  const body = await readJsonBody<AuthPayload>(request);
 
   if (!body?.username || !body.password) {
     authEventsTotal.inc({ event: 'register', result: 'invalid' });
@@ -162,7 +142,7 @@ async function handleLogin(request: Request) {
     return tooManyRequests(ipCheck.retryAfterMs);
   }
 
-  const body = await readJsonBody(request);
+  const body = await readJsonBody<AuthPayload>(request);
 
   if (!body?.username || !body.password) {
     authEventsTotal.inc({ event: 'login', result: 'invalid' });
@@ -243,7 +223,7 @@ const handleAcceptPolicies = requireAuth(async (_request, user) => {
 }, { allowSuspended: true, allowPolicyPending: true });
 
 const handleChangePassword = requireAuth(async (request, user) => {
-  const body = await readJsonBody(request);
+  const body = await readJsonBody<AuthPayload>(request);
 
   const currentPassword = typeof body?.currentPassword === 'string' ? body.currentPassword : undefined;
   const newPassword = typeof body?.newPassword === 'string' ? body.newPassword : undefined;
@@ -280,7 +260,7 @@ const handleChangePassword = requireAuth(async (request, user) => {
 }, { allowSuspended: true, allowPolicyPending: true });
 
 const handleDeleteAccount = requireAuth(async (request, user) => {
-  const body = await readJsonBody(request);
+  const body = await readJsonBody<AuthPayload>(request);
 
   if (!body?.password) {
     authEventsTotal.inc({ event: 'account_delete', result: 'invalid' });

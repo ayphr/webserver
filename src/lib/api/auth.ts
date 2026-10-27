@@ -1,4 +1,4 @@
-import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession, ChangePasswordRequest, SessionDeviceType } from '../../../common';
+import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession, ChangePasswordRequest, SessionDeviceType } from '@common';
 import type { RequestClient } from './client';
 
 function getClientDeviceType(): SessionDeviceType | undefined {

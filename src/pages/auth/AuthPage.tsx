@@ -4,8 +4,8 @@ import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input } from '../../components/common';
 import { api } from '../../lib/api';
-import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '../../../common/utils/password';
-import { getUsernameValidationError } from '../../../common/utils/username';
+import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '@common/utils/password';
+import { getUsernameValidationError } from '@common/utils/username';
 
 type AuthMode = 'login' | 'signup';
 

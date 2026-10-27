@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Markdown, MarkdownBlock, MarkdownInline } from '../../common';
+import type { Markdown, MarkdownBlock, MarkdownInline } from '@common';
 
 export type MarkdownFeature =
   | 'bold'
