@@ -1,4 +1,4 @@
-import { json, readJsonBody } from '../../lib/http';
+import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
 import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../lib/db';
@@ -13,11 +13,6 @@ const MAX_DURATION_MINUTES = 5 * 365 * 24 * 60;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-function parsePositiveInt(value: string | null, fallback: number) {
-  if (!value) return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
 const handleUsersSummary = requireRole('staff', async () => {
   const [users, staffUsers] = await Promise.all([
     getUserCount(),

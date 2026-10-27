@@ -18,7 +18,7 @@ import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
 import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
 import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
-import type { ProfileCountriesResponse, PublicUser, SocialLinkType, SocialLinks, UserRole } from '@common';
+import type { ProfileCountriesPayload, PublicUser, SocialLinkType, SocialLinks, UserRole } from '@common';
 import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '@common';
 import {
   SOCIAL_LINK_LABELS,
@@ -100,7 +100,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   onPunishSelf,
 }) => {
   const [user, setUser] = useState<PublicUser | null>(null);
-  const [countries, setCountries] = useState<ProfileCountriesResponse['countries']>([]);
+  const [countries, setCountries] = useState<ProfileCountriesPayload['countries']>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);

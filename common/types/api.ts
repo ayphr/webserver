@@ -27,35 +27,9 @@ export type AuthSession = {
   policyStatus: PolicyStatus | null;
 };
 
-export type AuthMeResponse = {
-  user: PublicUser;
-  suspension: Punishment | null;
-  policyStatus: PolicyStatus | null;
-};
-
-export type UserMeResponse = {
-  user: PublicUser;
-  activeSuspension: Punishment | null;
-  policyStatus: PolicyStatus | null;
-};
-
-export type ProfileMeResponse = {
-  user: PublicUser;
-};
-
 export type CountryOption = {
   code: string;
   name: string;
-};
-
-export type ProfileCountriesResponse = {
-  countries: CountryOption[];
-};
-
-export type PunishmentsMeResponse = {
-  user: PublicUser;
-  activeSuspension: Punishment | null;
-  punishments: Punishment[];
 };
 
 export type StaffSummary = {

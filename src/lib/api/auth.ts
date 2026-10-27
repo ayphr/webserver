@@ -1,4 +1,4 @@
-import type { AcceptPoliciesPayload, AuthMePayload, AuthMeResponse, AuthResponsePayload, AuthSession, ChangePasswordRequest, SessionDeviceType } from '@common';
+import type { AcceptPoliciesPayload, AuthMePayload, AuthResponsePayload, AuthSession, ChangePasswordRequest, SessionDeviceType } from '@common';
 import type { RequestClient } from './client';
 
 function getClientDeviceType(): SessionDeviceType | undefined {
@@ -75,7 +75,7 @@ export function createAuthApi(client: RequestClient) {
         user: response.user,
         suspension: response.suspension || null,
         policyStatus: response.policyStatus ?? null,
-      } satisfies AuthMeResponse;
+      } satisfies AuthMePayload;
     },
     async acceptPolicies() {
       const response = await client.requestJson<AcceptPoliciesPayload>('/api/auth/policies/accept', {

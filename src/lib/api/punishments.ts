@@ -1,4 +1,4 @@
-import type { PunishmentPayload, PunishmentsMePayload, PunishmentsMeResponse } from '@common';
+import type { PunishmentPayload, PunishmentsMePayload } from '@common';
 import type { RequestClient } from './client';
 
 export function createPunishmentsApi(client: RequestClient) {
@@ -9,7 +9,7 @@ export function createPunishmentsApi(client: RequestClient) {
         user: response.user,
         activeSuspension: response.activeSuspension || null,
         punishments: response.punishments,
-      } satisfies PunishmentsMeResponse;
+      } satisfies PunishmentsMePayload;
     },
     async getById(id: string) {
       const response = await client.requestJson<PunishmentPayload>(`/api/punishments/${id}`);

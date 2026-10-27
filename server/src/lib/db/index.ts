@@ -1,6 +1,6 @@
 import { Binary, Collection, Db, MongoClient, type Filter } from 'mongodb';
-import { createLogger } from './logger';
-import { recordMongoOperation, sessionsTotal } from './metrics';
+import { createLogger } from '../logger';
+import { recordMongoOperation, sessionsTotal } from '../metrics';
 import { type DataPoint, type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection } from '@common';
 import {
   DATA_POINTS_COLLECTION,
@@ -18,9 +18,9 @@ import {
   MONGO_URI,
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
-} from '../env';
-import { cacheDel, cacheGet, cacheSet } from './cache';
-import { invalidateAuthEntries } from './authCache';
+} from '../../env';
+import { cacheDel, cacheGet, cacheSet } from '../cache';
+import { invalidateAuthEntries } from '../authCache';
 
 const log = createLogger('db');
 

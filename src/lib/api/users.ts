@@ -1,4 +1,4 @@
-import type { UserMePayload, UserMeResponse, PublicUser } from '@common';
+import type { UserMePayload, PublicUser } from '@common';
 import type { RequestClient } from './client';
 
 export function createUsersApi(client: RequestClient) {
@@ -9,7 +9,7 @@ export function createUsersApi(client: RequestClient) {
         user: response.user,
         activeSuspension: response.activeSuspension || null,
         policyStatus: response.policyStatus ?? null,
-      } satisfies UserMeResponse;
+      } satisfies UserMePayload;
     },
     async getByUuid(uuid: string) {
       const response = await client.requestJson<{ user: PublicUser; requestedBy: PublicUser }>(`/api/users/${uuid}`);
