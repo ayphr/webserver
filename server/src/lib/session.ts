@@ -1,5 +1,5 @@
 import type { SessionDeviceType, SessionLocation } from '@common';
-import { normalizeCountryCode } from './country';
+import { normalizeCountryCode } from '@common';
 import { TIMEZONE_COUNTRY } from './timezoneCountry';
 
 const regionDisplayNames = new Intl.DisplayNames(['en'], { type: 'region' });

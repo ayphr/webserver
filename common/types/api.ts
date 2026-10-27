@@ -1,4 +1,5 @@
 import type { Device, DeviceSummary } from './device';
+import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
 import type {
@@ -25,11 +26,6 @@ export type AuthSession = {
   token: string;
   suspension?: Punishment | null;
   policyStatus: PolicyStatus | null;
-};
-
-export type CountryOption = {
-  code: string;
-  name: string;
 };
 
 export type StaffSummary = {

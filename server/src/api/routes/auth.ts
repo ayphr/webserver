@@ -19,7 +19,7 @@ import {
   updateUser,
 } from '../../lib/db';
 import type { User } from '@common';
-import { normalizeCountryCode } from '../../lib/country';
+import { normalizeCountryCode } from '@common';
 import { toPublicUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';

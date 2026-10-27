@@ -1,6 +1,6 @@
 import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
-import { normalizeCountryCode, getSupportedCountries } from '../../lib/country';
+import { normalizeCountryCode, getSupportedCountries } from '@common';
 import { toPublicUser } from '../../lib/user';
 import { isSocialLinkType, normalizeSocialHandle } from '@common/utils/social';
 import {

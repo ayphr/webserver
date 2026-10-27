@@ -1,4 +1,4 @@
-export { countryCodeToFlag } from './country';
+export { countryCodeToFlag, normalizeCountryCode, getSupportedCountries, type CountryOption } from './country';
 export {
   BIO_MAX_LENGTH,
   BIO_MAX_SOURCE_LENGTH,

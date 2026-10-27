@@ -1,0 +1,165 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+import * as internal from './internal';
+import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
+const {
+  DEVICE_CACHE,
+  DEVICE_CACHE_TTL_SECONDS,
+  DEVICE_LIST_CACHE,
+  DEVICE_LIST_CACHE_TTL_SECONDS,
+  DEVICE_NEGATIVE_TTL_SECONDS,
+  NONE,
+  client,
+  deviceCacheKey,
+  deviceListCacheKey,
+  deviceStatsCacheKey,
+  getCols,
+  normalizeDateValues,
+  trackMongoOperation,
+  DEVICES_COLLECTION,
+  DEVICE_CLAIMS_COLLECTION
+} = internal;
+
+import type {
+  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
+} from '@common';
+import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
+import { invalidateAuthEntries } from '../authCache';
+
+export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
+  const { devices, deviceClaims } = await getCols();
+
+  // Collect serials before deleting so their cache entries can be dropped.
+  trackMongoOperation('find', DEVICES_COLLECTION);
+  const existing = await devices.find({ ownerUuid }, { projection: { serial: 1, _id: 0 } }).toArray();
+
+  trackMongoOperation('deleteMany', DEVICES_COLLECTION);
+  await devices.deleteMany({ ownerUuid });
+  trackMongoOperation('deleteOne', DEVICE_CLAIMS_COLLECTION);
+  await deviceClaims.deleteOne({ ownerUuid });
+
+  await cacheDel(
+    DEVICE_CACHE,
+    ...existing.map((device) => deviceCacheKey(device.serial)),
+    deviceListCacheKey(ownerUuid),
+    deviceStatsCacheKey(ownerUuid),
+  );
+}
+
+
+export async function createDevice(device: DeviceDocument) {
+  const { devices } = await getCols();
+  const normalizedDevice = normalizeDateValues(device);
+  trackMongoOperation('insertOne', DEVICES_COLLECTION);
+  await devices.insertOne(normalizedDevice);
+
+  await cacheDevice(normalizedDevice);
+  // The owner's device list no longer matches.
+  await cacheDel(DEVICE_LIST_CACHE, deviceListCacheKey(normalizedDevice.ownerUuid));
+
+  return normalizedDevice;
+}
+
+/**
+ * Writes a device document into the cache. Used on creation and after uploads so
+ * the hot upload path never has to re-read the device from MongoDB.
+ */
+
+export async function cacheDevice(device: DeviceDocument): Promise<void> {
+  await cacheSet(DEVICE_CACHE, deviceCacheKey(device.serial), device, DEVICE_CACHE_TTL_SECONDS);
+}
+
+
+export async function getDeviceBySerial(serial: number) {
+  const cacheKey = deviceCacheKey(serial);
+  const cached = await cacheGet<DeviceDocument | typeof NONE>(DEVICE_CACHE, cacheKey);
+
+  if (cached === NONE) return null;
+  if (cached) return cached;
+
+  const { devices } = await getCols();
+  trackMongoOperation('findOne', DEVICES_COLLECTION);
+  const device = await devices.findOne({ serial });
+
+  if (device) {
+    await cacheSet(DEVICE_CACHE, cacheKey, device, DEVICE_CACHE_TTL_SECONDS);
+  } else {
+    // Short negative TTL keeps invalid-serial uploads from hammering MongoDB.
+    await cacheSet(DEVICE_CACHE, cacheKey, NONE, DEVICE_NEGATIVE_TTL_SECONDS);
+  }
+
+  return device;
+}
+
+
+export async function getDevicesForOwnerUuid(ownerUuid: string) {
+  const cacheKey = deviceListCacheKey(ownerUuid);
+  const cached = await cacheGet<DeviceDocument[]>(DEVICE_LIST_CACHE, cacheKey);
+  if (cached) return cached;
+
+  const { devices } = await getCols();
+  trackMongoOperation('find', DEVICES_COLLECTION);
+  const list = await devices.find({ ownerUuid }).sort({ registeredAt: -1 }).toArray();
+
+  await cacheSet(DEVICE_LIST_CACHE, cacheKey, list, DEVICE_LIST_CACHE_TTL_SECONDS);
+
+  return list;
+}
+
+/**
+ * Drops the per-owner device list and statistics caches after an upload changes
+ * the underlying data.
+ */
+
+export async function invalidateDeviceCachesForOwner(ownerUuid: string): Promise<void> {
+  await cacheDel(
+    DEVICE_LIST_CACHE,
+    deviceListCacheKey(ownerUuid),
+    deviceStatsCacheKey(ownerUuid),
+  );
+}
+
+
+export async function updateDeviceLastUpload(serial: number, when: Date) {
+  const { devices } = await getCols();
+  trackMongoOperation('updateOne', DEVICES_COLLECTION);
+  await devices.updateOne({ serial }, { $set: { lastUploadAt: when } });
+}
+
+/** Strips the secret token fields before a device is returned to a client. */
+
+export function toPublicDevice(device: DeviceDocument): Device {
+  const publicDevice: Device & { tokenHash?: string; tokenCreatedAt?: Date } = { ...device };
+  delete publicDevice.tokenHash;
+  delete publicDevice.tokenCreatedAt;
+  return publicDevice;
+}
+
+
+export async function setDeviceClaim(claim: DeviceClaim) {
+  const { deviceClaims } = await getCols();
+  const normalizedClaim = normalizeDateValues(claim);
+  trackMongoOperation('updateOne', DEVICE_CLAIMS_COLLECTION);
+  await deviceClaims.updateOne(
+    { ownerUuid: claim.ownerUuid },
+    { $set: normalizedClaim },
+    { upsert: true }
+  );
+  return normalizedClaim;
+}
+
+
+export async function getDeviceClaimByTokenHash(tokenHash: string) {
+  const { deviceClaims } = await getCols();
+  trackMongoOperation('findOne', DEVICE_CLAIMS_COLLECTION);
+  return deviceClaims.findOne({ tokenHash });
+}
+
+
+export async function deleteDeviceClaim(ownerUuid: string) {
+  const { deviceClaims } = await getCols();
+  trackMongoOperation('deleteOne', DEVICE_CLAIMS_COLLECTION);
+  await deviceClaims.deleteOne({ ownerUuid });
+}
+
+
