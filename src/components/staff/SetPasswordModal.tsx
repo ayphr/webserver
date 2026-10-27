@@ -69,7 +69,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Set password — ${username}`} size="sm" showCancel={false}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Set password for ${username}`} size="sm" showCancel={false}>
       <div className="set-password__body">
         <div className="set-password__section">
           <label htmlFor="set-password" className="set-password__label">New password</label>

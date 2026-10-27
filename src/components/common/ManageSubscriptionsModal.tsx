@@ -169,7 +169,7 @@ export const ManageSubscriptionsModal: React.FC<ManageSubscriptionsModalProps> =
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Subscriptions — ${username}`} size="md" showCancel={false}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`${username}'s subscriptions`} size="md" showCancel={false}>
       <div className="manage-subs__body">
         <section className="manage-subs__section">
           <h3 className="manage-subs__heading">Attached subscriptions</h3>

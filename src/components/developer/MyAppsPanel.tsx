@@ -183,7 +183,7 @@ export const MyAppsPanel = () => {
                 <p><strong>Client ID:</strong> <code>{app.clientId}</code></p>
                 <p><strong>Homepage:</strong> {app.homepageUrl}</p>
                 <p><strong>Scopes:</strong> {app.allowedScopes.join(', ')}</p>
-                <p><strong>Redirect URIs:</strong> {app.redirectUris.join(', ') || '—'}</p>
+                <p><strong>Redirect URIs:</strong> {app.redirectUris.join(', ') || 'No URIs configured'}</p>
                 <div className="my-apps__actions">
                   <Button variant="secondary" onClick={() => handleRegenerate(app.id)}>Regenerate secret</Button>
                   <Button variant="danger" onClick={() => handleDelete(app.id)}>Delete</Button>
