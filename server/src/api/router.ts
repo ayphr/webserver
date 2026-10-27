@@ -50,6 +50,7 @@ import { handleUserByUuid, handleMe as handleUsersMe, handleDeveloperToggle } fr
 import {
   handleStripeWebhook,
   handleSubscriptionAutoRenew,
+  handleSubscriptionCancelGranted,
   handleSubscriptionCheckout,
   handleSubscriptionMe,
   handleSubscriptionPortal,
@@ -98,6 +99,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/subscriptions/checkout', handle: handleSubscriptionCheckout },
   { method: 'POST', path: '/api/subscriptions/auto-renew', handle: handleSubscriptionAutoRenew },
   { method: 'POST', path: '/api/subscriptions/portal', handle: handleSubscriptionPortal },
+  { method: 'DELETE', path: '/api/subscriptions/attached/:id', handle: handleSubscriptionCancelGranted },
 
   { method: 'GET', path: '/api/sessions', handle: handleSessionsListMine },
   { method: 'DELETE', path: '/api/sessions/:id', handle: handleSessionRevoke },

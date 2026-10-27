@@ -24,6 +24,9 @@ export const UsernameDisplay = ({
   className = '',
 }: UsernameDisplayProps) => {
   const flag = countryCodeToFlag(country);
+  const countryName = country && country.length === 2
+    ? (new Intl.DisplayNames(['en'], { type: 'region' }).of(country.toUpperCase()) ?? country.toUpperCase())
+    : country;
 
   return (
     <div className={`username-display ${className}`}>
@@ -44,9 +47,11 @@ export const UsernameDisplay = ({
         </span>
       )}
       {flag && (
-        <span className="username-display__flag">
-          <EmojiText>{flag}</EmojiText>
-        </span>
+        <Tooltip content={countryName}>
+          <span className="username-display__flag" aria-label={countryName ?? undefined}>
+            <EmojiText>{flag}</EmojiText>
+          </span>
+        </Tooltip>
       )}
     </div>
   );

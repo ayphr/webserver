@@ -34,5 +34,10 @@ export function createSubscriptionsApi(client: RequestClient) {
       });
       return response.url;
     },
+    async cancelGranted(subscriptionId: string) {
+      await client.requestJson(`/api/subscriptions/attached/${encodeURIComponent(subscriptionId)}`, {
+        method: 'DELETE',
+      });
+    },
   };
 }

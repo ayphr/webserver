@@ -12,6 +12,19 @@
   border-right: 1px solid rgba(255, 255, 255, 0.03);
 }
 
+.n-sidebar__logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: block;
+}
+
+.n-sidebar__top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .n-sidebar__title {
   font-size: 1.1rem;
   margin: 0;

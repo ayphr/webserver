@@ -82,6 +82,7 @@ export const SubscriptionPanel = () => {
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [isAutoRenewPending, setIsAutoRenewPending] = useState(false);
   const [isPortalPending, setIsPortalPending] = useState(false);
+  const [isCancelGrantedPending, setIsCancelGrantedPending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('month');
 
@@ -171,6 +172,20 @@ export const SubscriptionPanel = () => {
     }
   };
 
+  const handleCancelGranted = async (subscriptionId: string) => {
+    setError(null);
+    setIsCancelGrantedPending(true);
+    try {
+      await api.subscriptions.cancelGranted(subscriptionId);
+      const data = await api.subscriptions.me();
+      setPayload(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel subscription');
+    } finally {
+      setIsCancelGrantedPending(false);
+    }
+  };
+
   if (isLoading) {
     return <p className="subscription__loading">Loading your subscription...</p>;
   }
@@ -197,8 +212,10 @@ export const SubscriptionPanel = () => {
           now={now}
           isAutoRenewPending={isAutoRenewPending}
           isPortalPending={isPortalPending}
+          isCancelGrantedPending={isCancelGrantedPending}
           onAutoRenew={handleAutoRenew}
           onPortal={handlePortal}
+          onCancelGranted={handleCancelGranted}
         />
       ) : (
         <div className="subscription__empty">
@@ -208,7 +225,7 @@ export const SubscriptionPanel = () => {
         </div>
       )}
 
-      {!paidSubscription && (
+      {!subscription && (
         <div className="subscription__plans">
           <div className="subscription__plans-header">
             <h3>Choose a plan</h3>
@@ -239,7 +256,7 @@ export const SubscriptionPanel = () => {
                 <PlanCard
                   key={tier}
                   plan={plan}
-                  currentTier={subscription?.tier ?? null}
+                  currentTier={null}
                   isPending={pendingKey === `${tier}:${billingInterval}`}
                   disabled={pendingKey !== null}
                   trialDays={trialDays}
@@ -260,8 +277,10 @@ type CurrentSubscriptionProps = {
   now: number;
   isAutoRenewPending: boolean;
   isPortalPending: boolean;
+  isCancelGrantedPending: boolean;
   onAutoRenew: (autoRenew: boolean) => void;
   onPortal: () => void;
+  onCancelGranted: (subscriptionId: string) => void;
 };
 
 const CurrentSubscription = ({
@@ -270,12 +289,15 @@ const CurrentSubscription = ({
   now,
   isAutoRenewPending,
   isPortalPending,
+  isCancelGrantedPending,
   onAutoRenew,
   onPortal,
+  onCancelGranted,
 }: CurrentSubscriptionProps) => {
   const tier = subscription.tier;
   const isPaid = subscription.source === 'paid';
   const isTrialing = isPaid && paidSubscription?.status === 'trialing';
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const status = isPaid && paidSubscription
     ? STATUS_LABELS[paidSubscription.status] ?? paidSubscription.status
     : null;
@@ -342,6 +364,41 @@ const CurrentSubscription = ({
           <p className="subscription__hint">
             This subscription is managed through Stripe. Use the billing portal to update it.
           </p>
+        )}
+
+        {!isPaid && (
+          <div className="subscription__controls">
+            {confirmingCancel ? (
+              <>
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    const id = subscription.attachedSubscription?.id;
+                    if (id) onCancelGranted(id);
+                  }}
+                  isLoading={isCancelGrantedPending}
+                  disabled={isCancelGrantedPending || !subscription.attachedSubscription?.id}
+                >
+                  Confirm cancel
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setConfirmingCancel(false)}
+                  disabled={isCancelGrantedPending}
+                >
+                  Keep subscription
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="danger"
+                onClick={() => setConfirmingCancel(true)}
+                disabled={isCancelGrantedPending}
+              >
+                Cancel subscription
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>

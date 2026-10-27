@@ -27,6 +27,7 @@ import {
   getUserByStripeCustomerId,
   getUserUuidByStripeCustomerId,
   recordStripeEvent,
+  removeAttachedSubscription,
   removePaidSubscription,
   setUserStripeCustomerId,
   upsertPaidSubscription,
@@ -316,9 +317,28 @@ const handleSubscriptionPortal = requireAuth(async (_request, user) => {
   return json({ url });
 }, { allowSuspended: true });
 
+const handleSubscriptionCancelGranted = requireAuth(async (_request, user, params) => {
+  const subscriptionId = params.id;
+  if (!subscriptionId) {
+    return json({ error: 'subscription id is required' }, 400);
+  }
+
+  const existing = (user.attachedSubscriptions ?? []).some((subscription) => subscription.id === subscriptionId);
+  if (!existing) {
+    return json({ error: 'subscription not found' }, 404);
+  }
+
+  await removeAttachedSubscription(user.uuid, subscriptionId);
+
+  subscriptionEventsTotal.inc({ event: 'granted_subscription_cancelled' });
+
+  return json({ removed: true });
+}, { allowSuspended: true });
+
 export {
   handleSubscriptionMe,
   handleSubscriptionCheckout,
   handleSubscriptionAutoRenew,
   handleSubscriptionPortal,
+  handleSubscriptionCancelGranted,
 };

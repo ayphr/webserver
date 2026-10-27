@@ -1,5 +1,6 @@
 import React from 'react';
 import './Sidebar.css';
+import logo from '../../assets/logo.svg';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import type { BadgeId } from '../../../common/types';
@@ -58,6 +59,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unkn
   return (
     <aside className="n-sidebar" aria-label="Sidebar">
       <div className="n-sidebar__top">
+        <img src={logo} alt="Ayphr" className="n-sidebar__logo" />
         <h1 className="n-sidebar__title">Ayphr</h1>
       </div>
 

@@ -11,6 +11,7 @@
   white-space: nowrap;
   font-family: var(--font-family-base);
   font-size: 0.95rem;
+  line-height: 1.2;
   background-color: hsl(0, 0%, 13%);
   color: var(--text-primary);
   padding: 0.5rem 1rem;
@@ -79,8 +80,8 @@
 
 .button__loader-spinner {
   display: inline-block;
-  width: 1em;
-  height: 1em;
+  width: 1.2em;
+  height: 1.2em;
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
