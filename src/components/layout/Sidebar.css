@@ -32,7 +32,7 @@
   padding: 0.5rem 0.4rem;
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-primary);
   text-align: left;
   cursor: pointer;
   border-radius: 6px;
@@ -54,7 +54,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted-opaque-surface);
+  color: var(--text-primary);
 }
 
 .n-sidebar__label {
