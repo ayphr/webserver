@@ -165,7 +165,8 @@ const STATS = [
 const PRICING = [
   {
     name: 'Lite',
-    price: '$9',
+    price: '$9.99',
+    currency: 'AUD',
     period: '/mo',
     desc: 'For small projects.',
     features: ['500 credits / month', '10M data points', '30-day retention', '10 devices'],
@@ -173,7 +174,8 @@ const PRICING = [
   },
   {
     name: 'Plus',
-    price: '$29',
+    price: '$14.99',
+    currency: 'AUD',
     period: '/mo',
     desc: 'For growing projects.',
     features: [
@@ -189,7 +191,8 @@ const PRICING = [
   },
   {
     name: 'Ultra',
-    price: '$99',
+    price: '$22.99',
+    currency: 'AUD',
     period: '/mo',
     desc: 'For large fleets.',
     features: [
@@ -739,6 +742,7 @@ export const LandingPage = () => {
                   <h3 className="landing-price-card__name">{p.name}</h3>
                   <div className="landing-price-card__price">
                     <span className="landing-price-card__amount">{p.price}</span>
+                    <span className="landing-price-card__currency">{p.currency}</span>
                     <span className="landing-price-card__period">{p.period}</span>
                   </div>
                   <p className="landing-price-card__desc">{p.desc}</p>
