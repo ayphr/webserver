@@ -1,18 +1,21 @@
-import { isDuplicateKeyError, json, readJsonBody } from '../../lib/http';
+import { json, readJsonBody } from '../../lib/http';
 import { randomBytes } from 'node:crypto';
 import { requireAuth } from '../auth';
 import {
   cacheDevice,
   createDevice,
-  deleteDeviceClaim,
+  createDevicePairing,
+  getDevicePairingByCode,
+  markDevicePairingFetched,
+  markDevicePairingLinked,
   getDataPointStats,
   getDeviceBySerial,
-  getDeviceClaimByTokenHash,
   getDevicesForOwnerUuid,
   invalidateDeviceCachesForOwner,
   setDeviceClaim,
   toPublicDevice,
   updateDeviceLastUpload,
+  updateDeviceToken,
   upsertDataPoints,
   type DeviceDocument,
 } from '../../lib/db';
@@ -130,6 +133,122 @@ const handleCreateToken = requireAuth(async (_request, user: User) => {
   return json({ token, expiresAt }, 201);
 });
 
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function generatePairingCode(): string {
+  let code = '';
+  for (let i = 0; i < 8; i += 1) {
+    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+const handleRequestPairing = async (request: Request): Promise<Response> => {
+  const body = await readJsonBody(request);
+  const serial = parseSerial(body?.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const name = parseName(body?.name) ?? `Device ${serial}`;
+
+  let code = generatePairingCode();
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const existing = await getDevicePairingByCode(code);
+    if (!existing) break;
+    code = generatePairingCode();
+  }
+
+  const token = randomBytes(32).toString('hex');
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + DEVICE_TOKEN_TTL_MS);
+
+  await createDevicePairing({
+    code,
+    serial,
+    name,
+    token,
+    tokenHash: hashToken(token),
+    createdAt: now,
+    expiresAt,
+    linked: false,
+  });
+
+  return json({ code, expiresAt }, 201);
+};
+
+const handleLink = requireAuth(async (request, user: User) => {
+  const body = await readJsonBody(request);
+  const code = typeof body?.code === 'string' ? body.code.trim().toUpperCase() : '';
+  if (!code) return json({ error: 'invalid code' }, 400);
+
+  const pairing = await getDevicePairingByCode(code);
+  const now = new Date();
+
+  if (!pairing || pairing.expiresAt.getTime() <= now.getTime()) {
+    return json({ error: 'invalid or expired code' }, 404);
+  }
+
+  if (pairing.linked) {
+    return json({ error: 'code already used' }, 409);
+  }
+
+  const serial = pairing.serial;
+  const name = pairing.name ?? `Device ${serial}`;
+  const tokenHash = pairing.tokenHash;
+
+  const existing = await getDeviceBySerial(serial);
+
+  let device: DeviceDocument;
+
+  if (existing) {
+    if (existing.ownerUuid !== user.uuid) {
+      return json({ error: 'forbidden' }, 403);
+    }
+
+    await updateDeviceToken(serial, tokenHash, pairing.createdAt);
+    device = { ...existing, tokenHash, tokenCreatedAt: pairing.createdAt };
+  } else {
+    const newDevice: DeviceDocument = {
+      serial,
+      name,
+      ownerUuid: user.uuid,
+      ownerUsername: user.username,
+      registeredAt: now,
+      tokenHash,
+      tokenCreatedAt: pairing.createdAt,
+    };
+
+    await createDevice(newDevice);
+    device = newDevice;
+    devicesRegisteredTotal.inc();
+  }
+
+  await markDevicePairingLinked(code, user.uuid, user.username);
+
+  return json({ linked: true, device: toPublicDevice(device) }, 200);
+});
+
+const handleFetchPairingToken = async (request: Request, params: { code?: string }): Promise<Response> => {
+  const code = typeof params.code === 'string' ? params.code.trim().toUpperCase() : '';
+  if (!code) return json({ error: 'invalid code' }, 400);
+
+  const pairing = await getDevicePairingByCode(code);
+  const now = new Date();
+
+  if (!pairing || pairing.expiresAt.getTime() <= now.getTime()) {
+    return json({ error: 'invalid or expired code' }, 404);
+  }
+
+  if (!pairing.linked) {
+    return json({ error: 'not linked yet' }, 404);
+  }
+
+  const response = json({ token: pairing.token, expiresAt: pairing.expiresAt, serial: pairing.serial }, 200);
+
+  await markDevicePairingFetched(code);
+
+  return response;
+};
+
 const handleListMine = requireAuth(async (_request, user: User) => {
   const devices = await getDevicesForOwnerUuid(user.uuid);
   const stats = await getDataPointStats(devices.map((device) => device.serial), user.uuid);
@@ -176,47 +295,16 @@ async function handleUpload(request: Request): Promise<Response> {
     const tokenHash = hashToken(token);
     const now = new Date();
     const existing = await getDeviceBySerial(serial);
-    let device: DeviceDocument;
-    let created = false;
 
-    if (existing) {
-      if (existing.tokenHash !== tokenHash) {
-        return json({ error: 'invalid device token' }, 401);
-      }
-      device = existing;
-    } else {
-      const claim = await getDeviceClaimByTokenHash(tokenHash);
-
-      if (!claim || claim.expiresAt.getTime() <= now.getTime()) {
-        return json({ error: 'invalid or expired device token' }, 401);
-      }
-
-      const newDevice: DeviceDocument = {
-        serial,
-        name,
-        ownerUuid: claim.ownerUuid,
-        ownerUsername: claim.ownerUsername,
-        registeredAt: now,
-        lastUploadAt: now,
-        tokenHash,
-        tokenCreatedAt: now,
-      };
-
-      try {
-        await createDevice(newDevice);
-        device = newDevice;
-        created = true;
-        await deleteDeviceClaim(claim.ownerUuid);
-      } catch (error) {
-        if (!isDuplicateKeyError(error)) throw error;
-
-        const raced = await getDeviceBySerial(serial);
-        if (raced?.tokenHash !== tokenHash) {
-          return json({ error: 'invalid device token' }, 401);
-        }
-        device = raced;
-      }
+    if (!existing) {
+      return json({ error: 'device not linked' }, 404);
     }
+
+    if (existing.tokenHash !== tokenHash) {
+      return json({ error: 'invalid device token' }, 401);
+    }
+
+    const device = existing;
 
     const [accepted] = await Promise.all([
       upsertDataPoints(serial, points),
@@ -232,12 +320,7 @@ async function handleUpload(request: Request): Promise<Response> {
     telemetryUploadBatchSize.observe(points.length);
     observeTelemetryValues(points);
 
-    if (created) {
-      devicesRegisteredTotal.inc();
-      deviceClaimsTotal.inc({ event: 'claimed' });
-    }
-
-    return json({ device: toPublicDevice(device), accepted }, created ? 201 : 200);
+    return json({ device: toPublicDevice(device), accepted }, 200);
   } catch (error) {
     telemetryUploadErrorsTotal.inc();
     throw error;
@@ -246,4 +329,4 @@ async function handleUpload(request: Request): Promise<Response> {
   }
 }
 
-export { handleCreateToken, handleListMine, handleGetBySerial, handleUpload };
+export { handleCreateToken, handleFetchPairingToken, handleLink, handleListMine, handleGetBySerial, handleRequestPairing, handleUpload };

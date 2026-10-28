@@ -11,6 +11,7 @@ import {
   PUNISHMENTS_COLLECTION,
   DEVICES_COLLECTION,
   DEVICE_CLAIMS_COLLECTION,
+  DEVICE_PAIRINGS_COLLECTION,
   SESSIONS_COLLECTION,
   STRIPE_EVENTS_COLLECTION,
   AVATARS_COLLECTION,
@@ -52,6 +53,21 @@ export type DeviceClaim = {
   expiresAt: Date;
 };
 
+export type DevicePairing = {
+  code: string;
+  serial: number;
+  name?: string;
+  token: string;
+  tokenHash: string;
+  createdAt: Date;
+  expiresAt: Date;
+  linked: boolean;
+  ownerUuid?: string;
+  ownerUsername?: string;
+  linkedAt?: Date;
+  fetched?: boolean;
+};
+
 export let client: MongoClient | null = null;
 export let database: Db | null = null;
 export let connectPromise: Promise<Db> | null = null;
@@ -62,6 +78,7 @@ export interface Collections {
   punishments: Collection<Punishment>;
   devices: Collection<DeviceDocument>;
   deviceClaims: Collection<DeviceClaim>;
+  devicePairings: Collection<DevicePairing>;
   sessions: Collection<Session>;
   stripeEvents: Collection<{ id: string; type: string; createdAt: Date }>;
   avatars: Collection<StoredAvatar>;
@@ -173,6 +190,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     punishments: db.collection<Punishment>(PUNISHMENTS_COLLECTION),
     devices: db.collection<DeviceDocument>(DEVICES_COLLECTION),
     deviceClaims: db.collection<DeviceClaim>(DEVICE_CLAIMS_COLLECTION),
+    devicePairings: db.collection<DevicePairing>(DEVICE_PAIRINGS_COLLECTION),
     sessions: db.collection<Session>(SESSIONS_COLLECTION),
     stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION),
     avatars: db.collection<StoredAvatar>(AVATARS_COLLECTION),
@@ -204,6 +222,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
       { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
     )],
     [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
+    [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ code: 1 }, { unique: true })],
+    [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 })],
   ];

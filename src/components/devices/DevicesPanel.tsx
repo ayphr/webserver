@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { IconAlertCircle, IconCopy, IconDatabase, IconPlus, IconRefresh } from '@tabler/icons-react';
-import type { DeviceSummary, DeviceToken } from '@common';
+import { IconAlertCircle, IconDatabase, IconRefresh } from '@tabler/icons-react';
+import type { DeviceSummary } from '@common';
 import { api } from '../../lib/api';
-import { Button, Modal } from '../common';
+import { Button } from '../common';
 import './DevicesPanel.css';
 
 function toDate(value: Date | string): Date {
@@ -33,10 +33,6 @@ export const DevicesPanel = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<DeviceToken | null>(null);
-  const [isTokenOpen, setIsTokenOpen] = useState(false);
-  const [isCreatingToken, setIsCreatingToken] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -61,33 +57,6 @@ export const DevicesPanel = () => {
     setIsRefreshing(false);
   };
 
-  const handleAddDevice = async () => {
-    setIsCreatingToken(true);
-    setError(null);
-    setCopied(false);
-
-    try {
-      const created = await api.devices.createToken();
-      setToken(created);
-      setIsTokenOpen(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate a device token');
-    } finally {
-      setIsCreatingToken(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!token) return;
-
-    try {
-      await navigator.clipboard.writeText(token.token);
-      setCopied(true);
-    } catch {
-      setError('Could not copy the token. Please copy it manually.');
-    }
-  };
-
   return (
     <div className="devices">
       <div className="devices__toolbar">
@@ -95,10 +64,6 @@ export const DevicesPanel = () => {
           <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
             <IconRefresh size={16} strokeWidth={1.75} />
             Refresh
-          </Button>
-          <Button onClick={() => void handleAddDevice()} isLoading={isCreatingToken}>
-            <IconPlus size={16} strokeWidth={1.75} />
-            Add device
           </Button>
         </div>
       </div>
@@ -136,31 +101,6 @@ export const DevicesPanel = () => {
         </ul>
       )}
 
-      <Modal
-        isOpen={isTokenOpen}
-        onClose={() => setIsTokenOpen(false)}
-        title="Add a device"
-        confirmText="Done"
-        onConfirm={() => setIsTokenOpen(false)}
-      >
-        <div className="devices__token">
-          <p>
-            Enter this one-time token in device setup. It will be registered the first time it uploads data.
-          </p>
-          <div className="devices__token-row">
-            <code className="devices__token-value">{token?.token}</code>
-            <Button variant="secondary" onClick={() => void handleCopy()}>
-              <IconCopy size={16} strokeWidth={1.75} />
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
-          </div>
-          {token && (
-            <p className="devices__token-expiry">
-              Expires {formatDateTime(token.expiresAt)}
-            </p>
-          )}
-        </div>
-      </Modal>
     </div>
   );
 };

@@ -8,6 +8,7 @@ import {
   PrivacyPage,
   RefundPage,
   LandingPage,
+  LinkPage,
 } from './pages';
 import { PolicyGate } from './components/policy';
 import { AuthorizePage } from './pages/oauth';
@@ -23,6 +24,7 @@ function App() {
             <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
             <Route path="/auth/login" element={<AuthPage initialMode="login" />} />
             <Route path="/auth/register" element={<AuthPage initialMode="signup" />} />
+            <Route path="/link" element={<LinkPage />} />
             <Route path="/policies" element={<PoliciesPage />} />
             <Route path="/policies/terms" element={<TermsPage />} />
             <Route path="/policies/privacy" element={<PrivacyPage />} />

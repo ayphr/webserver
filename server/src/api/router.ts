@@ -28,7 +28,7 @@ import {
   handleStaffUsers,
   handleUsersSummary,
 } from './routes/staff';
-import { handleCreateToken, handleGetBySerial, handleListMine, handleUpload } from './routes/devices';
+import { handleCreateToken, handleFetchPairingToken, handleGetBySerial, handleLink, handleListMine, handleRequestPairing, handleUpload } from './routes/devices';
 import {
   handleListApps,
   handleCreateApp,
@@ -110,6 +110,9 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/punishments/:id', handle: handlePunishment },
 
   { method: 'POST', path: '/api/devices/token', handle: handleCreateToken },
+  { method: 'POST', path: '/api/devices/pair', handle: handleRequestPairing },
+  { method: 'GET', path: '/api/devices/pair/:code', handle: handleFetchPairingToken },
+  { method: 'POST', path: '/api/devices/link', handle: handleLink },
   { method: 'POST', path: '/api/devices/data', handle: handleUpload },
   { method: 'GET', path: '/api/devices', handle: handleListMine },
   { method: 'GET', path: '/api/devices/mine', handle: handleListMine },

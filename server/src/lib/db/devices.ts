@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
+import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, DevicePairing, StoredAvatar } from './internal';
 const {
   DEVICE_CACHE,
   DEVICE_CACHE_TTL_SECONDS,
@@ -126,6 +126,13 @@ export async function updateDeviceLastUpload(serial: number, when: Date) {
   await devices.updateOne({ serial }, { $set: { lastUploadAt: when } });
 }
 
+export async function updateDeviceToken(serial: number, tokenHash: string, tokenCreatedAt: Date) {
+  const { devices } = await getCols();
+  trackMongoOperation('updateOne', DEVICES_COLLECTION);
+  await devices.updateOne({ serial }, { $set: { tokenHash, tokenCreatedAt } });
+  await cacheDel(DEVICE_CACHE, deviceCacheKey(serial));
+}
+
 /** Strips the secret token fields before a device is returned to a client. */
 
 export function toPublicDevice(device: DeviceDocument): Device {
@@ -163,3 +170,28 @@ export async function deleteDeviceClaim(ownerUuid: string) {
 }
 
 
+export async function createDevicePairing(pairing: DevicePairing) {
+  const { devicePairings } = await getCols();
+  const normalized = normalizeDateValues(pairing);
+  trackMongoOperation('insertOne', 'device_pairings');
+  await devicePairings.insertOne(normalized);
+  return normalized;
+}
+
+export async function getDevicePairingByCode(code: string) {
+  const { devicePairings } = await getCols();
+  trackMongoOperation('findOne', 'device_pairings');
+  return devicePairings.findOne({ code });
+}
+
+export async function markDevicePairingLinked(code: string, ownerUuid: string, ownerUsername: string) {
+  const { devicePairings } = await getCols();
+  trackMongoOperation('updateOne', 'device_pairings');
+  await devicePairings.updateOne({ code }, { $set: { linked: true, ownerUuid, ownerUsername, linkedAt: new Date() } });
+}
+
+export async function markDevicePairingFetched(code: string) {
+  const { devicePairings } = await getCols();
+  trackMongoOperation('deleteOne', 'device_pairings');
+  await devicePairings.deleteOne({ code });
+}

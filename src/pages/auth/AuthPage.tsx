@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay } from '../../components/common';
@@ -23,6 +23,8 @@ export interface AuthPageProps {
 export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
   const mode: AuthMode = initialMode ?? (location.pathname.includes('register') ? 'signup' : 'login');
 
   const [formData, setFormData] = useState<FormData>({
@@ -115,7 +117,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
           acceptPolicies: acceptedPolicies,
         });
       }
-      navigate('/dashboard');
+      navigate(redirectTo);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Authentication failed. Please try again.';
       setAuthError(errorMessage);

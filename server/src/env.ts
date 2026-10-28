@@ -11,6 +11,7 @@ export const USERS_COLLECTION = 'users';
 export const PUNISHMENTS_COLLECTION = 'punishments';
 export const DEVICES_COLLECTION = 'devices';
 export const DEVICE_CLAIMS_COLLECTION = 'device_claims';
+export const DEVICE_PAIRINGS_COLLECTION = 'device_pairings';
 export const SESSIONS_COLLECTION = 'sessions';
 export const STRIPE_EVENTS_COLLECTION = 'stripe_events';
 export const AVATARS_COLLECTION = 'avatars';

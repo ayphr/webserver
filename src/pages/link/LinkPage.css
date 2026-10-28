@@ -1,0 +1,55 @@
+.link-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.link-page__container {
+  width: 100%;
+  max-width: 480px;
+}
+
+.link-page__card {
+  width: 100%;
+}
+
+.link-page__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-danger, #ff6b6b);
+}
+
+.link-page__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.link-page__result {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.link-page__token-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.link-page__token-value {
+  flex: 1;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.link-page__expiry {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}

@@ -90,6 +90,22 @@ export type DeviceTokenPayload = {
   expiresAt: Date;
 };
 
+export type DeviceLinkPayload = {
+  linked: boolean;
+  device: Device;
+};
+
+export type DevicePairingRequestPayload = {
+  code: string;
+  expiresAt: Date;
+};
+
+export type DevicePairingTokenPayload = {
+  token: string;
+  expiresAt: Date;
+  serial: number;
+};
+
 export type PunishmentPayload = {
   punishment: Punishment;
 };
