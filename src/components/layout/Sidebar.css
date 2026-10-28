@@ -156,6 +156,7 @@
   cursor: pointer;
   width: 100%;
   text-align: left;
+  color: var(--text-primary);
 }
 
 .n-sidebar__accountButton:hover {
@@ -176,8 +177,6 @@
   flex-direction: column;
   gap: 0.25rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  max-height: 260px;
-  overflow-y: auto;
 }
 
 .n-sidebar__accountMenuItem {
@@ -234,4 +233,8 @@
   padding: 0.4rem;
   font-size: 0.85rem;
   color: var(--text-secondary, #aaa);
+}
+
+.n-sidebar__accountName {
+  font-size: 0.9rem;
 }

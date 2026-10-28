@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
-import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay } from '../../components/common';
-import { getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input } from '../../components/common';
+import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { api } from '../../lib/api';
 import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
@@ -164,20 +164,14 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
               <div className="auth-accounts">
                 <p className="auth-accounts__title">Choose an account</p>
                 <div className="auth-accounts__list">
-                  {storedAccounts.map((account) => (
+                  {storedAccounts.filter((account) => account.token !== getActiveToken()).map((account) => (
                     <button
                       key={account.user.uuid}
                       type="button"
                       className="auth-accounts__item"
                       onClick={() => handleChooseAccount(account.token)}
                     >
-                      <UsernameDisplay
-                        username={account.user.username}
-                        badges={account.user.badges}
-                        country={account.user.country}
-                        avatarUrl={account.user.avatarUrl}
-                        avatarSize={32}
-                      />
+                      <span className="auth-accounts__name">{account.user.username}</span>
                     </button>
                   ))}
                 </div>

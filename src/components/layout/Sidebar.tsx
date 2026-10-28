@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconCheck } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout } from "@tabler/icons-react";
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import type { StoredAccount } from '../../lib/accounts';
@@ -182,35 +182,24 @@ export const Sidebar: React.FC<Props> = ({
 
           {isAccountMenuOpen && (
             <div className="n-sidebar__accountMenu" role="menu">
-              {accounts.length === 0 && (
+              {accounts.filter((account) => account.token !== activeToken).length === 0 && (
                 <div className="n-sidebar__accountMenuItem n-sidebar__accountMenuItem--empty">
                   No other signed-in accounts
                 </div>
               )}
-              {accounts.map((account) => (
+              {accounts
+                .filter((account) => account.token !== activeToken)
+                .map((account) => (
                 <div key={account.user.uuid} className="n-sidebar__accountMenuItem">
                   <button
                     type="button"
-                    className={`n-sidebar__accountSwitch ${account.token === activeToken ? 'is-active' : ''}`}
+                    className="n-sidebar__accountSwitch"
                     onClick={() => {
-                      if (account.token !== activeToken) {
-                        onSwitchAccount?.(account.token);
-                      }
+                      onSwitchAccount?.(account.token);
                       setIsAccountMenuOpen(false);
                     }}
                   >
-                    <UsernameDisplay
-                      username={account.user.username}
-                      badges={account.user.badges}
-                      country={account.user.country}
-                      avatarUrl={account.user.avatarUrl}
-                      avatarSize={24}
-                    />
-                    {account.token === activeToken && (
-                      <span className="n-sidebar__accountCheck">
-                        <IconCheck size={16} />
-                      </span>
-                    )}
+                    <span className="n-sidebar__accountName">{account.user.username}</span>
                   </button>
                   <button
                     type="button"
