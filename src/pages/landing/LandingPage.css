@@ -18,7 +18,9 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--bg-base);
+  background: transparent;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   width: 100%;
 }
 
