@@ -5,6 +5,7 @@ import {
   createSession,
   deleteSession,
   deleteSessionsForUserUuid,
+  deleteOtherSessionsForUserUuid,
   deleteSessionByTokenHash,
   getActiveSuspensionForUserUuid,
   getSessionByTokenHash,
@@ -116,6 +117,12 @@ export async function endCurrentSession(request: Request) {
 
 export async function endAllSessions(user: User) {
   await deleteSessionsForUserUuid(user.uuid);
+}
+
+export async function endOtherSessions(user: User, request: Request) {
+  const token = getBearerToken(request);
+  if (!token) return;
+  await deleteOtherSessionsForUserUuid(user.uuid, hashToken(token));
 }
 
 export async function createUserRecord(user: User, password: string) {

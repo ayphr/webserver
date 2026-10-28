@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconCheck } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
+import { ConfirmDialog } from '../common/Dialog';
+import type { StoredAccount } from '../../lib/accounts';
 import type { BadgeId } from '@common/types';
 
 type Tab = { id: string; name: string };
@@ -47,14 +49,55 @@ type Props = {
   isSuspended?: boolean;
   isStaff?: boolean;
   isDeveloper?: boolean;
+  accounts?: StoredAccount[];
+  activeToken?: string | null;
+  onSwitchAccount?: (token: string) => void;
+  onLogoutAccount?: (token: string) => void;
 };
 
-export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unknown', badges = [], country, avatarUrl, isSuspended = false, isStaff = false, isDeveloper = false }) => {
+export const Sidebar: React.FC<Props> = ({
+  activeTab,
+  onChange,
+  username = 'unknown',
+  badges = [],
+  country,
+  avatarUrl,
+  isSuspended = false,
+  isStaff = false,
+  isDeveloper = false,
+  accounts = [],
+  activeToken = null,
+  onSwitchAccount,
+  onLogoutAccount,
+}) => {
   const visibleTabs = [
     ...tabs,
     ...(isDeveloper ? developerTabs : []),
     ...(isStaff ? staffTabs : []),
   ];
+
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [accountToLogout, setAccountToLogout] = useState<StoredAccount | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isAccountMenuOpen]);
+
+  const handleConfirmLogout = () => {
+    const account = accountToLogout;
+    setAccountToLogout(null);
+    if (account) {
+      onLogoutAccount?.(account.token);
+    }
+  };
 
   return (
     <aside className="n-sidebar" aria-label="Sidebar">
@@ -126,10 +169,79 @@ export const Sidebar: React.FC<Props> = ({ activeTab, onChange, username = 'unkn
           </button>
         </nav>
 
-        <div className="n-sidebar__accountDisplay">
-          <UsernameDisplay username={username} badges={badges} country={country ?? undefined} avatarUrl={avatarUrl} />
+        <div className="n-sidebar__accountDisplay n-sidebar__accountDisplay--clickable" ref={containerRef}>
+          <button
+            type="button"
+            className="n-sidebar__accountButton"
+            onClick={() => setIsAccountMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={isAccountMenuOpen}
+          >
+            <UsernameDisplay username={username} badges={badges} country={country ?? undefined} avatarUrl={avatarUrl} />
+          </button>
+
+          {isAccountMenuOpen && (
+            <div className="n-sidebar__accountMenu" role="menu">
+              {accounts.length === 0 && (
+                <div className="n-sidebar__accountMenuItem n-sidebar__accountMenuItem--empty">
+                  No other signed-in accounts
+                </div>
+              )}
+              {accounts.map((account) => (
+                <div key={account.user.uuid} className="n-sidebar__accountMenuItem">
+                  <button
+                    type="button"
+                    className={`n-sidebar__accountSwitch ${account.token === activeToken ? 'is-active' : ''}`}
+                    onClick={() => {
+                      if (account.token !== activeToken) {
+                        onSwitchAccount?.(account.token);
+                      }
+                      setIsAccountMenuOpen(false);
+                    }}
+                  >
+                    <UsernameDisplay
+                      username={account.user.username}
+                      badges={account.user.badges}
+                      country={account.user.country}
+                      avatarUrl={account.user.avatarUrl}
+                      avatarSize={24}
+                    />
+                    {account.token === activeToken && (
+                      <span className="n-sidebar__accountCheck">
+                        <IconCheck size={16} />
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="n-sidebar__accountLogout"
+                    aria-label={`Sign out ${account.user.username}`}
+                    onClick={() => setAccountToLogout(account)}
+                  >
+                    <IconLogout size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={accountToLogout !== null}
+        title="Sign out account"
+        confirmText="Sign out"
+        cancelText="Cancel"
+        isDangerous
+        onConfirm={handleConfirmLogout}
+        onCancel={() => setAccountToLogout(null)}
+      >
+        {accountToLogout && (
+          <p>
+            Sign out <strong>{accountToLogout.user.username}</strong>? That account will need to log in again.
+          </p>
+        )}
+      </ConfirmDialog>
     </aside>
   );
 };

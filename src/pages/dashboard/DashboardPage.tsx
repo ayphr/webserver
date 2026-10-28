@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
+import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import type { Punishment, PublicUser } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
@@ -133,6 +134,7 @@ export const DashboardPage = () => {
   const [compactLayout, setCompactLayout] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-compact') === '1',
   );
+  const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
 
   useEffect(() => {
     const load = async () => {
@@ -142,6 +144,9 @@ export const DashboardPage = () => {
         const userData = await api.users.me();
         setUser(userData.user);
         setActiveSuspension(userData.activeSuspension);
+        const token = api.getAuthToken();
+        if (token) updateStoredAccount(token, userData.user);
+        setAccounts(getStoredAccounts());
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
         console.error(message);
@@ -181,6 +186,49 @@ export const DashboardPage = () => {
       console.error('Failed to lift suspension:', err);
     } finally {
       setIsLiftingPunishment(false);
+    }
+  };
+
+
+  const handleSwitchAccount = async (token: string) => {
+    setActiveToken(token);
+    try {
+      const userData = await api.users.me();
+      setUser(userData.user);
+      setActiveSuspension(userData.activeSuspension);
+      updateStoredAccount(token, userData.user);
+      setAccounts(getStoredAccounts());
+    } catch {
+      removeStoredAccount(token);
+      setAccounts(getStoredAccounts());
+      const remaining = getStoredAccounts();
+      if (remaining.length > 0) {
+        await handleSwitchAccount(remaining[0].token);
+      } else {
+        navigate('/auth', { replace: true });
+      }
+    }
+  };
+
+  const handleLogoutAccount = async (token: string) => {
+    const previousToken = api.getAuthToken();
+    try {
+      api.setAuthToken(token);
+      await api.auth.logout();
+    } catch {
+      // Ignore failures; remove locally regardless.
+    } finally {
+      api.setAuthToken(previousToken);
+    }
+    removeStoredAccount(token);
+    setAccounts(getStoredAccounts());
+    if (token === previousToken) {
+      const remaining = getStoredAccounts();
+      if (remaining.length > 0) {
+        await handleSwitchAccount(remaining[0].token);
+      } else {
+        navigate('/auth', { replace: true });
+      }
     }
   };
 
@@ -228,6 +276,23 @@ export const DashboardPage = () => {
           action: async () => {
             await api.auth.logout();
             await navigate('/auth', { replace: true });
+          },
+        },
+        {
+          id: 'logout-other-sessions',
+          optionType: 'button',
+          icon: <IconLogout2 size={18} strokeWidth={1.75} />,
+          title: 'Sign out all other sessions',
+          description: 'Sign out of all other devices and active sessions, keeping this one.',
+          label: 'Sign out all other sessions',
+          variant: 'secondary',
+          confirm: {
+            title: 'Sign out all other sessions',
+            message: 'You will be signed out of all other devices and active sessions. This device will stay signed in.',
+            confirmText: 'Sign out others',
+          },
+          action: async () => {
+            await api.auth.logoutOthers();
           },
         },
         {
@@ -388,7 +453,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
           <Card className="dashboard-page__card" elevated>
@@ -532,7 +597,7 @@ export const DashboardPage = () => {
             )}
 
             {activePage === 'my-apps' && isDeveloper && (
-              <Card className="dashboard-page__card dashboard-page__card--full" elevated>
+              <Card className="dashboard-page__card dashboard-page__card--fit" elevated>
                 <CardHeader>
                   <h2>My Apps</h2>
                   <p>Create and manage your Ayphr apps</p>

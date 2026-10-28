@@ -10,5 +10,8 @@ export function createSessionsApi(client: RequestClient) {
     async remove(id: string) {
       await client.requestJson<null>(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
+    async removeOthers() {
+      await client.requestJson<null>('/api/auth/logout-others', { method: 'POST' });
+    },
   };
 }

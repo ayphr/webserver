@@ -5,6 +5,7 @@ import {
   handleLogin,
   handleLogout,
   handleLogoutAll,
+  handleLogoutOthers,
   handleMe as handleAuthMe,
   handleRegister as handleAuthRegister,
 } from './routes/auth';
@@ -84,6 +85,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/auth/me', handle: handleAuthMe },
   { method: 'POST', path: '/api/auth/logout', handle: handleLogout },
   { method: 'POST', path: '/api/auth/logout-all', handle: handleLogoutAll },
+  { method: 'POST', path: '/api/auth/logout-others', handle: handleLogoutOthers },
   { method: 'POST', path: '/api/auth/policies/accept', handle: handleAcceptPolicies },
   { method: 'POST', path: '/api/auth/password', handle: handleChangePassword },
   { method: 'DELETE', path: '/api/auth/account', handle: handleDeleteAccount },

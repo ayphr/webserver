@@ -144,3 +144,94 @@
 .n-sidebar__menuIcon svg {
   display: block;
 }
+
+.n-sidebar__accountDisplay--clickable {
+  position: relative;
+}
+
+.n-sidebar__accountButton {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.n-sidebar__accountButton:hover {
+  opacity: 0.9;
+}
+
+.n-sidebar__accountMenu {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--bg-surface, hsl(0, 0%, 10%));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.n-sidebar__accountMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.n-sidebar__accountSwitch {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 0.4rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.n-sidebar__accountSwitch:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.n-sidebar__accountSwitch.is-active {
+  font-weight: 600;
+}
+
+.n-sidebar__accountCheck {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.n-sidebar__accountLogout {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #aaa);
+  padding: 0.4rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.n-sidebar__accountLogout:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.n-sidebar__accountMenuItem--empty {
+  padding: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aaa);
+}

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
-import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input } from '../../components/common';
+import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay } from '../../components/common';
+import { getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { api } from '../../lib/api';
 import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
@@ -33,6 +34,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [storedAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const passwordChecks = getPasswordValidationChecks(formData.password);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,6 +50,12 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
         [name]: undefined,
       }));
     }
+  };
+
+
+  const handleChooseAccount = (token: string) => {
+    setActiveToken(token);
+    navigate('/dashboard');
   };
 
   const validateForm = (): boolean => {
@@ -150,6 +158,31 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
           </CardHeader>
 
           <CardBody>
+            {mode === 'login' && storedAccounts.length > 0 && (
+              <div className="auth-accounts">
+                <p className="auth-accounts__title">Choose an account</p>
+                <div className="auth-accounts__list">
+                  {storedAccounts.map((account) => (
+                    <button
+                      key={account.user.uuid}
+                      type="button"
+                      className="auth-accounts__item"
+                      onClick={() => handleChooseAccount(account.token)}
+                    >
+                      <UsernameDisplay
+                        username={account.user.username}
+                        badges={account.user.badges}
+                        country={account.user.country}
+                        avatarUrl={account.user.avatarUrl}
+                        avatarSize={32}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <p className="auth-accounts__divider">or sign in with another account</p>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="auth-form">
               {authError && (
                 <div className="auth-form__error-banner">

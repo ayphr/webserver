@@ -1,4 +1,5 @@
 import { type ApiErrorBody } from '@common';
+import { getStoredAccounts, removeStoredAccount, setActiveToken } from '../accounts';
 
 export type ApiClientConfig = {
   baseUrl?: string;
@@ -134,7 +135,13 @@ export function createRequestClient(config: ApiClientConfig = {}) {
         ?? `Request failed with status ${response.status}`;
 
       if (response.status === 401 && token) {
+        removeStoredAccount(token);
         writeStoredToken(storageKey, null);
+        const remaining = getStoredAccounts();
+        if (remaining.length > 0) {
+          setActiveToken(remaining[0].token);
+          writeStoredToken(storageKey, remaining[0].token);
+        }
         onUnauthorized?.();
       }
 

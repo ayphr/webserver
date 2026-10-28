@@ -79,6 +79,14 @@ export async function deleteSessionsForUserUuid(userUuid: string) {
   await invalidateAuthEntries();
 }
 
+export async function deleteOtherSessionsForUserUuid(userUuid: string, keepTokenHash: string) {
+  const { sessions } = await getCols();
+  trackMongoOperation('deleteMany', SESSIONS_COLLECTION);
+  const result = await sessions.deleteMany({ userUuid, tokenHash: { $ne: keepTokenHash } });
+  sessionsTotal.inc({ event: 'revoked_others' }, result.deletedCount);
+  await invalidateAuthEntries();
+}
+
 // ---------------------------------------------------------------------------
 // Apps
 // ---------------------------------------------------------------------------

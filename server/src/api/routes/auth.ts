@@ -3,6 +3,7 @@ import {
   createPasswordHash,
   endAllSessions,
   endCurrentSession,
+  endOtherSessions,
   requireAuth,
   startSession,
   verifyPassword,
@@ -203,6 +204,12 @@ const handleLogoutAll = requireAuth(async (_request, user) => {
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
+const handleLogoutOthers = requireAuth(async (request, user) => {
+  await endOtherSessions(user, request);
+  authEventsTotal.inc({ event: 'logout_others', result: 'success' });
+  return new Response(null, { status: 204 });
+}, { allowSuspended: true, allowPolicyPending: true });
+
 const handleAcceptPolicies = requireAuth(async (_request, user) => {
   const policyVersions = await getPolicyVersions();
   if (!policyVersions) {
@@ -284,4 +291,4 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true });
 
-export { handleRegister, handleLogin, handleMe, handleLogout, handleLogoutAll, handleAcceptPolicies, handleChangePassword, handleDeleteAccount };
+export { handleRegister, handleLogin, handleMe, handleLogout, handleLogoutAll, handleLogoutOthers, handleAcceptPolicies, handleChangePassword, handleDeleteAccount };

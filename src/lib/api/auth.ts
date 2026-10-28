@@ -1,5 +1,6 @@
 import type { AcceptPoliciesPayload, AuthMePayload, AuthResponsePayload, AuthSession, ChangePasswordRequest, SessionDeviceType } from '@common';
 import type { RequestClient } from './client';
+import { addStoredAccount, removeStoredAccount } from '../accounts';
 
 function getClientDeviceType(): SessionDeviceType | undefined {
   if (typeof navigator === 'undefined') return undefined;
@@ -45,6 +46,7 @@ export function createAuthApi(client: RequestClient) {
       });
 
       client.setAuthToken(response.token);
+      addStoredAccount(response.token, response.user);
 
       return {
         user: response.user,
@@ -61,6 +63,7 @@ export function createAuthApi(client: RequestClient) {
       });
 
       client.setAuthToken(response.token);
+      addStoredAccount(response.token, response.user);
 
       return {
         user: response.user,
@@ -87,28 +90,39 @@ export function createAuthApi(client: RequestClient) {
       };
     },
     async deleteAccount(input: { password: string }) {
+      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/account', {
         method: 'DELETE',
         body: { password: input.password },
       });
+      if (token) removeStoredAccount(token);
       client.clearAuthToken();
     },
     async changePassword(input: ChangePasswordRequest) {
       // All sessions (including this one) are revoked when the password changes,
       // so the client clears its token and lets the user sign back in.
+      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/password', {
         method: 'POST',
         body: input,
       });
+      if (token) removeStoredAccount(token);
       client.clearAuthToken();
     },
     async logout() {
+      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/logout', { method: 'POST' });
+      if (token) removeStoredAccount(token);
       client.clearAuthToken();
     },
     async logoutAll() {
+      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/logout-all', { method: 'POST' });
+      if (token) removeStoredAccount(token);
       client.clearAuthToken();
+    },
+    async logoutOthers() {
+      await client.requestJson<null>('/api/auth/logout-others', { method: 'POST' });
     },
   };
 }
