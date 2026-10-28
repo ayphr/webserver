@@ -1243,7 +1243,7 @@
   transition: border-color 0.2s ease;
 }
 .landing-faq__item--open {
-  border-color: rgba(126, 240, 154, 0.3);
+  border-color: var(--border);
 }
 .landing-faq__question {
   width: 100%;
