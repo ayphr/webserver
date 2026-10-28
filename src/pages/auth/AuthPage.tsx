@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
-import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input } from '../../components/common';
+import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay } from '../../components/common';
 import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { api } from '../../lib/api';
 import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '@common/utils/password';
@@ -173,7 +173,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                       className="auth-accounts__item"
                       onClick={() => handleChooseAccount(account.token)}
                     >
-                      <span className="auth-accounts__name">{account.user.username}</span>
+                      <UsernameDisplay username={account.user.username} badges={account.user.badges} country={account.user.country} avatarUrl={account.user.avatarUrl} avatarSize={28} />
                     </button>
                   ))}
                 </div>
