@@ -18,7 +18,7 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: transparent;
+  background: var(--bg-base);
   width: 100%;
 }
 
