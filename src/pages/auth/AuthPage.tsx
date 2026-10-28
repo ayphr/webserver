@@ -37,6 +37,8 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [storedAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const visibleAccounts = storedAccounts.filter((account) => account.token !== getActiveToken());
+  const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : storedAccounts;
   const passwordChecks = getPasswordValidationChecks(formData.password);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,11 +162,11 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
           </CardHeader>
 
           <CardBody>
-            {mode === 'login' && storedAccounts.length > 0 && (
+            {mode === 'login' && accountsToShow.length > 0 && (
               <div className="auth-accounts">
                 <p className="auth-accounts__title">Choose an account</p>
                 <div className="auth-accounts__list">
-                  {storedAccounts.filter((account) => account.token !== getActiveToken()).map((account) => (
+                  {accountsToShow.map((account) => (
                     <button
                       key={account.user.uuid}
                       type="button"
