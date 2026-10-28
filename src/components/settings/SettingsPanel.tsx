@@ -3,11 +3,34 @@ import { Button, Checkbox, ConfirmDialog, Input } from '../common';
 import type { ButtonSettingsOption, SettingsSection } from '../../lib/settings';
 import './SettingsPanel.css';
 
-export const SettingsPanel = ({ sections }: { sections: SettingsSection[] }) => {
+export interface SettingsPanelProps {
+  sections: SettingsSection[];
+  /** ID of the section that should be shown first. Defaults to the first section. */
+  defaultTab?: string;
+}
+
+export const SettingsPanel = ({ sections, defaultTab }: SettingsPanelProps) => {
+  const [requestedId, setRequestedId] = useState<string>(() => {
+    if (defaultTab && sections.some((section) => section.id === defaultTab)) {
+      return defaultTab;
+    }
+    return sections[0]?.id ?? '';
+  });
+
+  // Fall back to the first available section when the requested one disappears.
+  const activeId =
+    sections.length === 0
+      ? ''
+      : sections.some((section) => section.id === requestedId)
+        ? requestedId
+        : sections[0].id;
+
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [confirmOption, setConfirmOption] = useState<ButtonSettingsOption | null>(null);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const activeSection = sections.find((section) => section.id === activeId) ?? sections[0] ?? null;
 
   const runButton = async (option: ButtonSettingsOption, password?: string) => {
     setError(null);
@@ -102,19 +125,55 @@ export const SettingsPanel = ({ sections }: { sections: SettingsSection[] }) => 
     }
   };
 
+  if (sections.length === 0) {
+    return (
+      <div className="settings settings--empty">
+        <p className="settings__empty">No settings available.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="settings">
       {error && <div className="settings__error">{error}</div>}
 
-      {sections.map((section) => (
-        <section className="settings__section" key={section.id}>
-          {section.title && <h3 className="settings__subheading">{section.title}</h3>}
-          {section.description && (
-            <p className="settings__section-description">{section.description}</p>
+      <div className="settings__tabs" role="tablist" aria-label="Settings sections">
+        {sections.map((section) => {
+          const isActive = section.id === activeId;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`settings-panel-${section.id}`}
+              id={`settings-tab-${section.id}`}
+              tabIndex={isActive ? 0 : -1}
+              className={`settings__tab ${isActive ? 'settings__tab--active' : ''}`}
+              onClick={() => setRequestedId(section.id)}
+            >
+              {section.title ?? section.id}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeSection && (
+        <div
+          className="settings__panel"
+          role="tabpanel"
+          id={`settings-panel-${activeSection.id}`}
+          aria-labelledby={`settings-tab-${activeSection.id}`}
+        >
+          {activeSection.title && (
+            <h3 className="settings__section-title">{activeSection.title}</h3>
+          )}
+          {activeSection.description && (
+            <p className="settings__section-description">{activeSection.description}</p>
           )}
 
           <div className="settings__options">
-            {section.options.map((option) => (
+            {activeSection.options.map((option) => (
               <div
                 className={`settings__option ${option.danger ? 'settings__option--danger' : ''} ${option.disabled ? 'settings__option--disabled' : ''}`}
                 key={option.id}
@@ -130,8 +189,12 @@ export const SettingsPanel = ({ sections }: { sections: SettingsSection[] }) => 
               </div>
             ))}
           </div>
-        </section>
-      ))}
+
+          {activeSection.options.length === 0 && (
+            <p className="settings__empty">No options in this section.</p>
+          )}
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={confirmOption !== null}

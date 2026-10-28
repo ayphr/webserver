@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout } from "@tabler/icons-react";
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import type { StoredAccount } from '../../lib/accounts';
@@ -152,7 +152,7 @@ export const Sidebar: React.FC<Props> = ({
             <span>Connections</span>
           </button>
           <button
-            className={`n-sidebar__menuItem ${activeTab === 'account-settings' ? 'active' : ''}`}
+            className={`n-sidebar__menuItem ${activeTab === 'account-settings' || activeTab === 'settings' ? 'active' : ''}`}
             type="button"
             onClick={() => onChange('account-settings')}
           >

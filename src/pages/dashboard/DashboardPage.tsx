@@ -205,7 +205,7 @@ export const DashboardPage = () => {
       if (remaining.length > 0) {
         await handleSwitchAccount(remaining[0].token);
       } else {
-        navigate('/auth', { replace: true });
+        await navigate('/auth', { replace: true });
       }
     }
   };
@@ -227,7 +227,7 @@ export const DashboardPage = () => {
       if (remaining.length > 0) {
         await handleSwitchAccount(remaining[0].token);
       } else {
-        navigate('/auth', { replace: true });
+        await navigate('/auth', { replace: true });
       }
     }
   };
@@ -561,21 +561,10 @@ export const DashboardPage = () => {
               </Card>
             )}
 
-            {activePage === 'settings' && (
-              <Card className="dashboard-page__card" elevated>
+            {(activePage === 'settings' || activePage === 'account-settings') && (
+              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
                 <CardHeader>
                   <h2>Settings</h2>
-                </CardHeader>
-                <CardBody>
-                  <p>Application settings go here.</p>
-                </CardBody>
-              </Card>
-            )}
-
-            {activePage === 'account-settings' && (
-              <Card className="dashboard-page__card" elevated>
-                <CardHeader>
-                  <h2>Account Settings</h2>
                   <p>Manage your account, sessions, and preferences</p>
                 </CardHeader>
                 <CardBody>

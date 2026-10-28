@@ -207,19 +207,19 @@ const PRICING = [
 
 const TESTIMONIALS = [
   {
-    quote: 'We stopped juggling three different tools. Everything is in one place now.',
-    name: 'Mara Chen',
-    role: 'Hardware Lead, FieldOps',
+    quote: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    name: 'Lorem Ipsum',
+    role: 'Lorem Ipsum',
   },
   {
-    quote: 'Adding a new sensor takes about ten seconds. The token flow is the easiest I have used.',
-    name: 'Daniel Okafor',
-    role: 'Embedded Engineer, TerraSense',
+    quote: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    name: 'Lorem Ipsum',
+    role: 'Lorem Ipsum',
   },
   {
-    quote: 'Our ops team figured it out without a walkthrough. That rarely happens.',
-    name: 'Priya Raman',
-    role: 'Ops Manager, GreenGrid',
+    quote: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    name: 'Lorem Ipsum',
+    role: 'Lorem Ipsum',
   },
 ];
 
@@ -268,12 +268,10 @@ const INTEGRATIONS = [
   'Webhooks',
   'Grafana',
   'Slack',
-  'Zapier',
-  'AWS IoT',
-  'Google Cloud',
+  'Discord'
 ];
 
-const LOGOS = ['FieldOps', 'TerraSense', 'GreenGrid', 'AeroLab', 'ColdChain', 'AgriNode'];
+const LOGOS = ['Placeholder', 'Placeholder', 'Placeholder', 'Placeholder', 'Placeholder', 'Placeholder'];
 
 const FeatureVisual = ({ index }: { index: number }) => {
   if (index === 0) {
@@ -393,7 +391,7 @@ export const LandingPage = () => {
 
   useEffect(() => {
     const ready = () => setMarqueeReady(true);
-    if (document.fonts && document.fonts.ready) {
+    if (document.fonts?.ready) {
       document.fonts.ready.then(ready).catch(ready);
     } else {
       ready();
@@ -462,7 +460,7 @@ export const LandingPage = () => {
 
           <Reveal>
             <span className="landing-hero__eyebrow">
-              <IconBolt size={14} /> Public beta
+              <IconBolt size={14} /> Coming soon
             </span>
           </Reveal>
 

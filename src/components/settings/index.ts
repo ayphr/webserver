@@ -1,3 +1,4 @@
 export { SettingsPanel } from './SettingsPanel';
-export { SessionsModal, type SessionsModalProps } from './SessionsModal';
-export { ChangePasswordModal, type ChangePasswordModalProps } from './ChangePasswordModal';
+export type { SettingsPanelProps } from './SettingsPanel';
+export { SessionsModal } from './SessionsModal';
+export { ChangePasswordModal } from './ChangePasswordModal';
