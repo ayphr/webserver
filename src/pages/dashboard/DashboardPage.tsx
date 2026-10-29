@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
@@ -7,12 +7,14 @@ import type { Punishment, PublicUser } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
-import { DevicesPanel } from '../../components/devices';
-import { MyAppsPanel } from '../../components/developer/MyAppsPanel';
-import { ConnectionsPanel } from '../../components/connections/ConnectionsPanel';
-import { SettingsPanel, SessionsModal, ChangePasswordModal } from '../../components/settings';
-import { SubscriptionPanel } from '../../components/subscriptions';
-import { UsersPanel } from '../../components/staff';
+import { SessionsModal, ChangePasswordModal } from '../../components/settings';
+import { SettingsPanel } from '../../components/settings';
+
+const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
+const MyAppsPanel = lazy(() => import('../../components/developer/MyAppsPanel').then((m) => ({ default: m.MyAppsPanel })));
+const ConnectionsPanel = lazy(() => import('../../components/connections/ConnectionsPanel').then((m) => ({ default: m.ConnectionsPanel })));
+const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
+const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 import './DashboardPage.css';
 
 const VALID_TABS = new Set(['overview', 'devices', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections']);
@@ -542,7 +544,9 @@ export const DashboardPage = () => {
                   <p>Ayphr devices registered to your account</p>
                 </CardHeader>
                 <CardBody>
-                  <DevicesPanel />
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <DevicesPanel />
+                  </Suspense>
                 </CardBody>
               </Card>
             )}
@@ -584,7 +588,9 @@ export const DashboardPage = () => {
                   <p>Manage your Ayphr subscription and billing</p>
                 </CardHeader>
                 <CardBody>
-                  <SubscriptionPanel />
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <SubscriptionPanel />
+                  </Suspense>
                 </CardBody>
               </Card>
             )}
@@ -596,7 +602,9 @@ export const DashboardPage = () => {
                   <p>Create and manage your Ayphr apps</p>
                 </CardHeader>
                 <CardBody>
-                  <MyAppsPanel />
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <MyAppsPanel />
+                  </Suspense>
                 </CardBody>
               </Card>
             )}
@@ -608,7 +616,9 @@ export const DashboardPage = () => {
                   <p>Apps connected to your account</p>
                 </CardHeader>
                 <CardBody>
-                  <ConnectionsPanel />
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <ConnectionsPanel />
+                  </Suspense>
                 </CardBody>
               </Card>
             )}
@@ -620,7 +630,9 @@ export const DashboardPage = () => {
                   <p>Search and manage Ayphr users</p>
                 </CardHeader>
                 <CardBody>
-                  <UsersPanel />
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <UsersPanel />
+                  </Suspense>
                 </CardBody>
               </Card>
             )}

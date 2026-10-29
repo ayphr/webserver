@@ -55,7 +55,7 @@ export const ConnectionsPanel = () => {
                 <h4>{c.appName}</h4>
               </CardHeader>
               <CardBody>
-                {c.appLogoUrl && <img src={c.appLogoUrl} alt={c.appName} className="connections__logo" />}
+                {c.appLogoUrl && <img src={c.appLogoUrl} alt={c.appName} className="connections__logo" loading="lazy" />}
                 <p><strong>Scopes:</strong> {c.scopes.join(', ')}</p>
                 <p><strong>Connected:</strong> {new Date(c.createdAt).toLocaleDateString()}</p>
                 <Button variant="danger" onClick={() => handleRevoke(c.id)}>Revoke</Button>

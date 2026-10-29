@@ -28,7 +28,7 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
 
     const load = async () => {
       try {
-        const { policyStatus } = await api.auth.me();
+        const { policyStatus } = await api.users.me();
         if (!active) return;
 
         if (policyStatus && !policyStatus.upToDate) {
@@ -54,7 +54,7 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
   // device revokes it. A 401 triggers the global unauthorized handler.
   useEffect(() => {
     const interval = setInterval(() => {
-      void api.auth.me().catch(() => undefined);
+      void api.users.me().catch(() => undefined);
     }, 20000);
 
     return () => clearInterval(interval);

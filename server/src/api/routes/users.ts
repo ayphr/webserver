@@ -1,11 +1,11 @@
 import { json } from '../../lib/http';
-import { requireAuth } from '../auth';
+import { getCachedActiveSuspension, requireAuth } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid, updateUser } from '../../lib/db';
 import { getPolicyStatus } from '../../lib/policies';
 import { toPublicUser } from '../../lib/user';
 
-const handleMe = requireAuth(async (_request, user) => {
-  const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
+const handleMe = requireAuth(async (request, user) => {
+  const activeSuspension = getCachedActiveSuspension(request) ?? await getActiveSuspensionForUserUuid(user.uuid);
   const policyStatus = await getPolicyStatus(user);
   return json({
     user: toPublicUser(user),

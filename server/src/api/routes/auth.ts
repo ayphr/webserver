@@ -4,6 +4,7 @@ import {
   endAllSessions,
   endCurrentSession,
   endOtherSessions,
+  getCachedActiveSuspension,
   requireAuth,
   startSession,
   verifyPassword,
@@ -181,8 +182,8 @@ async function handleLogin(request: Request) {
   });
 }
 
-const handleMe = requireAuth(async (_request, user) => {
-  const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
+const handleMe = requireAuth(async (request, user) => {
+  const activeSuspension = getCachedActiveSuspension(request) ?? await getActiveSuspensionForUserUuid(user.uuid);
   const policyStatus = await getPolicyStatus(user);
 
   return json({

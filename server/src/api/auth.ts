@@ -1,6 +1,6 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import type { Session, User, UserRole } from '@common';
+import type { Punishment, Session, User, UserRole } from '@common';
 import {
   createSession,
   deleteSession,
@@ -30,6 +30,10 @@ const scrypt = promisify(scryptCallback) as (
 export const TOKEN_EXPIRE_DURATION_SECONDS = 48 * 60 * 60; // 48 hours
 
 const SESSION_ACTIVITY_THRESHOLD_MS = 60 * 1000;
+
+// Per-request cache so handlers do not re-fetch the active suspension that
+// requireAuth already loaded.
+const requestSuspensionCache = new WeakMap<Request, Punishment | null>();
 
 const PASSWORD_HASH_ALGORITHM = 'scrypt';
 const PASSWORD_HASH_LENGTH = 64;
@@ -207,6 +211,10 @@ export function hasRoleAtLeast(userRole: UserRole, minimumRole: UserRole) {
   return (roleRank[userRole] || 0) >= (roleRank[minimumRole] || 0);
 }
 
+export function getCachedActiveSuspension(request: Request): Punishment | null | undefined {
+  return requestSuspensionCache.get(request);
+}
+
 export function requireAuth(handler: AuthenticatedHandler, options: AuthGuardOptions = {}) {
   return async (request: Request, params: RouteParams) => {
     const user = await getUserFromRequest(request);
@@ -216,6 +224,7 @@ export function requireAuth(handler: AuthenticatedHandler, options: AuthGuardOpt
     }
 
     const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
+    requestSuspensionCache.set(request, activeSuspension);
     if (activeSuspension && !options.allowSuspended) {
       return Response.json(
         {
