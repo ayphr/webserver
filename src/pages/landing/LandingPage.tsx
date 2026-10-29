@@ -855,8 +855,10 @@ export const LandingPage = () => {
                       <span>{f.q}</span>
                       {open ? <IconMinus size={18} /> : <IconPlus size={18} />}
                     </button>
-                    <div className="landing-faq__answer" hidden={!open}>
-                      <p>{f.a}</p>
+                    <div className={`landing-faq__answer ${open ? 'landing-faq__answer--open' : ''}`}>
+                      <div className="landing-faq__answer-inner">
+                        <p>{f.a}</p>
+                      </div>
                     </div>
                   </div>
                 </Reveal>

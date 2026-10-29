@@ -1,6 +1,6 @@
 :root {
   --font-family-base: 'DM Sans', sans-serif;
-  --font-family-mono: 'DM Mono', monospace;
+  --font-family-mono: 'JetBrains Mono', monospace;
 
   --bg-base: rgb(18, 18, 18);
   --bg-surface: hsl(0, 0%, 10%);

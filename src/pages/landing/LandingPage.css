@@ -109,6 +109,7 @@
 
 .landing-section__eyebrow {
   display: inline-block;
+  font-family: var(--font-family-mono);
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -1264,13 +1265,30 @@
   flex-shrink: 0;
 }
 .landing-faq__answer {
-  padding: 0 1.25rem 1.1rem;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
 }
-.landing-faq__answer p {
+.landing-faq__item--open .landing-faq__answer,
+.landing-faq__answer--open {
+  grid-template-rows: 1fr;
+}
+.landing-faq__answer-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.landing-faq__answer-inner p {
+  padding: 0 1.25rem 1.1rem;
   font-size: 0.9rem;
   color: var(--text-muted);
   line-height: 1.65;
   margin: 0;
+}
+.landing-faq__question svg {
+  transition: transform 0.3s ease;
+}
+.landing-faq__item--open .landing-faq__question svg {
+  transform: rotate(180deg);
 }
 
 .landing-final-cta {
