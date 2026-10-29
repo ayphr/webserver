@@ -29,6 +29,31 @@
   gap: 1rem;
 }
 
+.link-page__code {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.link-page__code-input {
+  width: 2.5rem;
+  height: 3rem;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: var(--font-family-mono);
+  text-transform: uppercase;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.link-page__code-input:focus {
+  outline: none;
+  border-color: var(--text-primary, #fff);
+}
+
 .link-page__result {
   display: flex;
   flex-direction: column;

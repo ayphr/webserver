@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   IconActivity,
   IconArrowRight,
-  IconBolt,
   IconChartLine,
   IconCheck,
   IconCloud,
@@ -463,7 +462,7 @@ export const LandingPage = () => {
 
           <Reveal>
             <span className="landing-hero__eyebrow">
-              <IconBolt size={14} /> Coming soon
+              First generation Geo pre-orders start 2027
             </span>
           </Reveal>
 

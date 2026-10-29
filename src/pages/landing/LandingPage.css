@@ -209,16 +209,10 @@
 }
 
 .landing-hero__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
-  background: rgba(126, 240, 154, 0.08);
-  border: 1px solid rgba(126, 240, 154, 0.2);
-  color: #7ef09a;
-  font-size: 0.8rem;
-  font-weight: 600;
+  display: block;
+  color: var(--text-muted, #888);
+  font-size: 0.9rem;
+  font-weight: 400;
   margin-bottom: 1.5rem;
 }
 .landing-hero__title {
