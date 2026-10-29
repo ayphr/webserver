@@ -24,15 +24,23 @@ function resolveClientIp(request: Request, socketIp: string | null): string | nu
 }
 
 function getRequestBaseOrigin(request: Request): string {
-  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
-  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-  const host = forwardedHost || request.headers.get('host') || 'localhost';
+  // Only trust forwarded headers when explicitly configured; otherwise a client
+  // could spoof the host/proto used to normalize the request URL.
+  let host = request.headers.get('host') || 'localhost';
+  let proto: string | null = null;
 
-  if (forwardedProto === 'http' || forwardedProto === 'https') {
-    return `${forwardedProto}://${host}`;
+  if (TRUST_PROXY) {
+    const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+    if (forwardedHost) host = forwardedHost;
+    if (forwardedProto === 'http' || forwardedProto === 'https') proto = forwardedProto;
   }
 
-  return request.url.startsWith('https://') ? `https://${host}` : `http://${host}`;
+  if (!proto) {
+    proto = request.url.startsWith('https://') ? 'https' : 'http';
+  }
+
+  return `${proto}://${host}`;
 }
 
 function normalizeRequest(request: Request): Request {
@@ -50,6 +58,16 @@ export function setupServer(port: number, callback: () => void): Server<undefine
     port,
 
     async fetch(request) {
+      const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
+      const contentLength = request.headers.get('content-length');
+      if (contentLength) {
+        const size = Number(contentLength);
+        if (Number.isFinite(size) && size > MAX_REQUEST_BODY_BYTES) {
+          const tooLarge = Response.json({ error: 'Request body too large' }, { status: 413, headers: SECURITY_HEADERS });
+          return addCorsHeaders(tooLarge, request);
+        }
+      }
+
       const normalized = normalizeRequest(request);
       setClientIp(normalized, resolveClientIp(request, server.requestIP(request)?.address ?? null));
       const method = normalized.method;

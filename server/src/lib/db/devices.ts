@@ -184,10 +184,14 @@ export async function getDevicePairingByCode(code: string) {
   return devicePairings.findOne({ code });
 }
 
-export async function markDevicePairingLinked(code: string, ownerUuid: string, ownerUsername: string) {
+export async function markDevicePairingLinked(code: string, ownerUuid: string, ownerUsername: string): Promise<boolean> {
   const { devicePairings } = await getCols();
   trackMongoOperation('updateOne', 'device_pairings');
-  await devicePairings.updateOne({ code }, { $set: { linked: true, ownerUuid, ownerUsername, linkedAt: new Date() } });
+  const result = await devicePairings.updateOne(
+    { code, linked: false },
+    { $set: { linked: true, ownerUuid, ownerUsername, linkedAt: new Date() } },
+  );
+  return result.modifiedCount > 0;
 }
 
 export async function markDevicePairingFetched(code: string) {

@@ -111,10 +111,10 @@ export function trackMongoOperation(operation: string, collection: string) {
 // ---------------------------------------------------------------------------
 
 export const USER_CACHE = 'user';
-export const USER_CACHE_TTL_SECONDS = 60;
+export const USER_CACHE_TTL_SECONDS = 15;
 
 export const SUSPENSION_CACHE = 'suspension';
-export const SUSPENSION_CACHE_TTL_SECONDS = 15;
+export const SUSPENSION_CACHE_TTL_SECONDS = 5;
 
 export const DEVICE_CACHE = 'device';
 export const DEVICE_CACHE_TTL_SECONDS = 60;

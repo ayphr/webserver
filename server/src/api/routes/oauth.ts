@@ -1,5 +1,7 @@
 import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
+import { getClientIp } from '../../lib/requestContext';
+import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import {
   getAppByClientId,
   getAppById,
@@ -8,19 +10,31 @@ import {
   markOAuthCodeUsed,
   createOAuthToken,
   getOAuthTokenByHash,
+  revokeOAuthToken,
   getConnectionByUserAndApp,
   createConnection,
   updateConnectionScopes,
+  recordConnectionActivity,
   getConnectionsForUser,
   revokeConnection,
   getUserFromUuid,
   getDevicesForOwnerUuid,
 } from '../../lib/db';
+import { createHash } from 'node:crypto';
 import { hashToken } from '../../lib/tokens';
 import { toPublicUser } from '../../lib/user';
 import { toPublicDevice } from '../../lib/db';
 import type { AppScope } from '@common';
 import type { RouteParams } from '../types';
+
+function base64UrlEncode(buffer: Buffer): string {
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function computeCodeChallenge(verifier: string, method: 'plain' | 'S256'): string {
+  if (method === 'plain') return verifier;
+  return base64UrlEncode(createHash('sha256').update(verifier).digest());
+}
 
 function readBody(request: Request): Promise<Record<string, unknown> | null> {
   if (!request.headers.get('content-type')?.includes('application/json')) return Promise.resolve(null);
@@ -40,6 +54,14 @@ async function getOAuthAuth(request: Request) {
   if (!user) return null;
   const app = await getAppById(stored.appId);
   if (!app) return null;
+
+  // Best-effort activity tracking; never fail the request on a tracking error.
+  try {
+    await recordConnectionActivity(stored.connectionId, request.method, new URL(request.url).pathname, stored.scopes);
+  } catch {
+    // ignore
+  }
+
   return { user, token: stored, scopes: stored.scopes, app };
 }
 
@@ -71,6 +93,21 @@ const handleAuthorize = requireAuth(async (request, user) => {
   const scopeStr = typeof body.scope === 'string' ? body.scope : (typeof body.scopes === 'string' ? body.scopes : '');
   const state = typeof body.state === 'string' ? body.state : undefined;
 
+  const codeChallenge = typeof body.codeChallenge === 'string'
+    ? body.codeChallenge
+    : (typeof body.code_challenge === 'string' ? body.code_challenge : undefined);
+  const codeChallengeMethodRaw = typeof body.codeChallengeMethod === 'string'
+    ? body.codeChallengeMethod
+    : (typeof body.code_challenge_method === 'string' ? body.code_challenge_method : 'S256');
+
+  let codeChallengeMethod: 'plain' | 'S256' | undefined;
+  if (codeChallenge) {
+    if (codeChallengeMethodRaw !== 'plain' && codeChallengeMethodRaw !== 'S256') {
+      return json({ error: 'invalid code_challenge_method' }, 400);
+    }
+    codeChallengeMethod = codeChallengeMethodRaw;
+  }
+
   const app = await getAppByClientId(clientId);
   if (!app) return json({ error: 'invalid client' }, 400);
   if (!app.redirectUris.includes(redirectUri)) return json({ error: 'invalid redirect_uri' }, 400);
@@ -96,23 +133,35 @@ const handleAuthorize = requireAuth(async (request, user) => {
     expiresAt,
     used: false,
     createdAt: now,
+    ...(codeChallenge ? { codeChallenge, codeChallengeMethod } : {}),
   });
 
   return json({ code, redirectUri, state });
 });
 
+const oauthTokenLimiter = createRateLimiter(15 * 60 * 1000, 30, 'oauth-token');
+
 // Token exchange
 const handleToken = async (request: Request) => {
+  const ipCheck = await oauthTokenLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+
   const body = await readBody(request);
   if (!body) return json({ error: 'invalid body' }, 400);
 
   const grantType = typeof body.grantType === 'string' ? body.grantType : (typeof body.grant_type === 'string' ? body.grant_type : '');
   const clientId = typeof body.clientId === 'string' ? body.clientId : (typeof body.client_id === 'string' ? body.client_id : '');
   const clientSecret = typeof body.clientSecret === 'string' ? body.clientSecret : (typeof body.client_secret === 'string' ? body.client_secret : '');
+  const codeVerifier = typeof body.codeVerifier === 'string' ? body.codeVerifier : (typeof body.code_verifier === 'string' ? body.code_verifier : '');
 
   const app = await getAppByClientId(clientId);
   if (!app) return json({ error: 'invalid client' }, 400);
-  if (hashToken(clientSecret) !== app.clientSecretHash) return json({ error: 'invalid client secret' }, 401);
+
+  // Confidential clients authenticate with their secret; public (PKCE) clients
+  // may omit it, but only when a code challenge was recorded for the code.
+  if (clientSecret) {
+    if (hashToken(clientSecret) !== app.clientSecretHash) return json({ error: 'invalid client secret' }, 401);
+  }
 
   if (grantType === 'authorization_code') {
     const code = typeof body.code === 'string' ? body.code : '';
@@ -124,7 +173,16 @@ const handleToken = async (request: Request) => {
     if (storedCode.redirectUri !== redirectUri) return json({ error: 'invalid redirect_uri' }, 400);
     if (Date.now() > new Date(storedCode.expiresAt).getTime()) return json({ error: 'code expired' }, 400);
 
-    await markOAuthCodeUsed(codeHash);
+    if (storedCode.codeChallenge) {
+      if (!codeVerifier) return json({ error: 'code_verifier required' }, 400);
+      const computed = computeCodeChallenge(codeVerifier, storedCode.codeChallengeMethod ?? 'S256');
+      if (computed !== storedCode.codeChallenge) return json({ error: 'invalid code_verifier' }, 400);
+    } else if (!clientSecret) {
+      return json({ error: 'client secret required' }, 401);
+    }
+
+    const marked = await markOAuthCodeUsed(codeHash);
+    if (!marked) return json({ error: 'invalid code' }, 400);
 
     // Ensure connection
     let connection = await getConnectionByUserAndApp(storedCode.userId, app.id);
@@ -208,6 +266,27 @@ const handleRevokeConnection = requireAuth(async (_request, user, params) => {
   return new Response(null, { status: 204 });
 });
 
+// Token revocation (RFC 7009)
+const handleRevokeToken = async (request: Request) => {
+  const body = await readBody(request);
+  let token = typeof body?.token === 'string' ? body.token.trim() : '';
+  if (!token) {
+    const authHeader = request.headers.get('Authorization') ?? request.headers.get('Authentication');
+    if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7).trim();
+  }
+
+  if (token) {
+    const tokenHash = hashToken(token);
+    const stored = await getOAuthTokenByHash(tokenHash);
+    if (stored && !stored.revokedAt) {
+      await revokeOAuthToken(tokenHash);
+    }
+  }
+
+  // RFC 7009: always return 200 for valid requests.
+  return json({});
+};
+
 // Revoke oauth token (app? optional) not needed
 
 export {
@@ -218,4 +297,5 @@ export {
   handleOAuthDevices,
   handleConnectionsList,
   handleRevokeConnection,
+  handleRevokeToken,
 };

@@ -60,10 +60,14 @@ export const AuthorizePage = () => {
   };
 
   const handleDeny = () => {
-    const url = new URL(redirectUri);
-    url.searchParams.set('error', 'access_denied');
-    if (state) url.searchParams.set('state', state);
-    window.location.assign(url.toString());
+    try {
+      const url = new URL(redirectUri);
+      url.searchParams.set('error', 'access_denied');
+      if (state) url.searchParams.set('state', state);
+      window.location.assign(url.toString());
+    } catch {
+      window.location.assign('/');
+    }
   };
 
   if (isLoading) return <div className="authorize-page"><p>Loading...</p></div>;

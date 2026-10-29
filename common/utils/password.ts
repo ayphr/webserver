@@ -1,4 +1,5 @@
 export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MAX_LENGTH = 128;
 
 export type PasswordValidationChecks = {
   minLength: boolean;
@@ -24,6 +25,9 @@ export function getPasswordValidationErrors(password: string): string[] {
 
   if (!checks.minLength) {
     errors.push(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+  }
+  if (password.length > PASSWORD_MAX_LENGTH) {
+    errors.push(`Password must be at most ${PASSWORD_MAX_LENGTH} characters`);
   }
   if (!checks.lowercase) {
     errors.push('Password must include at least one lowercase letter');

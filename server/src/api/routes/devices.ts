@@ -1,5 +1,5 @@
 import { json, readJsonBody } from '../../lib/http';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { requireAuth } from '../auth';
 import {
   cacheDevice,
@@ -144,7 +144,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function generatePairingCode(): string {
   let code = '';
   for (let i = 0; i < PAIRING_CODE_LENGTH; i += 1) {
-    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   }
   return code;
 }
@@ -237,7 +237,10 @@ const handleLink = requireAuth(async (request, user: User) => {
     devicesRegisteredTotal.inc();
   }
 
-  await markDevicePairingLinked(code, user.uuid, user.username);
+  const linked = await markDevicePairingLinked(code, user.uuid, user.username);
+  if (!linked) {
+    return json({ error: 'code already used' }, 409);
+  }
 
   return json({ linked: true, device: toPublicDevice(device) }, 200);
 });

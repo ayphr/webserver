@@ -45,6 +45,7 @@ import {
   handleOAuthDevices,
   handleConnectionsList,
   handleRevokeConnection,
+  handleRevokeToken,
 } from './routes/oauth';
 import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
 import { handleUserByUuid, handleMe as handleUsersMe, handleDeveloperToggle } from './routes/users';
@@ -135,6 +136,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/oauth/apps/:clientId', handle: handlePublicApp },
   { method: 'POST', path: '/api/oauth/authorize', handle: handleAuthorize },
   { method: 'POST', path: '/api/oauth/token', handle: handleToken },
+  { method: 'POST', path: '/api/oauth/revoke', handle: handleRevokeToken },
   { method: 'GET', path: '/api/oauth/userinfo', handle: handleUserinfo },
   { method: 'GET', path: '/api/oauth/devices', handle: handleOAuthDevices },
 
@@ -196,9 +198,16 @@ for (const route of COMPILED_ROUTES) {
   }
 }
 
-// Fewer parameters first, preserving the original declaration order for ties.
+// Fewer parameters first, then more literal segments (more specific paths) first,
+// preserving the original declaration order for remaining ties.
 for (const list of PARAM_ROUTES.values()) {
-  list.sort((a, b) => a.params - b.params);
+  list.sort((a, b) => {
+    if (a.params !== b.params) return a.params - b.params;
+    const aLiterals = a.segments.filter((segment) => !segment.startsWith(':')).length;
+    const bLiterals = b.segments.filter((segment) => !segment.startsWith(':')).length;
+    if (aLiterals !== bLiterals) return bLiterals - aLiterals;
+    return 0;
+  });
 }
 
 function isApiPath(pathname: string): boolean {

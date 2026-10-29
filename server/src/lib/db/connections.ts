@@ -66,3 +66,21 @@ export async function updateConnectionScopes(id: string, scopes: string[]): Prom
   await connections.updateOne({ id } as Record<string, unknown>, { $set: { scopes } });
 }
 
+export async function recordConnectionActivity(
+  id: string,
+  method: string,
+  path: string,
+  scopes: string[],
+): Promise<void> {
+  const { connections } = await getCols();
+  trackMongoOperation('updateOne', CONNECTIONS_COLLECTION);
+  const entry = { method, path, scopes, at: new Date() };
+  await connections.updateOne(
+    { id } as Record<string, unknown>,
+    {
+      $set: { lastUsedAt: entry.at },
+      $push: { recentActivity: { $each: [entry], $slice: -50 } as unknown as never },
+    } as Record<string, unknown>,
+  );
+}
+

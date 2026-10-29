@@ -219,6 +219,7 @@ export async function setUserStripeCustomerId(userUuid: string, stripeCustomerId
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid: userUuid }, { $set: { stripeCustomerId } });
   await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
 }
 
 

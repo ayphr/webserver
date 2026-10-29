@@ -5,7 +5,7 @@ const CACHE = 'auth';
 const GEN_KEY = 'ayphr:cache:auth:gen';
 const KEY_PREFIX = 'ayphr:cache:auth:entry:';
 
-export const AUTH_CACHE_TTL_SECONDS = 30;
+export const AUTH_CACHE_TTL_SECONDS = 10;
 
 const INITIAL_GEN = 0;
 

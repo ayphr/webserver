@@ -32,10 +32,14 @@ export async function getOAuthCodeByHash(codeHash: string): Promise<OAuthAuthori
 }
 
 
-export async function markOAuthCodeUsed(codeHash: string): Promise<void> {
+export async function markOAuthCodeUsed(codeHash: string): Promise<boolean> {
   const { oauthCodes } = await getCols();
   trackMongoOperation('updateOne', OAUTH_CODES_COLLECTION);
-  await oauthCodes.updateOne({ codeHash }, { $set: { used: true } });
+  const result = await oauthCodes.updateOne(
+    { codeHash, used: { $ne: true } },
+    { $set: { used: true, usedAt: new Date() } },
+  );
+  return result.modifiedCount > 0;
 }
 
 // ---------------------------------------------------------------------------

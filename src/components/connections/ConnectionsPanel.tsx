@@ -8,6 +8,7 @@ export const ConnectionsPanel = () => {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -58,7 +59,33 @@ export const ConnectionsPanel = () => {
                 {c.appLogoUrl && <img src={c.appLogoUrl} alt={c.appName} className="connections__logo" loading="lazy" />}
                 <p><strong>Scopes:</strong> {c.scopes.join(', ')}</p>
                 <p><strong>Connected:</strong> {new Date(c.createdAt).toLocaleDateString()}</p>
-                <Button variant="danger" onClick={() => handleRevoke(c.id)}>Revoke</Button>
+                {c.lastUsedAt && <p><strong>Last used:</strong> {new Date(c.lastUsedAt).toLocaleString()}</p>}
+                <div className="connections__actions">
+                  <Button variant="secondary" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
+                    {expanded === c.id ? 'Hide activity' : 'View activity'}
+                  </Button>
+                  <Button variant="danger" onClick={() => handleRevoke(c.id)}>Revoke</Button>
+                </div>
+                {expanded === c.id && (
+                  <div className="connections__activity">
+                    <h5>Recent activity</h5>
+                    {(c.recentActivity ?? []).length === 0 ? (
+                      <p>No recorded activity yet.</p>
+                    ) : (
+                      <ul>
+                        {(c.recentActivity ?? []).slice().reverse().map((entry, index) => (
+                          <li key={index}>
+                            <code>{entry.method}</code> {entry.path}
+                            <span className="connections__activity-time"> — {new Date(entry.at).toLocaleString()}</span>
+                            {entry.scopes?.length ? (
+                              <div className="connections__activity-scopes">Scopes: {entry.scopes.join(', ')}</div>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </CardBody>
             </Card>
           ))}

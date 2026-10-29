@@ -76,9 +76,10 @@ export type OAuthTokenRequest = {
   grantType: 'authorization_code' | 'refresh_token';
   code?: string;
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
   redirectUri?: string;
   refreshToken?: string;
+  codeVerifier?: string;
 };
 
 export type OAuthTokenResponse = {
@@ -99,6 +100,8 @@ export type OAuthAuthorizationCode = {
   expiresAt: Date;
   used: boolean;
   createdAt: Date;
+  codeChallenge?: string;
+  codeChallengeMethod?: 'plain' | 'S256';
 };
 
 export type OAuthAccessToken = {
@@ -113,6 +116,13 @@ export type OAuthAccessToken = {
   revokedAt?: Date;
 };
 
+export type ConnectionActivity = {
+  method: string;
+  path: string;
+  scopes: AppScope[];
+  at: Date;
+};
+
 export type Connection = {
   id: string;
   userId: string;
@@ -125,6 +135,7 @@ export type Connection = {
   createdAt: Date;
   lastUsedAt?: Date;
   revokedAt?: Date;
+  recentActivity?: ConnectionActivity[];
 };
 
 export type ConnectionListPayload = {
