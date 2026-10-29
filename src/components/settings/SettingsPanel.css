@@ -20,11 +20,7 @@
 .settings__tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0.35rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  gap: 0.25rem;
   width: fit-content;
   max-width: 100%;
   overflow-x: auto;
@@ -32,29 +28,26 @@
 
 .settings__tab {
   appearance: none;
-  border: 1px solid transparent;
+  border: none;
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-family-base);
   font-size: 0.88rem;
   font-weight: var(--font-weight-md);
-  padding: 0.5rem 0.95rem;
+  padding: 0.4rem 0.75rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+  transition: color 0.15s ease;
   white-space: nowrap;
 }
 
 .settings__tab:hover {
   color: var(--text-primary);
-  background: hsla(0, 0%, 100%, 0.04);
 }
 
 .settings__tab--active {
   color: var(--text-primary);
-  background: var(--bg-surface);
-  border-color: var(--border-subtle);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  font-weight: var(--font-weight-hv);
 }
 
 .settings__tab:focus-visible {
@@ -106,16 +99,14 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, hsl(0, 0%, 12%), hsl(0, 0%, 10%));
-  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.12s ease, box-shadow 0.2s ease;
+  padding: 0.75rem 0;
+  border: none;
+  background: transparent;
+  transition: none;
 }
 
 .settings__option:hover {
-  border-color: var(--border-focus);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  /* no-op: keep simple */
 }
 
 .settings__option--disabled {
@@ -124,13 +115,11 @@
 }
 
 .settings__option--danger {
-  border-color: hsla(4, 100%, 71%, 0.22);
-  background: linear-gradient(180deg, hsla(4, 100%, 71%, 0.05), hsl(0, 0%, 10%));
+  /* danger styling handled by icon/text color */
 }
 
 .settings__option--danger:hover {
-  border-color: hsla(4, 100%, 71%, 0.45);
-  box-shadow: 0 2px 8px hsla(4, 100%, 71%, 0.08);
+  /* no-op */
 }
 
 .settings__option-icon {
