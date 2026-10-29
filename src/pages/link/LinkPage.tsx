@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconAlertCircle, IconDeviceDesktop } from '@tabler/icons-react';
 import { api } from '../../lib/api';
-import { Button, Card, CardHeader, CardBody, Input } from '../../components/common';
+import { Button, Card, CardHeader, CardBody, Input, UsernameDisplay } from '../../components/common';
+import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import './LinkPage.css';
+import '../auth/AuthPage.css';
 
 export const LinkPage = () => {
   const navigate = useNavigate();
+  const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const [activeTokenState, setActiveTokenState] = useState<string | null>(() => getActiveToken());
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,20 +21,34 @@ export const LinkPage = () => {
   useEffect(() => {
     let active = true;
     const check = async () => {
+      setIsCheckingAuth(true);
       try {
         await api.auth.me();
-        if (active) setIsCheckingAuth(false);
+        if (active) {
+          setIsAuthenticated(true);
+          setIsCheckingAuth(false);
+        }
       } catch {
         if (!active) return;
-        const redirect = '/link';
-        navigate(`/auth/login?redirect=${encodeURIComponent(redirect)}`, { replace: true });
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+        if (getStoredAccounts().length === 0) {
+          const redirect = '/link';
+          navigate(`/auth/login?redirect=${encodeURIComponent(redirect)}`, { replace: true });
+        }
       }
     };
     void check();
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, [navigate, activeTokenState]);
+
+  const handleChooseAccount = (token: string) => {
+    setActiveToken(token);
+    setActiveTokenState(token);
+    setStoredAccounts(getStoredAccounts());
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,10 +71,53 @@ export const LinkPage = () => {
     }
   };
 
+  const visibleAccounts = storedAccounts.filter((account) => account.token !== activeTokenState);
+  const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : storedAccounts;
+
   if (isCheckingAuth) {
     return (
       <div className="link-page">
         <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="link-page">
+        <div className="link-page__container">
+          <Card elevated className="link-page__card">
+            <CardHeader>
+              <h2>Link a device</h2>
+              <p>Choose an account to link this device to.</p>
+            </CardHeader>
+            <CardBody>
+              {storedAccounts.length > 0 ? (
+                <div className="auth-accounts">
+                  <p className="auth-accounts__title">Choose an account</p>
+                  <div className="auth-accounts__list">
+                    {accountsToShow.map((account) => (
+                      <button
+                        key={account.user.uuid}
+                        type="button"
+                        className="auth-accounts__item"
+                        onClick={() => handleChooseAccount(account.token)}
+                      >
+                        <UsernameDisplay username={account.user.username} badges={account.user.badges} country={account.user.country} avatarUrl={account.user.avatarUrl} avatarSize={28} />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="auth-accounts__divider">or sign in with another account</p>
+                  <Button variant="secondary" onClick={() => navigate(`/auth/login?redirect=${encodeURIComponent('/link')}`)}>
+                    Sign in
+                  </Button>
+                </div>
+              ) : (
+                <p>Redirecting to sign in...</p>
+              )}
+            </CardBody>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -69,6 +131,24 @@ export const LinkPage = () => {
             <p>Enter the code shown on your device to link it to your account.</p>
           </CardHeader>
           <CardBody>
+            {storedAccounts.length > 1 && (
+              <div className="auth-accounts">
+                <p className="auth-accounts__title">Switch account</p>
+                <div className="auth-accounts__list">
+                  {accountsToShow.map((account) => (
+                    <button
+                      key={account.user.uuid}
+                      type="button"
+                      className="auth-accounts__item"
+                      onClick={() => handleChooseAccount(account.token)}
+                    >
+                      <UsernameDisplay username={account.user.username} badges={account.user.badges} country={account.user.country} avatarUrl={account.user.avatarUrl} avatarSize={28} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="link-page__error">
                 <IconAlertCircle size={16} strokeWidth={1.75} />

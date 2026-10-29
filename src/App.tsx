@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import {
   AuthPage,
   DashboardPage,
@@ -12,13 +13,23 @@ import {
 } from './pages';
 import { PolicyGate } from './components/policy';
 import { AuthorizePage } from './pages/oauth';
-import { ModalProvider, TooltipProvider } from './context';
+import { ModalProvider, TooltipProvider, useTooltip } from './context';
+
+function TooltipRouteWatcher() {
+  const location = useLocation();
+  const { hideTooltip } = useTooltip();
+  useEffect(() => {
+    hideTooltip();
+  }, [location, hideTooltip]);
+  return null;
+}
 
 function App() {
   return (
     <TooltipProvider>
       <ModalProvider>
         <BrowserRouter>
+          <TooltipRouteWatcher />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<Navigate to="/auth/login" replace />} />

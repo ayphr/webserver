@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { IconAlertCircle, IconDatabase, IconRefresh } from '@tabler/icons-react';
+import { IconAlertCircle, IconDatabase, IconExternalLink, IconRefresh } from '@tabler/icons-react';
 import type { DeviceSummary } from '@common';
 import { api } from '../../lib/api';
 import { Button } from '../common';
@@ -65,6 +65,10 @@ export const DevicesPanel = () => {
             <IconRefresh size={16} strokeWidth={1.75} />
             Refresh
           </Button>
+          <Button variant="primary" onClick={() => window.open('https://ayphr.com/link', '_blank', 'noopener,noreferrer')}>
+            <IconExternalLink size={16} strokeWidth={1.75} />
+            Add device
+          </Button>
         </div>
       </div>
 
@@ -81,7 +85,7 @@ export const DevicesPanel = () => {
         <div className="devices__empty">
           <IconDatabase size={28} strokeWidth={1.5} />
           <h3>No devices yet</h3>
-          <p>Click "Add device" to generate a token and register your first device.</p>
+          <p>Use "Add device" to open ayphr.com/link and enter the code shown on your device.</p>
         </div>
       ) : (
         <ul className="devices__list">

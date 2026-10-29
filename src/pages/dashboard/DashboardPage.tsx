@@ -115,7 +115,7 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 
 function getStoredDefaultTab(): string {
   const stored = localStorage.getItem('ayphr-pref-default-tab');
-  return stored === 'overview' || stored === 'devices' || stored === 'users' ? stored : 'overview';
+  return stored === 'overview' || stored === 'devices' || stored === 'users' || stored === 'my-apps' ? stored : 'overview';
 }
 
 export const DashboardPage = () => {
@@ -245,6 +245,9 @@ export const DashboardPage = () => {
 
   useEffect(() => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
+      changeTab('overview');
+    }
+    if (!isLoading && user && activePage === 'my-apps' && user.developerAccount !== true) {
       changeTab('overview');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -405,6 +408,7 @@ export const DashboardPage = () => {
             { value: 'overview', label: 'Overview' },
             { value: 'devices', label: 'Devices' },
             ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
+            ...(isDeveloper ? [{ value: 'my-apps', label: 'My Apps' }] : []),
           ],
           onChange: setDefaultTabPref,
         },
@@ -419,7 +423,7 @@ export const DashboardPage = () => {
         },
       ],
     },
-  ], [defaultTab, compactLayout, navigate, isStaff, user]);
+  ], [defaultTab, compactLayout, navigate, isStaff, isDeveloper, user]);
 
   if (isLoading) {
     return (
