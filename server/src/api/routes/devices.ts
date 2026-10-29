@@ -20,6 +20,8 @@ import {
   type DeviceDocument,
 } from '../../lib/db';
 import { hashToken } from '../../lib/tokens';
+import { getClientIp } from '../../lib/requestContext';
+import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import {
   deviceClaimsTotal,
   devicesRegisteredTotal,
@@ -30,10 +32,14 @@ import {
   telemetryUploadDuration,
   telemetryUploadErrorsTotal,
 } from '../../lib/metrics';
-import { DEVICE_TOKEN_TTL_MS } from '../../env';
-import type { DataPoint, DeviceSummary, User } from '@common';
+import { DEVICE_TOKEN_TTL_MS, PAIRING_CODE_TTL_MS } from '../../env';
+import { PAIRING_CODE_LENGTH, type DataPoint, type DeviceSummary, type User } from '@common';
 
 const MAX_SERIAL = 0xFFFFFFFF;
+
+const pairingRequestLimiter = createRateLimiter(15 * 60 * 1000, 20, 'pairing-request');
+const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
+const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
 const MAX_NAME_LENGTH = 64;
 const MAX_POINTS_PER_UPLOAD = 2_000;
 
@@ -137,13 +143,16 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generatePairingCode(): string {
   let code = '';
-  for (let i = 0; i < 8; i += 1) {
+  for (let i = 0; i < PAIRING_CODE_LENGTH; i += 1) {
     code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
   }
   return code;
 }
 
 const handleRequestPairing = async (request: Request): Promise<Response> => {
+  const ipCheck = await pairingRequestLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+
   const body = await readJsonBody(request);
   const serial = parseSerial(body?.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
@@ -159,7 +168,7 @@ const handleRequestPairing = async (request: Request): Promise<Response> => {
 
   const token = randomBytes(32).toString('hex');
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + DEVICE_TOKEN_TTL_MS);
+  const expiresAt = new Date(now.getTime() + PAIRING_CODE_TTL_MS);
 
   await createDevicePairing({
     code,
@@ -176,6 +185,12 @@ const handleRequestPairing = async (request: Request): Promise<Response> => {
 };
 
 const handleLink = requireAuth(async (request, user: User) => {
+  const ipCheck = await linkCodeLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+
+  const userCheck = await linkCodeLimiter.check(`user:${user.uuid}`);
+  if (!userCheck.allowed) return tooManyRequests(userCheck.retryAfterMs);
+
   const body = await readJsonBody(request);
   const code = typeof body?.code === 'string' ? body.code.trim().toUpperCase() : '';
   if (!code) return json({ error: 'invalid code' }, 400);
@@ -228,8 +243,14 @@ const handleLink = requireAuth(async (request, user: User) => {
 });
 
 const handleFetchPairingToken = async (request: Request, params: { code?: string }): Promise<Response> => {
+  const ipCheck = await fetchPairingTokenLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+
   const code = typeof params.code === 'string' ? params.code.trim().toUpperCase() : '';
   if (!code) return json({ error: 'invalid code' }, 400);
+
+  const codeCheck = await fetchPairingTokenLimiter.check(`code:${code}`);
+  if (!codeCheck.allowed) return tooManyRequests(codeCheck.retryAfterMs);
 
   const pairing = await getDevicePairingByCode(code);
   const now = new Date();

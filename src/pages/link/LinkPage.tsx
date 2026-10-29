@@ -4,6 +4,7 @@ import { IconAlertCircle, IconDeviceDesktop } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { Button, Card, CardHeader, CardBody, UsernameDisplay } from '../../components/common';
 import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { PAIRING_CODE_LENGTH } from '@common';
 import './LinkPage.css';
 import '../auth/AuthPage.css';
 
@@ -55,8 +56,8 @@ export const LinkPage = () => {
     setError(null);
 
     const trimmed = code.trim().toUpperCase();
-    if (trimmed.length !== 8) {
-      setError('Enter the 8-character code from your device');
+    if (trimmed.length !== PAIRING_CODE_LENGTH) {
+      setError(`Enter the ${PAIRING_CODE_LENGTH}-character code from your device`);
       return;
     }
 
@@ -78,24 +79,24 @@ export const LinkPage = () => {
   const setCodeAt = (index: number, char: string) => {
     setCode((prev) => {
       const chars = prev.split('');
-      while (chars.length < 8) chars.push('');
+      while (chars.length < PAIRING_CODE_LENGTH) chars.push('');
       chars[index] = char ? char.toUpperCase().slice(0, 1) : '';
-      return chars.join('').slice(0, 8);
+      return chars.join('').slice(0, PAIRING_CODE_LENGTH);
     });
   };
 
   const applyPaste = (startIndex: number, text: string) => {
-    const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, PAIRING_CODE_LENGTH);
     setCode((prev) => {
       const chars = prev.split('');
-      while (chars.length < 8) chars.push('');
+      while (chars.length < PAIRING_CODE_LENGTH) chars.push('');
       for (let i = 0; i < cleaned.length; i++) {
         const idx = startIndex + i;
-        if (idx < 8) chars[idx] = cleaned[i];
+        if (idx < PAIRING_CODE_LENGTH) chars[idx] = cleaned[i];
       }
-      return chars.join('').slice(0, 8);
+      return chars.join('').slice(0, PAIRING_CODE_LENGTH);
     });
-    const nextFocus = Math.min(startIndex + cleaned.length, 7);
+    const nextFocus = Math.min(startIndex + cleaned.length, PAIRING_CODE_LENGTH - 1);
     inputRefs.current[nextFocus]?.focus();
   };
 
@@ -106,7 +107,7 @@ export const LinkPage = () => {
       return;
     }
     setCodeAt(index, val);
-    if (val && index < 7) inputRefs.current[index + 1]?.focus();
+    if (val && index < PAIRING_CODE_LENGTH - 1) inputRefs.current[index + 1]?.focus();
   };
 
   const handlePaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -121,7 +122,7 @@ export const LinkPage = () => {
       e.preventDefault();
     } else if (e.key === 'ArrowLeft' && index > 0) {
       inputRefs.current[index - 1]?.focus();
-    } else if (e.key === 'ArrowRight' && index < 7) {
+    } else if (e.key === 'ArrowRight' && index < PAIRING_CODE_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -218,7 +219,7 @@ export const LinkPage = () => {
             ) : (
               <form onSubmit={handleSubmit} className="link-page__form">
                 <div className="link-page__code" role="group" aria-label="Device code">
-                  {Array.from({ length: 8 }).map((_, i) => (
+                  {Array.from({ length: PAIRING_CODE_LENGTH }).map((_, i) => (
                     <input
                       key={i}
                       ref={(el) => {

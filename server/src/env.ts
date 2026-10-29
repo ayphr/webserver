@@ -26,6 +26,9 @@ export const METRICS_PORT = Number(process.env.METRICS_PORT || 7234);
 export const DEVICE_TOKEN_TTL_MINUTES = Number(process.env.DEVICE_TOKEN_TTL_MINUTES || 60);
 export const DEVICE_TOKEN_TTL_MS = DEVICE_TOKEN_TTL_MINUTES * 60 * 1000;
 
+export const PAIRING_CODE_TTL_MINUTES = Number(process.env.PAIRING_CODE_TTL_MINUTES || 5);
+export const PAIRING_CODE_TTL_MS = PAIRING_CODE_TTL_MINUTES * 60 * 1000;
+
 export const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'https://ayphr.com,https://www.ayphr.com')
   .split(',')
   .map((origin) => origin.trim())

@@ -48,3 +48,5 @@ export type DeviceUploadPayload = {
   device: Device;
   accepted: number;
 };
+
+export const PAIRING_CODE_LENGTH = 6;
