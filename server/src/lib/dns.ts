@@ -1,11 +1,5 @@
 import { promises as dns } from 'node:dns';
 
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1']);
-} catch {
-  // ignore
-}
-
 export const DOMAIN_TXT_PREFIX = '_ayphr';
 
 export function getTxtRecordNames(domain: string): string[] {
@@ -15,6 +9,15 @@ export function getTxtRecordNames(domain: string): string[] {
 
 export async function resolveTxtRecords(name: string): Promise<string[]> {
   try {
+    const records = await dns.resolveTxt(name);
+    const normalized = records.map((entry) => entry.join('').trim()).filter(Boolean);
+    if (normalized.length > 0) return normalized;
+  } catch {
+    // fall through
+  }
+
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
     const records = await dns.resolveTxt(name);
     return records.map((entry) => entry.join('').trim()).filter(Boolean);
   } catch {
