@@ -12,7 +12,7 @@ import {
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { api } from '../../lib/api';
-import { BioEditor, BioText, Button, UsernameDisplay, Avatar, Modal } from './index';
+import { BioEditor, BioText, Button, UsernameDisplay, Avatar, DnsChallengeModal } from './index';
 import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
@@ -593,24 +593,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         />
       )}
 
-      <Modal
+      <DnsChallengeModal
         isOpen={isDnsModalOpen}
         onClose={() => setIsDnsModalOpen(false)}
-        title="Verify website ownership"
-        showCancel={true}
-        cancelText="Close"
-      >
-        <div className="profile-card__form-group">
-          <p>Add a TXT record to your DNS:</p>
-          <p><strong>Name:</strong> {dnsChallenge?.recordName ?? dnsChallenge?.txtName ?? dnsChallenge?.name}</p>
-          <p><strong>Value:</strong> {dnsChallenge?.recordValue ?? dnsChallenge?.txtValue ?? dnsChallenge?.value ?? dnsChallenge?.token}</p>
-          <p>Then click Check.</p>
-          {dnsError && <p className="profile-card__form-error">{dnsError}</p>}
-          <Button onClick={() => void handleDnsCheck()} isLoading={isDnsChecking} disabled={isDnsChecking}>
-            Check
-          </Button>
-        </div>
-      </Modal>
+        challenge={dnsChallenge}
+        onCheck={() => void handleDnsCheck()}
+        isChecking={isDnsChecking}
+        error={dnsError}
+      />
     </div>
   );
 };
