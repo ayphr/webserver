@@ -10,7 +10,7 @@ import {
 import type { DeviceSummary, Location, PublicUser } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
-import { Button, Card, Input, Modal } from '../common';
+import { Button, Card, ConfirmDialog, Input, Modal } from '../common';
 import '../settings/SettingsPanel.css';
 import './LocationsPanel.css';
 
@@ -43,6 +43,8 @@ export const LocationsPanel = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [settingsName, setSettingsName] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -136,6 +138,7 @@ export const LocationsPanel = () => {
 
   const handleDelete = async () => {
     if (!selectedLocation || selectedLocation.isDefault) return;
+    setIsDeleting(true);
     setError(null);
     try {
       await api.locations.remove(selectedLocation.id);
@@ -143,8 +146,11 @@ export const LocationsPanel = () => {
       setLocations(remaining);
       setSelectedId(remaining[0]?.id ?? null);
       setView('list');
+      setIsDeleteOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete location');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -351,7 +357,7 @@ export const LocationsPanel = () => {
                 Save
               </Button>
               {!selectedLocation!.isDefault && (
-                <Button variant="danger" onClick={() => void handleDelete()}>
+                <Button variant="danger" onClick={() => setIsDeleteOpen(true)}>
                   <IconTrash size={16} strokeWidth={1.75} />
                   Delete location
                 </Button>
@@ -359,6 +365,18 @@ export const LocationsPanel = () => {
             </div>
           </div>
         )}
+          <ConfirmDialog
+            isOpen={isDeleteOpen}
+            title="Delete location"
+            confirmText={isDeleting ? 'Deleting...' : 'Delete'}
+            cancelText="Cancel"
+            isDangerous
+            confirmDisabled={isDeleting}
+            onConfirm={() => void handleDelete()}
+            onCancel={() => setIsDeleteOpen(false)}
+          >
+            <p>Are you sure you want to delete &quot;{selectedLocation?.name}&quot;? This cannot be undone.</p>
+          </ConfirmDialog>
       </div>
     </div>
   );
