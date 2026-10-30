@@ -5,6 +5,7 @@ export { Select, type SelectProps, type SelectOption } from './Select';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Modal, type ModalProps } from './Modal';
 export { DnsChallengeModal, type DnsChallengeModalProps } from './DnsChallengeModal';
+export { CopyableField, type CopyableFieldProps } from './CopyableField';
 export { Alert, ConfirmDialog, type AlertProps, type ConfirmDialogProps } from './Dialog';
 export { UsernameDisplay, type UsernameDisplayProps } from './UsernameDisplay';
 export { Avatar, type AvatarProps } from './Avatar';
