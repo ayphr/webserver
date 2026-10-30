@@ -116,6 +116,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [isPunishModalOpen, setIsPunishModalOpen] = useState(false);
   const [isSubscriptionsModalOpen, setIsSubscriptionsModalOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [isReverifying, setIsReverifying] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -166,6 +167,22 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       setError(message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleReverifyDomains = async () => {
+    if (!user) return;
+    setIsReverifying(true);
+    setError(null);
+    try {
+      const updated = await api.profile.reverifyDomains();
+      setUser(updated.user ?? updated);
+      setReloadToken((t) => t + 1);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to re-verify domains';
+      setError(message);
+    } finally {
+      setIsReverifying(false);
     }
   };
 
@@ -338,6 +355,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                       <span className="profile-card__social-icon">{SOCIAL_LINK_ICONS[key].icon}</span>
                     </a>
                   ))}
+                </div>
+              )}
+              {renderedSocialLinks.some(({ key }) => key === 'website' && user.socialLinkVerified?.website === false) && (
+                <div className="profile-card__form-error">
+                  Website ownership unverified.{' '}
+                  <button type="button" onClick={() => void handleReverifyDomains()} disabled={isReverifying}>
+                    {isReverifying ? 'Checking...' : 'Re-verify'}
+                  </button>
                 </div>
               )}
             </div>

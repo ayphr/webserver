@@ -8,3 +8,4 @@ export * from './sessions';
 export * from './apps';
 export * from './oauth';
 export * from './connections';
+export * from './domainVerifications';

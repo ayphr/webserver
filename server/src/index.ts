@@ -1,5 +1,6 @@
 import { setupMetricsServer, setupServer } from './api/server';
 import { countActiveDevices, countDevices, disconnect, getUserCount } from './lib/db';
+import { reverifyAllDomains } from './lib/domainReverification';
 import { setActiveDevices, setTotalDevices, setTotalUsers } from './lib/metrics';
 import { getRedis, closeRedis } from './lib/redis';
 import { createLogger } from './lib/logger';
@@ -10,6 +11,7 @@ const log = createLogger('server');
 const ACTIVE_DEVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const ACTIVE_DEVICE_REFRESH_MS = 60_000;
 const ENTITY_COUNT_REFRESH_MS = 60_000;
+const DOMAIN_REVERIFY_REFRESH_MS = 5 * 60 * 1000;
 
 if (REDIS_URL) {
   if (getRedis()) {
@@ -54,6 +56,8 @@ void refreshActiveDevices();
 void refreshEntityCounts();
 const activeDevicesTimer = setInterval(() => void refreshActiveDevices(), ACTIVE_DEVICE_REFRESH_MS);
 const entityCountTimer = setInterval(() => void refreshEntityCounts(), ENTITY_COUNT_REFRESH_MS);
+const domainReverifyTimer = setInterval(() => void reverifyAllDomains().catch(() => {}), DOMAIN_REVERIFY_REFRESH_MS);
+void reverifyAllDomains().catch(() => {});
 
 let shuttingDown = false;
 
@@ -65,6 +69,7 @@ async function shutdown(signal: string) {
 
   clearInterval(activeDevicesTimer);
   clearInterval(entityCountTimer);
+  clearInterval(domainReverifyTimer);
   await httpServer.stop();
   await metricsServer.stop();
   await closeRedis();

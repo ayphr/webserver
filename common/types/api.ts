@@ -211,3 +211,47 @@ export type SubscriptionAutoRenewPayload = {
 export type SubscriptionPortalPayload = {
   url: string;
 };
+
+export type DomainChallengeRequest = {
+  type?: string;
+  socialType?: string;
+  linkType?: string;
+  key?: string;
+  platform?: string;
+  domain?: string;
+  handle?: string;
+  value?: string;
+};
+
+export type DomainChallengePayload = {
+  domain: string;
+  type: string;
+  token: string;
+  recordName: string;
+  recordValue: string;
+  txtName: string;
+  txtValue: string;
+  name: string;
+  value: string;
+  expiresAt: Date;
+  challenge?: string;
+};
+
+export type DomainVerifyRequest = {
+  type?: string;
+  socialType?: string;
+  linkType?: string;
+  key?: string;
+  platform?: string;
+  domain?: string;
+  handle?: string;
+  value?: string;
+  token?: string;
+  code?: string;
+  challenge?: string;
+};
+
+export type DomainVerifyPayload = {
+  verified: boolean;
+  user: PublicUser;
+};

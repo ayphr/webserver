@@ -34,6 +34,27 @@ export function createProfileApi(client: RequestClient) {
       });
       return response.user;
     },
+    async requestDomainChallenge(input: { type?: string; socialType?: string; domain?: string; handle?: string; value?: string }) {
+      const response = await client.requestJson<any>('/api/profile/domain-challenge', {
+        method: 'POST',
+        body: input,
+      });
+      return response;
+    },
+    async verifyDomain(input: { type?: string; socialType?: string; domain?: string; handle?: string; value?: string; token?: string; code?: string; challenge?: string }) {
+      const response = await client.requestJson<{ verified: boolean; user: PublicUser }>('/api/profile/domain-verify', {
+        method: 'POST',
+        body: input,
+      });
+      return response;
+    },
+    async reverifyDomains(input: any = {}) {
+      const response = await client.requestJson<any>('/api/profile/domain-reverify', {
+        method: 'POST',
+        body: input,
+      });
+      return response;
+    },
     async uploadAvatar(file: File, userUuid?: string) {
       const form = new FormData();
       form.append('avatar', file);

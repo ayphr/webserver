@@ -36,6 +36,7 @@ export type User = {
   bio?: string;
   bioFormat?: MarkdownFormat;
   socialLinks?: SocialLinks;
+  socialLinkVerified?: Partial<Record<SocialLinkType, boolean>>;
   policyAgreements?: PolicyAgreements;
   auth: {
     passwordHash?: string;

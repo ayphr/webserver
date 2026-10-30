@@ -19,6 +19,7 @@ import {
   OAUTH_CODES_COLLECTION,
   OAUTH_TOKENS_COLLECTION,
   CONNECTIONS_COLLECTION,
+  DOMAIN_VERIFICATIONS_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
@@ -68,6 +69,17 @@ export type DevicePairing = {
   fetched?: boolean;
 };
 
+export type DomainVerification = {
+  id: string;
+  userUuid: string;
+  socialType: string;
+  domain: string;
+  token: string;
+  createdAt: Date;
+  expiresAt: Date;
+  verifiedAt?: Date;
+};
+
 export let client: MongoClient | null = null;
 export let database: Db | null = null;
 export let connectPromise: Promise<Db> | null = null;
@@ -86,6 +98,7 @@ export interface Collections {
   oauthCodes: Collection<OAuthAuthorizationCode>;
   oauthTokens: Collection<OAuthAccessToken>;
   connections: Collection<Connection>;
+  domainVerifications: Collection<DomainVerification>;
 }
 
 export interface StoredAvatar {
@@ -197,7 +210,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     apps: db.collection<App>(APPS_COLLECTION),
     oauthCodes: db.collection<OAuthAuthorizationCode>(OAUTH_CODES_COLLECTION),
     oauthTokens: db.collection<OAuthAccessToken>(OAUTH_TOKENS_COLLECTION),
-    connections: db.collection<Connection>(CONNECTIONS_COLLECTION)
+    connections: db.collection<Connection>(CONNECTIONS_COLLECTION),
+    domainVerifications: db.collection<DomainVerification>(DOMAIN_VERIFICATIONS_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
