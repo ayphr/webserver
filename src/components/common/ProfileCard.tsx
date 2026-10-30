@@ -120,6 +120,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [dnsChallenge, setDnsChallenge] = useState<DomainChallengePayload | null>(null);
   const [isDnsChecking, setIsDnsChecking] = useState(false);
   const [dnsError, setDnsError] = useState<string | null>(null);
+  const [dnsSuccess, setDnsSuccess] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -176,6 +177,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const openDnsModal = async () => {
     if (!user?.socialLinks?.website) return;
     setDnsError(null);
+    setDnsSuccess(false);
     setIsDnsChecking(true);
     try {
       const challenge = await api.profile.requestDomainChallenge({ type: 'website', domain: user.socialLinks.website });
@@ -198,7 +200,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       const token = dnsChallenge.token ?? dnsChallenge.challenge ?? dnsChallenge.txtValue;
       const result = await api.profile.verifyDomain({ type: 'website', domain, token });
       setUser(result.user ?? result);
-      setIsDnsModalOpen(false);
+      setDnsSuccess(true);
       setReloadToken((t) => t + 1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'TXT record not found or does not match';
@@ -600,6 +602,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         onCheck={() => void handleDnsCheck()}
         isChecking={isDnsChecking}
         error={dnsError}
+        success={dnsSuccess}
       />
     </div>
   );

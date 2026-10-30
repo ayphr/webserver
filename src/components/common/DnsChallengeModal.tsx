@@ -11,6 +11,7 @@ export interface DnsChallengeModalProps {
   onCheck: () => void;
   isChecking: boolean;
   error: string | null;
+  success: boolean;
 }
 
 export const DnsChallengeModal = ({
@@ -20,6 +21,7 @@ export const DnsChallengeModal = ({
   onCheck,
   isChecking,
   error,
+  success,
 }: DnsChallengeModalProps) => {
   const recordName =
     challenge?.recordName ?? challenge?.txtName ?? challenge?.name ?? '';
@@ -29,21 +31,32 @@ export const DnsChallengeModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Verify website ownership" showCancel={false}>
       <div className="dns-challenge">
-        <p>Add the following TXT record to your DNS, then click Check.</p>
-        <CopyableField label="TXT name" value={recordName} />
-        <CopyableField label="TXT value" value={recordValue} />
-        <div className="dns-challenge__error">
-          {error ? <p className="profile-card__form-error">{error}</p> : null}
-          {error ? <p className="dns-challenge__note">DNS changes can take a few minutes to propagate.</p> : null}
-        </div>
-        <div className="dns-challenge__actions">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-          <Button onClick={() => void onCheck()} isLoading={isChecking} disabled={isChecking}>
-            Check
-          </Button>
-        </div>
+        {success ? (
+          <>
+            <p>Verification succeeded. Your website is now verified.</p>
+            <div className="dns-challenge__actions">
+              <Button onClick={onClose}>Done</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p>Add the following TXT record to your DNS, then click Check.</p>
+            <CopyableField label="TXT name" value={recordName} />
+            <CopyableField label="TXT value" value={recordValue} />
+            <div className="dns-challenge__error">
+              {error ? <p className="profile-card__form-error">{error}</p> : null}
+              {error ? <p className="dns-challenge__note">DNS changes can take a few minutes to propagate.</p> : null}
+            </div>
+            <div className="dns-challenge__actions">
+              <Button variant="secondary" onClick={onClose}>
+                Close
+              </Button>
+              <Button onClick={() => void onCheck()} isLoading={isChecking} disabled={isChecking}>
+                Check
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );
