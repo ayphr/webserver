@@ -287,9 +287,11 @@ const handleDomainVerify = requireAuth(async (request, user) => {
     return json({ error: 'invalid verification token' }, 400);
   }
 
+  const recordName = `_ayphr.${verification.domain}`;
   const records = await resolveDomainTxt(verification.domain);
-  if (!records.includes(expectedToken)) {
-    return json({ error: 'TXT record not found or does not match' }, 400);
+  const normalizedRecords = records.map((value) => value.trim().toLowerCase());
+  if (!normalizedRecords.includes(expectedToken.trim().toLowerCase())) {
+    return json({ error: 'TXT record not found or does not match', recordName, resolved: records }, 400);
   }
 
   await markDomainVerificationVerified(verification.id);
