@@ -10,6 +10,12 @@
   margin-top: 0.75rem;
 }
 
+.dns-challenge__note {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #999;
+}
+
 .dns-challenge {
   min-width: 22rem;
   min-height: 16rem;

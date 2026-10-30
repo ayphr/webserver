@@ -33,7 +33,8 @@ export const DnsChallengeModal = ({
         <CopyableField label="TXT name" value={recordName} />
         <CopyableField label="TXT value" value={recordValue} />
         <div className="dns-challenge__error">
-          {error ? <p className="profile-card__form-error">{error} DNS changes can take a few minutes to propagate.</p> : null}
+          {error ? <p className="profile-card__form-error">{error}</p> : null}
+          {error ? <p className="dns-challenge__note">DNS changes can take a few minutes to propagate.</p> : null}
         </div>
         <div className="dns-challenge__actions">
           <Button variant="secondary" onClick={onClose}>
