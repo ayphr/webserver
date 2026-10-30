@@ -26,13 +26,16 @@ export const DnsChallengeModal = ({
     challenge?.recordValue ?? challenge?.txtValue ?? challenge?.value ?? challenge?.token ?? '';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Verify website ownership" showCancel cancelText="Close">
+    <Modal isOpen={isOpen} onClose={onClose} title="Verify website ownership" showCancel={false}>
       <div className="dns-challenge">
         <p>Add the following TXT record to your DNS, then click Check.</p>
         <CopyableField label="TXT name" value={recordName} />
         <CopyableField label="TXT value" value={recordValue} />
         {error && <p className="profile-card__form-error">{error}</p>}
         <div className="dns-challenge__actions">
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
           <Button onClick={() => void onCheck()} isLoading={isChecking} disabled={isChecking}>
             Check
           </Button>
