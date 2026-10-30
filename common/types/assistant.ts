@@ -1,1 +1,1 @@
-export type AssistantVariants = 'light' | 'standard' | 'heavy' | 'extra-heavy' | 'ultra-heavy' | 'max';
+export type AssistantVariants = 'nano' | 'lite' | 'standard' | 'plus' | 'turbo' | 'ultra';
