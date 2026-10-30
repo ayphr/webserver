@@ -12,7 +12,7 @@ import {
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { api } from '../../lib/api';
-import { BioEditor, BioText, Button, UsernameDisplay, Avatar } from './index';
+import { BioEditor, BioText, Button, UsernameDisplay, Avatar, Modal } from './index';
 import { EmojiText } from './EmojiText';
 import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
@@ -116,7 +116,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [isPunishModalOpen, setIsPunishModalOpen] = useState(false);
   const [isSubscriptionsModalOpen, setIsSubscriptionsModalOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const [isReverifying, setIsReverifying] = useState(false);
+  const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
+  const [dnsChallenge, setDnsChallenge] = useState<any>(null);
+  const [isDnsChecking, setIsDnsChecking] = useState(false);
+  const [dnsError, setDnsError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -170,19 +173,38 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     }
   };
 
-  const handleReverifyDomains = async () => {
-    if (!user) return;
-    setIsReverifying(true);
-    setError(null);
+  const openDnsModal = async () => {
+    if (!user?.socialLinks?.website) return;
+    setDnsError(null);
+    setIsDnsChecking(true);
     try {
-      const updated = await api.profile.reverifyDomains();
-      setUser(updated.user ?? updated);
-      setReloadToken((t) => t + 1);
+      const challenge = await api.profile.requestDomainChallenge({ type: 'website', domain: user.socialLinks.website });
+      setDnsChallenge(challenge);
+      setIsDnsModalOpen(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to re-verify domains';
+      const message = err instanceof Error ? err.message : 'Failed to load DNS challenge';
       setError(message);
     } finally {
-      setIsReverifying(false);
+      setIsDnsChecking(false);
+    }
+  };
+
+  const handleDnsCheck = async () => {
+    if (!dnsChallenge) return;
+    setIsDnsChecking(true);
+    setDnsError(null);
+    try {
+      const domain = dnsChallenge.domain ?? dnsChallenge.value ?? user?.socialLinks?.website;
+      const token = dnsChallenge.token ?? dnsChallenge.challenge ?? dnsChallenge.txtValue;
+      const result = await api.profile.verifyDomain({ type: 'website', domain, token });
+      setUser(result.user ?? result);
+      setIsDnsModalOpen(false);
+      setReloadToken((t) => t + 1);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'TXT record not found or does not match';
+      setDnsError(message);
+    } finally {
+      setIsDnsChecking(false);
     }
   };
 
@@ -360,9 +382,9 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               {renderedSocialLinks.some(({ key }) => key === 'website' && user.socialLinkVerified?.website === false) && (
                 <div className="profile-card__form-error">
                   Website ownership unverified.{' '}
-                  <button type="button" onClick={() => void handleReverifyDomains()} disabled={isReverifying}>
-                    {isReverifying ? 'Checking...' : 'Re-verify'}
-                  </button>
+                  <Button type="button" onClick={() => void openDnsModal()} disabled={isDnsChecking} isLoading={isDnsChecking} variant="secondary">
+                    Verify
+                  </Button>
                 </div>
               )}
             </div>
@@ -570,6 +592,25 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           onChanged={() => setReloadToken((token) => token + 1)}
         />
       )}
+
+      <Modal
+        isOpen={isDnsModalOpen}
+        onClose={() => setIsDnsModalOpen(false)}
+        title="Verify website ownership"
+        showCancel={true}
+        cancelText="Close"
+      >
+        <div className="profile-card__form-group">
+          <p>Add a TXT record to your DNS:</p>
+          <p><strong>Name:</strong> {dnsChallenge?.recordName ?? dnsChallenge?.txtName ?? dnsChallenge?.name}</p>
+          <p><strong>Value:</strong> {dnsChallenge?.recordValue ?? dnsChallenge?.txtValue ?? dnsChallenge?.value ?? dnsChallenge?.token}</p>
+          <p>Then click Check.</p>
+          {dnsError && <p className="profile-card__form-error">{dnsError}</p>}
+          <Button onClick={() => void handleDnsCheck()} isLoading={isDnsChecking} disabled={isDnsChecking}>
+            Check
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
