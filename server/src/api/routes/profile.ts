@@ -10,7 +10,7 @@ import {
   Markdown,
 } from '@common/utils/markdown';
 import { updateUser, getUserFromUuid, getCols } from '../../lib/db';
-import { createDomainVerification, getLatestDomainVerification, markDomainVerificationVerified } from '../../lib/db';
+import { createDomainVerification, getLatestDomainVerification, markDomainVerificationVerified, deleteDomainVerifications } from '../../lib/db';
 import { resolveDomainTxt } from '../../lib/dns';
 import { reverifyUserDomains } from '../../lib/domainReverification';
 import { profileUpdatesTotal } from '../../lib/metrics';
@@ -133,6 +133,12 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
 
       if (typeof value !== 'string' || value.trim().length === 0) {
         delete nextSocialLinks[key];
+        if (isSocialLinkType(key) && (key === 'website')) {
+          const previous = targetUser.socialLinks?.[key];
+          if (previous) {
+            await deleteDomainVerifications(targetUser.uuid, key, previous);
+          }
+        }
         continue;
       }
 
@@ -203,20 +209,29 @@ const handleDomainChallenge = requireAuth(async (request, user) => {
     return json({ error: `${type} is not a domain social link` }, 400);
   }
 
-  const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
-  const id = crypto.randomUUID();
+  let existing = await getLatestDomainVerification(user.uuid, type, domain);
+  let token: string;
+  let expiresAt: Date;
 
-  await createDomainVerification({
-    id,
-    userUuid: user.uuid,
-    socialType: type,
-    domain,
-    token,
-    createdAt: now,
-    expiresAt,
-  });
+  if (existing) {
+    token = existing.token;
+    expiresAt = existing.expiresAt;
+  } else {
+    token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    const now = new Date();
+    expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+    const id = crypto.randomUUID();
+
+    await createDomainVerification({
+      id,
+      userUuid: user.uuid,
+      socialType: type,
+      domain,
+      token,
+      createdAt: now,
+      expiresAt,
+    });
+  }
 
   const recordName = `_ayphr.${domain}`;
   return json({

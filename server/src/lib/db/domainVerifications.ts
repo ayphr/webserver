@@ -40,3 +40,11 @@ export async function deleteDomainVerificationsForUser(userUuid: string) {
   trackMongoOperation('deleteMany', COLLECTION);
   await domainVerifications.deleteMany({ userUuid });
 }
+
+export async function deleteDomainVerifications(userUuid: string, socialType: string, domain?: string) {
+  const { domainVerifications } = await internal.getCols();
+  const filter: Record<string, unknown> = { userUuid, socialType };
+  if (domain) filter.domain = domain;
+  trackMongoOperation('deleteMany', COLLECTION);
+  await domainVerifications.deleteMany(filter);
+}
