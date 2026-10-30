@@ -18,7 +18,7 @@ import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
 import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
 import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
-import type { ProfileCountriesPayload, PublicUser, SocialLinkType, SocialLinks, UserRole } from '@common';
+import type { ProfileCountriesPayload, PublicUser, SocialLinkType, SocialLinks, UserRole, DomainChallengePayload } from '@common';
 import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '@common';
 import {
   SOCIAL_LINK_LABELS,
@@ -117,7 +117,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [isSubscriptionsModalOpen, setIsSubscriptionsModalOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
-  const [dnsChallenge, setDnsChallenge] = useState<any>(null);
+  const [dnsChallenge, setDnsChallenge] = useState<DomainChallengePayload | null>(null);
   const [isDnsChecking, setIsDnsChecking] = useState(false);
   const [dnsError, setDnsError] = useState<string | null>(null);
 

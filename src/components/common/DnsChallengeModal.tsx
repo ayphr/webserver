@@ -1,12 +1,13 @@
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { CopyableField } from './CopyableField';
+import type { DomainChallengePayload } from '@common';
 import './DnsChallengeModal.css';
 
 export interface DnsChallengeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  challenge: any;
+  challenge: DomainChallengePayload | null;
   onCheck: () => void;
   isChecking: boolean;
   error: string | null;
@@ -31,7 +32,9 @@ export const DnsChallengeModal = ({
         <p>Add the following TXT record to your DNS, then click Check.</p>
         <CopyableField label="TXT name" value={recordName} />
         <CopyableField label="TXT value" value={recordValue} />
-        {error && <p className="profile-card__form-error">{error}</p>}
+        <div className="dns-challenge__error">
+          {error ? <p className="profile-card__form-error">{error} DNS changes can take a few minutes to propagate.</p> : null}
+        </div>
         <div className="dns-challenge__actions">
           <Button variant="secondary" onClick={onClose}>
             Close

@@ -3,6 +3,7 @@ import type {
   ProfileMePayload,
   PublicUser,
   SocialLinks,
+  DomainChallengePayload,
 } from '@common';
 import type { RequestClient } from './client';
 
@@ -35,7 +36,7 @@ export function createProfileApi(client: RequestClient) {
       return response.user;
     },
     async requestDomainChallenge(input: { type?: string; socialType?: string; domain?: string; handle?: string; value?: string }) {
-      const response = await client.requestJson<any>('/api/profile/domain-challenge', {
+      const response = await client.requestJson<DomainChallengePayload>('/api/profile/domain-challenge', {
         method: 'POST',
         body: input,
       });

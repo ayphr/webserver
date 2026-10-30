@@ -4,3 +4,13 @@
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+.dns-challenge__error {
+  min-height: 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.dns-challenge {
+  min-width: 22rem;
+  min-height: 16rem;
+}
