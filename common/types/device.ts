@@ -3,6 +3,7 @@ export type Device = {
   name?: string;
   ownerUuid: string;
   ownerUsername: string;
+  locationId?: string;
   registeredAt: Date;
   lastUploadAt?: Date;
   metadata?: Record<string, unknown>;

@@ -1,0 +1,181 @@
+.locations {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.locations__layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.5rem;
+}
+
+.locations__sidebar,
+.locations__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.locations__toolbar,
+.locations__create {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.locations__create {
+  flex-wrap: wrap;
+}
+
+.locations__limit {
+  font-size: 0.9rem;
+  color: var(--text-muted, #666);
+}
+
+.locations__limit-warning {
+  color: #c0392b;
+}
+
+.locations__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.locations__list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.locations__list-item.is-active {
+  background: var(--accent-soft, #eef);
+  border-color: var(--accent, #446);
+}
+
+.locations__default-badge {
+  margin-left: auto;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.locations__tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.locations__tab {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.4rem;
+  background: transparent;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.locations__tab.is-active {
+  background: var(--accent, #446);
+  color: #fff;
+}
+
+.locations__stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.locations__stat {
+  padding: 0.75rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.locations__stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted, #666);
+}
+
+.locations__stat-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.locations__device-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.locations__device-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.5rem;
+}
+
+.locations__device-name {
+  font-weight: 500;
+  margin-right: 0.5rem;
+}
+
+.locations__device-serial {
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+}
+
+.locations__device-status.is-online {
+  color: #1e8449;
+}
+
+.locations__device-status.is-offline {
+  color: #922b21;
+}
+
+.locations__settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 360px;
+}
+
+.locations__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.locations__settings-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.locations__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #922b21;
+}
+
+.locations__notice {
+  color: var(--text-muted, #666);
+}

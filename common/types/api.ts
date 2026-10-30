@@ -1,4 +1,5 @@
 import type { Device, DeviceSummary } from './device';
+import type { Location } from './location';
 import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
@@ -79,6 +80,14 @@ export type PunishmentsMePayload = {
 
 export type DeviceListPayload = {
   devices: DeviceSummary[];
+};
+
+export type LocationListPayload = {
+  locations: Location[];
+};
+
+export type LocationPayload = {
+  location: Location;
 };
 
 export type DevicePayload = {

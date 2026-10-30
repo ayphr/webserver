@@ -29,6 +29,7 @@ import {
   handleUsersSummary,
 } from './routes/staff';
 import { handleCreateToken, handleFetchPairingToken, handleGetBySerial, handleLink, handleListMine, handleRequestPairing, handleUpload } from './routes/devices';
+import { handleLocationsListMine, handleLocationCreate, handleLocationGet, handleLocationUpdate, handleLocationDelete } from './routes/locations';
 import {
   handleListApps,
   handleCreateApp,
@@ -121,6 +122,12 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/devices', handle: handleListMine },
   { method: 'GET', path: '/api/devices/mine', handle: handleListMine },
   { method: 'GET', path: '/api/devices/:serial', handle: handleGetBySerial },
+
+  { method: 'GET', path: '/api/locations', handle: handleLocationsListMine },
+  { method: 'POST', path: '/api/locations', handle: handleLocationCreate },
+  { method: 'GET', path: '/api/locations/:id', handle: handleLocationGet },
+  { method: 'PATCH', path: '/api/locations/:id', handle: handleLocationUpdate },
+  { method: 'DELETE', path: '/api/locations/:id', handle: handleLocationDelete },
 
   { method: 'GET', path: '/api/profile/me', handle: handleProfileMe },
   { method: 'GET', path: '/api/profile/countries', handle: handleCountries },

@@ -11,13 +11,14 @@ import { SessionsModal, ChangePasswordModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
+const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
 const MyAppsPanel = lazy(() => import('../../components/developer/MyAppsPanel').then((m) => ({ default: m.MyAppsPanel })));
 const ConnectionsPanel = lazy(() => import('../../components/connections/ConnectionsPanel').then((m) => ({ default: m.ConnectionsPanel })));
 const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections']);
+const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections']);
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -546,6 +547,20 @@ export const DashboardPage = () => {
                 <CardBody>
                   <Suspense fallback={<p>Loading...</p>}>
                     <DevicesPanel />
+                  </Suspense>
+                </CardBody>
+              </Card>
+            )}
+
+            {activePage === 'locations' && (
+              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
+                <CardHeader>
+                  <h2>Locations</h2>
+                  <p>Group your devices into locations</p>
+                </CardHeader>
+                <CardBody>
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <LocationsPanel />
                   </Suspense>
                 </CardBody>
               </Card>

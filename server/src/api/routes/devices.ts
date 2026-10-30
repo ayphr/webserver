@@ -5,16 +5,21 @@ import {
   cacheDevice,
   createDevice,
   createDevicePairing,
+  ensureDefaultLocation,
   getDevicePairingByCode,
+  getLocationById,
   markDevicePairingFetched,
   markDevicePairingLinked,
   getDataPointStats,
   getDeviceBySerial,
   getDevicesForOwnerUuid,
+  getUserFromUuid,
   invalidateDeviceCachesForOwner,
+  pruneDataPointsForSerials,
   setDeviceClaim,
   toPublicDevice,
   updateDeviceLastUpload,
+  updateDeviceLocation,
   updateDeviceToken,
   upsertDataPoints,
   type DeviceDocument,
@@ -33,7 +38,7 @@ import {
   telemetryUploadErrorsTotal,
 } from '../../lib/metrics';
 import { DEVICE_TOKEN_TTL_MS, PAIRING_CODE_TTL_MS } from '../../env';
-import { PAIRING_CODE_LENGTH, type DataPoint, type DeviceSummary, type User } from '@common';
+import { PAIRING_CODE_LENGTH, type DataPoint, type DeviceSummary, type User, getPlanFeaturesForUser } from '@common';
 
 const MAX_SERIAL = 0xFFFFFFFF;
 
@@ -195,6 +200,17 @@ const handleLink = requireAuth(async (request, user: User) => {
   const code = typeof body?.code === 'string' ? body.code.trim().toUpperCase() : '';
   if (!code) return json({ error: 'invalid code' }, 400);
 
+  const requestedLocationId = typeof body?.locationId === 'string' ? body.locationId.trim() : null;
+
+  let resolvedLocationId: string | null = null;
+  if (requestedLocationId) {
+    const requestedLocation = await getLocationById(requestedLocationId);
+    if (!requestedLocation || requestedLocation.ownerUuid !== user.uuid) {
+      return json({ error: 'invalid location' }, 400);
+    }
+    resolvedLocationId = requestedLocation.id;
+  }
+
   const pairing = await getDevicePairingByCode(code);
   const now = new Date();
 
@@ -220,13 +236,32 @@ const handleLink = requireAuth(async (request, user: User) => {
     }
 
     await updateDeviceToken(serial, tokenHash, pairing.createdAt);
+    if (resolvedLocationId && existing.locationId !== resolvedLocationId) {
+      await updateDeviceLocation(serial, resolvedLocationId);
+      existing.locationId = resolvedLocationId;
+    }
     device = { ...existing, tokenHash, tokenCreatedAt: pairing.createdAt };
   } else {
+    const ownedDevices = await getDevicesForOwnerUuid(user.uuid);
+    const maxDevices = getPlanFeaturesForUser(user).maxDevices;
+    if (ownedDevices.length >= maxDevices) {
+      return json({ error: 'device limit reached for your plan' }, 409);
+    }
+
+    let locationId: string | undefined;
+    if (resolvedLocationId) {
+      locationId = resolvedLocationId;
+    } else {
+      const defaultLocation = await ensureDefaultLocation(user.uuid, user.username);
+      locationId = defaultLocation.id;
+    }
+
     const newDevice: DeviceDocument = {
       serial,
       name,
       ownerUuid: user.uuid,
       ownerUsername: user.username,
+      locationId,
       registeredAt: now,
       tokenHash,
       tokenCreatedAt: pairing.createdAt,
@@ -274,7 +309,23 @@ const handleFetchPairingToken = async (request: Request, params: { code?: string
 };
 
 const handleListMine = requireAuth(async (_request, user: User) => {
+  await ensureDefaultLocation(user.uuid, user.username);
   const devices = await getDevicesForOwnerUuid(user.uuid);
+
+  // Enforce retention and data point caps whenever the device list is viewed.
+  try {
+    const features = getPlanFeaturesForUser(user);
+    const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
+    await pruneDataPointsForSerials(
+      devices.map((device) => device.serial),
+      features.sharedMaxDataPointsPerUser,
+      cutoff,
+    );
+    await invalidateDeviceCachesForOwner(user.uuid);
+  } catch (pruneError) {
+    console.error('Failed to prune data points:', pruneError);
+  }
+
   const stats = await getDataPointStats(devices.map((device) => device.serial), user.uuid);
 
   const summaries: DeviceSummary[] = devices.map((device) => {
@@ -334,6 +385,20 @@ async function handleUpload(request: Request): Promise<Response> {
       upsertDataPoints(serial, points),
       updateDeviceLastUpload(serial, now),
     ]);
+
+    // Enforce the owner's plan retention window and total data point cap,
+    // deleting the oldest points when the cap is exceeded.
+    try {
+      const ownerDevices = await getDevicesForOwnerUuid(device.ownerUuid);
+      const serials = ownerDevices.map((owned) => owned.serial);
+      const owner = await getUserFromUuid(device.ownerUuid);
+      const features = getPlanFeaturesForUser(owner);
+      const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
+      await pruneDataPointsForSerials(serials, features.sharedMaxDataPointsPerUser, cutoff);
+    } catch (pruneError) {
+      // Pruning is best-effort; never fail an upload because of it.
+      console.error('Failed to prune data points:', pruneError);
+    }
 
     device.lastUploadAt = now;
     await cacheDevice(device);

@@ -30,6 +30,20 @@ export {
 } from './username';
 export { POLICIES_VERSIONS_URL } from './policies';
 export {
+  getFeaturesForPlan,
+  getPlanDataRetentionDays,
+  getPlanFeatures,
+  getPlanFeaturesForTier,
+  getPlanFeaturesForUser,
+  getPlanMaxDataPoints,
+  getPlanMaxDevices,
+  getPlanTier,
+  getTierForUser,
+  getUserPlanFeatures,
+  getUserPlanTier,
+  resolvePlanTier,
+} from './plans';
+export {
   ENTITLED_PAID_STATUSES,
   getActivePaidSubscription,
   getSubscriptionTier,

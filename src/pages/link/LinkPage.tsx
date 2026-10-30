@@ -4,7 +4,7 @@ import { IconAlertCircle, IconDeviceDesktop } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { Button, Card, CardHeader, CardBody, UsernameDisplay } from '../../components/common';
 import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
-import { PAIRING_CODE_LENGTH } from '@common';
+import { PAIRING_CODE_LENGTH, type Location } from '@common';
 import './LinkPage.css';
 import '../auth/AuthPage.css';
 
@@ -18,6 +18,26 @@ export const LinkPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ linked: boolean } | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let active = true;
+    void (async () => {
+      try {
+        const loaded = await api.locations.listMine();
+        if (!active) return;
+        setLocations(loaded);
+        if (loaded.length > 0) setSelectedLocationId(loaded[0].id);
+      } catch {
+        // Ignore; linking can still proceed with the default location.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -63,7 +83,7 @@ export const LinkPage = () => {
 
     setIsLoading(true);
     try {
-      await api.devices.linkByCode(trimmed);
+      await api.devices.linkByCode(trimmed, selectedLocationId || undefined);
       setResult({ linked: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to link device');
@@ -218,6 +238,21 @@ export const LinkPage = () => {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="link-page__form">
+                {locations.length > 0 && (
+                  <label className="link-page__location">
+                    <span>Location</span>
+                    <select
+                      value={selectedLocationId}
+                      onChange={(event) => setSelectedLocationId(event.target.value)}
+                    >
+                      {locations.map((location) => (
+                        <option key={location.id} value={location.id}>
+                          {location.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <div className="link-page__code" role="group" aria-label="Device code">
                   {Array.from({ length: PAIRING_CODE_LENGTH }).map((_, i) => (
                     <input

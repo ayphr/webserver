@@ -3,6 +3,7 @@ import { createOAuthApi } from './oauth';
 import { createDeveloperApi } from './developer';
 import { createConnectionsApi } from './connections';
 import { createDevicesApi } from './devices';
+import { createLocationsApi } from './locations';
 import { createRequestClient, type ApiClientConfig, type RequestClient } from './client';
 import { createPunishmentsApi } from './punishments';
 import { createStaffApi } from './staff';
@@ -25,6 +26,7 @@ export type AyphrApiClient = RequestClient & {
   profile: ReturnType<typeof createProfileApi>;
   punishments: ReturnType<typeof createPunishmentsApi>;
   devices: ReturnType<typeof createDevicesApi>;
+  locations: ReturnType<typeof createLocationsApi>;
   staff: ReturnType<typeof createStaffApi>;
   sessions: ReturnType<typeof createSessionsApi>;
   subscriptions: ReturnType<typeof createSubscriptionsApi>;
@@ -55,6 +57,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     profile: createProfileApi(client),
     punishments: createPunishmentsApi(client),
     devices: createDevicesApi(client),
+  locations: createLocationsApi(client),
     staff: createStaffApi(client),
     sessions: createSessionsApi(client),
     subscriptions: createSubscriptionsApi(client),

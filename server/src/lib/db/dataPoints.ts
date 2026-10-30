@@ -120,4 +120,51 @@ export async function countDevices(): Promise<number> {
   return devices.countDocuments({});
 }
 
+/**
+ * Enforces a plan's data retention and total data point cap for the given set
+ * of device serials. Data points older than `retentionCutoff` are removed, and
+ * if the remaining total exceeds `maxPoints` the oldest points are deleted until
+ * the cap is met. Returns the number of documents removed.
+ */
+export async function pruneDataPointsForSerials(
+  serials: number[],
+  maxPoints: number,
+  retentionCutoff: Date,
+): Promise<number> {
+  if (serials.length === 0) return 0;
+
+  const { dataPoints } = await getCols();
+  let removed = 0;
+
+  trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);
+  const retentionResult = await dataPoints.deleteMany({
+    deviceSerial: { $in: serials },
+    timestamp: { $lt: retentionCutoff },
+  });
+  removed += retentionResult.deletedCount ?? 0;
+
+  trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
+  const total = await dataPoints.countDocuments({ deviceSerial: { $in: serials } });
+
+  const excess = total - maxPoints;
+  if (excess > 0) {
+    trackMongoOperation('find', DATA_POINTS_COLLECTION);
+    const oldest = await dataPoints
+      .find({ deviceSerial: { $in: serials } }, { projection: { _id: 1 } })
+      .sort({ timestamp: 1, _id: 1 })
+      .limit(excess)
+      .toArray();
+
+    if (oldest.length > 0) {
+      trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);
+      const deleteResult = await dataPoints.deleteMany({
+        _id: { $in: oldest.map((doc) => doc._id) },
+      });
+      removed += deleteResult.deletedCount ?? 0;
+    }
+  }
+
+  return removed;
+}
+
 

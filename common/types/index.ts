@@ -6,3 +6,6 @@ export * from './user';
 export * from './badges';
 export * from './subscription';
 export * from './app';
+export * from './assistant';
+export * from './location';
+export * from './plans';

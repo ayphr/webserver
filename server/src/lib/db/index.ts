@@ -4,6 +4,7 @@ export * from './users';
 export * from './avatars';
 export * from './punishments';
 export * from './devices';
+export * from './locations';
 export * from './sessions';
 export * from './apps';
 export * from './oauth';

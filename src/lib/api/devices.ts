@@ -22,10 +22,10 @@ export function createDevicesApi(client: RequestClient) {
         body: input,
       });
     },
-    async linkByCode(code: string) {
+    async linkByCode(code: string, locationId?: string) {
       return client.requestJson<DeviceLinkPayload>('/api/devices/link', {
         method: 'POST',
-        body: { code },
+        body: { code, locationId },
       });
     },
     async fetchPairingToken(code: string) {

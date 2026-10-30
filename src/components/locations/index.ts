@@ -1,0 +1,1 @@
+export { LocationsPanel } from './LocationsPanel';

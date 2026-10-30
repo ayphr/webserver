@@ -20,6 +20,7 @@ export const OAUTH_CODES_COLLECTION = 'oauth_codes';
 export const OAUTH_TOKENS_COLLECTION = 'oauth_tokens';
 export const CONNECTIONS_COLLECTION = 'connections';
 export const DOMAIN_VERIFICATIONS_COLLECTION = 'domain_verifications';
+export const LOCATIONS_COLLECTION = 'locations';
 
 export const API_PORT = Number(process.env.API_PORT || 7233);
 export const METRICS_PORT = Number(process.env.METRICS_PORT || 7234);

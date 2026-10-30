@@ -4,7 +4,7 @@ import { Binary, Collection, Db, MongoClient, type Filter } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation, sessionsTotal } from '../metrics';
-import { type DataPoint, type Device, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection } from '@common';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection } from '@common';
 import {
   DATA_POINTS_COLLECTION,
   USERS_COLLECTION,
@@ -20,6 +20,7 @@ import {
   OAUTH_TOKENS_COLLECTION,
   CONNECTIONS_COLLECTION,
   DOMAIN_VERIFICATIONS_COLLECTION,
+  LOCATIONS_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
@@ -99,6 +100,7 @@ export interface Collections {
   oauthTokens: Collection<OAuthAccessToken>;
   connections: Collection<Connection>;
   domainVerifications: Collection<DomainVerification>;
+  locations: Collection<Location>;
 }
 
 export interface StoredAvatar {
@@ -211,7 +213,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     oauthCodes: db.collection<OAuthAuthorizationCode>(OAUTH_CODES_COLLECTION),
     oauthTokens: db.collection<OAuthAccessToken>(OAUTH_TOKENS_COLLECTION),
     connections: db.collection<Connection>(CONNECTIONS_COLLECTION),
-    domainVerifications: db.collection<DomainVerification>(DOMAIN_VERIFICATIONS_COLLECTION)
+    domainVerifications: db.collection<DomainVerification>(DOMAIN_VERIFICATIONS_COLLECTION),
+    locations: db.collection<Location>(LOCATIONS_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -238,6 +241,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ code: 1 }, { unique: true })],
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
+    [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
+    [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ ownerUuid: 1 })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 })],
   ];

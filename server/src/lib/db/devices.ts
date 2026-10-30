@@ -133,6 +133,17 @@ export async function updateDeviceToken(serial: number, tokenHash: string, token
   await cacheDel(DEVICE_CACHE, deviceCacheKey(serial));
 }
 
+export async function updateDeviceLocation(serial: number, locationId: string) {
+  const { devices } = await getCols();
+  trackMongoOperation('updateOne', DEVICES_COLLECTION);
+  await devices.updateOne({ serial }, { $set: { locationId } });
+  await cacheDel(DEVICE_CACHE, deviceCacheKey(serial));
+  const device = await devices.findOne({ serial });
+  if (device?.ownerUuid) {
+    await cacheDel(DEVICE_LIST_CACHE, deviceListCacheKey(device.ownerUuid));
+  }
+}
+
 /** Strips the secret token fields before a device is returned to a client. */
 
 export function toPublicDevice(device: DeviceDocument): Device {
