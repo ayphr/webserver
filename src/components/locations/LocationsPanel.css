@@ -179,3 +179,26 @@
 .locations__notice {
   color: var(--text-muted, #666);
 }
+
+.locations__title {
+  margin: 0;
+}
+
+.locations__location-card {
+  cursor: pointer;
+}
+
+.locations__location-card__content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.locations__location-card__name {
+  font-weight: 600;
+}
+
+.locations__location-card__meta {
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+}

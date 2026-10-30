@@ -243,6 +243,10 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ ownerUuid: 1 })],
+    [LOCATIONS_COLLECTION, () => cols.locations.createIndex(
+      { ownerUuid: 1, isDefault: 1 },
+      { unique: true, partialFilterExpression: { isDefault: true } }
+    )],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 })],
   ];

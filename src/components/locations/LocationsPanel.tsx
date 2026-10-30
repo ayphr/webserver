@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   IconAlertCircle,
+  IconArrowLeft,
   IconMapPin,
   IconPlus,
   IconRefresh,
@@ -9,7 +10,8 @@ import {
 import type { DeviceSummary, Location, PublicUser } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
-import { Button, Input } from '../common';
+import { Button, Card, Input, Modal } from '../common';
+import '../settings/SettingsPanel.css';
 import './LocationsPanel.css';
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
@@ -24,7 +26,10 @@ function average(values: number[]): number | null {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+type View = 'list' | 'detail';
+
 export const LocationsPanel = () => {
+  const [view, setView] = useState<View>('list');
   const [locations, setLocations] = useState<Location[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [user, setUser] = useState<PublicUser | null>(null);
@@ -33,7 +38,8 @@ export const LocationsPanel = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [settingsName, setSettingsName] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -91,15 +97,17 @@ export const LocationsPanel = () => {
   };
 
   const handleCreate = async () => {
-    const name = newName.trim();
+    const name = createName.trim();
     if (!name) return;
     setIsCreating(true);
     setError(null);
     try {
       const created = await api.locations.create(name);
-      setNewName('');
       setLocations((current) => [...current, created]);
+      setCreateName('');
+      setIsCreateOpen(false);
       setSelectedId(created.id);
+      setView('detail');
       setDetailTab('overview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create location');
@@ -134,7 +142,7 @@ export const LocationsPanel = () => {
       const remaining = locations.filter((location) => location.id !== selectedLocation.id);
       setLocations(remaining);
       setSelectedId(remaining[0]?.id ?? null);
-      setDetailTab('overview');
+      setView('list');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete location');
     }
@@ -158,6 +166,81 @@ export const LocationsPanel = () => {
     return <p className="locations__notice">Loading locations...</p>;
   }
 
+  const effectiveView = view === 'detail' && selectedLocation ? 'detail' : 'list';
+
+  if (effectiveView === 'list') {
+    return (
+      <div className="locations">
+        {error && (
+          <div className="locations__error">
+            <IconAlertCircle size={16} strokeWidth={1.75} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="locations__toolbar">
+          <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
+            <IconRefresh size={16} strokeWidth={1.75} />
+            Refresh
+          </Button>
+          <Button variant="primary" onClick={() => setIsCreateOpen(true)} disabled={atLocationLimit}>
+            <IconPlus size={16} strokeWidth={1.75} />
+            Create location
+          </Button>
+        </div>
+
+        {maxLocations !== null && (
+          <p className="locations__limit">
+            Locations: {locations.length} / {maxLocations.toLocaleString()}
+            {atLocationLimit && <span className="locations__limit-warning"> Location limit reached.</span>}
+          </p>
+        )}
+
+        <div className="locations__list">
+          {locations.map((location) => (
+            <Card
+              key={location.id}
+              elevated
+              className="locations__location-card"
+              onClick={() => {
+                setSelectedId(location.id);
+                setDetailTab('overview');
+                setView('detail');
+              }}
+            >
+              <div className="locations__location-card__content">
+                <IconMapPin size={18} strokeWidth={1.75} />
+                <div>
+                  <div className="locations__location-card__name">{location.name}</div>
+                  <div className="locations__location-card__meta">
+                    {location.isDefault ? 'Default location' : 'Custom location'}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <Modal
+          isOpen={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
+          title="Create location"
+          onConfirm={() => void handleCreate()}
+          confirmText="Create"
+          confirmDisabled={isCreating || !createName.trim()}
+        >
+          <Input
+            value={createName}
+            onChange={(event) => setCreateName(event.target.value)}
+            placeholder="Location name"
+            disabled={isCreating}
+            fullWidth
+          />
+        </Modal>
+      </div>
+    );
+  }
+
   return (
     <div className="locations">
       {error && (
@@ -167,177 +250,115 @@ export const LocationsPanel = () => {
         </div>
       )}
 
-      <div className="locations__layout">
-        <div className="locations__sidebar">
-          <div className="locations__toolbar">
-            <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
-              <IconRefresh size={16} strokeWidth={1.75} />
-              Refresh
-            </Button>
-          </div>
+      <div className="locations__toolbar">
+        <Button variant="secondary" onClick={() => setView('list')}>
+          <IconArrowLeft size={16} strokeWidth={1.75} />
+          Back to locations
+        </Button>
+        <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
+          <IconRefresh size={16} strokeWidth={1.75} />
+          Refresh
+        </Button>
+      </div>
 
-          {maxLocations !== null && (
-            <div className="locations__limit">
-              Locations: {locations.length} / {maxLocations.toLocaleString()}
-              {atLocationLimit && <span className="locations__limit-warning"> Location limit reached.</span>}
-            </div>
-          )}
+      <h3 className="locations__title">{selectedLocation!.name}</h3>
 
-          <div className="locations__create">
-            <Input
-              value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-              placeholder="New location name"
-              disabled={atLocationLimit}
-            />
-            <Button
-              variant="primary"
-              onClick={() => void handleCreate()}
-              isLoading={isCreating}
-              disabled={atLocationLimit || !newName.trim()}
-            >
-              <IconPlus size={16} strokeWidth={1.75} />
-              Create
-            </Button>
-          </div>
+      <div className="settings__tabs" role="tablist" aria-label="Location sections">
+        {(['overview', 'devices', 'settings'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={detailTab === tab}
+            className={`settings__tab ${detailTab === tab ? 'settings__tab--active' : ''}`}
+            onClick={() => setDetailTab(tab)}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
 
-          <ul className="locations__list">
-            {locations.map((location) => (
-              <li key={location.id}>
-                <button
-                  type="button"
-                  className={`locations__list-item ${selectedId === location.id ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setSelectedId(location.id);
-                    setDetailTab('overview');
-                  }}
-                >
-                  <IconMapPin size={16} strokeWidth={1.75} />
-                  <span>{location.name}</span>
-                  {location.isDefault && <span className="locations__default-badge">Default</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="locations__detail">
-          {selectedLocation ? (
-            <>
-              <div className="locations__detail-header">
-                <h3>{selectedLocation.name}</h3>
-                <div className="locations__tabs" role="tablist">
-                  {(['overview', 'devices', 'settings'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      role="tab"
-                      className={`locations__tab ${detailTab === tab ? 'is-active' : ''}`}
-                      onClick={() => setDetailTab(tab)}
-                    >
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    </button>
-                  ))}
-                </div>
+      <div className="settings__panel">
+        {detailTab === 'overview' && (
+          <div className="locations__overview">
+            <div className="locations__stat-grid">
+              <div className="locations__stat">
+                <span className="locations__stat-label">Devices</span>
+                <span className="locations__stat-value">{stats.deviceCount}</span>
               </div>
+              <div className="locations__stat">
+                <span className="locations__stat-label">Online</span>
+                <span className="locations__stat-value">{stats.onlineCount}</span>
+              </div>
+              <div className="locations__stat">
+                <span className="locations__stat-label">Offline</span>
+                <span className="locations__stat-value">{stats.offlineCount}</span>
+              </div>
+              <div className="locations__stat">
+                <span className="locations__stat-label">Avg temp</span>
+                <span className="locations__stat-value">
+                  {stats.avgTemperature === null ? '—' : `${stats.avgTemperature.toFixed(1)} °C`}
+                </span>
+              </div>
+              <div className="locations__stat">
+                <span className="locations__stat-label">Avg humidity</span>
+                <span className="locations__stat-value">
+                  {stats.avgHumidity === null ? '—' : `${stats.avgHumidity.toFixed(1)} %`}
+                </span>
+              </div>
+              <div className="locations__stat">
+                <span className="locations__stat-label">Avg pressure</span>
+                <span className="locations__stat-value">
+                  {stats.avgPressure === null ? '—' : `${stats.avgPressure.toFixed(0)} hPa`}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
-              {detailTab === 'overview' && (
-                <div className="locations__overview">
-                  <div className="locations__stat-grid">
-                    <div className="locations__stat">
-                      <span className="locations__stat-label">Devices</span>
-                      <span className="locations__stat-value">{stats.deviceCount}</span>
-                    </div>
-                    <div className="locations__stat">
-                      <span className="locations__stat-label">Online</span>
-                      <span className="locations__stat-value">{stats.onlineCount}</span>
-                    </div>
-                    <div className="locations__stat">
-                      <span className="locations__stat-label">Offline</span>
-                      <span className="locations__stat-value">{stats.offlineCount}</span>
-                    </div>
-                    <div className="locations__stat">
-                      <span className="locations__stat-label">Avg temp</span>
-                      <span className="locations__stat-value">
-                        {stats.avgTemperature === null ? '—' : `${stats.avgTemperature.toFixed(1)} °C`}
+        {detailTab === 'devices' && (
+          <div className="locations__devices">
+            {locationDevices.length === 0 ? (
+              <p className="locations__notice">No devices in this location yet.</p>
+            ) : (
+              <ul className="locations__device-list">
+                {locationDevices.map((device) => (
+                  <li key={device.serial} className="locations__device-item">
+                    <div>
+                      <span className="locations__device-name">
+                        {device.name?.trim() || `Device ${device.serial}`}
                       </span>
+                      <span className="locations__device-serial">#{device.serial}</span>
                     </div>
-                    <div className="locations__stat">
-                      <span className="locations__stat-label">Avg humidity</span>
-                      <span className="locations__stat-value">
-                        {stats.avgHumidity === null ? '—' : `${stats.avgHumidity.toFixed(1)} %`}
-                      </span>
-                    </div>
-                    <div className="locations__stat">
-                      <span className="locations__stat-label">Avg pressure</span>
-                      <span className="locations__stat-value">
-                        {stats.avgPressure === null ? '—' : `${stats.avgPressure.toFixed(0)} hPa`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                    <span className={`locations__device-status ${isOnline(device) ? 'is-online' : 'is-offline'}`}>
+                      {isOnline(device) ? 'Online' : 'Offline'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
-              {detailTab === 'devices' && (
-                <div className="locations__devices">
-                  {locationDevices.length === 0 ? (
-                    <p className="locations__notice">No devices in this location yet.</p>
-                  ) : (
-                    <ul className="locations__device-list">
-                      {locationDevices.map((device) => (
-                        <li key={device.serial} className="locations__device-item">
-                          <div>
-                            <span className="locations__device-name">
-                              {device.name?.trim() || `Device ${device.serial}`}
-                            </span>
-                            <span className="locations__device-serial">#{device.serial}</span>
-                          </div>
-                          <span className={`locations__device-status ${isOnline(device) ? 'is-online' : 'is-offline'}`}>
-                            {isOnline(device) ? 'Online' : 'Offline'}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+        {detailTab === 'settings' && (
+          <div className="locations__settings">
+            <label className="locations__field">
+              <span>Name</span>
+              <Input value={settingsName} onChange={(event) => setSettingsName(event.target.value)} />
+            </label>
+            <div className="locations__settings-actions">
+              <Button variant="primary" onClick={() => void handleSaveSettings()} isLoading={isSavingSettings} disabled={!settingsName.trim()}>
+                Save
+              </Button>
+              {!selectedLocation!.isDefault && (
+                <Button variant="danger" onClick={() => void handleDelete()}>
+                  <IconTrash size={16} strokeWidth={1.75} />
+                  Delete location
+                </Button>
               )}
-
-              {detailTab === 'settings' && (
-                <div className="locations__settings">
-                  <label className="locations__field">
-                    <span>Name</span>
-                    <Input
-                      value={settingsName}
-                      onChange={(event) => setSettingsName(event.target.value)}
-                      disabled={selectedLocation.isDefault}
-                    />
-                  </label>
-                  {selectedLocation.isDefault && (
-                    <p className="locations__notice">The default location cannot be renamed.</p>
-                  )}
-                  <div className="locations__settings-actions">
-                    <Button
-                      variant="primary"
-                      onClick={() => void handleSaveSettings()}
-                      isLoading={isSavingSettings}
-                      disabled={selectedLocation.isDefault || !settingsName.trim()}
-                    >
-                      Save
-                    </Button>
-                    {!selectedLocation.isDefault && (
-                      <Button variant="danger" onClick={() => void handleDelete()}>
-                        <IconTrash size={16} strokeWidth={1.75} />
-                        Delete location
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="locations__notice">Select a location to view details.</p>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

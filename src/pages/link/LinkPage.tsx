@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconAlertCircle, IconDeviceDesktop } from '@tabler/icons-react';
 import { api } from '../../lib/api';
-import { Button, Card, CardHeader, CardBody, UsernameDisplay } from '../../components/common';
+import { Button, Card, CardHeader, CardBody, Select, UsernameDisplay } from '../../components/common';
 import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { PAIRING_CODE_LENGTH, type Location } from '@common';
 import './LinkPage.css';
@@ -239,19 +239,16 @@ export const LinkPage = () => {
             ) : (
               <form onSubmit={handleSubmit} className="link-page__form">
                 {locations.length > 0 && (
-                  <label className="link-page__location">
-                    <span>Location</span>
-                    <select
-                      value={selectedLocationId}
-                      onChange={(event) => setSelectedLocationId(event.target.value)}
-                    >
-                      {locations.map((location) => (
-                        <option key={location.id} value={location.id}>
-                          {location.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <Select
+                    label="Location"
+                    value={selectedLocationId}
+                    onChange={(event) => setSelectedLocationId(event.target.value)}
+                    options={locations.map((location) => ({
+                      value: location.id,
+                      label: location.name,
+                    }))}
+                    fullWidth
+                  />
                 )}
                 <div className="link-page__code" role="group" aria-label="Device code">
                   {Array.from({ length: PAIRING_CODE_LENGTH }).map((_, i) => (

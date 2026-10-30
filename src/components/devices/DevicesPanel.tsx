@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { IconAlertCircle, IconDatabase, IconExternalLink, IconRefresh } from '@tabler/icons-react';
-import type { DeviceSummary, PublicUser } from '@common';
-import { getPlanFeaturesForUser } from '@common';
+import type { DeviceSummary } from '@common';
 import { api } from '../../lib/api';
 import { Button } from '../common';
 import './DevicesPanel.css';
@@ -31,7 +30,6 @@ function deviceLabel(device: DeviceSummary): string {
 
 export const DevicesPanel = () => {
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
-  const [user, setUser] = useState<PublicUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,12 +37,7 @@ export const DevicesPanel = () => {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [loadedDevices, userData] = await Promise.all([
-        api.devices.listMine(),
-        api.users.me().catch(() => null),
-      ]);
-      setDevices(loadedDevices);
-      if (userData) setUser(userData.user);
+      setDevices(await api.devices.listMine());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
     }
@@ -57,13 +50,6 @@ export const DevicesPanel = () => {
       setIsLoading(false);
     })();
   }, [load]);
-
-  const planFeatures = user ? getPlanFeaturesForUser(user) : null;
-  const maxDevices = planFeatures?.maxDevices ?? null;
-  const maxDataPoints = planFeatures?.sharedMaxDataPointsPerUser ?? null;
-  const retentionDays = planFeatures?.dataRetentionDays ?? null;
-  const totalDataPoints = devices.reduce((sum, device) => sum + device.dataPointCount, 0);
-  const atDeviceLimit = maxDevices !== null && devices.length >= maxDevices;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -81,29 +67,12 @@ export const DevicesPanel = () => {
           </Button>
           <Button
             variant="primary"
-            disabled={atDeviceLimit}
             onClick={() => window.open('https://ayphr.com/link', '_blank', 'noopener,noreferrer')}
           >
             <IconExternalLink size={16} strokeWidth={1.75} />
             Add device
           </Button>
         </div>
-        {(maxDevices !== null || maxDataPoints !== null || retentionDays !== null) && (
-          <div className="devices__limits">
-            {maxDevices !== null && (
-              <span>
-                Devices: {devices.length} / {maxDevices.toLocaleString()}
-              </span>
-            )}
-            {maxDataPoints !== null && (
-              <span>
-                Data points: {totalDataPoints.toLocaleString()} / {maxDataPoints.toLocaleString()}
-              </span>
-            )}
-            {retentionDays !== null && <span>Retention: {retentionDays} days</span>}
-            {atDeviceLimit && <span className="devices__limit-warning">Device limit reached for your plan.</span>}
-          </div>
-        )}
       </div>
 
       {error && (
