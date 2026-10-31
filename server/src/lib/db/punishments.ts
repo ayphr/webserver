@@ -1,8 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
-const {
+import {
   NONE,
   SUSPENSION_CACHE,
   SUSPENSION_CACHE_TTL_SECONDS,
@@ -11,13 +7,11 @@ const {
   suspensionCacheKey,
   trackMongoOperation,
   PUNISHMENTS_COLLECTION
-} = internal;
+} from './internal';
 
 import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
-} from '@common';
-import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
-import { invalidateAuthEntries } from '../authCache';
+  Punishment} from '@common';
+import { cacheDel, cacheGet, cacheSet } from '../cache';
 
 export async function deletePunishmentsForUserUuid(userUuid: string) {
   const { punishments } = await getCols();

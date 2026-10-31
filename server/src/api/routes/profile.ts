@@ -9,8 +9,7 @@ import {
   DEFAULT_BIO,
   Markdown,
 } from '@common/utils/markdown';
-import { updateUser, getUserFromUuid, getCols } from '../../lib/db';
-import { createDomainVerification, getLatestDomainVerification, markDomainVerificationVerified, deleteDomainVerifications } from '../../lib/db';
+import { updateUser, getUserFromUuid, getCols , createDomainVerification, getLatestDomainVerification, markDomainVerificationVerified, deleteDomainVerifications } from '../../lib/db';
 import { resolveDomainTxt } from '../../lib/dns';
 import { reverifyUserDomains } from '../../lib/domainReverification';
 import { profileUpdatesTotal } from '../../lib/metrics';
@@ -200,7 +199,7 @@ const handleDomainChallenge = requireAuth(async (request, user) => {
     return json({ error: 'domain is required' }, 400);
   }
 
-  const domain = normalizeSocialHandle(type as any, value);
+  const domain = normalizeSocialHandle(type, value);
   if (!domain) {
     return json({ error: `"${value}" is not a valid ${type} handle` }, 400);
   }
@@ -209,7 +208,7 @@ const handleDomainChallenge = requireAuth(async (request, user) => {
     return json({ error: `${type} is not a domain social link` }, 400);
   }
 
-  let existing = await getLatestDomainVerification(user.uuid, type, domain);
+  const existing = await getLatestDomainVerification(user.uuid, type, domain);
   let token: string;
   let expiresAt: Date;
 
@@ -217,7 +216,7 @@ const handleDomainChallenge = requireAuth(async (request, user) => {
     token = existing.token;
     expiresAt = existing.expiresAt;
   } else {
-    token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
     const now = new Date();
     expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
     const id = crypto.randomUUID();
@@ -260,16 +259,26 @@ const handleDomainVerify = requireAuth(async (request, user) => {
   }
 
   const value = parseDomainValue(body);
-  const domain = value ? normalizeSocialHandle(type as any, value) : null;
+  const domain = value ? normalizeSocialHandle(type, value) : null;
+  
+  let tokenFromBody;
+  if (typeof body?.token === 'string') {
+    tokenFromBody = body.token;
+  } else if (typeof body?.code === 'string') {
+    tokenFromBody = body.code;
+  } else if (typeof body?.challenge === 'string') {
+    tokenFromBody = body.challenge;
+  } else if (typeof body?.challengeToken === 'string') {
+    tokenFromBody = body.challengeToken;
+  } else if (typeof body?.verificationToken === 'string') {
+    tokenFromBody = body.verificationToken;
+  } else if (typeof body?.txtValue === 'string') {
+    tokenFromBody = body.txtValue;
+  } else {
+    tokenFromBody = undefined;
+  }
 
-  const tokenFromBody =
-    typeof body?.token === 'string' ? body.token :
-    typeof body?.code === 'string' ? body.code :
-    typeof body?.challenge === 'string' ? body.challenge :
-    typeof body?.challengeToken === 'string' ? body.challengeToken :
-    typeof body?.verificationToken === 'string' ? body.verificationToken :
-    typeof body?.txtValue === 'string' ? body.txtValue : undefined;
-
+  // eslint-disable-next-line no-useless-assignment
   let verification = null;
   if (domain) {
     verification = await getLatestDomainVerification(user.uuid, type, domain);
@@ -289,7 +298,7 @@ const handleDomainVerify = requireAuth(async (request, user) => {
       token: tokenFromBody,
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-    } as any;
+    };
   }
 
   if (!verification) {
@@ -318,7 +327,7 @@ const handleDomainVerify = requireAuth(async (request, user) => {
   const nextSocialLinks = { ...targetUser.socialLinks };
   (nextSocialLinks as Record<string, string>)[type] = verification.domain;
   targetUser.socialLinks = nextSocialLinks;
-  targetUser.socialLinkVerified = { ...(targetUser.socialLinkVerified ?? {}), [type]: true };
+  targetUser.socialLinkVerified = { ...targetUser.socialLinkVerified, [type]: true };
   await updateUser(targetUser);
 
   return json({ verified: true, success: true, ok: true, user: toPublicUser(targetUser) });

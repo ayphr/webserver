@@ -1,8 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
-const {
+import {
   getCols,
   normalizeDateValues,
   trackMongoOperation,
@@ -10,13 +6,10 @@ const {
   CONNECTIONS_COLLECTION,
   OAUTH_CODES_COLLECTION,
   OAUTH_TOKENS_COLLECTION
-} = internal;
+} from './internal';
 
 import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
-} from '@common';
-import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
-import { invalidateAuthEntries } from '../authCache';
+  App} from '@common';
 
 export async function createApp(app: App): Promise<App> {
   const { apps } = await getCols();

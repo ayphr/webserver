@@ -37,7 +37,7 @@ import {
   telemetryUploadDuration,
   telemetryUploadErrorsTotal,
 } from '../../lib/metrics';
-import { DEVICE_TOKEN_TTL_MS, PAIRING_CODE_TTL_MS } from '../../env';
+import { PAIRING_CODE_TTL_MS } from '../../env';
 import { PAIRING_CODE_LENGTH, type DataPoint, type DeviceSummary, type User, getPlanFeaturesForUser } from '@common';
 
 const MAX_SERIAL = 0xFFFFFFFF;
@@ -130,18 +130,16 @@ function getDeviceToken(request: Request, body: Record<string, unknown> | null):
 const handleCreateToken = requireAuth(async (_request, user: User) => {
   const token = randomBytes(32).toString('hex');
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + DEVICE_TOKEN_TTL_MS);
 
   await setDeviceClaim({
     ownerUuid: user.uuid,
     ownerUsername: user.username,
     tokenHash: hashToken(token),
     createdAt: now,
-    expiresAt,
   });
   deviceClaimsTotal.inc({ event: 'created' });
 
-  return json({ token, expiresAt }, 201);
+  return json({ token }, 201);
 });
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

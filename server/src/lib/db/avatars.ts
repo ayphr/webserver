@@ -1,19 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import { Binary } from 'mongodb';
-import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
-const {
+
+import {
   getCols,
   trackMongoOperation,
   AVATARS_COLLECTION
-} = internal;
-
-import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
-} from '@common';
-import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
-import { invalidateAuthEntries } from '../authCache';
+} from './internal';
 
 export type AvatarMetadata = {
   contentType: string;

@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-import { Binary, Collection, Db, MongoClient, type Filter } from 'mongodb';
+import { Binary, Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
-import { recordMongoOperation, sessionsTotal } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type UserRole, type AttachedSubscription, type PaidSubscription, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection } from '@common';
+import { recordMongoOperation } from '../metrics';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection } from '@common';
+
 import {
   DATA_POINTS_COLLECTION,
   USERS_COLLECTION,
@@ -25,8 +24,7 @@ import {
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
 } from '../../env';
-import { cacheDel, cacheGet, cacheSet } from '../cache';
-import { invalidateAuthEntries } from '../authCache';
+import { cacheDel } from '../cache';
 
 export const log = createLogger('db');
 
@@ -52,7 +50,6 @@ export type DeviceClaim = {
   ownerUsername: string;
   tokenHash: string;
   createdAt: Date;
-  expiresAt: Date;
 };
 
 export type DevicePairing = {

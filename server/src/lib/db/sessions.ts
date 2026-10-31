@@ -1,19 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import { sessionsTotal } from '../metrics';
-import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
-const {
+import {
   getCols,
   normalizeDateValues,
   trackMongoOperation,
   SESSIONS_COLLECTION
-} = internal;
+} from './internal';
 
 import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
-} from '@common';
-import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
+  Session} from '@common';
 import { invalidateAuthEntries } from '../authCache';
 
 export async function createSession(session: Session) {

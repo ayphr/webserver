@@ -49,10 +49,9 @@ export function createProfileApi(client: RequestClient) {
       });
       return response;
     },
-    async reverifyDomains(input: any = {}) {
-      const response = await client.requestJson<any>('/api/profile/domain-reverify', {
+    async reverifyDomains() {
+      const response = await client.requestJson<{ user: PublicUser }>('/api/profile/domain-reverify', {
         method: 'POST',
-        body: input,
       });
       return response;
     },

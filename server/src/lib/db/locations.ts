@@ -1,16 +1,16 @@
-import * as internal from './internal';
-const {
+import {
   getCols,
   trackMongoOperation,
   LOCATIONS_COLLECTION,
   DEVICES_COLLECTION,
-} = internal;
+  normalizeDateValues,
+} from './internal';
 
 import type { Location } from '@common';
 
 export async function createLocation(location: Location): Promise<Location> {
   const { locations } = await getCols();
-  const normalized = internal.normalizeDateValues(location);
+  const normalized = normalizeDateValues(location);
   trackMongoOperation('insertOne', LOCATIONS_COLLECTION);
   await locations.insertOne(normalized);
   return normalized;
@@ -70,7 +70,7 @@ export async function ensureDefaultLocation(ownerUuid: string, ownerUsername: st
     isDefault: true,
     createdAt: new Date(),
   };
-  const normalized = internal.normalizeDateValues(location);
+  const normalized = normalizeDateValues(location);
 
   try {
     trackMongoOperation('insertOne', LOCATIONS_COLLECTION);

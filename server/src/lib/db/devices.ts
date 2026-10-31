@@ -1,16 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, DevicePairing, StoredAvatar } from './internal';
-const {
-  DEVICE_CACHE,
-  DEVICE_CACHE_TTL_SECONDS,
-  DEVICE_LIST_CACHE,
-  DEVICE_LIST_CACHE_TTL_SECONDS,
-  DEVICE_STATS_CACHE,
+import {
+  DEVICE_CACHE, DEVICE_CACHE_TTL_SECONDS, DEVICE_LIST_CACHE, DEVICE_LIST_CACHE_TTL_SECONDS, DEVICE_STATS_CACHE,
   DEVICE_NEGATIVE_TTL_SECONDS,
   NONE,
-  client,
   deviceCacheKey,
   deviceListCacheKey,
   deviceStatsCacheKey,
@@ -18,14 +9,14 @@ const {
   normalizeDateValues,
   trackMongoOperation,
   DEVICES_COLLECTION,
-  DEVICE_CLAIMS_COLLECTION
-} = internal;
+  DEVICE_CLAIMS_COLLECTION } from './internal';
+import type { DeviceClaim, DeviceDocument, DevicePairing } from './internal';
 
 import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
+  Device
 } from '@common';
-import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
-import { invalidateAuthEntries } from '../authCache';
+  
+import { cacheDel, cacheGet, cacheSet } from '../cache';
 
 export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
   const { devices, deviceClaims } = await getCols();

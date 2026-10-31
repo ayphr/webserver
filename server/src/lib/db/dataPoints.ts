@@ -1,8 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
-const {
+import type { DataPointDocument } from './internal';
+import {
   DEVICE_STATS_CACHE,
   DEVICE_STATS_CACHE_TTL_SECONDS,
   deviceStatsCacheKey,
@@ -10,13 +7,12 @@ const {
   trackMongoOperation,
   DATA_POINTS_COLLECTION,
   DEVICES_COLLECTION
-} = internal;
+} from './internal';
 
 import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
+  DataPoint
 } from '@common';
-import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
-import { invalidateAuthEntries } from '../authCache';
+import { cacheGet, cacheSet } from '../cache';
 
 export async function upsertDataPoints(deviceSerial: number, points: DataPoint[]): Promise<number> {
   if (points.length === 0) return 0;
@@ -85,11 +81,11 @@ export async function getDataPointStats(
       count: row.count,
       latest: row.latest
         ? {
-            timestamp: row.latest.timestamp,
-            temperature: row.latest.temperature,
-            humidity: row.latest.humidity,
-            airPressure: row.latest.airPressure,
-          }
+          timestamp: row.latest.timestamp,
+          temperature: row.latest.temperature,
+          humidity: row.latest.humidity,
+          airPressure: row.latest.airPressure,
+        }
         : null,
     });
   }

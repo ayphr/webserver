@@ -1,9 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import type { Filter } from 'mongodb';
-import * as internal from './internal';
-import type { Collections, DataPointDocument, DeviceClaim, DeviceDocument, StoredAvatar } from './internal';
-const {
+import {
   USER_CACHE,
   USER_CACHE_TTL_SECONDS,
   getCols,
@@ -13,17 +9,13 @@ const {
   userCacheKey,
   STRIPE_EVENTS_COLLECTION,
   USERS_COLLECTION
-} = internal;
+} from './internal';
 
 import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection, UserCredits
+  User, UserRole, AttachedSubscription, PaidSubscription, UserCredits
 } from '@common';
-import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
+import { cacheGet, cacheSet } from '../cache';
 import { invalidateAuthEntries } from '../authCache';
-import { deletePunishmentsForUserUuid } from './punishments';
-import { deleteDevicesForOwnerUuid } from './devices';
-import { deleteSessionsForUserUuid } from './sessions';
-import { deleteAvatar } from './avatars';
 
 export async function createUser(user: User) {
   const { users } = await getCols();
