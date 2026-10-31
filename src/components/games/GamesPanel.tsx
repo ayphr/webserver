@@ -5,6 +5,8 @@ import {
   IconCircleFilled,
   IconDiamondFilled,
   IconFlagFilled,
+  IconFlowerFilled,
+  IconHeartFilled,
   IconHexagonFilled,
   IconSquareFilled,
   IconStarFilled,
@@ -51,7 +53,7 @@ export function GamesPanel() {
   );
 }
 
-type Shape = 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'hexagon';
+type Shape = 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'hexagon' | 'heart' | 'flower';
 
 interface MemoryCard {
   id: number;
@@ -68,8 +70,8 @@ const MEMORY_PAIRS: { shape: Shape; color: string }[] = [
   { shape: 'diamond', color: '#fcc419' },
   { shape: 'star', color: '#cc5de8' },
   { shape: 'hexagon', color: '#ff922b' },
-  { shape: 'circle', color: '#20c997' },
-  { shape: 'square', color: '#748ffc' },
+  { shape: 'heart', color: '#20c997' },
+  { shape: 'flower', color: '#748ffc' },
 ];
 
 const SHAPE_ICONS: Record<Shape, typeof IconCircleFilled> = {
@@ -79,6 +81,8 @@ const SHAPE_ICONS: Record<Shape, typeof IconCircleFilled> = {
   diamond: IconDiamondFilled,
   star: IconStarFilled,
   hexagon: IconHexagonFilled,
+  heart: IconHeartFilled,
+  flower: IconFlowerFilled,
 };
 
 function ShapeIcon({ shape, color }: Readonly<{ shape: Shape; color: string }>) {

@@ -161,6 +161,26 @@
   cursor: default;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .memory-card .memory-card__inner {
+    transition: none;
+    transform: none;
+  }
+
+  .memory-card__face--front {
+    transform: none;
+  }
+
+  .memory-card:not(.memory-card--flipped):not(.memory-card--matched) .memory-card__face--front {
+    visibility: hidden;
+  }
+
+  .memory-card--flipped .memory-card__face--back,
+  .memory-card--matched .memory-card__face--back {
+    visibility: hidden;
+  }
+}
+
 .game-memory__win {
   color: var(--status-success);
   font-weight: var(--font-weight-md);
@@ -217,65 +237,4 @@
 
 .ms-cell--mine {
   background: var(--accent-red);
-}
-
-/* Snake */
-.game-snake {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  align-items: center;
-}
-
-.game-snake__status {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  color: var(--text-muted);
-}
-
-.snake-grid {
-  display: grid;
-  grid-template-columns: repeat(20, 1fr);
-  gap: 1px;
-  width: 100%;
-  max-width: 420px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 4px;
-}
-
-.snake-cell {
-  aspect-ratio: 1;
-  background: var(--bg-elevated);
-  border-radius: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--bg-base);
-  overflow: hidden;
-}
-
-.snake-cell--head {
-  color: var(--bg-base);
-}
-
-.snake-cell--food {
-  color: var(--bg-base);
-}
-
-.snake-cell--head {
-  background: var(--accent-green);
-}
-
-.snake-cell--body {
-  background: var(--accent-yellow);
-}
-
-.snake-cell--food {
-  background: var(--accent-red);
-  border-radius: 50%;
 }
