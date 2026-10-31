@@ -107,7 +107,7 @@
 }
 
 .auth-form__password-checklist li.is-valid .auth-form__password-rule-icon {
-  color: var(--accent-green);
+  color: var(--accent-green-solid);
 }
 
 .auth-form__password-checklist li.is-invalid {
@@ -115,7 +115,7 @@
 }
 
 .auth-form__password-checklist li.is-invalid .auth-form__password-rule-icon {
-  color: var(--accent-red);
+  color: var(--accent-red-solid);
 }
 
 .auth-form__submit {
