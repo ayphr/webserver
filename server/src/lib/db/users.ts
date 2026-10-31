@@ -2,7 +2,7 @@ import type { Filter } from 'mongodb';
 import {
   USER_CACHE,
   USER_CACHE_TTL_SECONDS,
-  getCols,
+  getCollection,
   invalidateUserCache,
   normalizeDateValues,
   trackMongoOperation,
@@ -18,7 +18,7 @@ import { cacheGet, cacheSet } from '../cache';
 import { invalidateAuthEntries } from '../authCache';
 
 export async function createUser(user: User) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   const normalizedUser = normalizeDateValues(user);
   trackMongoOperation('insertOne', USERS_COLLECTION);
   await users.insertOne(normalizedUser);
@@ -27,7 +27,7 @@ export async function createUser(user: User) {
 
 
 export async function deleteUser(uuid: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('deleteOne', USERS_COLLECTION);
   await users.deleteOne({ uuid });
   await invalidateUserCache(uuid);
@@ -39,7 +39,7 @@ export async function getUserFromUuid(uuid: string) {
   const cached = await cacheGet<User>(USER_CACHE, userCacheKey(uuid));
   if (cached) return cached;
 
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);
   const user = await users.findOne({ uuid }, { projection: { _id: 0 } });
   if (user) {
@@ -50,14 +50,14 @@ export async function getUserFromUuid(uuid: string) {
 
 
 export async function getUserFromUsername(username: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);
   return users.findOne({ username }, { projection: { _id: 0 } });
 }
 
 
 export async function getUsers() {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('find', USERS_COLLECTION);
   return users.find({}).sort({ createdAt: -1 }).toArray();
 }
@@ -93,7 +93,7 @@ function buildUserListQuery(filter: UserListFilter): Filter<User> {
 
 
 export async function listUsers(filter: UserListFilter = {}, options: UserListOptions = {}) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   const query = buildUserListQuery(filter);
   let cursor = users.find(query).sort({ createdAt: -1 });
 
@@ -106,28 +106,28 @@ export async function listUsers(filter: UserListFilter = {}, options: UserListOp
 
 
 export async function countUsers(filter: UserListFilter = {}) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('countDocuments', USERS_COLLECTION);
   return users.countDocuments(buildUserListQuery(filter));
 }
 
 
 export async function getUsersByRole(role: UserRole) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('find', USERS_COLLECTION);
   return users.find({ role }).sort({ createdAt: -1 }).toArray();
 }
 
 
 export async function getUserCount() {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('countDocuments', USERS_COLLECTION);
   return users.countDocuments({});
 }
 
 
 export async function updateUser(user: User, unsetKeys: string[] = []) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   const normalizedUser = normalizeDateValues(user);
   // Mongo documents carry an immutable `_id`; including it in $set makes the
   // update fail with "would modify the immutable field '_id'".
@@ -149,14 +149,14 @@ export async function updateUser(user: User, unsetKeys: string[] = []) {
 
 
 export async function getGameBests(userUuid: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);
   const user = await users.findOne({ uuid: userUuid }, { projection: { _id: 0, gameBests: 1 } });
   return (user?.gameBests as Record<string, unknown> | undefined) ?? {};
 }
 
 export async function updateGameBest(userUuid: string, game: 'memory' | 'minesweeper', value: number) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOneAndUpdate', USERS_COLLECTION);
   const result = await users.findOneAndUpdate(
     {
@@ -179,7 +179,7 @@ export async function updateGameBest(userUuid: string, game: 'memory' | 'mineswe
 }
 
 export async function updateUserLastActive(uuid: string, when: Date) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid }, { $set: { lastActive: when } });
   // Hot path (once per user per minute): refresh only that user's cached copy,
@@ -189,7 +189,7 @@ export async function updateUserLastActive(uuid: string, when: Date) {
 
 
 export async function updateUserCredits(userUuid: string, credits: UserCredits) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   const normalizedCredits = normalizeDateValues(credits);
 
   trackMongoOperation('updateOne', USERS_COLLECTION);
@@ -203,7 +203,7 @@ export async function updateUserCredits(userUuid: string, credits: UserCredits) 
 
 
 export async function updateUserRole(userUuid: string, role: UserRole) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOneAndUpdate', USERS_COLLECTION);
   const result = await users.findOneAndUpdate(
     { uuid: userUuid },
@@ -217,7 +217,7 @@ export async function updateUserRole(userUuid: string, role: UserRole) {
 
 
 export async function getPaidSubscriptionsForUserUuid(userUuid: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);
   const user = await users.findOne({ uuid: userUuid }, { projection: { paidSubscriptions: 1 } });
   return user?.paidSubscriptions ?? [];
@@ -225,7 +225,7 @@ export async function getPaidSubscriptionsForUserUuid(userUuid: string) {
 
 
 export async function getAttachedSubscriptionsForUserUuid(userUuid: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);
   const user = await users.findOne({ uuid: userUuid }, { projection: { attachedSubscriptions: 1 } });
   return user?.attachedSubscriptions ?? [];
@@ -233,7 +233,7 @@ export async function getAttachedSubscriptionsForUserUuid(userUuid: string) {
 
 
 export async function getUserUuidByStripeCustomerId(stripeCustomerId: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);
   const user = await users.findOne(
     { stripeCustomerId },
@@ -244,14 +244,14 @@ export async function getUserUuidByStripeCustomerId(stripeCustomerId: string) {
 
 
 export async function getUserByStripeCustomerId(stripeCustomerId: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);
   return users.findOne({ stripeCustomerId });
 }
 
 
 export async function setUserStripeCustomerId(userUuid: string, stripeCustomerId: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne({ uuid: userUuid }, { $set: { stripeCustomerId } });
   await invalidateUserCache(userUuid);
@@ -260,7 +260,7 @@ export async function setUserStripeCustomerId(userUuid: string, stripeCustomerId
 
 
 export async function recordStripeEvent(eventId: string, type: string) {
-  const { stripeEvents } = await getCols();
+  const stripeEvents = await getCollection('stripeEvents');
   trackMongoOperation('updateOne', STRIPE_EVENTS_COLLECTION);
 
   const result = await stripeEvents.updateOne(
@@ -274,7 +274,7 @@ export async function recordStripeEvent(eventId: string, type: string) {
 
 
 export async function upsertPaidSubscription(userUuid: string, subscription: PaidSubscription) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   const normalizedSubscription = normalizeDateValues(subscription);
 
   trackMongoOperation('updateOne', USERS_COLLECTION);
@@ -296,7 +296,7 @@ export async function upsertPaidSubscription(userUuid: string, subscription: Pai
 
 
 export async function removePaidSubscription(userUuid: string, stripeSubscriptionId: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne(
     { uuid: userUuid },
@@ -307,7 +307,7 @@ export async function removePaidSubscription(userUuid: string, stripeSubscriptio
 
 
 export async function addAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   const normalizedSubscription = normalizeDateValues(subscription);
 
   trackMongoOperation('updateOne', USERS_COLLECTION);
@@ -323,7 +323,7 @@ export async function addAttachedSubscription(userUuid: string, subscription: At
 
 
 export async function removeAttachedSubscription(userUuid: string, subscriptionId: string) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne(
     { uuid: userUuid },
@@ -334,7 +334,7 @@ export async function removeAttachedSubscription(userUuid: string, subscriptionI
 
 
 export async function updateAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
-  const { users } = await getCols();
+  const users = await getCollection('users');
   const normalizedSubscription = normalizeDateValues(subscription);
 
   trackMongoOperation('updateOne', USERS_COLLECTION);

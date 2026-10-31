@@ -66,10 +66,8 @@ import {
   handleCountryUpdate,
   handleMe as handleProfileMe,
   handleProfileEdit,
-  handleDomainChallenge,
-  handleDomainVerify,
-  handleDomainReverify,
 } from './routes/profile';
+import { handleDomainChallenge, handleDomainVerify, handleDomainReverify } from './routes/profileDomain';
 import type { ResolvedRoute, RouteHandler, RouteParams } from './types';
 
 type RouteMatch = {
@@ -142,37 +140,7 @@ const ROUTES: readonly RouteDefinition[] = [
 
   { method: 'POST', path: '/api/profile/domain-challenge', handle: handleDomainChallenge },
   { method: 'POST', path: '/api/profile/domain-verify', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/domains/challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/domains/verify', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/social/domain-challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/social/domain-verify', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/verify-domain', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/domain/verify', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/domain/challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/challenge-domain', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/verify-domain-dns', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/dns-challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/dns-verify', handle: handleDomainVerify },
-
-  { method: 'POST', path: '/api/profile/domain-verification', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/domain-verification/verify', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/domain_verification', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/verify_domain', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/verify', handle: handleDomainVerify },
-
   { method: 'POST', path: '/api/profile/domain-reverify', handle: handleDomainReverify },
-  { method: 'POST', path: '/api/profile/reverify-domains', handle: handleDomainReverify },
-  { method: 'POST', path: '/api/profile/reverify', handle: handleDomainReverify },
-  { method: 'POST', path: '/api/profile/check-ownership', handle: handleDomainReverify },
-  { method: 'POST', path: '/api/profile/verify-ownership', handle: handleDomainReverify },
-
-  { method: 'POST', path: '/api/profile/:uuid/domain-challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/:uuid/domain-verify', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/profile/:uuid/domains/challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/profile/:uuid/domains/verify', handle: handleDomainVerify },
-  { method: 'POST', path: '/api/users/:uuid/domain-challenge', handle: handleDomainChallenge },
-  { method: 'POST', path: '/api/users/:uuid/domain-verify', handle: handleDomainVerify },
 
   { method: 'GET', path: '/api/developer/apps', handle: handleListApps },
   { method: 'POST', path: '/api/developer/apps', handle: handleCreateApp },

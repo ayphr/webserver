@@ -5,12 +5,12 @@ import {
   deviceCacheKey,
   deviceListCacheKey,
   deviceStatsCacheKey,
-  getCols,
+  getCollection,
   normalizeDateValues,
   trackMongoOperation,
   DEVICES_COLLECTION,
-  DEVICE_CLAIMS_COLLECTION } from './internal';
-import type { DeviceClaim, DeviceDocument, DevicePairing } from './internal';
+} from './internal';
+import type { DeviceDocument, DevicePairing } from './internal';
 
 import type {
   Device
@@ -19,7 +19,7 @@ import type {
 import { cacheDel, cacheGet, cacheSet } from '../cache';
 
 export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
-  const { devices, deviceClaims } = await getCols();
+  const devices = await getCollection('devices');
 
   // Collect serials before deleting so their cache entries can be dropped.
   trackMongoOperation('find', DEVICES_COLLECTION);
@@ -27,8 +27,6 @@ export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
 
   trackMongoOperation('deleteMany', DEVICES_COLLECTION);
   await devices.deleteMany({ ownerUuid });
-  trackMongoOperation('deleteOne', DEVICE_CLAIMS_COLLECTION);
-  await deviceClaims.deleteOne({ ownerUuid });
 
   await cacheDel(
     DEVICE_CACHE,
@@ -40,7 +38,7 @@ export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
 
 
 export async function createDevice(device: DeviceDocument) {
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   const normalizedDevice = normalizeDateValues(device);
   trackMongoOperation('insertOne', DEVICES_COLLECTION);
   await devices.insertOne(normalizedDevice);
@@ -69,7 +67,7 @@ export async function getDeviceBySerial(serial: number) {
   if (cached === NONE) return null;
   if (cached) return cached;
 
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('findOne', DEVICES_COLLECTION);
   const device = await devices.findOne({ serial });
 
@@ -89,7 +87,7 @@ export async function getDevicesForOwnerUuid(ownerUuid: string) {
   const cached = await cacheGet<DeviceDocument[]>(DEVICE_LIST_CACHE, cacheKey);
   if (cached) return cached;
 
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('find', DEVICES_COLLECTION);
   const list = await devices.find({ ownerUuid }).sort({ registeredAt: -1 }).toArray();
 
@@ -121,20 +119,20 @@ export async function invalidateDeviceCachesForOwner(ownerUuid: string): Promise
 
 
 export async function updateDeviceLastUpload(serial: number, when: Date) {
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('updateOne', DEVICES_COLLECTION);
   await devices.updateOne({ serial }, { $set: { lastUploadAt: when } });
 }
 
 export async function updateDeviceToken(serial: number, tokenHash: string, tokenCreatedAt: Date) {
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('updateOne', DEVICES_COLLECTION);
   await devices.updateOne({ serial }, { $set: { tokenHash, tokenCreatedAt } });
   await cacheDel(DEVICE_CACHE, deviceCacheKey(serial));
 }
 
 export async function updateDeviceLocation(serial: number, locationId: string) {
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('updateOne', DEVICES_COLLECTION);
   await devices.updateOne({ serial }, { $set: { locationId } });
   await cacheDel(DEVICE_CACHE, deviceCacheKey(serial));
@@ -154,35 +152,8 @@ export function toPublicDevice(device: DeviceDocument): Device {
 }
 
 
-export async function setDeviceClaim(claim: DeviceClaim) {
-  const { deviceClaims } = await getCols();
-  const normalizedClaim = normalizeDateValues(claim);
-  trackMongoOperation('updateOne', DEVICE_CLAIMS_COLLECTION);
-  await deviceClaims.updateOne(
-    { ownerUuid: claim.ownerUuid },
-    { $set: normalizedClaim },
-    { upsert: true }
-  );
-  return normalizedClaim;
-}
-
-
-export async function getDeviceClaimByTokenHash(tokenHash: string) {
-  const { deviceClaims } = await getCols();
-  trackMongoOperation('findOne', DEVICE_CLAIMS_COLLECTION);
-  return deviceClaims.findOne({ tokenHash });
-}
-
-
-export async function deleteDeviceClaim(ownerUuid: string) {
-  const { deviceClaims } = await getCols();
-  trackMongoOperation('deleteOne', DEVICE_CLAIMS_COLLECTION);
-  await deviceClaims.deleteOne({ ownerUuid });
-}
-
-
 export async function createDevicePairing(pairing: DevicePairing) {
-  const { devicePairings } = await getCols();
+  const devicePairings = await getCollection('devicePairings');
   const normalized = normalizeDateValues(pairing);
   trackMongoOperation('insertOne', 'device_pairings');
   await devicePairings.insertOne(normalized);
@@ -190,13 +161,13 @@ export async function createDevicePairing(pairing: DevicePairing) {
 }
 
 export async function getDevicePairingByCode(code: string) {
-  const { devicePairings } = await getCols();
+  const devicePairings = await getCollection('devicePairings');
   trackMongoOperation('findOne', 'device_pairings');
   return devicePairings.findOne({ code });
 }
 
 export async function markDevicePairingLinked(code: string, ownerUuid: string, ownerUsername: string): Promise<boolean> {
-  const { devicePairings } = await getCols();
+  const devicePairings = await getCollection('devicePairings');
   trackMongoOperation('updateOne', 'device_pairings');
   const result = await devicePairings.updateOne(
     { code, linked: false },
@@ -206,7 +177,7 @@ export async function markDevicePairingLinked(code: string, ownerUuid: string, o
 }
 
 export async function markDevicePairingFetched(code: string) {
-  const { devicePairings } = await getCols();
+  const devicePairings = await getCollection('devicePairings');
   trackMongoOperation('deleteOne', 'device_pairings');
   await devicePairings.deleteOne({ code });
 }

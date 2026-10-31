@@ -1,7 +1,7 @@
 import { Binary } from 'mongodb';
 
 import {
-  getCols,
+  getCollection,
   trackMongoOperation,
   AVATARS_COLLECTION
 } from './internal';
@@ -14,7 +14,7 @@ export type AvatarMetadata = {
 
 
 export async function putAvatar(userUuid: string, data: Uint8Array, contentType: string): Promise<AvatarMetadata> {
-  const { avatars } = await getCols();
+  const avatars = await getCollection('avatars');
   const bytes = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   const metadata: AvatarMetadata = {
     contentType,
@@ -34,14 +34,14 @@ export async function putAvatar(userUuid: string, data: Uint8Array, contentType:
 
 
 export async function getAvatar(userUuid: string) {
-  const { avatars } = await getCols();
+  const avatars = await getCollection('avatars');
   trackMongoOperation('findOne', AVATARS_COLLECTION);
   return avatars.findOne({ userUuid });
 }
 
 
 export async function deleteAvatar(userUuid: string) {
-  const { avatars } = await getCols();
+  const avatars = await getCollection('avatars');
   trackMongoOperation('deleteOne', AVATARS_COLLECTION);
   await avatars.deleteOne({ userUuid });
 }

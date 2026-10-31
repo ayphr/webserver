@@ -2,7 +2,7 @@ import {
   NONE,
   SUSPENSION_CACHE,
   SUSPENSION_CACHE_TTL_SECONDS,
-  getCols,
+  getCollection,
   normalizeDateValues,
   suspensionCacheKey,
   trackMongoOperation,
@@ -14,7 +14,7 @@ import type {
 import { cacheDel, cacheGet, cacheSet } from '../cache';
 
 export async function deletePunishmentsForUserUuid(userUuid: string) {
-  const { punishments } = await getCols();
+  const punishments = await getCollection('punishments');
   trackMongoOperation('deleteMany', PUNISHMENTS_COLLECTION);
   await punishments.deleteMany({ userUuid });
   await cacheDel(SUSPENSION_CACHE, suspensionCacheKey(userUuid));
@@ -22,7 +22,7 @@ export async function deletePunishmentsForUserUuid(userUuid: string) {
 
 
 export async function createPunishment(punishment: Punishment) {
-  const { punishments } = await getCols();
+  const punishments = await getCollection('punishments');
   const normalizedPunishment = normalizeDateValues(punishment);
   trackMongoOperation('insertOne', PUNISHMENTS_COLLECTION);
   await punishments.insertOne(normalizedPunishment);
@@ -32,14 +32,14 @@ export async function createPunishment(punishment: Punishment) {
 
 
 export async function getPunishmentById(id: string) {
-  const { punishments } = await getCols();
+  const punishments = await getCollection('punishments');
   trackMongoOperation('findOne', PUNISHMENTS_COLLECTION);
   return punishments.findOne({ id } as Record<string, unknown>);
 }
 
 
 export async function getPunishmentsForUserUuid(userUuid: string) {
-  const { punishments } = await getCols();
+  const punishments = await getCollection('punishments');
   trackMongoOperation('find', PUNISHMENTS_COLLECTION);
   return punishments.find({ userUuid }).sort({ issuedAt: -1 }).toArray();
 }
@@ -52,7 +52,7 @@ export async function getActiveSuspensionForUserUuid(userUuid: string) {
   if (cached === NONE) return null;
   if (cached) return cached;
 
-  const { punishments } = await getCols();
+  const punishments = await getCollection('punishments');
   const now = new Date();
 
   trackMongoOperation('findOne', PUNISHMENTS_COLLECTION);
@@ -87,14 +87,14 @@ export async function getActiveSuspensionForUserUuid(userUuid: string) {
 
 
 export async function getPunishmentsByType(type: Punishment['type']) {
-  const { punishments } = await getCols();
+  const punishments = await getCollection('punishments');
   trackMongoOperation('find', PUNISHMENTS_COLLECTION);
   return punishments.find({ type }).sort({ issuedAt: -1 }).toArray();
 }
 
 
 export async function updatePunishment(punishment: Punishment) {
-  const { punishments } = await getCols();
+  const punishments = await getCollection('punishments');
   const normalizedPunishment = normalizeDateValues(punishment);
   trackMongoOperation('updateOne', PUNISHMENTS_COLLECTION);
   await punishments.updateOne(

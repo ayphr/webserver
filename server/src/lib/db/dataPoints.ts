@@ -3,7 +3,7 @@ import {
   DEVICE_STATS_CACHE,
   DEVICE_STATS_CACHE_TTL_SECONDS,
   deviceStatsCacheKey,
-  getCols,
+  getCollection,
   trackMongoOperation,
   DATA_POINTS_COLLECTION,
   DEVICES_COLLECTION
@@ -17,7 +17,7 @@ import { cacheGet, cacheSet } from '../cache';
 export async function upsertDataPoints(deviceSerial: number, points: DataPoint[]): Promise<number> {
   if (points.length === 0) return 0;
 
-  const { dataPoints } = await getCols();
+  const dataPoints = await getCollection('dataPoints');
   const operations = points.map((point) => ({
     updateOne: {
       filter: { deviceSerial, timestamp: point.timestamp },
@@ -58,7 +58,7 @@ export async function getDataPointStats(
     if (cached) return new Map(cached);
   }
 
-  const { dataPoints } = await getCols();
+  const dataPoints = await getCollection('dataPoints');
   trackMongoOperation('aggregate', DATA_POINTS_COLLECTION);
 
   const rows = await dataPoints
@@ -104,14 +104,14 @@ export async function getDataPointStats(
 
 
 export async function countActiveDevices(since: Date): Promise<number> {
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('countDocuments', DEVICES_COLLECTION);
   return devices.countDocuments({ lastUploadAt: { $gte: since } });
 }
 
 
 export async function countDevices(): Promise<number> {
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('countDocuments', DEVICES_COLLECTION);
   return devices.countDocuments({});
 }
@@ -129,7 +129,7 @@ export async function pruneDataPointsForSerials(
 ): Promise<number> {
   if (serials.length === 0) return 0;
 
-  const { dataPoints } = await getCols();
+  const dataPoints = await getCollection('dataPoints');
   let removed = 0;
 
   trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);

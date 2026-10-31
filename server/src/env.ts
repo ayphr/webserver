@@ -1,16 +1,23 @@
-export const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
-export const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'ayphr';
-export const MONGO_MAX_POOL_SIZE = Number(process.env.MONGO_MAX_POOL_SIZE || 100);
+function envNumber(name: string, fallback: number): number {
+  const raw = Bun.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) throw new Error(`Invalid numeric env ${name}: ${raw}`);
+  return value;
+}
 
-export const REDIS_URL = process.env.REDIS_URL || '';
+export const MONGO_URI = Bun.env.MONGO_URI || 'mongodb://localhost:27017';
+export const MONGO_DB_NAME = Bun.env.MONGO_DB_NAME || 'ayphr';
+export const MONGO_MAX_POOL_SIZE = envNumber('MONGO_MAX_POOL_SIZE', 100);
 
-export const TRUST_PROXY = process.env.TRUST_PROXY === 'true';
+export const REDIS_URL = Bun.env.REDIS_URL || '';
+
+export const TRUST_PROXY = Bun.env.TRUST_PROXY === 'true';
 
 export const DATA_POINTS_COLLECTION = 'data_points';
 export const USERS_COLLECTION = 'users';
 export const PUNISHMENTS_COLLECTION = 'punishments';
 export const DEVICES_COLLECTION = 'devices';
-export const DEVICE_CLAIMS_COLLECTION = 'device_claims';
 export const DEVICE_PAIRINGS_COLLECTION = 'device_pairings';
 export const SESSIONS_COLLECTION = 'sessions';
 export const STRIPE_EVENTS_COLLECTION = 'stripe_events';
@@ -22,26 +29,26 @@ export const CONNECTIONS_COLLECTION = 'connections';
 export const DOMAIN_VERIFICATIONS_COLLECTION = 'domain_verifications';
 export const LOCATIONS_COLLECTION = 'locations';
 
-export const API_PORT = Number(process.env.API_PORT || 7233);
-export const METRICS_PORT = Number(process.env.METRICS_PORT || 7234);
+export const API_PORT = envNumber('API_PORT', 7233);
+export const METRICS_PORT = envNumber('METRICS_PORT', 7234);
 
-export const PAIRING_CODE_TTL_MINUTES = Number(process.env.PAIRING_CODE_TTL_MINUTES || 5);
+export const PAIRING_CODE_TTL_MINUTES = envNumber('PAIRING_CODE_TTL_MINUTES', 5);
 export const PAIRING_CODE_TTL_MS = PAIRING_CODE_TTL_MINUTES * 60 * 1000;
 
-export const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'https://ayphr.com,https://www.ayphr.com')
+export const CORS_ALLOWED_ORIGINS = (Bun.env.CORS_ALLOWED_ORIGINS || 'https://ayphr.com,https://www.ayphr.com')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
-export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+export const STRIPE_SECRET_KEY = Bun.env.STRIPE_SECRET_KEY || '';
+export const STRIPE_WEBHOOK_SECRET = Bun.env.STRIPE_WEBHOOK_SECRET || '';
 
-export const STRIPE_TRIAL_DAYS = Number(process.env.STRIPE_TRIAL_DAYS || 7);
+export const STRIPE_TRIAL_DAYS = envNumber('STRIPE_TRIAL_DAYS', 7);
 
-export const CLIENT_URL = (process.env.CLIENT_URL || 'https://ayphr.com').replace(/\/+$/, '');
+export const CLIENT_URL = (Bun.env.CLIENT_URL || 'https://ayphr.com').replace(/\/+$/, '');
 
 export const STRIPE_PRICE_TIERS: Record<string, { tier: string; interval: string }> = Object.fromEntries(
-  (process.env.STRIPE_PRICE_TIERS || '')
+  (Bun.env.STRIPE_PRICE_TIERS || '')
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)

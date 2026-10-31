@@ -1,5 +1,5 @@
 import {
-  getCols,
+  getCollection,
   trackMongoOperation,
   LOCATIONS_COLLECTION,
   DEVICES_COLLECTION,
@@ -9,7 +9,7 @@ import {
 import type { Location } from '@common';
 
 export async function createLocation(location: Location): Promise<Location> {
-  const { locations } = await getCols();
+  const locations = await getCollection('locations');
   const normalized = normalizeDateValues(location);
   trackMongoOperation('insertOne', LOCATIONS_COLLECTION);
   await locations.insertOne(normalized);
@@ -17,19 +17,19 @@ export async function createLocation(location: Location): Promise<Location> {
 }
 
 export async function getLocationById(id: string): Promise<Location | null> {
-  const { locations } = await getCols();
+  const locations = await getCollection('locations');
   trackMongoOperation('findOne', LOCATIONS_COLLECTION);
   return locations.findOne({ id });
 }
 
 export async function getLocationsForOwnerUuid(ownerUuid: string): Promise<Location[]> {
-  const { locations } = await getCols();
+  const locations = await getCollection('locations');
   trackMongoOperation('find', LOCATIONS_COLLECTION);
   return locations.find({ ownerUuid }).sort({ createdAt: 1 }).toArray();
 }
 
 export async function ensureDefaultLocation(ownerUuid: string, ownerUsername: string): Promise<Location> {
-  const { locations } = await getCols();
+  const locations = await getCollection('locations');
 
   trackMongoOperation('find', LOCATIONS_COLLECTION);
   const defaults = await locations
@@ -89,7 +89,7 @@ export async function ensureDefaultLocation(ownerUuid: string, ownerUsername: st
 }
 
 async function migrateUnlocatedDevices(ownerUuid: string, locationId: string): Promise<void> {
-  const { devices } = await getCols();
+  const devices = await getCollection('devices');
   trackMongoOperation('updateMany', DEVICES_COLLECTION);
   await devices.updateMany(
     { ownerUuid, $or: [{ locationId: { $exists: false } }, { locationId: { $eq: null } }] } as Record<string, unknown>,
@@ -98,7 +98,7 @@ async function migrateUnlocatedDevices(ownerUuid: string, locationId: string): P
 }
 
 export async function updateLocation(id: string, updates: Partial<Pick<Location, 'name'>>): Promise<Location | null> {
-  const { locations } = await getCols();
+  const locations = await getCollection('locations');
   trackMongoOperation('findOneAndUpdate', LOCATIONS_COLLECTION);
   const result = await locations.findOneAndUpdate(
     { id },
@@ -109,7 +109,8 @@ export async function updateLocation(id: string, updates: Partial<Pick<Location,
 }
 
 export async function deleteLocation(id: string, ownerUuid: string): Promise<boolean> {
-  const { locations, devices } = await getCols();
+  const locations = await getCollection('locations');
+  const devices = await getCollection('devices');
   trackMongoOperation('findOne', LOCATIONS_COLLECTION);
   const location = await locations.findOne({ id, ownerUuid });
   if (!location || location.isDefault) return false;
@@ -127,7 +128,7 @@ export async function deleteLocation(id: string, ownerUuid: string): Promise<boo
 }
 
 export async function countLocations(ownerUuid: string): Promise<number> {
-  const { locations } = await getCols();
+  const locations = await getCollection('locations');
   trackMongoOperation('countDocuments', LOCATIONS_COLLECTION);
   return locations.countDocuments({ ownerUuid });
 }

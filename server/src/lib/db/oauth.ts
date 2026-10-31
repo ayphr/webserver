@@ -1,5 +1,5 @@
 import {
-  getCols,
+  getCollection,
   normalizeDateValues,
   trackMongoOperation,
   OAUTH_CODES_COLLECTION,
@@ -10,7 +10,7 @@ import type {
   OAuthAuthorizationCode, OAuthAccessToken} from '@common';
 
 export async function createOAuthCode(code: OAuthAuthorizationCode): Promise<OAuthAuthorizationCode> {
-  const { oauthCodes } = await getCols();
+  const oauthCodes = await getCollection('oauthCodes');
   const normalized = normalizeDateValues(code);
   trackMongoOperation('insertOne', OAUTH_CODES_COLLECTION);
   await oauthCodes.insertOne(normalized);
@@ -19,14 +19,14 @@ export async function createOAuthCode(code: OAuthAuthorizationCode): Promise<OAu
 
 
 export async function getOAuthCodeByHash(codeHash: string): Promise<OAuthAuthorizationCode | null> {
-  const { oauthCodes } = await getCols();
+  const oauthCodes = await getCollection('oauthCodes');
   trackMongoOperation('findOne', OAUTH_CODES_COLLECTION);
   return oauthCodes.findOne({ codeHash }, { projection: { _id: 0 } });
 }
 
 
 export async function markOAuthCodeUsed(codeHash: string): Promise<boolean> {
-  const { oauthCodes } = await getCols();
+  const oauthCodes = await getCollection('oauthCodes');
   trackMongoOperation('updateOne', OAUTH_CODES_COLLECTION);
   const result = await oauthCodes.updateOne(
     { codeHash, used: { $ne: true } },
@@ -41,7 +41,7 @@ export async function markOAuthCodeUsed(codeHash: string): Promise<boolean> {
 
 
 export async function createOAuthToken(token: OAuthAccessToken): Promise<OAuthAccessToken> {
-  const { oauthTokens } = await getCols();
+  const oauthTokens = await getCollection('oauthTokens');
   const normalized = normalizeDateValues(token);
   trackMongoOperation('insertOne', OAUTH_TOKENS_COLLECTION);
   await oauthTokens.insertOne(normalized);
@@ -50,28 +50,28 @@ export async function createOAuthToken(token: OAuthAccessToken): Promise<OAuthAc
 
 
 export async function getOAuthTokenByHash(tokenHash: string): Promise<OAuthAccessToken | null> {
-  const { oauthTokens } = await getCols();
+  const oauthTokens = await getCollection('oauthTokens');
   trackMongoOperation('findOne', OAUTH_TOKENS_COLLECTION);
   return oauthTokens.findOne({ tokenHash }, { projection: { _id: 0 } });
 }
 
 
 export async function revokeOAuthToken(tokenHash: string): Promise<void> {
-  const { oauthTokens } = await getCols();
+  const oauthTokens = await getCollection('oauthTokens');
   trackMongoOperation('updateOne', OAUTH_TOKENS_COLLECTION);
   await oauthTokens.updateOne({ tokenHash }, { $set: { revokedAt: new Date() } });
 }
 
 
 export async function getOAuthTokensForUser(userId: string): Promise<OAuthAccessToken[]> {
-  const { oauthTokens } = await getCols();
+  const oauthTokens = await getCollection('oauthTokens');
   trackMongoOperation('find', OAUTH_TOKENS_COLLECTION);
   return oauthTokens.find({ userId, revokedAt: { $exists: false } } as Record<string, unknown>).toArray();
 }
 
 
 export async function revokeOAuthTokensForConnection(connectionId: string): Promise<void> {
-  const { oauthTokens } = await getCols();
+  const oauthTokens = await getCollection('oauthTokens');
   trackMongoOperation('updateMany', OAUTH_TOKENS_COLLECTION);
   await oauthTokens.updateMany({ connectionId } as Record<string, unknown>, { $set: { revokedAt: new Date() } });
 }

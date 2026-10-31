@@ -9,7 +9,6 @@ import {
   USERS_COLLECTION,
   PUNISHMENTS_COLLECTION,
   DEVICES_COLLECTION,
-  DEVICE_CLAIMS_COLLECTION,
   DEVICE_PAIRINGS_COLLECTION,
   SESSIONS_COLLECTION,
   STRIPE_EVENTS_COLLECTION,
@@ -39,17 +38,6 @@ export type DataPointDocument = DataPoint & {
 export type DeviceDocument = Device & {
   tokenHash: string;
   tokenCreatedAt: Date;
-};
-
-/**
- * A one-time token generated from the dashboard so a device can claim itself on
- * first upload. Only one claim may be pending per account at a time.
- */
-export type DeviceClaim = {
-  ownerUuid: string;
-  ownerUsername: string;
-  tokenHash: string;
-  createdAt: Date;
 };
 
 export type DevicePairing = {
@@ -87,7 +75,6 @@ export interface Collections {
   users: Collection<User>;
   punishments: Collection<Punishment>;
   devices: Collection<DeviceDocument>;
-  deviceClaims: Collection<DeviceClaim>;
   devicePairings: Collection<DevicePairing>;
   sessions: Collection<Session>;
   stripeEvents: Collection<{ id: string; type: string; createdAt: Date }>;
@@ -205,7 +192,6 @@ export async function setupCollections(db: Db): Promise<Collections> {
     users: db.collection<User>(USERS_COLLECTION),
     punishments: db.collection<Punishment>(PUNISHMENTS_COLLECTION),
     devices: db.collection<DeviceDocument>(DEVICES_COLLECTION),
-    deviceClaims: db.collection<DeviceClaim>(DEVICE_CLAIMS_COLLECTION),
     devicePairings: db.collection<DevicePairing>(DEVICE_PAIRINGS_COLLECTION),
     sessions: db.collection<Session>(SESSIONS_COLLECTION),
     stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION),
@@ -234,12 +220,6 @@ export async function setupCollections(db: Db): Promise<Collections> {
       { tokenHash: 1 },
       { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
     )],
-    [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex({ ownerUuid: 1 }, { unique: true })],
-    [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex(
-      { tokenHash: 1 },
-      { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
-    )],
-    [DEVICE_CLAIMS_COLLECTION, () => cols.deviceClaims.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ code: 1 }, { unique: true })],
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
@@ -344,4 +324,9 @@ export async function disconnect(): Promise<void> {
 
 export async function getCols(): Promise<Collections> {
   return collections ?? connect();
+}
+
+export async function getCollection<K extends keyof Collections>(name: K): Promise<Collections[K]> {
+  const cols = await getCols();
+  return cols[name];
 }

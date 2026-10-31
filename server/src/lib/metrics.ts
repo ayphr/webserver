@@ -66,13 +66,6 @@ export const devicesRegisteredTotal = new Counter({
   registers: [registry],
 });
 
-export const deviceClaimsTotal = new Counter({
-  name: 'ayphr_device_claims_total',
-  help: 'Device claim-token lifecycle events (created, claimed).',
-  labelNames: ['event'],
-  registers: [registry],
-});
-
 export const telemetryRecordsAcceptedTotal = new Counter({
   name: 'ayphr_telemetry_records_accepted_total',
   help: 'Data points accepted from authenticated device uploads.',
