@@ -101,18 +101,20 @@
 }
 
 .memory-card {
+  position: relative;
+  width: 100%;
   aspect-ratio: 1;
   perspective: 800px;
   background: transparent;
   border: none;
   padding: 0;
   cursor: pointer;
+  display: block;
 }
 
 .memory-card__inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   transform-style: preserve-3d;
   transition: transform 0.45s ease;
 }

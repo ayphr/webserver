@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '../common';
 import {
-  IconAppleFilled,
   IconBomb,
-  IconCircleDotFilled,
   IconCircleFilled,
   IconDiamondFilled,
   IconFlagFilled,
@@ -14,7 +12,7 @@ import {
 } from '@tabler/icons-react';
 import './GamesPanel.css';
 
-type GameId = 'menu' | 'memory' | 'minesweeper' | 'snake';
+type GameId = 'menu' | 'memory' | 'minesweeper';
 
 export function GamesPanel() {
   const [game, setGame] = useState<GameId>('menu');
@@ -32,9 +30,7 @@ export function GamesPanel() {
       <div className="games-panel__body">
         {game === 'menu' && (
           <div className="games-panel__menu">
-            <p className="games-panel__intro">
-              Pick a game to play. Everything runs locally in your browser.
-            </p>
+            <p className="games-panel__intro">Pick a game to play.</p>
             <div className="games-panel__menu-grid">
               <button className="games-panel__menu-card" onClick={() => setGame('memory')}>
                 <span className="games-panel__menu-title">Card Match</span>
@@ -44,23 +40,16 @@ export function GamesPanel() {
                 <span className="games-panel__menu-title">Minesweeper</span>
                 <span className="games-panel__menu-desc">Clear the board without hitting a mine.</span>
               </button>
-              <button className="games-panel__menu-card" onClick={() => setGame('snake')}>
-                <span className="games-panel__menu-title">Snake</span>
-                <span className="games-panel__menu-desc">Eat, grow, and avoid crashing.</span>
-              </button>
             </div>
           </div>
         )}
 
         {game === 'memory' && <MemoryGame />}
         {game === 'minesweeper' && <MinesweeperGame />}
-        {game === 'snake' && <SnakeGame />}
       </div>
     </div>
   );
 }
-
-/* ---------------- Memory game ---------------- */
 
 type Shape = 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'hexagon';
 
@@ -92,7 +81,7 @@ const SHAPE_ICONS: Record<Shape, typeof IconCircleFilled> = {
   hexagon: IconHexagonFilled,
 };
 
-function ShapeIcon({ shape, color }: { shape: Shape; color: string }) {
+function ShapeIcon({ shape, color }: Readonly<{ shape: Shape; color: string }>) {
   const Icon = SHAPE_ICONS[shape];
   return <Icon size={40} style={{ color }} />;
 }
@@ -209,8 +198,6 @@ function MemoryGame() {
     </div>
   );
 }
-
-/* ---------------- Minesweeper ---------------- */
 
 const MS_SIZE = 9;
 const MS_MINES = 10;
@@ -394,148 +381,3 @@ function MinesweeperGame() {
   );
 }
 
-/* ---------------- Snake ---------------- */
-
-const SNAKE_SIZE = 20;
-type Point = { x: number; y: number };
-type Direction = 'up' | 'down' | 'left' | 'right';
-
-function SnakeGame() {
-  const [snake, setSnake] = useState<Point[]>([{ x: 10, y: 10 }]);
-  const [food, setFood] = useState<Point>({ x: 5, y: 5 });
-  const [direction, setDirection] = useState<Direction>('right');
-  const [status, setStatus] = useState<'idle' | 'playing' | 'gameover'>('idle');
-  const [score, setScore] = useState(0);
-
-  const directionRef = useRef(direction);
-  useEffect(() => {
-    directionRef.current = direction;
-  }, [direction]);
-
-  const randomFood = useCallback((currentSnake: Point[]) => {
-    const occupied = new Set(currentSnake.map((p) => `${p.x},${p.y}`));
-    let pos: Point;
-    do {
-      pos = {
-        x: Math.floor(Math.random() * SNAKE_SIZE),
-        y: Math.floor(Math.random() * SNAKE_SIZE),
-      };
-    } while (occupied.has(`${pos.x},${pos.y}`));
-    return pos;
-  }, []);
-
-  const reset = () => {
-    const initial = [{ x: 10, y: 10 }];
-    setSnake(initial);
-    setFood(randomFood(initial));
-    setDirection('right');
-    setStatus('idle');
-    setScore(0);
-  };
-
-  useEffect(() => {
-    if (status !== 'playing') return;
-    const interval = setInterval(() => {
-      setSnake((prev) => {
-        const head = prev[0];
-        const dir = directionRef.current;
-        const next: Point = { ...head };
-        if (dir === 'up') next.y -= 1;
-        if (dir === 'down') next.y += 1;
-        if (dir === 'left') next.x -= 1;
-        if (dir === 'right') next.x += 1;
-
-        // collision with wall
-        if (next.x < 0 || next.x >= SNAKE_SIZE || next.y < 0 || next.y >= SNAKE_SIZE) {
-          setStatus('gameover');
-          return prev;
-        }
-        // collision with self
-        if (prev.some((p) => p.x === next.x && p.y === next.y)) {
-          setStatus('gameover');
-          return prev;
-        }
-
-        const newSnake = [next, ...prev];
-        if (next.x === food.x && next.y === food.y) {
-          setScore((s) => s + 1);
-          setFood(randomFood(newSnake));
-        } else {
-          newSnake.pop();
-        }
-        return newSnake;
-      });
-    }, 120);
-    return () => clearInterval(interval);
-  }, [status, food, randomFood]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      let newDir: Direction | null = null;
-      if (key === 'arrowup' || key === 'w') newDir = 'up';
-      if (key === 'arrowdown' || key === 's') newDir = 'down';
-      if (key === 'arrowleft' || key === 'a') newDir = 'left';
-      if (key === 'arrowright' || key === 'd') newDir = 'right';
-      if (!newDir) return;
-      e.preventDefault();
-
-      const opposite: Record<Direction, Direction> = {
-        up: 'down',
-        down: 'up',
-        left: 'right',
-        right: 'left',
-      };
-      if (newDir === opposite[directionRef.current]) return;
-
-      if (status === 'idle') setStatus('playing');
-      if (status === 'gameover') return;
-      setDirection(newDir);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [status]);
-
-  const snakeSet = new Set(snake.map((p) => `${p.x},${p.y}`));
-
-  return (
-    <div className="game-snake">
-      <div className="game-snake__status">
-        <span>Score: {score}</span>
-        <span>
-          {status === 'idle'
-            ? 'Press an arrow key to start'
-            : status === 'gameover'
-            ? 'Game over'
-            : 'Playing'}
-        </span>
-        <Button variant="secondary" onClick={reset}>
-          Reset
-        </Button>
-      </div>
-      <div className="snake-grid">
-        {Array.from({ length: SNAKE_SIZE * SNAKE_SIZE }).map((_, i) => {
-          const x = i % SNAKE_SIZE;
-          const y = Math.floor(i / SNAKE_SIZE);
-          const isHead = snake[0].x === x && snake[0].y === y;
-          const isBody = !isHead && snakeSet.has(`${x},${y}`);
-          const isFood = food.x === x && food.y === y;
-          return (
-            <div
-              key={i}
-              className={`snake-cell ${isHead ? 'snake-cell--head' : ''} ${
-                isBody ? 'snake-cell--body' : ''
-              } ${isFood ? 'snake-cell--food' : ''}`}
-            >
-              {isHead ? (
-                <IconCircleDotFilled size={14} />
-              ) : isFood ? (
-                <IconAppleFilled size={14} />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
