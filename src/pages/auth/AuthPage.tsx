@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay } from '../../components/common';
-import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { getActiveToken, getStoredAccounts, isStoredAccountExpired, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { api } from '../../lib/api';
 import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
@@ -37,8 +37,9 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [storedAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
-  const visibleAccounts = storedAccounts.filter((account) => account.token !== getActiveToken());
-  const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : storedAccounts;
+  const eligibleAccounts = storedAccounts.filter((account) => !isStoredAccountExpired(account));
+  const visibleAccounts = eligibleAccounts.filter((account) => account.token !== getActiveToken());
+  const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : eligibleAccounts;
   const passwordChecks = getPasswordValidationChecks(formData.password);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

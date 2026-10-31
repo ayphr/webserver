@@ -45,6 +45,7 @@ export type AuthResponsePayload = {
   token: string;
   suspension?: Punishment | null;
   policyStatus: PolicyStatus | null;
+  expiresAt?: Date;
 };
 
 export type AuthMePayload = {

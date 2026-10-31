@@ -4,7 +4,7 @@ import logo from '../../assets/logo.svg';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
-import type { StoredAccount } from '../../lib/accounts';
+import { isStoredAccountExpired, type StoredAccount } from '../../lib/accounts';
 import type { BadgeId } from '@common/types';
 
 type Tab = { id: string; name: string };
@@ -185,13 +185,13 @@ export const Sidebar: React.FC<Props> = ({
 
           {isAccountMenuOpen && (
             <div className="n-sidebar__accountMenu" role="menu">
-              {accounts.filter((account) => account.token !== activeToken).length === 0 && (
+              {accounts.filter((account) => !isStoredAccountExpired(account) && account.token !== activeToken).length === 0 && (
                 <div className="n-sidebar__accountMenuItem n-sidebar__accountMenuItem--empty">
                   No other signed-in accounts
                 </div>
               )}
               {accounts
-                .filter((account) => account.token !== activeToken)
+                .filter((account) => !isStoredAccountExpired(account) && account.token !== activeToken)
                 .map((account) => (
                 <div key={account.user.uuid} className="n-sidebar__accountMenuItem">
                   <button

@@ -5,6 +5,7 @@ import {
   endCurrentSession,
   endOtherSessions,
   getCachedActiveSuspension,
+  getExpiryDate,
   requireAuth,
   startSession,
   verifyPassword,
@@ -134,7 +135,7 @@ async function handleRegister(request: Request) {
 
   const policyStatus = await getPolicyStatus(user);
 
-  return json({ user: toPublicUser(user), token, policyStatus }, 201);
+  return json({ user: toPublicUser(user), token, policyStatus, expiresAt: getExpiryDate(now) }, 201);
 }
 
 async function handleLogin(request: Request) {
@@ -168,6 +169,7 @@ async function handleLogin(request: Request) {
 
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
 
+  const now = new Date();
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
   authEventsTotal.inc({ event: 'login', result: 'success' });
@@ -179,6 +181,7 @@ async function handleLogin(request: Request) {
     token,
     suspension: activeSuspension,
     policyStatus,
+    expiresAt: getExpiryDate(now),
   });
 }
 

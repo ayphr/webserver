@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { IconAlertCircle, IconDeviceDesktop } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { Button, Card, CardHeader, CardBody, Select, UsernameDisplay } from '../../components/common';
-import { getActiveToken, getStoredAccounts, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { getActiveToken, getStoredAccounts, isStoredAccountExpired, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { PAIRING_CODE_LENGTH, type Location } from '@common';
 import './LinkPage.css';
 import '../auth/AuthPage.css';
@@ -93,8 +93,9 @@ export const LinkPage = () => {
   };
 
   const inputRefs = useRef<HTMLInputElement[]>([]);
-  const visibleAccounts = storedAccounts.filter((account) => account.token !== activeTokenState);
-  const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : storedAccounts;
+  const eligibleAccounts = storedAccounts.filter((account) => !isStoredAccountExpired(account));
+  const visibleAccounts = eligibleAccounts.filter((account) => account.token !== activeTokenState);
+  const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : eligibleAccounts;
 
   const setCodeAt = (index: number, char: string) => {
     setCode((prev) => {

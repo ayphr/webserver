@@ -3,6 +3,8 @@ import type { PublicUser } from '@common';
 export type StoredAccount = {
   token: string;
   user: PublicUser;
+  /** ISO timestamp (or Date) after which the saved token is no longer valid. */
+  expiresAt?: string | number | Date;
 };
 
 const ACCOUNTS_KEY = 'ayphr-accounts';
@@ -15,7 +17,18 @@ function isStoredAccount(value: unknown): value is StoredAccount {
   if (!candidate.user || typeof candidate.user !== 'object') return false;
   const user = candidate.user as Record<string, unknown>;
   if (typeof user.uuid !== 'string' || typeof user.username !== 'string') return false;
+  if (candidate.expiresAt !== undefined && candidate.expiresAt !== null) {
+    const time = new Date(candidate.expiresAt as string | number | Date).getTime();
+    if (Number.isNaN(time)) return false;
+  }
   return true;
+}
+
+export function isStoredAccountExpired(account: StoredAccount): boolean {
+  if (account.expiresAt === undefined || account.expiresAt === null) return false;
+  const time = new Date(account.expiresAt).getTime();
+  if (Number.isNaN(time)) return false;
+  return time <= Date.now();
 }
 
 export function getStoredAccounts(): StoredAccount[] {
@@ -25,7 +38,7 @@ export function getStoredAccounts(): StoredAccount[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isStoredAccount);
+    return parsed.filter(isStoredAccount).filter((account) => !isStoredAccountExpired(account));
   } catch {
     return [];
   }
@@ -50,9 +63,22 @@ export function setActiveToken(token: string | null) {
   }
 }
 
-export function addStoredAccount(token: string, user: PublicUser) {
+const DEFAULT_TOKEN_EXPIRE_MS = 48 * 60 * 60 * 1000;
+
+function normalizeExpiresAt(value: StoredAccount['expiresAt'] | undefined): string {
+  if (value === undefined || value === null) {
+    return new Date(Date.now() + DEFAULT_TOKEN_EXPIRE_MS).toISOString();
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date(Date.now() + DEFAULT_TOKEN_EXPIRE_MS).toISOString();
+  }
+  return date.toISOString();
+}
+
+export function addStoredAccount(token: string, user: PublicUser, expiresAt?: StoredAccount['expiresAt']) {
   const accounts = getStoredAccounts().filter((account) => account.user.uuid !== user.uuid && account.token !== token);
-  accounts.unshift({ token, user });
+  accounts.unshift({ token, user, expiresAt: normalizeExpiresAt(expiresAt) });
   saveStoredAccounts(accounts);
   setActiveToken(token);
 }

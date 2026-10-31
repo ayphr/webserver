@@ -46,7 +46,7 @@ export function createAuthApi(client: RequestClient) {
       });
 
       client.setAuthToken(response.token);
-      addStoredAccount(response.token, response.user);
+      addStoredAccount(response.token, response.user, response.expiresAt);
 
       return {
         user: response.user,
@@ -63,7 +63,7 @@ export function createAuthApi(client: RequestClient) {
       });
 
       client.setAuthToken(response.token);
-      addStoredAccount(response.token, response.user);
+      addStoredAccount(response.token, response.user, response.expiresAt);
 
       return {
         user: response.user,
