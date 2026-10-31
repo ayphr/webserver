@@ -16,9 +16,10 @@ const MyAppsPanel = lazy(() => import('../../components/developer/MyAppsPanel').
 const ConnectionsPanel = lazy(() => import('../../components/connections/ConnectionsPanel').then((m) => ({ default: m.ConnectionsPanel })));
 const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
+const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections']);
+const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections', 'games']);
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -647,6 +648,20 @@ export const DashboardPage = () => {
                 <CardBody>
                   <Suspense fallback={<p>Loading...</p>}>
                     <UsersPanel />
+                  </Suspense>
+                </CardBody>
+              </Card>
+            )}
+
+            {activePage === 'games' && (
+              <Card className="dashboard-page__card dashboard-page__card--full" elevated>
+                <CardHeader>
+                  <h2>Games</h2>
+                  <p>Take a break with a few small games</p>
+                </CardHeader>
+                <CardBody>
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <GamesPanel />
                   </Suspense>
                 </CardBody>
               </Card>

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2 } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { isStoredAccountExpired, type StoredAccount } from '../../lib/accounts';
@@ -13,6 +13,7 @@ const tabs: Tab[] = [
   { id: 'overview', name: 'Overview' },
   { id: 'devices', name: 'Devices' },
   { id: 'locations', name: 'Locations' },
+  { id: 'games', name: 'Games' },
 ];
 
 const staffTabs: Tab[] = [
@@ -31,6 +32,8 @@ const iconFor = (id: string) => {
       return <IconDatabase size={18} />;
     case 'locations':
       return <IconMapPin size={18} />;
+    case 'games':
+      return <IconDeviceGamepad2 size={18} />;
     case 'users':
       return <IconUsers size={18} />;
     case 'my-apps':
