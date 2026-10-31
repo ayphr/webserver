@@ -9,7 +9,7 @@ import {
 } from '@tabler/icons-react';
 import type { CreditBalance, PlanTier } from '@common';
 import { api } from '../../lib/api';
-import { formatCreditDate, formatCredits } from '../../lib/credits';
+import { formatCreditDateTime, formatCredits } from '../../lib/credits';
 import { Button } from '../common';
 import './CreditsPanel.css';
 
@@ -143,9 +143,6 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
           >
             <span className="credits__bar-fill" style={{ width: `${monthlyPercent}%` }} />
           </div>
-          <span className="credits__stat-foot">
-            {formatCredits(credits.monthlyUsed)} used · resets {formatCreditDate(credits.monthlyResetsAt, credits.timezone)}
-          </span>
         </section>
 
         <section className="credits__stat">
@@ -157,11 +154,6 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
           <span className="credits__stat-detail">
             of {formatCredits(credits.additionalLimit)} plan limit
           </span>
-          <span className="credits__stat-foot">
-            {credits.additionalCapacity > 0
-              ? `${formatCredits(credits.additionalCapacity)} more can be added · never resets`
-              : 'Plan limit reached · never resets'}
-          </span>
         </section>
 
         <section className="credits__stat">
@@ -171,14 +163,11 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
           </div>
           <span className="credits__stat-value">{formatCredits(credits.onHold)}</span>
           <span className="credits__stat-detail">still yours, not spendable</span>
-          <span className="credits__stat-foot">
-            Held credits become available again once released.
-          </span>
         </section>
       </div>
 
       <p className="credits__note">
-        Monthly credits reset on the 1st of each month at 00:00 ({credits.timezone}). Additional credits carry over and do not reset.
+        Monthly credits reset on {formatCreditDateTime(credits.monthlyResetsAt)} local time. Additional credits carry over and do not reset.
       </p>
     </div>
   );

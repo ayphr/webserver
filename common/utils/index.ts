@@ -44,9 +44,9 @@ export {
   resolvePlanTier,
 } from './plans';
 export {
+  CREDIT_TIMEZONE,
   getCreditPeriodEnd,
   getCreditPeriodStart,
-  getCreditTimezone,
   resolveCreditBalance,
 } from './credits';
 export {

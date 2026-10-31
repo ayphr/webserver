@@ -7,12 +7,14 @@ export function formatCredits(value: number): string {
   return creditFormatter.format(value);
 }
 
-/** Formats a credit reset date in the server's timezone, matching the reset boundary. */
-export function formatCreditDate(date: Date, timeZone?: string): string {
-  return date.toLocaleDateString(undefined, {
+/** Formats a credit date and time in the viewer's local timezone. */
+export function formatCreditDateTime(date: Date): string {
+  return date.toLocaleString(undefined, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-    ...(timeZone ? { timeZone } : {}),
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
+

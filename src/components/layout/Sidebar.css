@@ -88,7 +88,7 @@
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 193, 7, 0.03));
+  background: var(--bg-elevated);
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
@@ -96,20 +96,20 @@
 }
 
 .n-sidebar__credits:hover {
-  border-color: rgba(255, 193, 7, 0.4);
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.16), rgba(255, 193, 7, 0.05));
+  border-color: var(--border);
+  background: var(--bg-input);
 }
 
 .n-sidebar__credits.active {
-  border-color: rgba(255, 193, 7, 0.55);
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.07));
+  border-color: var(--border);
+  background: var(--bg-input);
 }
 
 .n-sidebar__creditsIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: hsl(41, 99%, 59%);
+  color: var(--text-muted);
 }
 
 .n-sidebar__creditsAmount {
