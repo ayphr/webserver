@@ -114,7 +114,6 @@ export type DevicePairingRequestPayload = {
 
 export type DevicePairingTokenPayload = {
   token: string;
-  expiresAt: Date;
   serial: number;
 };
 

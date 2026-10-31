@@ -16,7 +16,6 @@ import {
   getUserFromUuid,
   invalidateDeviceStatsForOwner,
   pruneDataPointsForSerials,
-  setDeviceClaim,
   toPublicDevice,
   updateDeviceLastUpload,
   updateDeviceLocation,
@@ -28,7 +27,6 @@ import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import {
-  deviceClaimsTotal,
   devicesRegisteredTotal,
   observeTelemetryValues,
   telemetryRecordsAcceptedTotal,
@@ -126,21 +124,6 @@ function getDeviceToken(request: Request, body: Record<string, unknown> | null):
 
   return null;
 }
-
-const handleCreateToken = requireAuth(async (_request, user: User) => {
-  const token = randomBytes(32).toString('hex');
-  const now = new Date();
-
-  await setDeviceClaim({
-    ownerUuid: user.uuid,
-    ownerUsername: user.username,
-    tokenHash: hashToken(token),
-    createdAt: now,
-  });
-  deviceClaimsTotal.inc({ event: 'created' });
-
-  return json({ token }, 201);
-});
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -299,7 +282,7 @@ const handleFetchPairingToken = async (request: Request, params: { code?: string
     return json({ error: 'not linked yet' }, 404);
   }
 
-  const response = json({ token: pairing.token, expiresAt: pairing.expiresAt, serial: pairing.serial }, 200);
+  const response = json({ token: pairing.token, serial: pairing.serial }, 200);
 
   await markDevicePairingFetched(code);
 
@@ -422,4 +405,4 @@ async function handleUpload(request: Request): Promise<Response> {
   }
 }
 
-export { handleCreateToken, handleFetchPairingToken, handleLink, handleListMine, handleGetBySerial, handleRequestPairing, handleUpload };
+export { handleFetchPairingToken, handleLink, handleListMine, handleGetBySerial, handleRequestPairing, handleUpload };
