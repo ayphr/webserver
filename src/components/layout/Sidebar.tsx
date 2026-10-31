@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconRobot } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import type { StoredAccount } from '../../lib/accounts';
@@ -11,6 +11,7 @@ type Tab = { id: string; name: string };
 
 const tabs: Tab[] = [
   { id: 'overview', name: 'Overview' },
+  { id: 'assistant', name: 'Assistant' },
   { id: 'devices', name: 'Devices' },
   { id: 'locations', name: 'Locations' },
 ];
@@ -35,6 +36,8 @@ const iconFor = (id: string) => {
       return <IconUsers size={18} />;
     case 'my-apps':
       return <IconApps size={18} />;
+    case 'assistant':
+      return <IconRobot size={18} />;
     case 'jail':
       return <IconBan size={18} />;
     default:
