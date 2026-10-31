@@ -29,6 +29,7 @@ export function createUsersApi(client: RequestClient) {
           user: response.user,
           activeSuspension: response.activeSuspension || null,
           policyStatus: response.policyStatus ?? null,
+          credits: response.credits,
         } satisfies UserMePayload));
 
       cachedMe = { token, at: now, promise };

@@ -44,6 +44,12 @@ export {
   resolvePlanTier,
 } from './plans';
 export {
+  getCreditPeriodEnd,
+  getCreditPeriodStart,
+  getCreditTimezone,
+  resolveCreditBalance,
+} from './credits';
+export {
   ENTITLED_PAID_STATUSES,
   getActivePaidSubscription,
   getSubscriptionTier,

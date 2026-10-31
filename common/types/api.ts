@@ -3,6 +3,7 @@ import type { Location } from './location';
 import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
+import type { CreditBalance } from './credits';
 import type {
   AttachedSubscription,
   BillingInterval,
@@ -58,6 +59,7 @@ export type UserMePayload = {
   user: PublicUser;
   activeSuspension: Punishment | null;
   policyStatus: PolicyStatus | null;
+  credits: CreditBalance;
 };
 
 export type AcceptPoliciesPayload = {

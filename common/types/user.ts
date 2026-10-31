@@ -1,5 +1,6 @@
 import type { MarkdownFormat } from '../utils/markdown';
 import type { BadgeId } from './badges';
+import type { UserCredits } from './credits';
 import type {
   AttachedSubscription,
   PaidSubscription,
@@ -59,6 +60,7 @@ export type User = {
   stripeCustomerId?: string;
   paidSubscriptions?: PaidSubscription[];
   attachedSubscriptions?: AttachedSubscription[];
+  credits?: UserCredits;
 };
 
 export type PublicUser = Omit<

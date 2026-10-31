@@ -16,7 +16,7 @@ const {
 } = internal;
 
 import type {
-  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection
+  DataPoint, Device, Punishment, Session, User, UserRole, AttachedSubscription, PaidSubscription, App, OAuthAuthorizationCode, OAuthAccessToken, Connection, UserCredits
 } from '@common';
 import { cacheDel, cacheGet, cacheSet, cacheIncr, cacheReadCounter } from '../cache';
 import { invalidateAuthEntries } from '../authCache';
@@ -193,6 +193,20 @@ export async function updateUserLastActive(uuid: string, when: Date) {
   // Hot path (once per user per minute): refresh only that user's cached copy,
   // never the global auth generation.
   await invalidateUserCache(uuid);
+}
+
+
+export async function updateUserCredits(userUuid: string, credits: UserCredits) {
+  const { users } = await getCols();
+  const normalizedCredits = normalizeDateValues(credits);
+
+  trackMongoOperation('updateOne', USERS_COLLECTION);
+  await users.updateOne({ uuid: userUuid }, { $set: { credits: normalizedCredits } });
+
+  await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
+
+  return normalizedCredits;
 }
 
 

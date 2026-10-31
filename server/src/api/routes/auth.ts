@@ -22,7 +22,7 @@ import {
   updateUser,
 } from '../../lib/db';
 import type { User } from '@common';
-import { normalizeCountryCode } from '@common';
+import { getCreditPeriodStart, normalizeCountryCode } from '@common';
 import { toPublicUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
@@ -115,6 +115,12 @@ async function handleRegister(request: Request) {
     createdAt: now,
     lastActive: now,
     country,
+    credits: {
+      periodStart: getCreditPeriodStart(now),
+      monthlyUsed: 0,
+      additional: 0,
+      onHold: 0,
+    },
   };
 
   try {

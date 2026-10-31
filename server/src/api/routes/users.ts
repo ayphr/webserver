@@ -3,6 +3,7 @@ import { getCachedActiveSuspension, requireAuth } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid, updateUser } from '../../lib/db';
 import { getPolicyStatus } from '../../lib/policies';
 import { toPublicUser } from '../../lib/user';
+import { getCreditBalance } from '../../lib/credits';
 
 const handleMe = requireAuth(async (request, user) => {
   const activeSuspension = getCachedActiveSuspension(request) ?? await getActiveSuspensionForUserUuid(user.uuid);
@@ -11,6 +12,7 @@ const handleMe = requireAuth(async (request, user) => {
     user: toPublicUser(user),
     activeSuspension,
     policyStatus,
+    credits: getCreditBalance(user),
   });
 }, { allowSuspended: true, allowPolicyPending: true });
 

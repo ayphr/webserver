@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2 } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { isStoredAccountExpired, type StoredAccount } from '../../lib/accounts';
-import type { BadgeId } from '@common/types';
+import { formatCredits } from '../../lib/credits';
+import type { BadgeId, CreditBalance } from '@common/types';
 
 type Tab = { id: string; name: string };
 
@@ -55,6 +56,7 @@ type Props = {
   isSuspended?: boolean;
   isStaff?: boolean;
   isDeveloper?: boolean;
+  credits?: CreditBalance | null;
   accounts?: StoredAccount[];
   activeToken?: string | null;
   onSwitchAccount?: (token: string) => void;
@@ -71,6 +73,7 @@ export const Sidebar: React.FC<Props> = ({
   isSuspended = false,
   isStaff = false,
   isDeveloper = false,
+  credits = null,
   accounts = [],
   activeToken = null,
   onSwitchAccount,
@@ -138,6 +141,18 @@ export const Sidebar: React.FC<Props> = ({
       </nav>
 
       <div className="n-sidebar__spacer" />
+
+      <button
+        type="button"
+        className={`n-sidebar__credits ${activeTab === 'credits' ? 'active' : ''}`}
+        onClick={() => onChange('credits')}
+        title={credits ? `${formatCredits(credits.available)} credits available${credits.onHold > 0 ? ` (${formatCredits(credits.onHold)} on hold)` : ''}` : 'Credits'}
+        aria-label={credits ? `Credits: ${formatCredits(credits.available)} available` : 'Credits'}
+      >
+        <span className="n-sidebar__creditsIcon"><IconCoin size={18} strokeWidth={1.5} /></span>
+        <span className="n-sidebar__creditsAmount">{credits ? formatCredits(credits.available) : '—'}</span>
+        <span className="n-sidebar__creditsLabel">credits</span>
+      </button>
 
       <div className="n-sidebar__bottom">
         <nav className="n-sidebar__bottomTabs" aria-label="Account tabs">

@@ -80,6 +80,57 @@
   flex: 1
 }
 
+.n-sidebar__credits {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 193, 7, 0.03));
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+
+.n-sidebar__credits:hover {
+  border-color: rgba(255, 193, 7, 0.4);
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.16), rgba(255, 193, 7, 0.05));
+}
+
+.n-sidebar__credits.active {
+  border-color: rgba(255, 193, 7, 0.55);
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.07));
+}
+
+.n-sidebar__creditsIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(41, 99%, 59%);
+}
+
+.n-sidebar__creditsAmount {
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-hv);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.n-sidebar__creditsLabel {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.n-sidebar__creditsIcon svg {
+  display: block;
+}
+
 .n-sidebar__bottom {
   display: flex;
   flex-direction: column;

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
-import type { Punishment, PublicUser } from '@common';
+import type { Punishment, PublicUser, CreditBalance } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
@@ -15,11 +15,12 @@ const LocationsPanel = lazy(() => import('../../components/locations').then((m) 
 const MyAppsPanel = lazy(() => import('../../components/developer/MyAppsPanel').then((m) => ({ default: m.MyAppsPanel })));
 const ConnectionsPanel = lazy(() => import('../../components/connections/ConnectionsPanel').then((m) => ({ default: m.ConnectionsPanel })));
 const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
+const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections', 'games']);
+const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games']);
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -124,6 +125,7 @@ function getStoredDefaultTab(): string {
 
 export const DashboardPage = () => {
   const [user, setUser] = useState<PublicUser | null>(null);
+  const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [activePage, setActivePage] = useState<string>(() => {
@@ -147,6 +149,7 @@ export const DashboardPage = () => {
       try {
         const userData = await api.users.me();
         setUser(userData.user);
+        setCredits(userData.credits);
         setActiveSuspension(userData.activeSuspension);
         const token = api.getAuthToken();
         if (token) updateStoredAccount(token, userData.user);
@@ -171,6 +174,7 @@ export const DashboardPage = () => {
     try {
       const userData = await api.users.me();
       setUser(userData.user);
+      setCredits(userData.credits);
       setActiveSuspension(userData.activeSuspension);
       changeTab('overview');
     } catch (err) {
@@ -199,6 +203,7 @@ export const DashboardPage = () => {
     try {
       const userData = await api.users.me();
       setUser(userData.user);
+      setCredits(userData.credits);
       setActiveSuspension(userData.activeSuspension);
       updateStoredAccount(token, userData.user);
       setAccounts(getStoredAccounts());
@@ -432,7 +437,7 @@ export const DashboardPage = () => {
   if (isLoading) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} isDeveloper={isDeveloper} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} isDeveloper={isDeveloper} credits={credits} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
             <CardBody>
@@ -447,7 +452,7 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} credits={credits} />
         <main className="dashboard-main">
           <Card className="dashboard-page__card" elevated>
             <CardBody>
@@ -461,9 +466,9 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
       <main className="dashboard-main">
-        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' ? (
+        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' ? (
           <Card className="dashboard-page__card" elevated>
             <CardHeader>
               <h2>Account Suspended</h2>
@@ -606,6 +611,20 @@ export const DashboardPage = () => {
                 <CardBody>
                   <Suspense fallback={<p>Loading...</p>}>
                     <SubscriptionPanel />
+                  </Suspense>
+                </CardBody>
+              </Card>
+            )}
+
+            {activePage === 'credits' && (
+              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
+                <CardHeader>
+                  <h2>Credits</h2>
+                  <p>Your monthly allowance, additional credits, and held credits</p>
+                </CardHeader>
+                <CardBody>
+                  <Suspense fallback={<p>Loading...</p>}>
+                    <CreditsPanel key={user.uuid} initialCredits={credits} onCreditsChange={setCredits} />
                   </Suspense>
                 </CardBody>
               </Card>

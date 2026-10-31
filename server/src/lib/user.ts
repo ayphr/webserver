@@ -5,7 +5,7 @@ import { buildAvatarUrl } from './avatars';
 
 export function toPublicUser(user: User): PublicUser {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { auth, stripeCustomerId, paidSubscriptions, attachedSubscriptions, avatar, ...rest } = user;
+  const { auth, stripeCustomerId, paidSubscriptions, attachedSubscriptions, credits, avatar, ...rest } = user;
   const resolved = getUserSubscription(user);
 
   return {

@@ -50,6 +50,7 @@ import {
 } from './routes/oauth';
 import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
 import { handleUserByUuid, handleMe as handleUsersMe, handleDeveloperToggle } from './routes/users';
+import { handleCreditsMe } from './routes/credits';
 import { handleGetBests as handleGamesBestsGet, handleUpdateBest as handleGamesBestsUpdate } from './routes/games';
 import {
   handleStripeWebhook,
@@ -97,6 +98,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'DELETE', path: '/api/auth/account', handle: handleDeleteAccount },
 
   { method: 'GET', path: '/api/users/me', handle: handleUsersMe },
+  { method: 'GET', path: '/api/credits/me', handle: handleCreditsMe },
   { method: 'GET', path: '/api/games/bests', handle: handleGamesBestsGet },
   { method: 'POST', path: '/api/games/bests', handle: handleGamesBestsUpdate },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },

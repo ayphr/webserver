@@ -9,3 +9,4 @@ export * from './app';
 export * from './assistant';
 export * from './location';
 export * from './plans';
+export * from './credits';
