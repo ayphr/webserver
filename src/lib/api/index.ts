@@ -4,6 +4,7 @@ import { createDeveloperApi } from './developer';
 import { createConnectionsApi } from './connections';
 import { createDevicesApi } from './devices';
 import { createLocationsApi } from './locations';
+import { createGamesApi } from './games';
 import { createRequestClient, type ApiClientConfig, type RequestClient } from './client';
 import { createPunishmentsApi } from './punishments';
 import { createStaffApi } from './staff';
@@ -19,6 +20,7 @@ export const API_BASE_URL = import.meta.env.DEV
 export type AyphrApiClient = RequestClient & {
   getStatus: () => Promise<string>;
   auth: ReturnType<typeof createAuthApi>;
+  games: ReturnType<typeof createGamesApi>;
   oauth: ReturnType<typeof createOAuthApi>;
   developer: ReturnType<typeof createDeveloperApi>;
   connections: ReturnType<typeof createConnectionsApi>;
@@ -58,6 +60,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     punishments: createPunishmentsApi(client),
     devices: createDevicesApi(client),
   locations: createLocationsApi(client),
+  games: createGamesApi(client),
     staff: createStaffApi(client),
     sessions: createSessionsApi(client),
     subscriptions: createSubscriptionsApi(client),

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../common';
+import { api } from '../../lib/api';
 import {
   IconBomb,
   IconCircleFilled,
@@ -112,6 +113,20 @@ function MemoryGame() {
   const [flipped, setFlipped] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [bestMoves, setBestMoves] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api.games
+      .getBests()
+      .then((res) => {
+        if (active) setBestMoves(res.bests.memory?.value ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const matchedCount = cards.filter((c) => c.matched).length;
 
@@ -148,6 +163,16 @@ function MemoryGame() {
       );
       setFlipped([]);
       setLocked(false);
+
+      const newMoves = moves + 1;
+      if (matchedCount + 2 === cards.length) {
+        if (bestMoves === null || newMoves < bestMoves) {
+          api.games
+            .updateBest('memory', newMoves)
+            .then((res) => setBestMoves(res.bests.memory?.value ?? newMoves))
+            .catch(() => {});
+        }
+      }
     } else {
       window.setTimeout(() => {
         setCards((prev) =>
@@ -173,6 +198,7 @@ function MemoryGame() {
       <div className="game-memory__status">
         <span>Moves: {moves}</span>
         <span>Matched: {matchedCount / 2} / {MEMORY_PAIRS.length}</span>
+        <span>Best: {bestMoves ?? '-'}</span>
         <Button variant="secondary" onClick={reset}>
           Reset
         </Button>
@@ -286,12 +312,34 @@ function MinesweeperGame() {
   const [status, setStatus] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [firstClick, setFirstClick] = useState(true);
   const [flagCount, setFlagCount] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [bestTime, setBestTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api.games
+      .getBests()
+      .then((res) => {
+        if (active) setBestTime(res.bests.minesweeper?.value ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (status !== 'playing') return;
+    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(id);
+  }, [status]);
 
   const reset = () => {
     setBoard(createEmptyMsBoard());
     setStatus('idle');
     setFirstClick(true);
     setFlagCount(0);
+    setElapsed(0);
   };
 
   const handleReveal = (r: number, c: number) => {
@@ -321,8 +369,18 @@ function MinesweeperGame() {
     setBoard(working);
 
     const won = working.flat().every((cl) => cl.mine || cl.revealed);
-    if (won) setStatus('won');
-    else setStatus('playing');
+    if (won) {
+      setStatus('won');
+      const time = elapsed;
+      if (bestTime === null || time < bestTime) {
+        api.games
+          .updateBest('minesweeper', time)
+          .then((res) => setBestTime(res.bests.minesweeper?.value ?? time))
+          .catch(() => {});
+      }
+    } else {
+      setStatus('playing');
+    }
   };
 
   const handleFlag = (e: React.MouseEvent, r: number, c: number) => {
@@ -350,6 +408,8 @@ function MinesweeperGame() {
     <div className="game-minesweeper">
       <div className="game-minesweeper__status">
         <span>Mines: {Math.max(0, MS_MINES - flagCount)}</span>
+        <span>Time: {elapsed}s</span>
+        <span>Best: {bestTime !== null ? `${bestTime}s` : '-'}</span>
         <span>
           {status === 'won' ? 'You won!' : status === 'lost' ? 'Game over' : 'Playing'}
         </span>

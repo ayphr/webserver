@@ -156,6 +156,36 @@ export async function updateUser(user: User, unsetKeys: string[] = []) {
 }
 
 
+export async function getGameBests(userUuid: string) {
+  const { users } = await getCols();
+  trackMongoOperation('findOne', USERS_COLLECTION);
+  const user = await users.findOne({ uuid: userUuid }, { projection: { _id: 0, gameBests: 1 } });
+  return (user?.gameBests as Record<string, unknown> | undefined) ?? {};
+}
+
+export async function updateGameBest(userUuid: string, game: 'memory' | 'minesweeper', value: number) {
+  const { users } = await getCols();
+  trackMongoOperation('findOneAndUpdate', USERS_COLLECTION);
+  const result = await users.findOneAndUpdate(
+    {
+      uuid: userUuid,
+      $or: [
+        { [`gameBests.${game}`]: { $exists: false } },
+        { [`gameBests.${game}.value`]: { $gt: value } },
+      ],
+    },
+    { $set: { [`gameBests.${game}`]: { value, achievedAt: new Date() } } },
+    { returnDocument: 'after', projection: { _id: 0, gameBests: 1 } },
+  );
+  const updated = result !== null;
+  const bests = (result?.gameBests as Record<string, unknown> | undefined) ?? (await getGameBests(userUuid));
+  if (updated) {
+    await invalidateUserCache(userUuid);
+    await invalidateAuthEntries();
+  }
+  return { updated, bests };
+}
+
 export async function updateUserLastActive(uuid: string, when: Date) {
   const { users } = await getCols();
   trackMongoOperation('updateOne', USERS_COLLECTION);

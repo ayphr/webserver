@@ -28,6 +28,16 @@ export type UserAvatar = {
   updatedAt: Date;
 };
 
+export type GameBest = {
+  value: number;
+  achievedAt: Date;
+};
+
+export type GameBests = {
+  memory?: GameBest;
+  minesweeper?: GameBest;
+};
+
 export type User = {
   uuid: string;
   username: string;
@@ -44,6 +54,7 @@ export type User = {
   createdAt: Date;
   lastActive: Date;
   country?: string;
+  gameBests?: GameBests;
   developerAccount?: boolean;
   stripeCustomerId?: string;
   paidSubscriptions?: PaidSubscription[];
@@ -52,7 +63,7 @@ export type User = {
 
 export type PublicUser = Omit<
   User,
-  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar'
+  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar' | 'gameBests'
 > & {
   badges: BadgeId[];
   avatarUrl?: string;
