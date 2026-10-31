@@ -5,7 +5,10 @@ const CACHE = 'auth';
 const GEN_KEY = 'ayphr:cache:auth:gen';
 const KEY_PREFIX = 'ayphr:cache:auth:entry:';
 
-export const AUTH_CACHE_TTL_SECONDS = 10;
+// Invalidation is explicit (the generation counter below), so this TTL only
+// bounds how long a missed invalidation can linger. Keep it comfortably above
+// the client request cadence.
+export const AUTH_CACHE_TTL_SECONDS = 60;
 
 const INITIAL_GEN = 0;
 

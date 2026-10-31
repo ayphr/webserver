@@ -72,11 +72,20 @@ export async function getActiveSuspensionForUserUuid(userUuid: string) {
 
   // Cache the negative case too: most users are never suspended, and this
   // query previously ran on every single authenticated request.
+  //
+  // A suspension that ends before the TTL would otherwise stay cached (and
+  // keep blocking the user) after it expired, so cap the entry at endsAt.
+  let ttl = SUSPENSION_CACHE_TTL_SECONDS;
+  if (suspension?.endsAt) {
+    const secondsUntilEnd = Math.ceil((suspension.endsAt.getTime() - now.getTime()) / 1000);
+    ttl = Math.max(1, Math.min(ttl, secondsUntilEnd));
+  }
+
   await cacheSet(
     SUSPENSION_CACHE,
     cacheKey,
     suspension ?? NONE,
-    SUSPENSION_CACHE_TTL_SECONDS,
+    ttl,
   );
 
   return suspension;

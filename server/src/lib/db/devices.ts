@@ -7,6 +7,7 @@ const {
   DEVICE_CACHE_TTL_SECONDS,
   DEVICE_LIST_CACHE,
   DEVICE_LIST_CACHE_TTL_SECONDS,
+  DEVICE_STATS_CACHE,
   DEVICE_NEGATIVE_TTL_SECONDS,
   NONE,
   client,
@@ -106,11 +107,19 @@ export async function getDevicesForOwnerUuid(ownerUuid: string) {
   return list;
 }
 
-/**
- * Drops the per-owner device list and statistics caches after an upload changes
- * the underlying data.
- */
+/** Drops only the per-owner statistics cache (counts / latest point). */
+export async function invalidateDeviceStatsForOwner(ownerUuid: string): Promise<void> {
+  await cacheDel(DEVICE_STATS_CACHE, deviceStatsCacheKey(ownerUuid));
+}
 
+/**
+ * Drops the per-owner device list and statistics caches after a device is
+ * added, removed, renamed or re-located.
+ *
+ * Telemetry uploads deliberately do not call this: they happen far more often
+ * than the dashboard is read, so invalidating here would keep the keys cold
+ * forever. New points reach readers on the next cache fill (bounded by TTL).
+ */
 export async function invalidateDeviceCachesForOwner(ownerUuid: string): Promise<void> {
   await cacheDel(
     DEVICE_LIST_CACHE,

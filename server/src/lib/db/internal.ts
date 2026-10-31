@@ -125,21 +125,25 @@ export function trackMongoOperation(operation: string, collection: string) {
 // are fail-soft, so a Redis outage degrades to uncached MongoDB access.
 // ---------------------------------------------------------------------------
 
+// TTLs are a backstop, not the primary freshness mechanism: every write path
+// invalidates or refreshes the keys it affects. They need to outlive the gap
+// between consecutive requests from one client, otherwise the cache is always
+// cold when a client polls (the dashboard refreshes about once a minute).
 export const USER_CACHE = 'user';
-export const USER_CACHE_TTL_SECONDS = 15;
+export const USER_CACHE_TTL_SECONDS = 60;
 
 export const SUSPENSION_CACHE = 'suspension';
-export const SUSPENSION_CACHE_TTL_SECONDS = 5;
+export const SUSPENSION_CACHE_TTL_SECONDS = 60;
 
 export const DEVICE_CACHE = 'device';
 export const DEVICE_CACHE_TTL_SECONDS = 60;
 export const DEVICE_NEGATIVE_TTL_SECONDS = 5;
 
 export const DEVICE_LIST_CACHE = 'device_list';
-export const DEVICE_LIST_CACHE_TTL_SECONDS = 30;
+export const DEVICE_LIST_CACHE_TTL_SECONDS = 60;
 
 export const DEVICE_STATS_CACHE = 'device_stats';
-export const DEVICE_STATS_CACHE_TTL_SECONDS = 30;
+export const DEVICE_STATS_CACHE_TTL_SECONDS = 60;
 
 /** Sentinel cached in place of a null result so negative lookups are cached too. */
 export const NONE = 'none';

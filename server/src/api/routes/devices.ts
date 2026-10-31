@@ -14,7 +14,7 @@ import {
   getDeviceBySerial,
   getDevicesForOwnerUuid,
   getUserFromUuid,
-  invalidateDeviceCachesForOwner,
+  invalidateDeviceStatsForOwner,
   pruneDataPointsForSerials,
   setDeviceClaim,
   toPublicDevice,
@@ -313,15 +313,19 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   const devices = await getDevicesForOwnerUuid(user.uuid);
 
   // Enforce retention and data point caps whenever the device list is viewed.
+  // Only touch the stats cache when the prune actually removed rows; the list
+  // and stats caches are otherwise valid and should survive the read.
   try {
     const features = getPlanFeaturesForUser(user);
     const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
-    await pruneDataPointsForSerials(
+    const removed = await pruneDataPointsForSerials(
       devices.map((device) => device.serial),
       features.sharedMaxDataPointsPerUser,
       cutoff,
     );
-    await invalidateDeviceCachesForOwner(user.uuid);
+    if (removed > 0) {
+      await invalidateDeviceStatsForOwner(user.uuid);
+    }
   } catch (pruneError) {
     console.error('Failed to prune data points:', pruneError);
   }
@@ -402,7 +406,9 @@ async function handleUpload(request: Request): Promise<Response> {
 
     device.lastUploadAt = now;
     await cacheDevice(device);
-    await invalidateDeviceCachesForOwner(device.ownerUuid);
+    // Do not drop the owner's device list/stats caches here. Uploads almost
+    // always outpace dashboard reads, so invalidating would guarantee a miss
+    // on the next read. The TTL bounds how stale the aggregate view can be.
 
     telemetryRecordsAcceptedTotal.inc(points.length);
     telemetryRecordsPersistedTotal.inc(accepted);
