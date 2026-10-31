@@ -327,12 +327,13 @@ function MinesweeperGame() {
     const cell = board[r][c];
     if (cell.revealed) return;
     const nextFlagged = !cell.flagged;
+    if (nextFlagged && flagCount >= MS_MINES) return;
     setBoard((prev) => {
       const b = cloneMsBoard(prev);
       b[r][c].flagged = nextFlagged;
       return b;
     });
-    setFlagCount((n) => (nextFlagged ? n + 1 : n - 1));
+    setFlagCount((n) => (nextFlagged ? n + 1 : Math.max(0, n - 1)));
     if (status === 'idle') setStatus('playing');
   };
 
@@ -344,7 +345,7 @@ function MinesweeperGame() {
   return (
     <div className="game-minesweeper">
       <div className="game-minesweeper__status">
-        <span>Mines: {MS_MINES - flagCount}</span>
+        <span>Mines: {Math.max(0, MS_MINES - flagCount)}</span>
         <span>
           {status === 'won' ? 'You won!' : status === 'lost' ? 'Game over' : 'Playing'}
         </span>

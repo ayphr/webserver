@@ -124,6 +124,15 @@
   transform: rotateY(180deg);
 }
 
+.memory-card:not(.memory-card--flipped):not(.memory-card--matched) .memory-card__face--front {
+  visibility: hidden;
+}
+
+.memory-card--flipped .memory-card__face--back,
+.memory-card--matched .memory-card__face--back {
+  visibility: hidden;
+}
+
 .memory-card__face {
   position: absolute;
   inset: 0;
