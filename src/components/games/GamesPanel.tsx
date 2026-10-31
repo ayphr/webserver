@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../common';
+import {
+  IconAppleFilled,
+  IconBomb,
+  IconCircleDotFilled,
+  IconCircleFilled,
+  IconDiamondFilled,
+  IconFlagFilled,
+  IconHexagonFilled,
+  IconSquareFilled,
+  IconStarFilled,
+  IconTriangleFilled,
+} from '@tabler/icons-react';
 import './GamesPanel.css';
 
 type GameId = 'menu' | 'memory' | 'minesweeper' | 'snake';
@@ -9,34 +21,13 @@ export function GamesPanel() {
 
   return (
     <div className="games-panel">
-      <div className="games-panel__header">
-        <div className="games-panel__tabs">
-          <Button
-            variant={game === 'menu' ? 'primary' : 'secondary'}
-            onClick={() => setGame('menu')}
-          >
-            Menu
-          </Button>
-          <Button
-            variant={game === 'memory' ? 'primary' : 'secondary'}
-            onClick={() => setGame('memory')}
-          >
-            Card Match
-          </Button>
-          <Button
-            variant={game === 'minesweeper' ? 'primary' : 'secondary'}
-            onClick={() => setGame('minesweeper')}
-          >
-            Minesweeper
-          </Button>
-          <Button
-            variant={game === 'snake' ? 'primary' : 'secondary'}
-            onClick={() => setGame('snake')}
-          >
-            Snake
+      {game !== 'menu' && (
+        <div className="games-panel__back">
+          <Button variant="secondary" onClick={() => setGame('menu')}>
+            Back to menu
           </Button>
         </div>
-      </div>
+      )}
 
       <div className="games-panel__body">
         {game === 'menu' && (
@@ -92,51 +83,18 @@ const MEMORY_PAIRS: { shape: Shape; color: string }[] = [
   { shape: 'square', color: '#748ffc' },
 ];
 
+const SHAPE_ICONS: Record<Shape, typeof IconCircleFilled> = {
+  circle: IconCircleFilled,
+  square: IconSquareFilled,
+  triangle: IconTriangleFilled,
+  diamond: IconDiamondFilled,
+  star: IconStarFilled,
+  hexagon: IconHexagonFilled,
+};
+
 function ShapeIcon({ shape, color }: { shape: Shape; color: string }) {
-  const common = { width: 40, height: 40, viewBox: '0 0 40 40' };
-  switch (shape) {
-    case 'circle':
-      return (
-        <svg {...common}>
-          <circle cx="20" cy="20" r="14" fill={color} />
-        </svg>
-      );
-    case 'square':
-      return (
-        <svg {...common}>
-          <rect x="6" y="6" width="28" height="28" rx="4" fill={color} />
-        </svg>
-      );
-    case 'triangle':
-      return (
-        <svg {...common}>
-          <polygon points="20,4 36,34 4,34" fill={color} />
-        </svg>
-      );
-    case 'diamond':
-      return (
-        <svg {...common}>
-          <polygon points="20,4 36,20 20,36 4,20" fill={color} />
-        </svg>
-      );
-    case 'star':
-      return (
-        <svg {...common}>
-          <polygon
-            points="20,3 24.5,14 36,14 26.5,21 30,33 20,26 10,33 13.5,21 4,14 15.5,14"
-            fill={color}
-          />
-        </svg>
-      );
-    case 'hexagon':
-      return (
-        <svg {...common}>
-          <polygon points="12,4 28,4 36,20 28,36 12,36 4,20" fill={color} />
-        </svg>
-      );
-    default:
-      return null;
-  }
+  const Icon = SHAPE_ICONS[shape];
+  return <Icon size={40} style={{ color }} />;
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -236,11 +194,12 @@ function MemoryGame() {
             onClick={() => handleFlip(index)}
             disabled={card.matched}
           >
-            {card.flipped || card.matched ? (
-              <ShapeIcon shape={card.shape} color={card.color} />
-            ) : (
-              <span className="memory-card__back">?</span>
-            )}
+            <span className="memory-card__inner">
+              <span className="memory-card__face memory-card__face--front">
+                <ShapeIcon shape={card.shape} color={card.color} />
+              </span>
+              <span className="memory-card__face memory-card__face--back">?</span>
+            </span>
           </button>
         ))}
       </div>
@@ -419,12 +378,12 @@ function MinesweeperGame() {
             >
               {cell.revealed
                 ? cell.mine
-                  ? ' (mine) '
+                  ? <IconBomb size={18} />
                   : cell.adjacent > 0
                   ? <span style={{ color: adjacentColor(cell.adjacent), fontWeight: 700 }}>{cell.adjacent}</span>
                   : ''
                 : cell.flagged
-                ? ' (flag) '
+                ? <IconFlagFilled size={16} style={{ color: '#fcc419' }} />
                 : ''}
             </button>
           ))
@@ -567,7 +526,13 @@ function SnakeGame() {
               className={`snake-cell ${isHead ? 'snake-cell--head' : ''} ${
                 isBody ? 'snake-cell--body' : ''
               } ${isFood ? 'snake-cell--food' : ''}`}
-            />
+            >
+              {isHead ? (
+                <IconCircleDotFilled size={14} />
+              ) : isFood ? (
+                <IconAppleFilled size={14} />
+              ) : null}
+            </div>
           );
         })}
       </div>
