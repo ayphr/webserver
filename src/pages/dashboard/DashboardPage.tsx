@@ -13,13 +13,12 @@ import { SettingsPanel } from '../../components/settings';
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
 const MyAppsPanel = lazy(() => import('../../components/developer/MyAppsPanel').then((m) => ({ default: m.MyAppsPanel })));
-const AssistantPanel = lazy(() => import('../../components/assistant').then((m) => ({ default: m.AssistantPanel })));
 const ConnectionsPanel = lazy(() => import('../../components/connections/ConnectionsPanel').then((m) => ({ default: m.ConnectionsPanel })));
 const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'assistant', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections']);
+const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'users', 'my-apps', 'connections']);
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -119,7 +118,7 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 
 function getStoredDefaultTab(): string {
   const stored = localStorage.getItem('ayphr-pref-default-tab');
-  return stored === 'overview' || stored === 'assistant' || stored === 'devices' || stored === 'users' || stored === 'my-apps' ? stored : 'overview';
+  return stored === 'overview' || stored === 'devices' || stored === 'users' || stored === 'my-apps' ? stored : 'overview';
 }
 
 export const DashboardPage = () => {
@@ -410,7 +409,6 @@ export const DashboardPage = () => {
           value: defaultTab,
           options: [
             { value: 'overview', label: 'Overview' },
-            { value: 'assistant', label: 'Assistant' },
             { value: 'devices', label: 'Devices' },
             ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
             ...(isDeveloper ? [{ value: 'my-apps', label: 'My Apps' }] : []),
@@ -536,20 +534,6 @@ export const DashboardPage = () => {
                     className="dashboard-page__user-row"
                   />
                   <p>Welcome to your dashboard!</p>
-                </CardBody>
-              </Card>
-            )}
-
-            {activePage === 'assistant' && (
-              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
-                <CardHeader>
-                  <h2>Assistant</h2>
-                  <p>Chat with your Ayphr Assistant</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <AssistantPanel />
-                  </Suspense>
                 </CardBody>
               </Card>
             )}
