@@ -60,6 +60,12 @@ export async function cacheDevice(device: DeviceDocument): Promise<void> {
 }
 
 
+export async function getDeviceByTokenHash(tokenHash: string) {
+  const devices = await getCollection('devices');
+  trackMongoOperation('findOne', DEVICES_COLLECTION);
+  return devices.findOne({ tokenHash });
+}
+
 export async function getDeviceBySerial(serial: number) {
   const cacheKey = deviceCacheKey(serial);
   const cached = await cacheGet<DeviceDocument | typeof NONE>(DEVICE_CACHE, cacheKey);

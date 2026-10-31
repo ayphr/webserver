@@ -12,6 +12,7 @@ import {
   markDevicePairingLinked,
   getDataPointStats,
   getDeviceBySerial,
+  getDeviceByTokenHash,
   getDevicesForOwnerUuid,
   getUserFromUuid,
   invalidateDeviceStatsForOwner,
@@ -82,8 +83,6 @@ function isFiniteNumber(value: unknown): value is number {
 function parseDataPoints(value: unknown): DataPoint[] | null {
   if (!Array.isArray(value) || value.length > MAX_POINTS_PER_UPLOAD) return null;
 
-  // Rounding collapses sub-second readings onto the same second; keep the last
-  // value seen for each timestamp so a single batch cannot upsert twice.
   const byTimestamp = new Map<number, DataPoint>();
 
   for (const entry of value) {
@@ -112,16 +111,9 @@ function parseDataPoints(value: unknown): DataPoint[] | null {
   return [...byTimestamp.values()];
 }
 
-function getDeviceToken(request: Request, body: Record<string, unknown> | null): string | null {
+function getDeviceToken(body: Record<string, unknown> | null): string | null {
   const fromBody = body?.token;
   if (typeof fromBody === 'string' && fromBody.trim()) return fromBody.trim();
-
-  const authHeader = request.headers.get('Authorization') ?? request.headers.get('Authentication');
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7).trim();
-    if (token) return token;
-  }
-
   return null;
 }
 
@@ -186,7 +178,7 @@ const handleLink = requireAuth(async (request, user: User) => {
   let resolvedLocationId: string | null = null;
   if (requestedLocationId) {
     const requestedLocation = await getLocationById(requestedLocationId);
-    if (!requestedLocation || requestedLocation.ownerUuid !== user.uuid) {
+    if (requestedLocation?.ownerUuid !== user.uuid) {
       return json({ error: 'invalid location' }, 400);
     }
     resolvedLocationId = requestedLocation.id;
@@ -293,9 +285,6 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   await ensureDefaultLocation(user.uuid, user.username);
   const devices = await getDevicesForOwnerUuid(user.uuid);
 
-  // Enforce retention and data point caps whenever the device list is viewed.
-  // Only touch the stats cache when the prune actually removed rows; the list
-  // and stats caches are otherwise valid and should survive the read.
   try {
     const features = getPlanFeaturesForUser(user);
     const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
@@ -342,37 +331,28 @@ async function handleUpload(request: Request): Promise<Response> {
 
   try {
     const body = await readJsonBody(request);
-    const serial = parseSerial(body?.serial);
-    const name = parseName(body?.name);
-    const token = getDeviceToken(request, body);
+    const token = getDeviceToken(body);
     const points = parseDataPoints(body?.data);
 
-    if (serial === null) return json({ error: 'invalid serial' }, 400);
-    if (name === null) return json({ error: 'invalid device name' }, 400);
     if (!token) return json({ error: 'missing device token' }, 401);
     if (!points) return json({ error: 'invalid data' }, 400);
 
     const tokenHash = hashToken(token);
     const now = new Date();
-    const existing = await getDeviceBySerial(serial);
+    const existing = await getDeviceByTokenHash(tokenHash);
 
     if (!existing) {
       return json({ error: 'device not linked' }, 404);
     }
 
-    if (existing.tokenHash !== tokenHash) {
-      return json({ error: 'invalid device token' }, 401);
-    }
-
     const device = existing;
+    const serial = device.serial;
 
     const [accepted] = await Promise.all([
       upsertDataPoints(serial, points),
       updateDeviceLastUpload(serial, now),
     ]);
 
-    // Enforce the owner's plan retention window and total data point cap,
-    // deleting the oldest points when the cap is exceeded.
     try {
       const ownerDevices = await getDevicesForOwnerUuid(device.ownerUuid);
       const serials = ownerDevices.map((owned) => owned.serial);
@@ -381,15 +361,11 @@ async function handleUpload(request: Request): Promise<Response> {
       const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
       await pruneDataPointsForSerials(serials, features.sharedMaxDataPointsPerUser, cutoff);
     } catch (pruneError) {
-      // Pruning is best-effort; never fail an upload because of it.
       console.error('Failed to prune data points:', pruneError);
     }
 
     device.lastUploadAt = now;
     await cacheDevice(device);
-    // Do not drop the owner's device list/stats caches here. Uploads almost
-    // always outpace dashboard reads, so invalidating would guarantee a miss
-    // on the next read. The TTL bounds how stale the aggregate view can be.
 
     telemetryRecordsAcceptedTotal.inc(points.length);
     telemetryRecordsPersistedTotal.inc(accepted);

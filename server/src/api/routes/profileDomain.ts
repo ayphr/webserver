@@ -15,14 +15,13 @@ function readBody(request: Request): Promise<Record<string, unknown> | null> {
 
 function parseDomainType(body: Record<string, unknown> | null): string | null {
   if (!body) return null;
-  const raw =
-    body.type ?? body.socialType ?? body.linkType ?? body.key ?? body.platform ?? body.socialLinkType ?? body.link;
+  const raw = body.type;
   return typeof raw === 'string' ? raw.trim().toLowerCase() : null;
 }
 
 function parseDomainValue(body: Record<string, unknown> | null): string | null {
   if (!body) return null;
-  const raw = body.domain ?? body.handle ?? body.value ?? body.website;
+  const raw = body.domain;
   return typeof raw === 'string' ? raw.trim() : null;
 }
 
@@ -104,20 +103,7 @@ export const handleDomainVerify = requireAuth(async (request, user) => {
   const value = parseDomainValue(body);
   const domain = value ? normalizeSocialHandle(type, value) : null;
 
-  let tokenFromBody: string | undefined;
-  if (typeof body?.token === 'string') {
-    tokenFromBody = body.token;
-  } else if (typeof body?.code === 'string') {
-    tokenFromBody = body.code;
-  } else if (typeof body?.challenge === 'string') {
-    tokenFromBody = body.challenge;
-  } else if (typeof body?.challengeToken === 'string') {
-    tokenFromBody = body.challengeToken;
-  } else if (typeof body?.verificationToken === 'string') {
-    tokenFromBody = body.verificationToken;
-  } else if (typeof body?.txtValue === 'string') {
-    tokenFromBody = body.txtValue;
-  }
+  const tokenFromBody = typeof body?.token === 'string' ? body.token : undefined;
 
   // eslint-disable-next-line no-useless-assignment
   let verification = null;

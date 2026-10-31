@@ -140,7 +140,7 @@ export function getExpiryDate(date: Date): Date {
 }
 
 export function getBearerToken(request: Request): string | null {
-  const authHeader = request.headers.get('Authorization') ?? request.headers.get('Authentication');
+  const authHeader = request.headers.get('Authorization');
 
   if (!authHeader?.startsWith('Bearer ')) return null;
 
