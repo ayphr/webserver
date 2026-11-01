@@ -87,7 +87,8 @@ export const DevicesPanel = () => {
   const [period, setPeriod] = useState<Period>('24h');
   const [graphMode, setGraphMode] = useState<GraphMode>('combined');
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
+  const [isFetchingData, setIsFetchingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
   // Device settings state
@@ -137,6 +138,7 @@ export const DevicesPanel = () => {
     setSettingsName(selectedDevice.name?.trim() || '');
     setSettingsLocationId(selectedDevice.locationId || '');
     setSaveSuccess(false);
+    setHasLoadedInitialData(false);
   }
 
   // Load telemetry data points when a device is selected and tab is 'graphs'
@@ -145,12 +147,13 @@ export const DevicesPanel = () => {
     let cancelled = false;
 
     const run = async () => {
-      setIsLoadingData(true);
+      setIsFetchingData(true);
       setDataError(null);
       try {
         const res = await api.devices.getDataPoints(selectedSerial, { period });
         if (!cancelled) {
           setDataPoints(res.dataPoints);
+          setHasLoadedInitialData(true);
         }
       } catch (err) {
         if (!cancelled) {
@@ -158,7 +161,7 @@ export const DevicesPanel = () => {
         }
       } finally {
         if (!cancelled) {
-          setIsLoadingData(false);
+          setIsFetchingData(false);
         }
       }
     };
@@ -243,25 +246,22 @@ export const DevicesPanel = () => {
         min: Math.min(...temps),
         max: Math.max(...temps),
         avg: avg(temps),
-        latest: temps[temps.length - 1],
       },
       humidity: {
         min: Math.min(...hums),
         max: Math.max(...hums),
         avg: avg(hums),
-        latest: hums[hums.length - 1],
       },
       pressure: {
         min: Math.min(...press),
         max: Math.max(...press),
         avg: avg(press),
-        latest: press[press.length - 1],
       },
       count: dataPoints.length,
     };
   }, [dataPoints]);
 
-  // Combined chart config & data
+  // Combined chart config & data without gradients or saturated colors
   const combinedData = useMemo(() => {
     const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
     return {
@@ -270,38 +270,40 @@ export const DevicesPanel = () => {
         {
           label: 'Temperature (°C)',
           data: dataPoints.map((p) => p.temperature),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          borderColor: '#f8fafc',
+          backgroundColor: 'transparent',
           yAxisID: 'y',
-          tension: 0.35,
+          tension: 0.25,
           fill: false,
           borderWidth: 2,
           pointRadius: dataPoints.length > 80 ? 0 : 2,
-          pointHoverRadius: 5,
+          pointHoverRadius: 4,
         },
         {
           label: 'Humidity (%)',
           data: dataPoints.map((p) => p.humidity),
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.1)',
+          borderColor: '#cbd5e1',
+          backgroundColor: 'transparent',
+          borderDash: [5, 4],
           yAxisID: 'y1',
-          tension: 0.35,
+          tension: 0.25,
           fill: false,
           borderWidth: 2,
           pointRadius: dataPoints.length > 80 ? 0 : 2,
-          pointHoverRadius: 5,
+          pointHoverRadius: 4,
         },
         {
           label: 'Air Pressure (hPa)',
           data: dataPoints.map((p) => p.airPressure),
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          borderColor: '#94a3b8',
+          backgroundColor: 'transparent',
+          borderDash: [2, 3],
           yAxisID: 'y2',
-          tension: 0.35,
+          tension: 0.25,
           fill: false,
           borderWidth: 2,
           pointRadius: dataPoints.length > 80 ? 0 : 2,
-          pointHoverRadius: 5,
+          pointHoverRadius: 4,
         },
       ],
     };
@@ -311,6 +313,7 @@ export const DevicesPanel = () => {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      animation: { duration: 200 },
       interaction: {
         mode: 'index' as const,
         intersect: false,
@@ -321,7 +324,7 @@ export const DevicesPanel = () => {
           position: 'top' as const,
           labels: {
             color: '#e2e8f0',
-            boxWidth: 12,
+            boxWidth: 16,
             padding: 14,
           },
         },
@@ -351,13 +354,13 @@ export const DevicesPanel = () => {
           title: {
             display: true,
             text: '°C',
-            color: '#10b981',
+            color: '#94a3b8',
           },
           grid: {
             color: 'rgba(255, 255, 255, 0.05)',
           },
           ticks: {
-            color: '#10b981',
+            color: '#94a3b8',
           },
         },
         y1: {
@@ -367,13 +370,13 @@ export const DevicesPanel = () => {
           title: {
             display: true,
             text: '%',
-            color: '#06b6d4',
+            color: '#94a3b8',
           },
           grid: {
             drawOnChartArea: false,
           },
           ticks: {
-            color: '#06b6d4',
+            color: '#94a3b8',
           },
         },
         y2: {
@@ -383,13 +386,13 @@ export const DevicesPanel = () => {
           title: {
             display: true,
             text: 'hPa',
-            color: '#f59e0b',
+            color: '#94a3b8',
           },
           grid: {
             drawOnChartArea: false,
           },
           ticks: {
-            color: '#f59e0b',
+            color: '#94a3b8',
           },
         },
       },
@@ -397,10 +400,11 @@ export const DevicesPanel = () => {
     [],
   );
 
-  // Helper for separate charts
-  const createMetricConfig = (unit: string, color: string) => ({
+  // Helper for separate charts with clean neutral styling (no gradients or distinct colors)
+  const createMetricConfig = (unit: string) => ({
     responsive: true,
     maintainAspectRatio: false,
+    animation: { duration: 200 },
     interaction: {
       mode: 'index' as const,
       intersect: false,
@@ -425,9 +429,9 @@ export const DevicesPanel = () => {
         type: 'linear' as const,
         display: true,
         position: 'left' as const,
-        title: { display: true, text: unit, color },
+        title: { display: true, text: unit, color: '#94a3b8' },
         grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color },
+        ticks: { color: '#94a3b8' },
       },
     },
   });
@@ -440,13 +444,13 @@ export const DevicesPanel = () => {
         {
           label: 'Temperature (°C)',
           data: dataPoints.map((p) => p.temperature),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-          tension: 0.35,
-          fill: true,
+          borderColor: '#f8fafc',
+          backgroundColor: 'transparent',
+          tension: 0.25,
+          fill: false,
           borderWidth: 2,
           pointRadius: dataPoints.length > 80 ? 0 : 2,
-          pointHoverRadius: 5,
+          pointHoverRadius: 4,
         },
       ],
     };
@@ -460,13 +464,13 @@ export const DevicesPanel = () => {
         {
           label: 'Humidity (%)',
           data: dataPoints.map((p) => p.humidity),
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.15)',
-          tension: 0.35,
-          fill: true,
+          borderColor: '#f8fafc',
+          backgroundColor: 'transparent',
+          tension: 0.25,
+          fill: false,
           borderWidth: 2,
           pointRadius: dataPoints.length > 80 ? 0 : 2,
-          pointHoverRadius: 5,
+          pointHoverRadius: 4,
         },
       ],
     };
@@ -480,13 +484,13 @@ export const DevicesPanel = () => {
         {
           label: 'Air Pressure (hPa)',
           data: dataPoints.map((p) => p.airPressure),
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          tension: 0.35,
-          fill: true,
+          borderColor: '#f8fafc',
+          backgroundColor: 'transparent',
+          tension: 0.25,
+          fill: false,
           borderWidth: 2,
           pointRadius: dataPoints.length > 80 ? 0 : 2,
-          pointHoverRadius: 5,
+          pointHoverRadius: 4,
         },
       ],
     };
@@ -557,15 +561,15 @@ export const DevicesPanel = () => {
                   <div className="devices__card-telemetry">
                     {reading ? (
                       <div className="devices__telemetry-chips">
-                        <div className="devices__telemetry-chip chip-temp">
+                        <div className="devices__telemetry-chip">
                           <IconThermometer size={14} strokeWidth={2} />
                           <span>{reading.temperature.toFixed(1)} °C</span>
                         </div>
-                        <div className="devices__telemetry-chip chip-humidity">
+                        <div className="devices__telemetry-chip">
                           <IconDroplet size={14} strokeWidth={2} />
                           <span>{reading.humidity.toFixed(1)} %</span>
                         </div>
-                        <div className="devices__telemetry-chip chip-pressure">
+                        <div className="devices__telemetry-chip">
                           <IconGauge size={14} strokeWidth={2} />
                           <span>{reading.airPressure.toFixed(0)} hPa</span>
                         </div>
@@ -648,7 +652,7 @@ export const DevicesPanel = () => {
         ))}
       </div>
 
-      <div className="settings__panel">
+      <div className="devices__panel-body">
         {/* OVERVIEW TAB */}
         {detailTab === 'overview' && (
           <div className="devices__overview">
@@ -689,12 +693,12 @@ export const DevicesPanel = () => {
               </div>
             </div>
 
-            <h4 className="devices__section-title">Latest Live Telemetry</h4>
+            <h4 className="devices__section-title">Latest Telemetry</h4>
             {latest ? (
               <div className="devices__reading-grid">
-                <div className="devices__reading-card reading-temp">
+                <div className="devices__reading-card">
                   <div className="devices__reading-icon">
-                    <IconThermometer size={22} strokeWidth={2} />
+                    <IconThermometer size={20} strokeWidth={1.75} />
                   </div>
                   <div className="devices__reading-details">
                     <span className="devices__reading-label">Temperature</span>
@@ -702,9 +706,9 @@ export const DevicesPanel = () => {
                   </div>
                 </div>
 
-                <div className="devices__reading-card reading-humidity">
+                <div className="devices__reading-card">
                   <div className="devices__reading-icon">
-                    <IconDroplet size={22} strokeWidth={2} />
+                    <IconDroplet size={20} strokeWidth={1.75} />
                   </div>
                   <div className="devices__reading-details">
                     <span className="devices__reading-label">Humidity</span>
@@ -712,9 +716,9 @@ export const DevicesPanel = () => {
                   </div>
                 </div>
 
-                <div className="devices__reading-card reading-pressure">
+                <div className="devices__reading-card">
                   <div className="devices__reading-icon">
-                    <IconGauge size={22} strokeWidth={2} />
+                    <IconGauge size={20} strokeWidth={1.75} />
                   </div>
                   <div className="devices__reading-details">
                     <span className="devices__reading-label">Air Pressure</span>
@@ -791,8 +795,9 @@ export const DevicesPanel = () => {
               </div>
             )}
 
-            {isLoadingData ? (
-              <div className="devices__loading-state">
+            {/* If initial load has not finished yet, show initial placeholder with stable height */}
+            {!hasLoadedInitialData && isFetchingData ? (
+              <div className="devices__chart-card devices__loading-box">
                 <IconRefresh className="devices__spin-icon" size={24} strokeWidth={2} />
                 <p>Loading telemetry history...</p>
               </div>
@@ -803,12 +808,12 @@ export const DevicesPanel = () => {
                 <p>No telemetry recorded for this device during the selected time period.</p>
               </div>
             ) : (
-              <>
+              <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''}`}>
                 {stats && (
                   <div className="devices__metrics-summary">
-                    <div className="devices__summary-col col-temp">
+                    <div className="devices__summary-col">
                       <div className="devices__summary-header">
-                        <IconThermometer size={16} strokeWidth={2} />
+                        <IconThermometer size={16} strokeWidth={1.75} />
                         <span>Temperature</span>
                       </div>
                       <div className="devices__summary-metrics">
@@ -827,9 +832,9 @@ export const DevicesPanel = () => {
                       </div>
                     </div>
 
-                    <div className="devices__summary-col col-humidity">
+                    <div className="devices__summary-col">
                       <div className="devices__summary-header">
-                        <IconDroplet size={16} strokeWidth={2} />
+                        <IconDroplet size={16} strokeWidth={1.75} />
                         <span>Humidity</span>
                       </div>
                       <div className="devices__summary-metrics">
@@ -848,9 +853,9 @@ export const DevicesPanel = () => {
                       </div>
                     </div>
 
-                    <div className="devices__summary-col col-pressure">
+                    <div className="devices__summary-col">
                       <div className="devices__summary-header">
-                        <IconGauge size={16} strokeWidth={2} />
+                        <IconGauge size={16} strokeWidth={1.75} />
                         <span>Air Pressure</span>
                       </div>
                       <div className="devices__summary-metrics">
@@ -869,9 +874,9 @@ export const DevicesPanel = () => {
                       </div>
                     </div>
 
-                    <div className="devices__summary-col col-count">
+                    <div className="devices__summary-col">
                       <div className="devices__summary-header">
-                        <IconCpu size={16} strokeWidth={2} />
+                        <IconCpu size={16} strokeWidth={1.75} />
                         <span>Telemetry Points</span>
                       </div>
                       <div className="devices__summary-metrics">
@@ -894,45 +899,45 @@ export const DevicesPanel = () => {
                   <div className="devices__separate-charts">
                     <div className="devices__chart-card">
                       <div className="devices__chart-header">
-                        <IconThermometer size={18} strokeWidth={2} color="#10b981" />
+                        <IconThermometer size={18} strokeWidth={1.75} />
                         <h4>Temperature (°C)</h4>
                       </div>
-                      <div className="devices__chart-container">
+                      <div className="devices__chart-container devices__chart-container--separate">
                         <LineGraph
                           data={tempSeparateData}
-                          config={createMetricConfig('°C', '#10b981')}
+                          config={createMetricConfig('°C')}
                         />
                       </div>
                     </div>
 
                     <div className="devices__chart-card">
                       <div className="devices__chart-header">
-                        <IconDroplet size={18} strokeWidth={2} color="#06b6d4" />
+                        <IconDroplet size={18} strokeWidth={1.75} />
                         <h4>Humidity (%)</h4>
                       </div>
-                      <div className="devices__chart-container">
+                      <div className="devices__chart-container devices__chart-container--separate">
                         <LineGraph
                           data={humiditySeparateData}
-                          config={createMetricConfig('%', '#06b6d4')}
+                          config={createMetricConfig('%')}
                         />
                       </div>
                     </div>
 
                     <div className="devices__chart-card">
                       <div className="devices__chart-header">
-                        <IconGauge size={18} strokeWidth={2} color="#f59e0b" />
+                        <IconGauge size={18} strokeWidth={1.75} />
                         <h4>Air Pressure (hPa)</h4>
                       </div>
-                      <div className="devices__chart-container">
+                      <div className="devices__chart-container devices__chart-container--separate">
                         <LineGraph
                           data={pressureSeparateData}
-                          config={createMetricConfig('hPa', '#f59e0b')}
+                          config={createMetricConfig('hPa')}
                         />
                       </div>
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}

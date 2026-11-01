@@ -11,6 +11,7 @@ export type LineGraphAxisData = {
   pointRadius?: number;
   pointHoverRadius?: number;
   borderWidth?: number;
+  borderDash?: number[];
 };
 
 export type LineGraphScale = {
