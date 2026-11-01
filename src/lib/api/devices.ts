@@ -1,4 +1,13 @@
-import type { DeviceLinkPayload, DeviceListPayload, DevicePairingRequestPayload, DevicePairingTokenPayload, DevicePayload } from '@common';
+import type {
+  DeviceDataPointsPayload,
+  DeviceLinkPayload,
+  DeviceListPayload,
+  DevicePairingRequestPayload,
+  DevicePairingTokenPayload,
+  DevicePayload,
+  DeviceUnlinkPayload,
+  DeviceUpdatePayload,
+} from '@common';
 import type { RequestClient } from './client';
 
 export function createDevicesApi(client: RequestClient) {
@@ -10,6 +19,27 @@ export function createDevicesApi(client: RequestClient) {
     async getBySerial(serial: number) {
       const response = await client.requestJson<DevicePayload>(`/api/devices/${serial}`);
       return response.device;
+    },
+    async getDataPoints(serial: number, options?: { period?: string; from?: string; to?: string }) {
+      const params = new URLSearchParams();
+      if (options?.period) params.set('period', options.period);
+      if (options?.from) params.set('from', options.from);
+      if (options?.to) params.set('to', options.to);
+      const query = params.toString();
+      const path = `/api/devices/${serial}/data${query ? `?${query}` : ''}`;
+      return client.requestJson<DeviceDataPointsPayload>(path);
+    },
+    async update(serial: number, input: { name?: string; locationId?: string }) {
+      const response = await client.requestJson<DeviceUpdatePayload>(`/api/devices/${serial}`, {
+        method: 'PATCH',
+        body: input,
+      });
+      return response.device;
+    },
+    async unlink(serial: number) {
+      return client.requestJson<DeviceUnlinkPayload>(`/api/devices/${serial}`, {
+        method: 'DELETE',
+      });
     },
     async requestPairing(input: { serial: number; name?: string }) {
       return client.requestJson<DevicePairingRequestPayload>('/api/devices/pair', {

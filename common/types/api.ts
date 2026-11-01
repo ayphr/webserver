@@ -1,4 +1,4 @@
-import type { Device, DeviceSummary } from './device';
+import type { DataPoint, Device, DeviceSummary } from './device';
 import type { Location } from './location';
 import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
@@ -95,6 +95,27 @@ export type LocationPayload = {
 
 export type DevicePayload = {
   device: Device;
+};
+
+export type DeviceDataPointsPayload = {
+  serial: number;
+  period: string;
+  dataPoints: DataPoint[];
+  totalCount: number;
+};
+
+export type DeviceUpdateRequest = {
+  name?: string;
+  locationId?: string;
+};
+
+export type DeviceUpdatePayload = {
+  device: Device;
+};
+
+export type DeviceUnlinkPayload = {
+  unlinked: boolean;
+  serial: number;
 };
 
 export type DeviceTokenPayload = {

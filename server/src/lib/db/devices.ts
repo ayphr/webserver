@@ -9,6 +9,7 @@ import {
   normalizeDateValues,
   trackMongoOperation,
   DEVICES_COLLECTION,
+  DATA_POINTS_COLLECTION,
 } from './internal';
 import type { DeviceDocument, DevicePairing } from './internal';
 
@@ -186,4 +187,60 @@ export async function markDevicePairingFetched(code: string) {
   const devicePairings = await getCollection('devicePairings');
   trackMongoOperation('deleteOne', 'device_pairings');
   await devicePairings.deleteOne({ code });
+}
+
+export async function updateDevice(
+  serial: number,
+  ownerUuid: string,
+  patch: { name?: string; locationId?: string },
+): Promise<DeviceDocument | null> {
+  const devices = await getCollection('devices');
+  const updateFields: Record<string, unknown> = {};
+
+  if (patch.name !== undefined) {
+    updateFields.name = patch.name;
+  }
+  if (patch.locationId !== undefined) {
+    updateFields.locationId = patch.locationId;
+  }
+
+  if (Object.keys(updateFields).length === 0) {
+    return getDeviceBySerial(serial);
+  }
+
+  trackMongoOperation('findOneAndUpdate', DEVICES_COLLECTION);
+  const updated = await devices.findOneAndUpdate(
+    { serial, ownerUuid },
+    { $set: updateFields },
+    { returnDocument: 'after' },
+  );
+
+  if (updated) {
+    await cacheSet(DEVICE_CACHE, deviceCacheKey(serial), updated, DEVICE_CACHE_TTL_SECONDS);
+    await invalidateDeviceCachesForOwner(ownerUuid);
+  }
+
+  return updated;
+}
+
+export async function unlinkDevice(serial: number, ownerUuid: string): Promise<boolean> {
+  const devices = await getCollection('devices');
+  trackMongoOperation('deleteOne', DEVICES_COLLECTION);
+  const result = await devices.deleteOne({ serial, ownerUuid });
+
+  if (result.deletedCount > 0) {
+    const dataPoints = await getCollection('dataPoints');
+    trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);
+    await dataPoints.deleteMany({ deviceSerial: serial });
+
+    await cacheDel(
+      DEVICE_CACHE,
+      deviceCacheKey(serial),
+      deviceListCacheKey(ownerUuid),
+      deviceStatsCacheKey(ownerUuid),
+    );
+    return true;
+  }
+
+  return false;
 }

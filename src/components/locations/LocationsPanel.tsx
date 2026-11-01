@@ -88,9 +88,11 @@ export const LocationsPanel = () => {
   const maxLocations = planFeatures?.maxLocations ?? null;
   const atLocationLimit = maxLocations !== null && locations.length >= maxLocations;
 
-  useEffect(() => {
-    if (selectedLocation) setSettingsName(selectedLocation.name);
-  }, [selectedLocation]);
+  const [prevLocationId, setPrevLocationId] = useState<string | null>(null);
+  if (selectedLocation && selectedLocation.id !== prevLocationId) {
+    setPrevLocationId(selectedLocation.id);
+    setSettingsName(selectedLocation.name);
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

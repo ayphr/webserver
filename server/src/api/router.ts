@@ -28,7 +28,17 @@ import {
   handleStaffUsers,
   handleUsersSummary,
 } from './routes/staff';
-import { handleFetchPairingToken, handleGetBySerial, handleLink, handleListMine, handleRequestPairing, handleUpload } from './routes/devices';
+import {
+  handleFetchPairingToken,
+  handleGetBySerial,
+  handleDeviceGetData,
+  handleDeviceUpdate,
+  handleDeviceUnlink,
+  handleLink,
+  handleListMine,
+  handleRequestPairing,
+  handleUpload,
+} from './routes/devices';
 import { handleLocationsListMine, handleLocationCreate, handleLocationGet, handleLocationUpdate, handleLocationDelete } from './routes/locations';
 import {
   handleListApps,
@@ -123,7 +133,12 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/devices/data', handle: handleUpload },
   { method: 'GET', path: '/api/devices', handle: handleListMine },
   { method: 'GET', path: '/api/devices/mine', handle: handleListMine },
+  { method: 'GET', path: '/api/devices/:serial/data', handle: handleDeviceGetData },
   { method: 'GET', path: '/api/devices/:serial', handle: handleGetBySerial },
+  { method: 'PATCH', path: '/api/devices/:serial', handle: handleDeviceUpdate },
+  { method: 'PUT', path: '/api/devices/:serial', handle: handleDeviceUpdate },
+  { method: 'DELETE', path: '/api/devices/:serial', handle: handleDeviceUnlink },
+  { method: 'POST', path: '/api/devices/:serial/unlink', handle: handleDeviceUnlink },
 
   { method: 'GET', path: '/api/locations', handle: handleLocationsListMine },
   { method: 'POST', path: '/api/locations', handle: handleLocationCreate },

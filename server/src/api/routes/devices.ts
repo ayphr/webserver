@@ -11,6 +11,7 @@ import {
   markDevicePairingFetched,
   markDevicePairingLinked,
   getDataPointStats,
+  getDataPointsForDevice,
   getDeviceBySerial,
   getDeviceByTokenHash,
   getDevicesForOwnerUuid,
@@ -18,9 +19,11 @@ import {
   invalidateDeviceStatsForOwner,
   pruneDataPointsForSerials,
   toPublicDevice,
+  updateDevice,
   updateDeviceLastUpload,
   updateDeviceLocation,
   updateDeviceToken,
+  unlinkDevice,
   upsertDataPoints,
   type DeviceDocument,
 } from '../../lib/db';
@@ -381,4 +384,120 @@ async function handleUpload(request: Request): Promise<Response> {
   }
 }
 
-export { handleFetchPairingToken, handleLink, handleListMine, handleGetBySerial, handleRequestPairing, handleUpload };
+const handleGetData = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+
+  const url = new URL(request.url);
+  const period = url.searchParams.get('period') ?? '24h';
+  const fromParam = url.searchParams.get('from');
+  const toParam = url.searchParams.get('to');
+
+  let since: Date | undefined;
+  let until: Date | undefined;
+  const now = Date.now();
+
+  if (fromParam) {
+    const parsed = parseTimestamp(fromParam);
+    if (parsed) since = parsed;
+  } else {
+    switch (period) {
+      case '1h':
+        since = new Date(now - 60 * 60 * 1000);
+        break;
+      case '24h':
+        since = new Date(now - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        since = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        since = new Date(now - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'all':
+        since = undefined;
+        break;
+      default:
+        since = new Date(now - 24 * 60 * 60 * 1000);
+        break;
+    }
+  }
+
+  if (toParam) {
+    const parsed = parseTimestamp(toParam);
+    if (parsed) until = parsed;
+  }
+
+  const { points, totalCount } = await getDataPointsForDevice(serial, { since, until, maxPoints: 1200 });
+
+  return json({
+    serial,
+    period,
+    dataPoints: points,
+    totalCount,
+  });
+});
+
+const handleUpdateDevice = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+
+  const body = await readJsonBody(request);
+  const patch: { name?: string; locationId?: string } = {};
+
+  if (body?.name !== undefined) {
+    const name = parseName(body.name);
+    if (!name) return json({ error: 'invalid name' }, 400);
+    patch.name = name;
+  }
+
+  if (body?.locationId !== undefined) {
+    const locId = typeof body.locationId === 'string' ? body.locationId.trim() : '';
+    if (locId) {
+      const location = await getLocationById(locId);
+      if (!location || location.ownerUuid !== user.uuid) {
+        return json({ error: 'invalid location' }, 400);
+      }
+      patch.locationId = location.id;
+    }
+  }
+
+  const updated = await updateDevice(serial, user.uuid, patch);
+  if (!updated) return json({ error: 'failed to update device' }, 500);
+
+  return json({ device: toPublicDevice(updated) });
+});
+
+const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+
+  const unlinked = await unlinkDevice(serial, user.uuid);
+  if (!unlinked) return json({ error: 'failed to unlink device' }, 500);
+
+  return json({ unlinked: true, serial });
+});
+
+export {
+  handleFetchPairingToken,
+  handleLink,
+  handleListMine,
+  handleGetBySerial,
+  handleGetData as handleDeviceGetData,
+  handleUpdateDevice as handleDeviceUpdate,
+  handleUnlinkDevice as handleDeviceUnlink,
+  handleRequestPairing,
+  handleUpload,
+};

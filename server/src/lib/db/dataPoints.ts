@@ -163,4 +163,82 @@ export async function pruneDataPointsForSerials(
   return removed;
 }
 
+export async function getDataPointsForDevice(
+  serial: number,
+  options?: { since?: Date; until?: Date; maxPoints?: number },
+): Promise<{ points: DataPoint[]; totalCount: number }> {
+  const dataPoints = await getCollection('dataPoints');
+  const filter: Record<string, unknown> = { deviceSerial: serial };
+  if (options?.since || options?.until) {
+    const tsFilter: Record<string, unknown> = {};
+    if (options.since) tsFilter.$gte = options.since;
+    if (options.until) tsFilter.$lte = options.until;
+    filter.timestamp = tsFilter;
+  }
+
+  trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
+  const totalCount = await dataPoints.countDocuments(filter);
+
+  if (totalCount === 0) {
+    return { points: [], totalCount: 0 };
+  }
+
+  const max = options?.maxPoints ?? 1200;
+
+  trackMongoOperation('find', DATA_POINTS_COLLECTION);
+  if (totalCount <= max) {
+    const docs = await dataPoints.find(filter).sort({ timestamp: 1 }).toArray();
+    return {
+      points: docs.map((doc) => ({
+        timestamp: doc.timestamp,
+        temperature: doc.temperature,
+        humidity: doc.humidity,
+        airPressure: doc.airPressure,
+      })),
+      totalCount,
+    };
+  }
+
+  if (totalCount <= 10000) {
+    const docs = await dataPoints.find(filter).sort({ timestamp: 1 }).toArray();
+    const step = docs.length / max;
+    const sampled: DataPoint[] = [];
+    for (let i = 0; i < max; i++) {
+      const idx = Math.min(Math.floor(i * step), docs.length - 1);
+      const doc = docs[idx];
+      if (doc) {
+        sampled.push({
+          timestamp: doc.timestamp,
+          temperature: doc.temperature,
+          humidity: doc.humidity,
+          airPressure: doc.airPressure,
+        });
+      }
+    }
+    const lastDoc = docs[docs.length - 1];
+    const lastSampled = sampled[sampled.length - 1];
+    if (lastDoc && lastSampled && lastSampled.timestamp.getTime() !== lastDoc.timestamp.getTime()) {
+      sampled[sampled.length - 1] = {
+        timestamp: lastDoc.timestamp,
+        temperature: lastDoc.temperature,
+        humidity: lastDoc.humidity,
+        airPressure: lastDoc.airPressure,
+      };
+    }
+    return { points: sampled, totalCount };
+  }
+
+  const recentDocs = await dataPoints.find(filter).sort({ timestamp: -1 }).limit(max).toArray();
+  recentDocs.reverse();
+  return {
+    points: recentDocs.map((doc) => ({
+      timestamp: doc.timestamp,
+      temperature: doc.temperature,
+      humidity: doc.humidity,
+      airPressure: doc.airPressure,
+    })),
+    totalCount,
+  };
+}
+
 

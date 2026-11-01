@@ -545,7 +545,7 @@ export const DashboardPage = () => {
             )}
 
             {activePage === 'devices' && (
-              <Card className="dashboard-page__card" elevated>
+              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
                 <CardHeader>
                   <h2>Devices</h2>
                   <p>Ayphr devices registered to your account</p>
