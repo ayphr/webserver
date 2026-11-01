@@ -26,7 +26,7 @@
   padding: 0.75rem 1rem;
   border: 1px solid var(--status-error);
   border-radius: var(--radius-md);
-  background: rgba(255, 100, 100, 0.08);
+  background: var(--bg-surface);
   color: var(--status-error);
   font-size: 0.88rem;
 }
@@ -65,7 +65,7 @@
 /* LIST VIEW - CARDS GRID */
 .devices__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 380px));
   gap: 1rem;
 }
 
@@ -83,8 +83,8 @@
 
 .devices__card:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  border-color: var(--border-focus);
+  box-shadow: var(--container-shadow);
 }
 
 .devices__card-header {
@@ -111,7 +111,7 @@
   font-family: var(--font-family-mono);
   font-size: 0.78rem;
   padding: 0.15rem 0.45rem;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
@@ -129,14 +129,14 @@
 }
 
 .devices__status-badge.is-online {
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  color: #10b981;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-green);
+  color: var(--status-success);
 }
 
 .devices__status-badge.is-offline {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   color: var(--text-dim);
 }
 
@@ -148,7 +148,7 @@
 }
 
 .devices__status-badge.is-online .devices__status-dot {
-  box-shadow: 0 0 6px #10b981;
+  box-shadow: 0 0 6px var(--status-success);
 }
 
 .devices__card-telemetry {
@@ -171,7 +171,7 @@
   font-family: var(--font-family-mono);
   font-size: 0.8rem;
   font-weight: 500;
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
 }
@@ -248,7 +248,7 @@
 
 .devices__stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.85rem;
 }
 
@@ -277,7 +277,7 @@
 }
 
 .devices__stat-value.is-online-text {
-  color: #10b981;
+  color: var(--status-success);
 }
 
 .devices__stat-value.is-offline-text {
@@ -298,7 +298,7 @@
 
 .devices__reading-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.85rem;
 }
 
@@ -319,7 +319,7 @@
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
 }
@@ -424,7 +424,7 @@
 }
 
 .devices__control-btn.is-active {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-weight: var(--font-weight-hv);
 }
@@ -448,7 +448,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  height: 420px;
+  height: 400px;
   color: var(--text-muted);
 }
 
@@ -468,7 +468,7 @@
 
 .devices__metrics-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.85rem;
 }
 
@@ -571,7 +571,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 600px;
+  max-width: 520px;
 }
 
 .devices__settings-section {
@@ -634,7 +634,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: #10b981;
+  color: var(--status-success);
   font-size: 0.88rem;
   font-weight: 500;
 }
@@ -646,14 +646,14 @@
   gap: 0.75rem;
   padding: 1.25rem;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.04);
+  border: 1px solid var(--status-error);
+  background: var(--bg-surface);
 }
 
 .devices__danger-title {
   margin: 0;
   font-size: 1.05rem;
-  color: #ef4444;
+  color: var(--status-error);
   font-weight: var(--font-weight-md);
 }
 

@@ -43,7 +43,14 @@
 }
 
 .dashboard-page__card--devices {
-  max-width: 1280px;
+  width: 100%;
+  max-width: 800px;
+  transition: max-width 0.2s ease;
+}
+
+.dashboard-page__card--devices:has(.devices--wide),
+.dashboard-page__card--devices:has(.devices__graphs) {
+  max-width: 1140px;
 }
 
 .dashboard-page__user-row {
