@@ -207,14 +207,9 @@ const handleStaffPunishmentLift = requireRole('staff', async (_request, staffUse
     return json({ error: 'punishment not found' }, 404);
   }
 
-  // A suspended user may never lift a punishment, and nobody may lift their own
-  // suspension (which would otherwise let a suspended staff member un-suspend
-  // themselves).
-  if (punishment.userUuid === staffUser.uuid) {
-    return json({ error: 'Forbidden' }, 403);
-  }
-
-  if (staffUser.role === 'staff') {
+  // Staff can lift their own punishment, but a suspended staff member may not
+  // lift anyone else's.
+  if (staffUser.role === 'staff' && punishment.userUuid !== staffUser.uuid) {
     const activeSuspension = await getActiveSuspensionForUserUuid(staffUser.uuid);
     if (activeSuspension) {
       return json({ error: 'Forbidden' }, 403);
