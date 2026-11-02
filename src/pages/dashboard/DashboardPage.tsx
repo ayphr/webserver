@@ -1,11 +1,11 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import type { Punishment, PublicUser, CreditBalance } from '@common';
 import type { SettingsSection } from '../../lib/settings';
-import { Card, CardBody, CardHeader, UsernameDisplay, ProfileCard, Button } from '../../components/common';
+import { UsernameDisplay, ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -123,6 +123,23 @@ function getStoredDefaultTab(): string {
   return stored === 'overview' || stored === 'devices' || stored === 'users' || stored === 'my-apps' ? stored : 'overview';
 }
 
+type DashboardPanelProps = {
+  title: string;
+  description?: string;
+  className?: string;
+  children: ReactNode;
+};
+
+const DashboardPanel = ({ title, description, className = '', children }: DashboardPanelProps) => (
+  <section className={`dashboard-panel ${className}`}>
+    <header className="dashboard-panel__header">
+      <h2>{title}</h2>
+      {description && <p>{description}</p>}
+    </header>
+    <div className="dashboard-panel__content">{children}</div>
+  </section>
+);
+
 export const DashboardPage = () => {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
@@ -139,6 +156,9 @@ export const DashboardPage = () => {
   const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   const [compactLayout, setCompactLayout] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-compact') === '1',
+  );
+  const [sidebarPinned, setSidebarPinned] = useState<boolean>(
+    () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
 
@@ -270,6 +290,11 @@ export const DashboardPage = () => {
   const setCompactPref = (checked: boolean) => {
     setCompactLayout(checked);
     localStorage.setItem('ayphr-pref-compact', checked ? '1' : '0');
+  };
+
+  const setSidebarPinnedPref = (checked: boolean) => {
+    setSidebarPinned(checked);
+    localStorage.setItem('ayphr-pref-sidebar-pinned', checked ? '1' : '0');
   };
 
   const settingsSections = useMemo<SettingsSection[]>(() => [
@@ -430,20 +455,27 @@ export const DashboardPage = () => {
           checked: compactLayout,
           onChange: setCompactPref,
         },
+        {
+          id: 'sidebar-pinned',
+          optionType: 'checkbox',
+          icon: <IconLayoutSidebar size={18} strokeWidth={1.75} />,
+          title: 'Keep sidebar open',
+          description: 'Always show the full sidebar instead of collapsing it to icons.',
+          checked: sidebarPinned,
+          onChange: setSidebarPinnedPref,
+        },
       ],
     },
-  ], [defaultTab, compactLayout, navigate, isStaff, isDeveloper, user]);
+  ], [defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user]);
 
   if (isLoading) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} isDeveloper={isDeveloper} credits={credits} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} isDeveloper={isDeveloper} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main">
-          <Card className="dashboard-page__card" elevated>
-            <CardBody>
-              <p>Loading dashboard...</p>
-            </CardBody>
-          </Card>
+          <DashboardPanel title="Dashboard" description="Loading...">
+            <p>Loading dashboard...</p>
+          </DashboardPanel>
         </main>
       </div>
     );
@@ -452,13 +484,11 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} credits={credits} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main">
-          <Card className="dashboard-page__card" elevated>
-            <CardBody>
-              <p>Could not load user profile.</p>
-            </CardBody>
-          </Card>
+          <DashboardPanel title="Dashboard">
+            <p>Could not load user profile.</p>
+          </DashboardPanel>
         </main>
       </div>
     );
@@ -466,224 +496,182 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' ? (
-          <Card className="dashboard-page__card" elevated>
-            <CardHeader>
-              <h2>Account Suspended</h2>
-              <p>You are currently under a suspension</p>
-            </CardHeader>
-            <CardBody>
-              <div className="dashboard-page__punishment-info">
-                <div className="dashboard-page__punishment-field">
-                  <span className="dashboard-page__punishment-label">Reason:</span>
-                  <span className="dashboard-page__punishment-value">{activeSuspension.reason}</span>
-                </div>
-                <div className="dashboard-page__punishment-field">
-                  <span className="dashboard-page__punishment-label">Issued by:</span>
-                  <span className="dashboard-page__punishment-value">{activeSuspension.issuedByUsername}</span>
-                </div>
-                <div className="dashboard-page__punishment-field">
-                  <span className="dashboard-page__punishment-label">Issued:</span>
-                  <span className="dashboard-page__punishment-value">{getRelativeTime(activeSuspension.issuedAt)} ({formatDisplayDate(activeSuspension.issuedAt)})</span>
-                </div>
-                <div className="dashboard-page__punishment-field">
-                  <span className="dashboard-page__punishment-label">Ends:</span>
-                  <span className="dashboard-page__punishment-value">
-                    {activeSuspension.endsAt ? (
-                      <>
-                        {getTimeRemaining(activeSuspension.endsAt)} ({formatDisplayDate(activeSuspension.endsAt)})
-                      </>
-                    ) : (
-                      'Permanent'
-                    )}
-                  </span>
-                </div>
-                <div className="dashboard-page__punishment-field">
-                  <span className="dashboard-page__punishment-label">Time remaining:</span>
-                  <PunishmentCountdown
-                    endsAt={activeSuspension.endsAt}
-                    isPermanent={activeSuspension.endsAt === null}
-                  />
-                </div>
+          <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
+            <div className="dashboard-page__punishment-info">
+              <div className="dashboard-page__punishment-field">
+                <span className="dashboard-page__punishment-label">Reason:</span>
+                <span className="dashboard-page__punishment-value">{activeSuspension.reason}</span>
               </div>
-              {isStaff && (
-                <Button
-                  onClick={handleLiftSuspension}
-                  isLoading={isLiftingPunishment}
-                  disabled={isLiftingPunishment}
-                  variant="danger"
-                  className="dashboard-page__lift-button"
-                >
-                  Lift Suspension
-                </Button>
-              )}
-            </CardBody>
-          </Card>
+              <div className="dashboard-page__punishment-field">
+                <span className="dashboard-page__punishment-label">Issued by:</span>
+                <span className="dashboard-page__punishment-value">{activeSuspension.issuedByUsername}</span>
+              </div>
+              <div className="dashboard-page__punishment-field">
+                <span className="dashboard-page__punishment-label">Issued:</span>
+                <span className="dashboard-page__punishment-value">{getRelativeTime(activeSuspension.issuedAt)} ({formatDisplayDate(activeSuspension.issuedAt)})</span>
+              </div>
+              <div className="dashboard-page__punishment-field">
+                <span className="dashboard-page__punishment-label">Ends:</span>
+                <span className="dashboard-page__punishment-value">
+                  {activeSuspension.endsAt ? (
+                    <>
+                      {getTimeRemaining(activeSuspension.endsAt)} ({formatDisplayDate(activeSuspension.endsAt)})
+                    </>
+                  ) : (
+                    'Permanent'
+                  )}
+                </span>
+              </div>
+              <div className="dashboard-page__punishment-field">
+                <span className="dashboard-page__punishment-label">Time remaining:</span>
+                <PunishmentCountdown
+                  endsAt={activeSuspension.endsAt}
+                  isPermanent={activeSuspension.endsAt === null}
+                />
+              </div>
+            </div>
+            {isStaff && (
+              <Button
+                onClick={handleLiftSuspension}
+                isLoading={isLiftingPunishment}
+                disabled={isLiftingPunishment}
+                variant="danger"
+                className="dashboard-page__lift-button"
+              >
+                Lift Suspension
+              </Button>
+            )}
+          </DashboardPanel>
         ) : (
           <>
             {activePage === 'overview' && (
-              <Card className="dashboard-page__card" elevated>
-                <CardHeader>
-                  <h2>Dashboard</h2>
-                  <p>Profile summary</p>
-                </CardHeader>
-
-                <CardBody>
-                  <UsernameDisplay
-                    username={user.username}
-                    badges={user.badges}
-                    country={user.country}
-                    avatarUrl={user.avatarUrl}
-                    avatarSize={40}
-                    className="dashboard-page__user-row"
-                  />
-                  <p>Welcome to your dashboard!</p>
-                </CardBody>
-              </Card>
+              <DashboardPanel title="Dashboard" description="Profile summary">
+                <UsernameDisplay
+                  username={user.username}
+                  badges={user.badges}
+                  country={user.country}
+                  avatarUrl={user.avatarUrl}
+                  avatarSize={40}
+                  className="dashboard-page__user-row"
+                />
+                <p>Welcome to your dashboard!</p>
+              </DashboardPanel>
             )}
 
             {activePage === 'devices' && (
-              <Card className="dashboard-page__card dashboard-page__card--devices" elevated>
-                <CardHeader>
-                  <h2>Devices</h2>
-                  <p>Ayphr devices registered to your account</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <DevicesPanel />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Devices"
+                description="Ayphr devices registered to your account"
+                className="dashboard-panel--devices"
+              >
+                <Suspense fallback={<p>Loading...</p>}>
+                  <DevicesPanel />
+                </Suspense>
+              </DashboardPanel>
             )}
 
             {activePage === 'locations' && (
-              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
-                <CardHeader>
-                  <h2>Locations</h2>
-                  <p>Group your devices into locations</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <LocationsPanel />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Locations"
+                description="Group your devices into locations"
+                className="dashboard-panel--wide"
+              >
+                <Suspense fallback={<p>Loading...</p>}>
+                  <LocationsPanel />
+                </Suspense>
+              </DashboardPanel>
             )}
 
             {activePage === 'profile' && (
-              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
-                <CardHeader>
-                  <h2>Profile</h2>
-                  <p>Your profile information</p>
-                </CardHeader>
-                <CardBody>
-                  <ProfileCard
-                    userUuid={user.uuid}
-                    viewerUuid={user.uuid}
-                    viewerRole={user.role}
-                    canEditProfile
-                    onPunishSelf={handleSelfPunishment}
-                  />
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Profile"
+                description="Your profile information"
+                className="dashboard-panel--wide"
+              >
+                <ProfileCard
+                  userUuid={user.uuid}
+                  viewerUuid={user.uuid}
+                  viewerRole={user.role}
+                  canEditProfile
+                  onPunishSelf={handleSelfPunishment}
+                />
+              </DashboardPanel>
             )}
 
             {(activePage === 'settings' || activePage === 'account-settings') && (
-              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
-                <CardHeader>
-                  <h2>Settings</h2>
-                  <p>Manage your account, sessions, and preferences</p>
-                </CardHeader>
-                <CardBody>
-                  <SettingsPanel sections={settingsSections} />
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Settings"
+                description="Manage your account, sessions, and preferences"
+                className="dashboard-panel--wide"
+              >
+                <SettingsPanel sections={settingsSections} />
+              </DashboardPanel>
             )}
 
             {activePage === 'subscription' && (
-              <Card className="dashboard-page__card" elevated>
-                <CardHeader>
-                  <h2>Subscription</h2>
-                  <p>Manage your Ayphr subscription and billing</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <SubscriptionPanel />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Subscription"
+                description="Manage your Ayphr subscription and billing"
+              >
+                <Suspense fallback={<p>Loading...</p>}>
+                  <SubscriptionPanel />
+                </Suspense>
+              </DashboardPanel>
             )}
 
             {activePage === 'credits' && (
-              <Card className="dashboard-page__card dashboard-page__card--wide" elevated>
-                <CardHeader>
-                  <h2>Credits</h2>
-                  <p>Your monthly allowance, additional credits, and held credits</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <CreditsPanel key={user.uuid} initialCredits={credits} onCreditsChange={setCredits} />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Credits"
+                description="Your monthly allowance, additional credits, and held credits"
+                className="dashboard-panel--wide"
+              >
+                <Suspense fallback={<p>Loading...</p>}>
+                  <CreditsPanel key={user.uuid} initialCredits={credits} onCreditsChange={setCredits} />
+                </Suspense>
+              </DashboardPanel>
             )}
 
             {activePage === 'my-apps' && isDeveloper && (
-              <Card className="dashboard-page__card dashboard-page__card--fit" elevated>
-                <CardHeader>
-                  <h2>My Apps</h2>
-                  <p>Create and manage your Ayphr apps</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <MyAppsPanel />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel title="My Apps" description="Create and manage your Ayphr apps">
+                <Suspense fallback={<p>Loading...</p>}>
+                  <MyAppsPanel />
+                </Suspense>
+              </DashboardPanel>
             )}
 
             {activePage === 'connections' && (
-              <Card className="dashboard-page__card" elevated>
-                <CardHeader>
-                  <h2>Connections</h2>
-                  <p>Apps connected to your account</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <ConnectionsPanel />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel title="Connections" description="Apps connected to your account">
+                <Suspense fallback={<p>Loading...</p>}>
+                  <ConnectionsPanel />
+                </Suspense>
+              </DashboardPanel>
             )}
 
             {activePage === 'users' && isStaff && (
-              <Card className="dashboard-page__card dashboard-page__card--full" elevated>
-                <CardHeader>
-                  <h2>Users</h2>
-                  <p>Search and manage Ayphr users</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <UsersPanel />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Users"
+                description="Search and manage Ayphr users"
+                className="dashboard-panel--full"
+              >
+                <Suspense fallback={<p>Loading...</p>}>
+                  <UsersPanel />
+                </Suspense>
+              </DashboardPanel>
             )}
 
             {activePage === 'games' && (
-              <Card className="dashboard-page__card dashboard-page__card--full" elevated>
-                <CardHeader>
-                  <h2>Games</h2>
-                  <p>Take a break with a few small games</p>
-                </CardHeader>
-                <CardBody>
-                  <Suspense fallback={<p>Loading...</p>}>
-                    <GamesPanel />
-                  </Suspense>
-                </CardBody>
-              </Card>
+              <DashboardPanel
+                title="Games"
+                description="Take a break with a few small games"
+                className="dashboard-panel--full"
+              >
+                <Suspense fallback={<p>Loading...</p>}>
+                  <GamesPanel />
+                </Suspense>
+              </DashboardPanel>
             )}
           </>
         )}

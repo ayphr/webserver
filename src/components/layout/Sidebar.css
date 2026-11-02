@@ -1,6 +1,10 @@
 .n-sidebar {
-  width: fit-content;
-  min-width: 220px;
+  --sidebar-width-expanded: 232px;
+  --sidebar-width-collapsed: 80px;
+  --sidebar-width: var(--sidebar-width-expanded);
+
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
   flex-shrink: 0;
   height: 100vh;
   box-sizing: border-box;
@@ -8,8 +12,21 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--bg-surface);
   border-right: 1px solid rgba(255, 255, 255, 0.03);
+  transition:
+    width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    min-width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.n-sidebar--collapsed {
+  --sidebar-width: var(--sidebar-width-collapsed);
+}
+
+.n-sidebar--collapsed:hover,
+.n-sidebar--collapsed.n-sidebar--menu-open {
+  --sidebar-width: var(--sidebar-width-expanded);
 }
 
 .n-sidebar__logo {
@@ -29,6 +46,10 @@
   font-size: 1.1rem;
   margin: 0;
   color: var(--text-primary);
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.14s ease, max-width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .n-sidebar__tabs {
@@ -49,7 +70,7 @@
   text-align: left;
   cursor: pointer;
   border-radius: 6px;
-  transition: background 0.2s, color 0.2s, font-weight 0.2s;
+  transition: background 0.2s, color 0.2s, gap 0.2s, padding 0.2s;
 }
 
 .n-sidebar__tab:hover {
@@ -68,12 +89,17 @@
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
+  flex-shrink: 0;
 }
 
 .n-sidebar__label {
   font-size: 0.95rem;
   line-height: 1;
   display: inline-block;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.14s ease, max-width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .n-sidebar__spacer {
@@ -117,6 +143,10 @@
   font-weight: var(--font-weight-hv);
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.14s ease, max-width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .n-sidebar__creditsLabel {
@@ -125,6 +155,10 @@
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.14s ease, max-width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .n-sidebar__creditsIcon svg {
@@ -179,6 +213,7 @@
   width: 100%;
   text-align: left;
   cursor: pointer;
+  transition: gap 0.2s, padding 0.2s;
 }
 
 .n-sidebar__menuItem:hover {
@@ -188,6 +223,16 @@
 .n-sidebar__menuIcon {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.n-sidebar__menuLabel {
+  font-size: 0.95rem;
+  line-height: 1;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.14s ease, max-width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Ensure SVG icons don't have extra descender space and align with text */
@@ -288,4 +333,20 @@
 
 .n-sidebar__accountName {
   font-size: 0.9rem;
+}
+
+/* Collapsed (icon-only) state */
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__title,
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__label,
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__menuLabel,
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__creditsAmount,
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__creditsLabel {
+  opacity: 0;
+  max-width: 0;
+}
+
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .username-display__username,
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .username-display__icons,
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .username-display__flag {
+  display: none;
 }

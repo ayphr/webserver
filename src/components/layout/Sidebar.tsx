@@ -4,6 +4,7 @@ import logo from '../../assets/logo.svg';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
+import { useTooltip } from '../../context';
 import { isStoredAccountExpired, type StoredAccount } from '../../lib/accounts';
 import { formatCredits } from '../../lib/credits';
 import type { BadgeId, CreditBalance } from '@common/types';
@@ -61,6 +62,7 @@ type Props = {
   activeToken?: string | null;
   onSwitchAccount?: (token: string) => void;
   onLogoutAccount?: (token: string) => void;
+  pinned?: boolean;
 };
 
 export const Sidebar: React.FC<Props> = ({
@@ -78,6 +80,7 @@ export const Sidebar: React.FC<Props> = ({
   activeToken = null,
   onSwitchAccount,
   onLogoutAccount,
+  pinned = false,
 }) => {
   const visibleTabs = [
     ...tabs,
@@ -88,6 +91,28 @@ export const Sidebar: React.FC<Props> = ({
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [accountToLogout, setAccountToLogout] = useState<StoredAccount | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { showTooltip, hideTooltip } = useTooltip();
+
+  const accountTooltip = `Account: ${username}`;
+  const creditsTooltip = credits
+    ? `${formatCredits(credits.available)} credits available${credits.onHold > 0 ? ` (${formatCredits(credits.onHold)} on hold)` : ''}`
+    : 'Credits';
+
+  // Icons only get tooltips while the sidebar is in auto-collapse mode.
+  const tooltipHandlers = (content: string) => {
+    if (pinned) return {};
+
+    return {
+      onMouseEnter: (event: React.MouseEvent<HTMLElement>) => {
+        showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect() });
+      },
+      onMouseLeave: hideTooltip,
+      onFocus: (event: React.FocusEvent<HTMLElement>) => {
+        showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect() });
+      },
+      onBlur: hideTooltip,
+    };
+  };
 
   useEffect(() => {
     if (!isAccountMenuOpen) return;
@@ -109,7 +134,10 @@ export const Sidebar: React.FC<Props> = ({
   };
 
   return (
-    <aside className="n-sidebar" aria-label="Sidebar">
+    <aside
+      className={`n-sidebar ${pinned ? 'n-sidebar--pinned' : 'n-sidebar--collapsed'} ${isAccountMenuOpen ? 'n-sidebar--menu-open' : ''}`}
+      aria-label="Sidebar"
+    >
       <div className="n-sidebar__top">
         <img src={logo} alt="Ayphr" className="n-sidebar__logo" />
         <h1 className="n-sidebar__title">Ayphr</h1>
@@ -121,6 +149,8 @@ export const Sidebar: React.FC<Props> = ({
             className={`n-sidebar__tab active`}
             type="button"
             onClick={() => onChange('overview')}
+            aria-label="Jail"
+            {...tooltipHandlers('Jail')}
           >
             <span className="n-sidebar__icon">{iconFor('jail')}</span>
             <span className="n-sidebar__label">Jail</span>
@@ -132,6 +162,8 @@ export const Sidebar: React.FC<Props> = ({
               className={`n-sidebar__tab ${activeTab === t.id ? 'active' : ''}`}
               onClick={() => onChange(t.id)}
               type="button"
+              aria-label={t.name}
+              {...tooltipHandlers(t.name)}
             >
               <span className="n-sidebar__icon">{iconFor(t.id)}</span>
               <span className="n-sidebar__label">{t.name}</span>
@@ -146,8 +178,9 @@ export const Sidebar: React.FC<Props> = ({
         type="button"
         className={`n-sidebar__credits ${activeTab === 'credits' ? 'active' : ''}`}
         onClick={() => onChange('credits')}
-        title={credits ? `${formatCredits(credits.available)} credits available${credits.onHold > 0 ? ` (${formatCredits(credits.onHold)} on hold)` : ''}` : 'Credits'}
+        title={creditsTooltip}
         aria-label={credits ? `Credits: ${formatCredits(credits.available)} available` : 'Credits'}
+        {...tooltipHandlers(creditsTooltip)}
       >
         <span className="n-sidebar__creditsIcon"><IconCoin size={18} strokeWidth={1.5} /></span>
         <span className="n-sidebar__creditsAmount">{credits ? formatCredits(credits.available) : '—'}</span>
@@ -160,33 +193,41 @@ export const Sidebar: React.FC<Props> = ({
             className={`n-sidebar__menuItem ${activeTab === 'profile' ? 'active' : ''}`}
             type="button"
             onClick={() => onChange('profile')}
+            aria-label="Profile"
+            {...tooltipHandlers('Profile')}
           >
             <span className="n-sidebar__menuIcon"><IconUser size={16} strokeWidth={1.5} /></span>
-            <span>Profile</span>
+            <span className="n-sidebar__menuLabel">Profile</span>
           </button>
           <button
             className={`n-sidebar__menuItem ${activeTab === 'connections' ? 'active' : ''}`}
             type="button"
             onClick={() => onChange('connections')}
+            aria-label="Connections"
+            {...tooltipHandlers('Connections')}
           >
             <span className="n-sidebar__menuIcon"><IconPlugConnected size={16} strokeWidth={1.5} /></span>
-            <span>Connections</span>
+            <span className="n-sidebar__menuLabel">Connections</span>
           </button>
           <button
             className={`n-sidebar__menuItem ${activeTab === 'account-settings' || activeTab === 'settings' ? 'active' : ''}`}
             type="button"
             onClick={() => onChange('account-settings')}
+            aria-label="Settings"
+            {...tooltipHandlers('Settings')}
           >
             <span className="n-sidebar__menuIcon"><IconSettings size={16} strokeWidth={1.5} /></span>
-            <span>Settings</span>
+            <span className="n-sidebar__menuLabel">Settings</span>
           </button>
           <button
             className={`n-sidebar__menuItem ${activeTab === 'subscription' ? 'active' : ''}`}
             type="button"
             onClick={() => onChange('subscription')}
+            aria-label="Subscription"
+            {...tooltipHandlers('Subscription')}
           >
             <span className="n-sidebar__menuIcon"><IconCreditCard size={16} strokeWidth={1.5} /></span>
-            <span>Subscription</span>
+            <span className="n-sidebar__menuLabel">Subscription</span>
           </button>
         </nav>
 
@@ -197,6 +238,8 @@ export const Sidebar: React.FC<Props> = ({
             onClick={() => setIsAccountMenuOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={isAccountMenuOpen}
+            aria-label={accountTooltip}
+            {...tooltipHandlers(accountTooltip)}
           >
             <UsernameDisplay username={username} badges={badges} country={country ?? undefined} avatarUrl={avatarUrl} />
           </button>
