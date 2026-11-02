@@ -934,7 +934,7 @@ export const LandingPage = () => {
           <div className="landing-footer__bottom">
             <span>&copy; {new Date().getFullYear()} Ayphr. All rights reserved.</span>
             <span className="landing-footer__social">
-              <IconRocket size={14} /> Made in-house
+              <IconRocket size={14} /> Made in Australia
             </span>
           </div>
         </div>
