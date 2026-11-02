@@ -336,6 +336,11 @@
 }
 
 /* Collapsed (icon-only) state */
+.n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__credits {
+  justify-content: center;
+  gap: 0;
+}
+
 .n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__title,
 .n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__label,
 .n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .n-sidebar__menuLabel,
