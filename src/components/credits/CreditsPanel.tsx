@@ -7,21 +7,11 @@ import {
   IconPlus,
   IconRefresh,
 } from '@tabler/icons-react';
-import type { CreditBalance, PlanTier } from '@common';
+import { PLAN_NAMES, type CreditBalance } from '@common';
 import { api } from '../../lib/api';
 import { formatCreditDateTime, formatCredits } from '../../lib/credits';
 import { Button } from '../common';
 import './CreditsPanel.css';
-
-const PLAN_NAMES: Record<PlanTier, string> = {
-  free: 'Free',
-  lite: 'Lite',
-  plus: 'Plus',
-  ultra: 'Ultra',
-  'team-lite': 'Team Lite',
-  'team-plus': 'Team Plus',
-  'team-ultra': 'Team Ultra',
-};
 
 type Props = {
   initialCredits?: CreditBalance | null;

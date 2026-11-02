@@ -32,14 +32,6 @@ function isOnline(device: DeviceSummary): boolean {
   return Date.now() - toDate(device.lastUploadAt).getTime() <= ONLINE_THRESHOLD_MS;
 }
 
-function formatDateTime(value: Date | string | undefined): string {
-  if (!value) return 'Never';
-  return toDate(value).toLocaleString('en-GB', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
-
 function formatRelativeTime(dateVal: Date | string | undefined): string {
   if (!dateVal) return 'Never';
   const resolved = toDate(dateVal);
@@ -69,16 +61,39 @@ function deviceLabel(device: DeviceSummary): string {
   return device.name?.trim() || `Device ${device.serial}`;
 }
 
+function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
+  if (!reading) {
+    return <span className="devices__no-data">No telemetry data recorded</span>;
+  }
+
+  return (
+    <div className="devices__telemetry-chips">
+      <div className="devices__telemetry-chip">
+        <IconThermometer size={14} strokeWidth={2} />
+        <span>{reading.temperature.toFixed(1)} °C</span>
+      </div>
+      <div className="devices__telemetry-chip">
+        <IconDroplet size={14} strokeWidth={2} />
+        <span>{reading.humidity.toFixed(1)} %</span>
+      </div>
+      <div className="devices__telemetry-chip">
+        <IconGauge size={14} strokeWidth={2} />
+        <span>{reading.airPressure.toFixed(0)} hPa</span>
+      </div>
+    </div>
+  );
+}
+
 type Period = '1h' | '24h' | '7d' | '30d' | 'all';
 type GraphMode = 'combined' | 'separate';
-type DetailTab = 'overview' | 'graphs' | 'settings';
+type DetailTab = 'graphs' | 'settings';
 
 export const DevicesPanel = () => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedSerial, setSelectedSerial] = useState<number | null>(null);
-  const [detailTab, setDetailTab] = useState<DetailTab>('overview');
+  const [detailTab, setDetailTab] = useState<DetailTab>('graphs');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -189,7 +204,7 @@ export const DevicesPanel = () => {
 
   const handleSelectDevice = (device: DeviceSummary) => {
     setSelectedSerial(device.serial);
-    setDetailTab('overview');
+    setDetailTab('graphs');
     setView('detail');
   };
 
@@ -559,24 +574,7 @@ export const DevicesPanel = () => {
                   </div>
 
                   <div className="devices__card-telemetry">
-                    {reading ? (
-                      <div className="devices__telemetry-chips">
-                        <div className="devices__telemetry-chip">
-                          <IconThermometer size={14} strokeWidth={2} />
-                          <span>{reading.temperature.toFixed(1)} °C</span>
-                        </div>
-                        <div className="devices__telemetry-chip">
-                          <IconDroplet size={14} strokeWidth={2} />
-                          <span>{reading.humidity.toFixed(1)} %</span>
-                        </div>
-                        <div className="devices__telemetry-chip">
-                          <IconGauge size={14} strokeWidth={2} />
-                          <span>{reading.airPressure.toFixed(0)} hPa</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="devices__no-data">No telemetry data recorded</span>
-                    )}
+                    <TelemetryChips reading={reading} />
                   </div>
 
                   <div className="devices__card-footer">
@@ -635,10 +633,31 @@ export const DevicesPanel = () => {
             {online ? 'Online' : 'Offline'}
           </span>
         </div>
+
+        <div className="devices__detail-meta">
+          <span>
+            <IconMapPin size={14} strokeWidth={1.75} />
+            {selectedLocation?.name ?? 'No location'}
+          </span>
+          <span>
+            <IconDatabase size={14} strokeWidth={1.75} />
+            {selectedDevice.dataPointCount.toLocaleString()} data points
+          </span>
+          <span>
+            <IconClock size={14} strokeWidth={1.75} />
+            Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
+          </span>
+        </div>
+
+        {latest && (
+          <div className="devices__detail-telemetry">
+            <TelemetryChips reading={latest} />
+          </div>
+        )}
       </div>
 
       <div className="settings__tabs" role="tablist" aria-label="Device sections">
-        {(['overview', 'graphs', 'settings'] as const).map((tab) => (
+        {(['graphs', 'settings'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -653,98 +672,6 @@ export const DevicesPanel = () => {
       </div>
 
       <div className="devices__panel-body">
-        {/* OVERVIEW TAB */}
-        {detailTab === 'overview' && (
-          <div className="devices__overview">
-            <div className="devices__stat-grid">
-              <div className="devices__stat-card">
-                <span className="devices__stat-label">Online Status</span>
-                <span className={`devices__stat-value ${online ? 'is-online-text' : 'is-offline-text'}`}>
-                  {online ? 'Online' : 'Offline'}
-                </span>
-                <span className="devices__stat-sub" title={formatDateTime(selectedDevice.lastUploadAt)}>
-                  Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
-                </span>
-              </div>
-              <div className="devices__stat-card">
-                <span className="devices__stat-label">Location</span>
-                <span className="devices__stat-value">
-                  {selectedLocation ? selectedLocation.name : 'Default location'}
-                </span>
-                <span className="devices__stat-sub">Assigned location</span>
-              </div>
-              <div className="devices__stat-card">
-                <span className="devices__stat-label">Total Data Points</span>
-                <span className="devices__stat-value">
-                  {selectedDevice.dataPointCount.toLocaleString()}
-                </span>
-                <span className="devices__stat-sub">Stored telemetry points</span>
-              </div>
-              <div className="devices__stat-card">
-                <span className="devices__stat-label">Registered Date</span>
-                <span className="devices__stat-value">
-                  {toDate(selectedDevice.registeredAt).toLocaleDateString('en-GB', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </span>
-                <span className="devices__stat-sub">Account link date</span>
-              </div>
-            </div>
-
-            <h4 className="devices__section-title">Latest Telemetry</h4>
-            {latest ? (
-              <div className="devices__reading-grid">
-                <div className="devices__reading-card">
-                  <div className="devices__reading-icon">
-                    <IconThermometer size={20} strokeWidth={1.75} />
-                  </div>
-                  <div className="devices__reading-details">
-                    <span className="devices__reading-label">Temperature</span>
-                    <span className="devices__reading-value">{latest.temperature.toFixed(1)} °C</span>
-                  </div>
-                </div>
-
-                <div className="devices__reading-card">
-                  <div className="devices__reading-icon">
-                    <IconDroplet size={20} strokeWidth={1.75} />
-                  </div>
-                  <div className="devices__reading-details">
-                    <span className="devices__reading-label">Humidity</span>
-                    <span className="devices__reading-value">{latest.humidity.toFixed(1)} %</span>
-                  </div>
-                </div>
-
-                <div className="devices__reading-card">
-                  <div className="devices__reading-icon">
-                    <IconGauge size={20} strokeWidth={1.75} />
-                  </div>
-                  <div className="devices__reading-details">
-                    <span className="devices__reading-label">Air Pressure</span>
-                    <span className="devices__reading-value">{latest.airPressure.toFixed(0)} hPa</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="devices__empty-reading">
-                <IconDatabase size={24} strokeWidth={1.5} />
-                <p>No telemetry has been uploaded yet for this device.</p>
-              </div>
-            )}
-
-            <div className="devices__overview-banner">
-              <div className="devices__banner-content">
-                <h5>Historical Telemetry Graphs</h5>
-                <p>Explore temperature, humidity, and atmospheric pressure history over multiple time horizons.</p>
-              </div>
-              <Button variant="secondary" onClick={() => setDetailTab('graphs')}>
-                View Graphs
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* GRAPHS TAB */}
         {detailTab === 'graphs' && (
           <div className="devices__graphs">

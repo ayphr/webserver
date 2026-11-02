@@ -7,6 +7,16 @@ export type EventsAccess = 'limited' | 'standard' | 'priority';
 
 export type PlanTier = 'free' | SubscriptionTier;
 
+export const PLAN_NAMES: Record<PlanTier, string> = {
+  free: 'Free',
+  lite: 'Lite',
+  plus: 'Plus',
+  ultra: 'Ultra',
+  'team-lite': 'Team Lite',
+  'team-plus': 'Team Plus',
+  'team-ultra': 'Team Ultra',
+};
+
 export type PlanFeatures = {
   sharedMaxDataPointsPerUser: number;
   dataRetentionDays: number;

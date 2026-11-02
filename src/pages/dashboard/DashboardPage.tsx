@@ -5,10 +5,11 @@ import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import type { Punishment, PublicUser, CreditBalance } from '@common';
 import type { SettingsSection } from '../../lib/settings';
-import { UsernameDisplay, ProfileCard, Button } from '../../components/common';
+import { ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
+import { OverviewPanel } from '../../components/overview/OverviewPanel';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
@@ -548,16 +549,18 @@ export const DashboardPage = () => {
         ) : (
           <>
             {activePage === 'overview' && (
-              <DashboardPanel title="Dashboard" description="Profile summary">
-                <UsernameDisplay
-                  username={user.username}
-                  badges={user.badges}
-                  country={user.country}
-                  avatarUrl={user.avatarUrl}
-                  avatarSize={40}
-                  className="dashboard-page__user-row"
+              <DashboardPanel
+                title="Overview"
+                description="A summary of your account and devices"
+                className="dashboard-panel--wide"
+              >
+                <OverviewPanel
+                  user={user}
+                  credits={credits}
+                  isStaff={isStaff}
+                  isDeveloper={isDeveloper}
+                  onNavigate={changeTab}
                 />
-                <p>Welcome to your dashboard!</p>
               </DashboardPanel>
             )}
 

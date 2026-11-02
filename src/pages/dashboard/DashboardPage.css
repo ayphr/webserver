@@ -80,30 +80,6 @@
   min-width: 0;
 }
 
-.dashboard-page__user-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-  font-size: 1.1rem;
-}
-
-.dashboard-page__role-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  min-width: 1rem;
-}
-
-.dashboard-page__flag {
-  font-size: 1.1rem;
-}
-
-.dashboard-page__username {
-  font-weight: var(--font-weight-md);
-}
-
 .dashboard-page__field {
   display: flex;
   flex-direction: column;
