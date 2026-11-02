@@ -666,7 +666,7 @@ export const DashboardPage = () => {
               <DashboardPanel
                 title="Games"
                 description="Take a break with a few small games"
-                className="dashboard-panel--full"
+                className="dashboard-panel--full dashboard-panel--centered"
               >
                 <Suspense fallback={<p>Loading...</p>}>
                   <GamesPanel />
