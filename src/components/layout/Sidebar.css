@@ -1,5 +1,5 @@
 .n-sidebar {
-  --sidebar-width-expanded: 232px;
+  --sidebar-width-expanded: 280px;
   --sidebar-width-collapsed: 80px;
   --sidebar-width: var(--sidebar-width-expanded);
 

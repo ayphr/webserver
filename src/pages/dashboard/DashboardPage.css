@@ -14,7 +14,7 @@
 }
 
 .dashboard-layout--compact .n-sidebar {
-  --sidebar-width-expanded: 200px;
+  --sidebar-width-expanded: 260px;
   --sidebar-width-collapsed: 72px;
   flex-shrink: 0;
   padding: 1rem;

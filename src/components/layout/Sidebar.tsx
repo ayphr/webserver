@@ -98,7 +98,7 @@ export const Sidebar: React.FC<Props> = ({
     ? `${formatCredits(credits.available)} credits available${credits.onHold > 0 ? ` (${formatCredits(credits.onHold)} on hold)` : ''}`
     : 'Credits';
 
-  // Icons only get tooltips while the sidebar is in auto-collapse mode.
+  // The credits and account controls keep tooltips while collapsed.
   const tooltipHandlers = (content: string) => {
     if (pinned) return {};
 
@@ -150,7 +150,6 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('overview')}
             aria-label="Jail"
-            {...tooltipHandlers('Jail')}
           >
             <span className="n-sidebar__icon">{iconFor('jail')}</span>
             <span className="n-sidebar__label">Jail</span>
@@ -163,7 +162,6 @@ export const Sidebar: React.FC<Props> = ({
               onClick={() => onChange(t.id)}
               type="button"
               aria-label={t.name}
-              {...tooltipHandlers(t.name)}
             >
               <span className="n-sidebar__icon">{iconFor(t.id)}</span>
               <span className="n-sidebar__label">{t.name}</span>
@@ -194,7 +192,6 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('profile')}
             aria-label="Profile"
-            {...tooltipHandlers('Profile')}
           >
             <span className="n-sidebar__menuIcon"><IconUser size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Profile</span>
@@ -204,7 +201,6 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('connections')}
             aria-label="Connections"
-            {...tooltipHandlers('Connections')}
           >
             <span className="n-sidebar__menuIcon"><IconPlugConnected size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Connections</span>
@@ -214,7 +210,6 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('account-settings')}
             aria-label="Settings"
-            {...tooltipHandlers('Settings')}
           >
             <span className="n-sidebar__menuIcon"><IconSettings size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Settings</span>
@@ -224,7 +219,6 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('subscription')}
             aria-label="Subscription"
-            {...tooltipHandlers('Subscription')}
           >
             <span className="n-sidebar__menuIcon"><IconCreditCard size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Subscription</span>
