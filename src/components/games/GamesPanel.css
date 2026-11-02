@@ -23,7 +23,7 @@
 
 .games-panel__back {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .games-panel__menu {

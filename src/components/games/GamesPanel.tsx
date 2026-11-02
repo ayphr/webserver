@@ -114,6 +114,7 @@ function MemoryGame() {
   const [moves, setMoves] = useState(0);
   const [locked, setLocked] = useState(false);
   const [bestMoves, setBestMoves] = useState<number | null>(null);
+  const [deckKey, setDeckKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -191,6 +192,8 @@ function MemoryGame() {
     setFlipped([]);
     setMoves(0);
     setLocked(false);
+    // Remount the grid so flipped cards don't animate back with their new shapes.
+    setDeckKey((key) => key + 1);
   };
 
   return (
@@ -203,7 +206,7 @@ function MemoryGame() {
           Reset
         </Button>
       </div>
-      <div className="game-memory__grid">
+      <div className="game-memory__grid" key={deckKey}>
         {cards.map((card, index) => (
           <button
             key={card.id}
