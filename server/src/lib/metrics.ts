@@ -54,23 +54,29 @@ export const activeDevices = new Gauge({
   registers: [registry],
 });
 
-export const processOpenFds = new Gauge({
-  name: 'ayphr_process_open_fds',
-  help: 'Open file descriptors for the process.',
-  registers: [registry],
-});
+// These may already be registered by collectDefaultMetrics on platforms that
+// expose them (Node/Linux). Reuse the existing metric instead of re-registering
+// to avoid "metric already registered" errors.
+function getOrCreateGauge(name: string, help: string): Gauge {
+  const existing = registry.getSingleMetric(name);
+  if (existing) return existing as Gauge;
+  return new Gauge({ name, help, registers: [registry] });
+}
 
-export const processMaxFds = new Gauge({
-  name: 'ayphr_process_max_fds',
-  help: 'Maximum file descriptors allowed for the process.',
-  registers: [registry],
-});
+export const processOpenFds = getOrCreateGauge(
+  'ayphr_process_open_fds',
+  'Open file descriptors for the process.',
+);
 
-export const processVirtualMemoryBytes = new Gauge({
-  name: 'ayphr_process_virtual_memory_bytes',
-  help: 'Virtual memory size of the process in bytes.',
-  registers: [registry],
-});
+export const processMaxFds = getOrCreateGauge(
+  'ayphr_process_max_fds',
+  'Maximum file descriptors allowed for the process.',
+);
+
+export const processVirtualMemoryBytes = getOrCreateGauge(
+  'ayphr_process_virtual_memory_bytes',
+  'Virtual memory size of the process in bytes.',
+);
 
 export const totalDevices = new Gauge({
   name: 'ayphr_devices_total',
