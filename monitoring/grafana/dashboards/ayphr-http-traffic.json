@@ -170,10 +170,10 @@
         }
       ],
       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 9
+        "h": 9,
+        "w": 6,
+        "x": 12,
+        "y": 0
       },
       "description": "Requests per second grouped by HTTP method."
     },
@@ -232,10 +232,10 @@
         }
       ],
       "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 9
+        "h": 9,
+        "w": 6,
+        "x": 18,
+        "y": 0
       },
       "description": "Share of all requests in the selected time range, split by HTTP method."
     },
@@ -318,7 +318,7 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 16,
+        "x": 0,
         "y": 9
       },
       "description": "The ten routes handling the most requests per second."
@@ -393,9 +393,9 @@
       ],
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 17
+        "w": 8,
+        "x": 8,
+        "y": 9
       },
       "description": "Each row is a status code and each column is a time bucket. The colour shows how many responses landed in that bucket."
     },
@@ -472,9 +472,9 @@
       ],
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 17
+        "w": 8,
+        "x": 16,
+        "y": 9
       },
       "description": "Colours each time bucket by the status codes seen in it. Use it to see when errors started and how long they lasted."
     },
@@ -586,7 +586,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 25
+        "y": 17
       },
       "description": "Per-route request rate, 5xx rate and p95 latency in one table."
     },
@@ -678,7 +678,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 25
+        "y": 17
       },
       "description": "Current requests in flight against the highest value seen in each window."
     }
