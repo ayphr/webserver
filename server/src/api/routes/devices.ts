@@ -3,6 +3,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { requireAuth } from '../auth';
 import {
   cacheDevice,
+  countDevices,
   createDevice,
   createDevicePairing,
   ensureDefaultLocation,
@@ -31,6 +32,8 @@ import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import {
+  deviceClaimsTotal,
+  setTotalDevices,
   devicesRegisteredTotal,
   observeTelemetryValues,
   telemetryRecordsAcceptedTotal,
@@ -162,6 +165,8 @@ const handleRequestPairing = async (request: Request): Promise<Response> => {
     linked: false,
   });
 
+  deviceClaimsTotal.inc({ event: 'created' });
+
   return json({ code, expiresAt }, 201);
 };
 
@@ -246,12 +251,19 @@ const handleLink = requireAuth(async (request, user: User) => {
     await createDevice(newDevice);
     device = newDevice;
     devicesRegisteredTotal.inc();
+    try {
+      setTotalDevices(await countDevices());
+    } catch {
+      // best effort
+    }
   }
 
   const linked = await markDevicePairingLinked(code, user.uuid, user.username);
   if (!linked) {
     return json({ error: 'code already used' }, 409);
   }
+
+  deviceClaimsTotal.inc({ event: 'claimed' });
 
   return json({ linked: true, device: toPublicDevice(device) }, 200);
 });

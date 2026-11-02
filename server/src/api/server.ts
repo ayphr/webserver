@@ -81,11 +81,23 @@ export function setupServer(port: number, callback: () => void): Server<undefine
 
         httpRequestsTotal.inc({ method, route: template, status: response.status.toString() });
 
-        const contentLength = response.headers.get('content-length');
-        if (contentLength !== null) {
-          const size = Number(contentLength);
-          if (Number.isFinite(size) && size >= 0) {
-            httpResponseSize.observe({ method, route: template }, size);
+        // Bun does not populate Content-Length on Response objects, so derive the
+        // body size by reading a clone of the response instead of relying on the
+        // header (which is usually absent).
+        try {
+          const cloned = response.clone();
+          const buffer = await cloned.arrayBuffer();
+          if (buffer.byteLength >= 0) {
+            httpResponseSize.observe({ method, route: template }, buffer.byteLength);
+          }
+        } catch {
+          // Fall back to a provided Content-Length header, if any.
+          const contentLength = response.headers.get('content-length');
+          if (contentLength !== null) {
+            const size = Number(contentLength);
+            if (Number.isFinite(size) && size >= 0) {
+              httpResponseSize.observe({ method, route: template }, size);
+            }
           }
         }
 

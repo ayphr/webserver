@@ -30,6 +30,8 @@ import { getUsernameValidationError } from '@common/utils/username';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { authEventsTotal, userRegistrationsByCountry } from '../../lib/metrics';
+import { getUserCount } from '../../lib/db/users';
+import { setTotalUsers } from '../../lib/metrics';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
 
 type AuthPayload = {
@@ -136,6 +138,11 @@ async function handleRegister(request: Request) {
 
   authEventsTotal.inc({ event: 'register', result: 'success' });
   userRegistrationsByCountry.inc({ country: country ?? 'unknown' });
+  try {
+    setTotalUsers(await getUserCount());
+  } catch {
+    // best effort
+  }
 
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 

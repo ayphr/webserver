@@ -54,6 +54,24 @@ export const activeDevices = new Gauge({
   registers: [registry],
 });
 
+export const processOpenFds = new Gauge({
+  name: 'ayphr_process_open_fds',
+  help: 'Open file descriptors for the process.',
+  registers: [registry],
+});
+
+export const processMaxFds = new Gauge({
+  name: 'ayphr_process_max_fds',
+  help: 'Maximum file descriptors allowed for the process.',
+  registers: [registry],
+});
+
+export const processVirtualMemoryBytes = new Gauge({
+  name: 'ayphr_process_virtual_memory_bytes',
+  help: 'Virtual memory size of the process in bytes.',
+  registers: [registry],
+});
+
 export const totalDevices = new Gauge({
   name: 'ayphr_devices_total',
   help: 'Total registered devices.',
@@ -63,6 +81,13 @@ export const totalDevices = new Gauge({
 export const devicesRegisteredTotal = new Counter({
   name: 'ayphr_devices_registered_total',
   help: 'Devices that completed their first upload and were registered.',
+  registers: [registry],
+});
+
+export const deviceClaimsTotal = new Counter({
+  name: 'ayphr_device_claims_total',
+  help: 'Device pairing claim lifecycle events (created, claimed).',
+  labelNames: ['event'],
   registers: [registry],
 });
 
@@ -246,6 +271,18 @@ export function recordMongoOperation(operation: string, collection: string, coun
 
 export function setActiveDevices(count: number) {
   activeDevices.set(count);
+}
+
+export function setProcessOpenFds(count: number) {
+  processOpenFds.set(count);
+}
+
+export function setProcessMaxFds(count: number) {
+  processMaxFds.set(count);
+}
+
+export function setProcessVirtualMemoryBytes(bytes: number) {
+  processVirtualMemoryBytes.set(bytes);
 }
 
 export function setTotalDevices(count: number) {
