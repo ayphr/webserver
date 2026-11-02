@@ -25,110 +25,6 @@
   "panels": [
     {
       "type": "timeseries",
-      "title": "Latency percentiles",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 3,
-          "min": 0,
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": []
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "histogram_quantile(0.50, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
-          "legendFormat": "p50"
-        },
-        {
-          "refId": "B",
-          "expr": "histogram_quantile(0.75, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
-          "legendFormat": "p75"
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.90, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
-          "legendFormat": "p90"
-        },
-        {
-          "refId": "D",
-          "expr": "histogram_quantile(0.95, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
-          "legendFormat": "p95"
-        },
-        {
-          "refId": "E",
-          "expr": "histogram_quantile(0.99, sum(rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le))",
-          "legendFormat": "p99"
-        },
-        {
-          "refId": "F",
-          "expr": "sum(rate(ayphr_http_request_duration_seconds_sum{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) / clamp_min(sum(rate(ayphr_http_request_duration_seconds_count{method=~\"$method\", route=~\"$route\"}[$__rate_interval])), 0.0001)",
-          "legendFormat": "avg"
-        }
-      ],
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "description": "Response time percentiles. p50 is the median and p99 is the slowest 1%. The average is shown for comparison but hides slow requests."
-    },
-    {
-      "type": "timeseries",
       "title": "Requests by status",
       "fieldConfig": {
         "defaults": {
@@ -199,7 +95,7 @@
       "gridPos": {
         "h": 9,
         "w": 12,
-        "x": 12,
+        "x": 0,
         "y": 0
       },
       "description": "Requests per second grouped by HTTP status code."
@@ -428,330 +324,6 @@
       "description": "The ten routes handling the most requests per second."
     },
     {
-      "type": "heatmap",
-      "title": "Latency distribution",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "scaleDistribution": {
-              "type": "linear"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "calculate": false,
-        "calculation": {
-          "xBuckets": {
-            "mode": "size",
-            "value": "10s"
-          },
-          "yBuckets": {
-            "mode": "count",
-            "value": 20
-          }
-        },
-        "cellGap": 2,
-        "cellValues": {
-          "unit": "s"
-        },
-        "color": {
-          "mode": "scheme",
-          "scheme": "Spectral",
-          "steps": 64,
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "reverse": false
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "filterValues": {
-          "le": 1e-09
-        },
-        "legend": {
-          "show": true
-        },
-        "rowsFrame": {
-          "layout": "auto"
-        },
-        "showValue": "never",
-        "tooltip": {
-          "mode": "single",
-          "showColorScale": false,
-          "yHistogram": true
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "unit": "s",
-          "reverse": false
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(increase(ayphr_http_request_duration_seconds_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le)",
-          "format": "heatmap",
-          "legendFormat": "{{le}}"
-        }
-      ],
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 17
-      },
-      "description": "Requests grouped by how long they took. Brighter cells hold more requests in that time bucket."
-    },
-    {
-      "type": "heatmap",
-      "title": "Response size distribution",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "scaleDistribution": {
-              "type": "linear"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "calculate": false,
-        "calculation": {
-          "xBuckets": {
-            "mode": "size",
-            "value": "10s"
-          },
-          "yBuckets": {
-            "mode": "count",
-            "value": 20
-          }
-        },
-        "cellGap": 2,
-        "cellValues": {
-          "unit": "bytes"
-        },
-        "color": {
-          "mode": "scheme",
-          "scheme": "YlOrRd",
-          "steps": 64,
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "reverse": false
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "filterValues": {
-          "le": 1e-09
-        },
-        "legend": {
-          "show": true
-        },
-        "rowsFrame": {
-          "layout": "auto"
-        },
-        "showValue": "never",
-        "tooltip": {
-          "mode": "single",
-          "showColorScale": false,
-          "yHistogram": true
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "unit": "bytes",
-          "reverse": false
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(increase(ayphr_http_response_size_bytes_bucket{method=~\"$method\", route=~\"$route\"}[$__rate_interval])) by (le)",
-          "format": "heatmap",
-          "legendFormat": "{{le}}"
-        }
-      ],
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 17
-      },
-      "description": "Responses grouped by payload size."
-    },
-    {
-      "type": "timeseries",
-      "title": "Latency p95 by route",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 3,
-          "min": 0,
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": []
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "topk(8, histogram_quantile(0.95, sum by (route, le) (rate(ayphr_http_request_duration_seconds_bucket{method=~\"$method\"}[$__rate_interval]))))",
-          "legendFormat": "{{route}}"
-        }
-      ],
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 26
-      },
-      "description": "Response time p95 for the busiest routes, so one slow route is not hidden by the rest."
-    },
-    {
-      "type": "timeseries",
-      "title": "Response size p95 by route",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": []
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "topk(8, histogram_quantile(0.95, sum by (route, le) (rate(ayphr_http_response_size_bytes_bucket{method=~\"$method\"}[$__rate_interval]))))",
-          "legendFormat": "{{route}}"
-        }
-      ],
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 26
-      },
-      "description": "Response size p95 for the busiest routes."
-    },
-    {
       "type": "status-history",
       "title": "Status codes over time",
       "maxDataPoints": 60,
@@ -823,7 +395,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 17
       },
       "description": "Each row is a status code and each column is a time bucket. The colour shows how many responses landed in that bucket."
     },
@@ -902,7 +474,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 17
       },
       "description": "Colours each time bucket by the status codes seen in it. Use it to see when errors started and how long they lasted."
     },
@@ -1014,7 +586,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 42
+        "y": 25
       },
       "description": "Per-route request rate, 5xx rate and p95 latency in one table."
     },
@@ -1106,7 +678,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 25
       },
       "description": "Current requests in flight against the highest value seen in each window."
     }
@@ -1171,7 +743,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "ayphr HTTP",
-  "uid": "ayphr-http",
+  "title": "ayphr HTTP Traffic",
+  "uid": "ayphr-http-traffic",
   "version": 1
 }
