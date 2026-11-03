@@ -16,7 +16,6 @@
 .devices__actions {
   display: flex;
   gap: 0.5rem;
-  margin-left: auto;
 }
 
 .devices__error {

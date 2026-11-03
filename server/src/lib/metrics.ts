@@ -3,7 +3,6 @@ import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom
 export const registry = new Registry();
 collectDefaultMetrics({ register: registry, prefix: 'ayphr_' });
 
-/** Upper bound extended past the old 5s ceiling so slow requests stay measurable. */
 const DURATION_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30];
 const COUNT_BUCKETS = [1, 10, 50, 100, 500, 1000, 5000, 10000];
 const RESPONSE_SIZE_BUCKETS = [100, 500, 1000, 5000, 10_000, 50_000, 100_000, 500_000, 1_000_000, 5_000_000];
@@ -54,9 +53,6 @@ export const activeDevices = new Gauge({
   registers: [registry],
 });
 
-// These may already be registered by collectDefaultMetrics on platforms that
-// expose them (Node/Linux). Reuse the existing metric instead of re-registering
-// to avoid "metric already registered" errors.
 function getOrCreateGauge(name: string, help: string): Gauge {
   const existing = registry.getSingleMetric(name);
   if (existing) return existing as Gauge;
