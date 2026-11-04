@@ -378,7 +378,7 @@ const FeatureVisual = ({ index }: { index: number }) => {
       {['ingest', 'store', 'query', 'alert'].map((step, i) => (
         <div key={step} className="feature-visual__pipeline-step">
           <span>{step}</span>
-          {i < 3 && <span className="feature-visual__arrow">→</span>}
+          {i < 3 && <IconArrowRight size={14} className="feature-visual__arrow" aria-hidden="true" />}
         </div>
       ))}
     </div>
