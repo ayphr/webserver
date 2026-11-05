@@ -57,12 +57,11 @@
   color: var(--text-primary);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .games-panel__menu-card:hover {
   border-color: var(--border-focus);
-  transform: translateY(-2px);
 }
 
 .games-panel__menu-title {
