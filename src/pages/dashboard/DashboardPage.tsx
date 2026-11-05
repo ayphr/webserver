@@ -10,6 +10,7 @@ import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
 import { OverviewPanel } from '../../components/overview/OverviewPanel';
+import { DashboardContentSkeleton, DashboardLoadingSkeleton } from './DashboardLoadingSkeleton';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
@@ -139,15 +140,6 @@ const DashboardPanel = ({ title, description, className = '', children }: Dashbo
     </header>
     <div className="dashboard-panel__content">{children}</div>
   </section>
-);
-
-const DashboardContentSkeleton = () => (
-  <div className="dashboard-skeleton" aria-hidden="true">
-    <div className="dashboard-skeleton__line dashboard-skeleton__line--title" />
-    <div className="dashboard-skeleton__line" />
-    <div className="dashboard-skeleton__line" />
-    <div className="dashboard-skeleton__block" />
-  </div>
 );
 
 export const DashboardPage = () => {
@@ -479,16 +471,7 @@ export const DashboardPage = () => {
   ], [defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user]);
 
   if (isLoading) {
-    return (
-      <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} isDeveloper={isDeveloper} pinned={sidebarPinned} credits={credits} />
-        <main className="dashboard-main">
-          <DashboardPanel title="Dashboard">
-            <DashboardContentSkeleton />
-          </DashboardPanel>
-        </main>
-      </div>
-    );
+    return <DashboardLoadingSkeleton />;
   }
 
   if (!user) {
