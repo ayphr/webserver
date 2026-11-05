@@ -36,12 +36,11 @@
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .overview__stat:hover {
   border-color: var(--border-focus);
-  transform: translateY(-1px);
 }
 
 .overview__stat-label {
