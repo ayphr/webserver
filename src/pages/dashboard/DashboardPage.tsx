@@ -471,7 +471,7 @@ export const DashboardPage = () => {
   ], [defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user]);
 
   if (isLoading) {
-    return <DashboardLoadingSkeleton />;
+    return <DashboardLoadingSkeleton activeTab={activePage} />;
   }
 
   if (!user) {
