@@ -549,8 +549,6 @@ export const DashboardPage = () => {
                 <OverviewPanel
                   user={user}
                   credits={credits}
-                  isStaff={isStaff}
-                  isDeveloper={isDeveloper}
                   onNavigate={changeTab}
                 />
               </DashboardPanel>
