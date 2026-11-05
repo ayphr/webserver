@@ -29,7 +29,11 @@ function RouteFallback() {
   const location = useLocation();
 
   if (location.pathname.startsWith('/dashboard')) {
-    return <DashboardLoadingSkeleton />;
+    return <DashboardLoadingSkeleton activeTab={new URLSearchParams(location.search).get('tab') ?? undefined} />;
+  }
+
+  if (location.pathname === '/') {
+    return null;
   }
 
   return (

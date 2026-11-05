@@ -50,6 +50,10 @@
   transition: max-width 0.2s ease;
 }
 
+.dashboard-panel--devices-skeleton {
+  max-width: 1140px;
+}
+
 .dashboard-panel--devices:has(.devices--wide),
 .dashboard-panel--devices:has(.devices__graphs) {
   max-width: 1140px;
@@ -182,6 +186,11 @@
   width: 42%;
   max-width: 220px;
   height: 1.2rem;
+}
+
+.dashboard-skeleton__line--header {
+  width: 9rem;
+  height: 1.35rem;
 }
 
 .dashboard-skeleton__line:not(.dashboard-skeleton__line--title) {
