@@ -141,6 +141,15 @@ const DashboardPanel = ({ title, description, className = '', children }: Dashbo
   </section>
 );
 
+const DashboardContentSkeleton = () => (
+  <div className="dashboard-skeleton" aria-hidden="true">
+    <div className="dashboard-skeleton__line dashboard-skeleton__line--title" />
+    <div className="dashboard-skeleton__line" />
+    <div className="dashboard-skeleton__line" />
+    <div className="dashboard-skeleton__block" />
+  </div>
+);
+
 export const DashboardPage = () => {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
@@ -474,8 +483,8 @@ export const DashboardPage = () => {
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
         <Sidebar activeTab={activePage} onChange={changeTab} username={user?.username ?? '...'} isDeveloper={isDeveloper} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main">
-          <DashboardPanel title="Dashboard" description="Loading...">
-            <p>Loading dashboard...</p>
+          <DashboardPanel title="Dashboard">
+            <DashboardContentSkeleton />
           </DashboardPanel>
         </main>
       </div>
@@ -570,7 +579,7 @@ export const DashboardPage = () => {
                 description="Ayphr devices registered to your account"
                 className="dashboard-panel--devices"
               >
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <DevicesPanel />
                 </Suspense>
               </DashboardPanel>
@@ -582,7 +591,7 @@ export const DashboardPage = () => {
                 description="Group your devices into locations"
                 className="dashboard-panel--wide"
               >
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <LocationsPanel />
                 </Suspense>
               </DashboardPanel>
@@ -619,7 +628,7 @@ export const DashboardPage = () => {
                 title="Subscription"
                 description="Manage your Ayphr subscription and billing"
               >
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <SubscriptionPanel />
                 </Suspense>
               </DashboardPanel>
@@ -631,7 +640,7 @@ export const DashboardPage = () => {
                 description="Your monthly allowance, additional credits, and held credits"
                 className="dashboard-panel--wide"
               >
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <CreditsPanel key={user.uuid} initialCredits={credits} onCreditsChange={setCredits} />
                 </Suspense>
               </DashboardPanel>
@@ -639,7 +648,7 @@ export const DashboardPage = () => {
 
             {activePage === 'my-apps' && isDeveloper && (
               <DashboardPanel title="My Apps" description="Create and manage your Ayphr apps">
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <MyAppsPanel />
                 </Suspense>
               </DashboardPanel>
@@ -647,7 +656,7 @@ export const DashboardPage = () => {
 
             {activePage === 'connections' && (
               <DashboardPanel title="Connections" description="Apps connected to your account">
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <ConnectionsPanel />
                 </Suspense>
               </DashboardPanel>
@@ -659,7 +668,7 @@ export const DashboardPage = () => {
                 description="Search and manage Ayphr users"
                 className="dashboard-panel--full"
               >
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <UsersPanel />
                 </Suspense>
               </DashboardPanel>
@@ -671,7 +680,7 @@ export const DashboardPage = () => {
                 description="Take a break with a few small games"
                 className="dashboard-panel--full dashboard-panel--centered"
               >
-                <Suspense fallback={<p>Loading...</p>}>
+                <Suspense fallback={<DashboardContentSkeleton />}>
                   <GamesPanel />
                 </Suspense>
               </DashboardPanel>
