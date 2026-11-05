@@ -468,8 +468,8 @@ export const LandingPage = () => {
 
           <Reveal delay={80}>
             <h1 id="hero-title" className="landing-hero__title">
-              Sensor data,{' '}
-              <span className="landing-hero__gradient-text">without the plumbing</span>
+              Sensor data, without the{' '}
+              <span className="landing-hero__gradient-text">plumbing</span>
             </h1>
           </Reveal>
 
