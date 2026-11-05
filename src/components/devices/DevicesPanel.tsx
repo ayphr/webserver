@@ -564,6 +564,7 @@ export const DevicesPanel = () => {
                 >
                   <div className="devices__card-header">
                     <div className="devices__card-title-group">
+                      <span className={`devices__device-dot ${online ? 'is-online' : 'is-offline'}`} />
                       <span className="devices__card-name">{deviceLabel(device)}</span>
                       <span className="devices__serial-pill">#{device.serial}</span>
                     </div>
