@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useEffect } from 'react';
 import { PolicyGate } from './components/policy';
 import { ModalProvider, TooltipProvider, useTooltip } from './context';
+import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
 
 const AuthPage = lazy(() => import('./pages/auth/AuthPage').then((m) => ({ default: m.AuthPage })));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
@@ -25,6 +26,12 @@ function TooltipRouteWatcher() {
 }
 
 function RouteFallback() {
+  const location = useLocation();
+
+  if (location.pathname.startsWith('/dashboard')) {
+    return <DashboardLoadingSkeleton />;
+  }
+
   return (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
       <p>Loading...</p>
@@ -50,7 +57,7 @@ function App() {
               <Route path="/policies/privacy" element={<PrivacyPage />} />
               <Route path="/policies/refunds" element={<RefundPage />} />
               <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
-              <Route path="/dashboard" element={<PolicyGate><DashboardPage /></PolicyGate>} />
+              <Route path="/dashboard" element={<PolicyGate loadingFallback={<DashboardLoadingSkeleton />}><DashboardPage /></PolicyGate>} />
               <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><ProfilePage /></PolicyGate>} />
               <Route path="/oauth/authorize" element={<AuthorizePage />} />
             </Routes>

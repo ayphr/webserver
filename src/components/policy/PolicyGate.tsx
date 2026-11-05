@@ -13,7 +13,13 @@ const POLICY_META: Record<PolicyKey, { title: string; to: string }> = {
 
 type GateState = 'loading' | 'ready' | 'required';
 
-export const PolicyGate = ({ children }: { children: ReactNode }) => {
+export const PolicyGate = ({
+  children,
+  loadingFallback,
+}: {
+  children: ReactNode;
+  loadingFallback?: ReactNode;
+}) => {
   const navigate = useNavigate();
   const [state, setState] = useState<GateState>('loading');
   const [status, setStatus] = useState<PolicyStatus | null>(null);
@@ -103,6 +109,10 @@ export const PolicyGate = ({ children }: { children: ReactNode }) => {
   };
 
   if (state === 'loading') {
+    if (loadingFallback) {
+      return <>{loadingFallback}</>;
+    }
+
     return (
       <div className="policy-gate">
         <div className="policy-gate__container">
