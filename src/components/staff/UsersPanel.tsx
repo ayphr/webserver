@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconChevronLeft, IconChevronRight, IconEdit, IconFilter, IconKey, IconSearch } from '@tabler/icons-react';
+import { IconEdit, IconFilter, IconKey, IconSearch } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type {
   PublicUser,
@@ -10,7 +10,7 @@ import type {
   UserRole,
 } from '@common';
 import { BADGES, SUBSCRIPTION_TIERS } from '@common';
-import { Button, Input, ManageSubscriptionsModal, PunishModal, Select, UsernameDisplay } from '../common';
+import { Button, Input, ManageSubscriptionsModal, Pagination, PunishModal, Select, UsernameDisplay } from '../common';
 import { SetPasswordModal } from './SetPasswordModal';
 import { getBadgeIcon } from '../../lib/badges';
 import './UsersPanel.css';
@@ -285,25 +285,12 @@ export const UsersPanel = () => {
         </ul>
       )}
 
-      <div className="users-panel__pagination">
-        <Button
-          variant="secondary"
-          onClick={() => setPage((current) => Math.max(1, current - 1))}
-          disabled={page <= 1 || isLoading}
-        >
-          <IconChevronLeft size={16} /> Prev
-        </Button>
-        <span className="users-panel__page-indicator">
-          {page} / {data.totalPages}
-        </span>
-        <Button
-          variant="secondary"
-          onClick={() => setPage((current) => Math.min(data.totalPages, current + 1))}
-          disabled={page >= data.totalPages || isLoading}
-        >
-          Next <IconChevronRight size={16} />
-        </Button>
-      </div>
+      <Pagination
+        page={page}
+        totalPages={data.totalPages}
+        onPageChange={setPage}
+        disabled={isLoading}
+      />
 
       {punishTarget && (
         <PunishModal

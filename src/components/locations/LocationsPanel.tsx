@@ -10,11 +10,12 @@ import {
 import type { DeviceSummary, Location, PublicUser } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
-import { Button, Card, ConfirmDialog, Input, Modal } from '../common';
+import { Button, Card, ConfirmDialog, Input, Modal, Pagination } from '../common';
 import '../settings/SettingsPanel.css';
 import './LocationsPanel.css';
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+const PAGE_SIZE = 5;
 
 function isOnline(device: DeviceSummary): boolean {
   if (!device.lastUploadAt) return false;
@@ -32,6 +33,8 @@ export const LocationsPanel = () => {
   const [view, setView] = useState<View>('list');
   const [locations, setLocations] = useState<Location[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
+  const [locationPage, setLocationPage] = useState(1);
+  const [locationDevicePage, setLocationDevicePage] = useState(1);
   const [user, setUser] = useState<PublicUser | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<'overview' | 'devices' | 'settings'>('overview');
@@ -82,6 +85,22 @@ export const LocationsPanel = () => {
   const locationDevices = useMemo(
     () => devices.filter((device) => device.locationId === selectedId),
     [devices, selectedId],
+  );
+
+  const locationTotalPages = Math.max(1, Math.ceil(locations.length / PAGE_SIZE));
+  const currentLocationPage = Math.min(locationPage, locationTotalPages);
+  const visibleLocations = useMemo(
+    () => locations.slice((currentLocationPage - 1) * PAGE_SIZE, currentLocationPage * PAGE_SIZE),
+    [currentLocationPage, locations],
+  );
+  const locationDeviceTotalPages = Math.max(1, Math.ceil(locationDevices.length / PAGE_SIZE));
+  const currentLocationDevicePage = Math.min(locationDevicePage, locationDeviceTotalPages);
+  const visibleLocationDevices = useMemo(
+    () => locationDevices.slice(
+      (currentLocationDevicePage - 1) * PAGE_SIZE,
+      currentLocationDevicePage * PAGE_SIZE,
+    ),
+    [currentLocationDevicePage, locationDevices],
   );
 
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;
@@ -205,7 +224,7 @@ export const LocationsPanel = () => {
         )}
 
         <div className="locations__list">
-          {locations.map((location) => (
+          {visibleLocations.map((location) => (
             <Card
               key={location.id}
               elevated
@@ -228,6 +247,7 @@ export const LocationsPanel = () => {
             </Card>
           ))}
         </div>
+        <Pagination page={currentLocationPage} totalPages={locationTotalPages} onPageChange={setLocationPage} disabled={isRefreshing} />
 
         <Modal
           isOpen={isCreateOpen}
@@ -330,7 +350,7 @@ export const LocationsPanel = () => {
               <p className="locations__notice">No devices in this location yet.</p>
             ) : (
               <ul className="locations__device-list">
-                {locationDevices.map((device) => (
+                {visibleLocationDevices.map((device) => (
                   <li key={device.serial} className="locations__device-item">
                     <div>
                       <span className="locations__device-name">
@@ -345,6 +365,12 @@ export const LocationsPanel = () => {
                 ))}
               </ul>
             )}
+            <Pagination
+              page={currentLocationDevicePage}
+              totalPages={locationDeviceTotalPages}
+              onPageChange={setLocationDevicePage}
+              disabled={isRefreshing}
+            />
           </div>
         )}
 
