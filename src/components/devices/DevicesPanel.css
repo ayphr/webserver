@@ -103,21 +103,6 @@
   min-width: 0;
 }
 
-.devices__device-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-}
-
-.devices__device-dot.is-online {
-  background: var(--status-success);
-}
-
-.devices__device-dot.is-offline {
-  background: var(--status-error);
-}
-
 .devices__card-name {
   overflow: hidden;
   color: var(--text-primary);
@@ -134,31 +119,19 @@
   color: var(--text-dim);
 }
 
-.devices__status-badge {
+.devices__connection-icon {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.76rem;
-  font-weight: var(--font-weight-md);
-  text-transform: capitalize;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
-.devices__status-badge.is-online {
+.devices__connection-icon.is-online {
   color: var(--status-success);
 }
 
-.devices__status-badge.is-offline {
+.devices__connection-icon.is-offline {
   color: var(--text-muted);
-}
-
-.devices__status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.devices__status-badge.is-online .devices__status-dot {
 }
 
 .devices__card-telemetry {
@@ -398,29 +371,17 @@
 }
 
 .devices__metrics-summary {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
 }
 
 .devices__summary-col {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  flex: 1 1 0;
-  padding: 0.75rem 1rem;
-  border-right: 1px solid var(--border-subtle);
-}
-
-.devices__summary-col:first-child {
-  padding-left: 0;
-}
-
-.devices__summary-col:last-child {
-  border-right: 0;
-  padding-right: 0;
+  min-width: 0;
+  padding: 0.75rem 0;
 }
 
 .devices__summary-header {
@@ -467,8 +428,7 @@
   gap: 0.75rem;
   padding: 0.25rem 0;
   border-radius: 0;
-  border: 1px solid var(--border-subtle);
-  border-width: 1px 0 0;
+  border: 0;
   background: transparent;
   width: 100%;
 }
@@ -522,15 +482,11 @@
   }
 
   .devices__metrics-summary {
-    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .devices__summary-col,
-  .devices__summary-col:first-child,
-  .devices__summary-col:last-child {
+  .devices__summary-col {
     padding: 0.75rem 0;
-    border-right: 0;
   }
 
   .devices__summary-col:nth-child(odd) {
@@ -539,7 +495,6 @@
 
   .devices__summary-col:nth-child(even) {
     padding-left: 0.75rem;
-    border-left: 1px solid var(--border-subtle);
   }
 }
 
