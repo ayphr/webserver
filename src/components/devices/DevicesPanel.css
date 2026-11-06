@@ -287,14 +287,26 @@
   font-size: 0.82rem;
 }
 
+.devices__detail-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.devices__detail-info-row .devices__detail-meta {
+  margin-top: 0;
+}
+
+.devices__detail-info-row .devices__telemetry-chips {
+  justify-content: flex-end;
+}
+
 .devices__detail-meta span {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-}
-
-.devices__detail-telemetry {
-  margin-top: 0.75rem;
 }
 
 /* GRAPHS TAB */
@@ -386,68 +398,11 @@
   }
 }
 
-.devices__metrics-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.65rem;
-}
-
-.devices__summary-col {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-}
-
-.devices__summary-header {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.85rem;
-  font-weight: var(--font-weight-md);
-  color: var(--text-primary);
-}
-
-.devices__summary-header svg {
-  color: var(--text-muted);
-}
-
-.devices__summary-metrics {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.devices__summary-metrics > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.summary-lbl {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  text-transform: uppercase;
-}
-
-.summary-val {
-  font-family: var(--font-family-mono);
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
 .devices__chart-card {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
+  padding: 0.25rem 0;
   width: 100%;
 }
 
@@ -470,8 +425,8 @@
 .devices__chart-container {
   position: relative;
   width: 100%;
-  height: 400px;
-  min-height: 400px;
+  height: 360px;
+  min-height: 360px;
 }
 
 .devices__separate-charts {
@@ -482,8 +437,19 @@
 }
 
 .devices__chart-container--separate {
-  height: 250px;
-  min-height: 250px;
+  height: 230px;
+  min-height: 230px;
+}
+
+@media (max-width: 720px) {
+  .devices__detail-info-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .devices__detail-info-row .devices__telemetry-chips {
+    justify-content: flex-start;
+  }
 }
 
 /* SETTINGS TAB */
