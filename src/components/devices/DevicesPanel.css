@@ -282,9 +282,16 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
-  margin-top: 0.75rem;
   color: var(--text-muted);
   font-size: 0.82rem;
+}
+
+.devices__detail-data-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 0.75rem;
 }
 
 .devices__detail-meta span {
@@ -294,7 +301,11 @@
 }
 
 .devices__detail-telemetry {
-  margin-top: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.devices__detail-telemetry .devices__telemetry-chips {
+  justify-content: flex-end;
 }
 
 /* GRAPHS TAB */
@@ -387,19 +398,29 @@
 }
 
 .devices__metrics-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.65rem;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .devices__summary-col {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
+  flex: 1 1 0;
+  padding: 0.75rem 1rem;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.devices__summary-col:first-child {
+  padding-left: 0;
+}
+
+.devices__summary-col:last-child {
+  border-right: 0;
+  padding-right: 0;
 }
 
 .devices__summary-header {
@@ -436,7 +457,7 @@
 .summary-val {
   font-family: var(--font-family-mono);
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   color: var(--text-primary);
 }
 
@@ -444,10 +465,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1rem;
-  border-radius: var(--radius-lg);
+  padding: 0.25rem 0;
+  border-radius: 0;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
+  border-width: 1px 0 0;
+  background: transparent;
   width: 100%;
 }
 
@@ -460,6 +482,7 @@
 .devices__chart-header h4 {
   margin: 0;
   font-size: 0.96rem;
+  font-weight: var(--font-weight-md);
   color: var(--text-primary);
 }
 
@@ -472,6 +495,7 @@
   width: 100%;
   height: 400px;
   min-height: 400px;
+  padding-top: 0.75rem;
 }
 
 .devices__separate-charts {
@@ -484,6 +508,39 @@
 .devices__chart-container--separate {
   height: 250px;
   min-height: 250px;
+}
+
+@media (max-width: 720px) {
+  .devices__detail-data-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .devices__detail-telemetry .devices__telemetry-chips {
+    justify-content: flex-start;
+  }
+
+  .devices__metrics-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .devices__summary-col,
+  .devices__summary-col:first-child,
+  .devices__summary-col:last-child {
+    padding: 0.75rem 0;
+    border-right: 0;
+  }
+
+  .devices__summary-col:nth-child(odd) {
+    padding-right: 0.75rem;
+  }
+
+  .devices__summary-col:nth-child(even) {
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--border-subtle);
+  }
 }
 
 /* SETTINGS TAB */

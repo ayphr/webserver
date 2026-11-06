@@ -4,7 +4,6 @@ import {
   IconArrowLeft,
   IconCheck,
   IconClock,
-  IconCpu,
   IconDatabase,
   IconDroplet,
   IconExternalLink,
@@ -281,11 +280,10 @@ export const DevicesPanel = () => {
         max: Math.max(...press),
         avg: avg(press),
       },
-      count: dataPoints.length,
     };
   }, [dataPoints]);
 
-  // Combined chart config & data without gradients or saturated colors
+  // Use the same restrained accent colours as the rest of the dashboard.
   const combinedData = useMemo(() => {
     const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
     return {
@@ -294,7 +292,7 @@ export const DevicesPanel = () => {
         {
           label: 'Temperature (°C)',
           data: dataPoints.map((p) => p.temperature),
-          borderColor: '#f8fafc',
+          borderColor: 'hsl(129, 77%, 60%)',
           backgroundColor: 'transparent',
           yAxisID: 'y',
           tension: 0.25,
@@ -306,7 +304,7 @@ export const DevicesPanel = () => {
         {
           label: 'Humidity (%)',
           data: dataPoints.map((p) => p.humidity),
-          borderColor: '#cbd5e1',
+          borderColor: 'hsl(41, 99%, 59%)',
           backgroundColor: 'transparent',
           borderDash: [5, 4],
           yAxisID: 'y1',
@@ -319,7 +317,7 @@ export const DevicesPanel = () => {
         {
           label: 'Air Pressure (hPa)',
           data: dataPoints.map((p) => p.airPressure),
-          borderColor: '#94a3b8',
+          borderColor: 'hsl(4, 100%, 71%)',
           backgroundColor: 'transparent',
           borderDash: [2, 3],
           yAxisID: 'y2',
@@ -337,6 +335,9 @@ export const DevicesPanel = () => {
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      font: {
+        family: "'DM Sans', sans-serif",
+      },
       animation: { duration: 200 },
       interaction: {
         mode: 'index' as const,
@@ -347,15 +348,15 @@ export const DevicesPanel = () => {
           display: true,
           position: 'top' as const,
           labels: {
-            color: '#e2e8f0',
+            color: 'hsla(180, 67%, 99%, 1)',
             boxWidth: 16,
             padding: 14,
           },
         },
         tooltip: {
           backgroundColor: 'rgba(20, 20, 20, 0.95)',
-          titleColor: '#ffffff',
-          bodyColor: '#cbd5e1',
+          titleColor: 'hsla(180, 67%, 99%, 1)',
+          bodyColor: 'hsl(180, 1%, 53%)',
           borderColor: 'rgba(255, 255, 255, 0.15)',
           borderWidth: 1,
           padding: 10,
@@ -364,10 +365,10 @@ export const DevicesPanel = () => {
       scales: {
         x: {
           grid: {
-            color: 'rgba(255, 255, 255, 0.05)',
+            color: 'rgba(255, 255, 255, 0.08)',
           },
           ticks: {
-            color: '#94a3b8',
+            color: 'hsl(180, 1%, 53%)',
             maxTicksLimit: 8,
           },
         },
@@ -378,13 +379,13 @@ export const DevicesPanel = () => {
           title: {
             display: true,
             text: '°C',
-            color: '#94a3b8',
+            color: 'hsl(180, 1%, 53%)',
           },
           grid: {
-            color: 'rgba(255, 255, 255, 0.05)',
+            color: 'rgba(255, 255, 255, 0.08)',
           },
           ticks: {
-            color: '#94a3b8',
+            color: 'hsl(180, 1%, 53%)',
           },
         },
         y1: {
@@ -394,13 +395,13 @@ export const DevicesPanel = () => {
           title: {
             display: true,
             text: '%',
-            color: '#94a3b8',
+            color: 'hsl(180, 1%, 53%)',
           },
           grid: {
             drawOnChartArea: false,
           },
           ticks: {
-            color: '#94a3b8',
+            color: 'hsl(180, 1%, 53%)',
           },
         },
         y2: {
@@ -410,13 +411,13 @@ export const DevicesPanel = () => {
           title: {
             display: true,
             text: 'hPa',
-            color: '#94a3b8',
+            color: 'hsl(180, 1%, 53%)',
           },
           grid: {
             drawOnChartArea: false,
           },
           ticks: {
-            color: '#94a3b8',
+            color: 'hsl(180, 1%, 53%)',
           },
         },
       },
@@ -424,10 +425,12 @@ export const DevicesPanel = () => {
     [],
   );
 
-  // Helper for separate charts with clean neutral styling (no gradients or distinct colors)
   const createMetricConfig = (unit: string) => ({
     responsive: true,
     maintainAspectRatio: false,
+    font: {
+      family: "'DM Sans', sans-serif",
+    },
     animation: { duration: 200 },
     interaction: {
       mode: 'index' as const,
@@ -436,9 +439,9 @@ export const DevicesPanel = () => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'rgba(20, 20, 20, 0.95)',
-        titleColor: '#ffffff',
-        bodyColor: '#cbd5e1',
+        backgroundColor: 'rgba(18, 18, 18, 0.96)',
+        titleColor: 'hsla(180, 67%, 99%, 1)',
+        bodyColor: 'hsl(180, 1%, 53%)',
         borderColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 1,
         padding: 10,
@@ -446,16 +449,16 @@ export const DevicesPanel = () => {
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8', maxTicksLimit: 8 },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
       },
       y: {
         type: 'linear' as const,
         display: true,
         position: 'left' as const,
-        title: { display: true, text: unit, color: '#94a3b8' },
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8' },
+        title: { display: true, text: unit, color: 'hsl(180, 1%, 53%)' },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
       },
     },
   });
@@ -468,7 +471,7 @@ export const DevicesPanel = () => {
         {
           label: 'Temperature (°C)',
           data: dataPoints.map((p) => p.temperature),
-          borderColor: '#f8fafc',
+          borderColor: 'hsl(129, 77%, 60%)',
           backgroundColor: 'transparent',
           tension: 0.25,
           fill: false,
@@ -488,7 +491,7 @@ export const DevicesPanel = () => {
         {
           label: 'Humidity (%)',
           data: dataPoints.map((p) => p.humidity),
-          borderColor: '#f8fafc',
+          borderColor: 'hsl(41, 99%, 59%)',
           backgroundColor: 'transparent',
           tension: 0.25,
           fill: false,
@@ -508,7 +511,7 @@ export const DevicesPanel = () => {
         {
           label: 'Air Pressure (hPa)',
           data: dataPoints.map((p) => p.airPressure),
-          borderColor: '#f8fafc',
+          borderColor: 'hsl(4, 100%, 71%)',
           backgroundColor: 'transparent',
           tension: 0.25,
           fill: false,
@@ -645,26 +648,28 @@ export const DevicesPanel = () => {
           </span>
         </div>
 
-        <div className="devices__detail-meta">
-          <span>
-            <IconMapPin size={14} strokeWidth={1.75} />
-            {selectedLocation?.name ?? 'No location'}
-          </span>
-          <span>
-            <IconDatabase size={14} strokeWidth={1.75} />
-            {selectedDevice.dataPointCount.toLocaleString()} data points
-          </span>
-          <span>
-            <IconClock size={14} strokeWidth={1.75} />
-            Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
-          </span>
-        </div>
-
-        {latest && (
-          <div className="devices__detail-telemetry">
-            <TelemetryChips reading={latest} />
+        <div className="devices__detail-data-row">
+          <div className="devices__detail-meta">
+            <span>
+              <IconMapPin size={14} strokeWidth={1.75} />
+              {selectedLocation?.name ?? 'No location'}
+            </span>
+            <span>
+              <IconDatabase size={14} strokeWidth={1.75} />
+              {selectedDevice.dataPointCount.toLocaleString()} data points
+            </span>
+            <span>
+              <IconClock size={14} strokeWidth={1.75} />
+              Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
+            </span>
           </div>
-        )}
+
+          {latest && (
+            <div className="devices__detail-telemetry">
+              <TelemetryChips reading={latest} />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="settings__tabs" role="tablist" aria-label="Device sections">
@@ -812,18 +817,6 @@ export const DevicesPanel = () => {
                       </div>
                     </div>
 
-                    <div className="devices__summary-col">
-                      <div className="devices__summary-header">
-                        <IconCpu size={16} strokeWidth={1.75} />
-                        <span>Telemetry Points</span>
-                      </div>
-                      <div className="devices__summary-metrics">
-                        <div>
-                          <span className="summary-lbl">Range count</span>
-                          <span className="summary-val">{stats.count.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
 
