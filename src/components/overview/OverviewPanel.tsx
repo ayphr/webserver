@@ -43,9 +43,10 @@ type Props = {
   user: PublicUser;
   credits: CreditBalance | null;
   onNavigate: (tab: string) => void;
+  onDeviceNavigate: (serial: number) => void;
 };
 
-export const OverviewPanel = ({ user, credits, onNavigate }: Props) => {
+export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: Props) => {
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,7 +181,7 @@ export const OverviewPanel = ({ user, credits, onNavigate }: Props) => {
                   key={device.serial}
                   type="button"
                   className="overview__device"
-                  onClick={() => onNavigate('devices')}
+                  onClick={() => onDeviceNavigate(device.serial)}
                 >
                   <span className={`overview__device-status ${online ? 'is-online' : 'is-offline'}`} />
                   <span className="overview__device-main">

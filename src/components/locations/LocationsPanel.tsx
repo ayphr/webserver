@@ -6,6 +6,8 @@ import {
   IconPlus,
   IconRefresh,
   IconTrash,
+  IconWifi,
+  IconWifiOff,
 } from '@tabler/icons-react';
 import type { DeviceSummary, Location, PublicUser } from '@common';
 import { getPlanFeaturesForUser } from '@common';
@@ -28,8 +30,11 @@ function average(values: number[]): number | null {
 }
 
 type View = 'list' | 'detail';
+type Props = {
+  onDeviceNavigate: (serial: number) => void;
+};
 
-export const LocationsPanel = () => {
+export const LocationsPanel = ({ onDeviceNavigate }: Props) => {
   const [view, setView] = useState<View>('list');
   const [locations, setLocations] = useState<Location[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
@@ -351,16 +356,26 @@ export const LocationsPanel = () => {
             ) : (
               <ul className="locations__device-list">
                 {visibleLocationDevices.map((device) => (
-                  <li key={device.serial} className="locations__device-item">
-                    <div>
-                      <span className="locations__device-name">
-                        {device.name?.trim() || `Device ${device.serial}`}
+                  <li key={device.serial}>
+                    <button
+                      type="button"
+                      className="locations__device-item"
+                      onClick={() => onDeviceNavigate(device.serial)}
+                    >
+                      <div>
+                        <span className="locations__device-name">
+                          {device.name?.trim() || `Device ${device.serial}`}
+                        </span>
+                        <span className="locations__device-serial">#{device.serial}</span>
+                      </div>
+                      <span
+                        className={`locations__device-status ${isOnline(device) ? 'is-online' : 'is-offline'}`}
+                        title={isOnline(device) ? 'Online' : 'Offline'}
+                        aria-label={isOnline(device) ? 'Online' : 'Offline'}
+                      >
+                        {isOnline(device) ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
                       </span>
-                      <span className="locations__device-serial">#{device.serial}</span>
-                    </div>
-                    <span className={`locations__device-status ${isOnline(device) ? 'is-online' : 'is-offline'}`}>
-                      {isOnline(device) ? 'Online' : 'Offline'}
-                    </span>
+                    </button>
                   </li>
                 ))}
               </ul>
