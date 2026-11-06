@@ -1,4 +1,4 @@
-import { isDuplicateKeyError, json, readJsonBody } from '../../lib/http';
+import { isDuplicateKeyError, json, readJsonBody, readValidatedJsonBody } from '../../lib/http';
 import {
   createPasswordHash,
   endAllSessions,
@@ -22,7 +22,7 @@ import {
   updateUser,
 } from '../../lib/db';
 import type { User } from '@common';
-import { getCreditPeriodStart, normalizeCountryCode } from '@common';
+import { getCreditPeriodStart, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
 import { toPublicUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
@@ -34,7 +34,7 @@ import { getUserCount } from '../../lib/db/users';
 import { setTotalUsers } from '../../lib/metrics';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
 
-type AuthPayload = {
+type AuthPayload = JsonObject & {
   username?: string;
   password?: string;
   currentPassword?: string;
@@ -45,6 +45,22 @@ type AuthPayload = {
   locale?: string;
   deviceType?: string;
 };
+
+function validateAuthPayload(value: unknown): AuthPayload {
+  const body = requireJsonObject(value);
+  return {
+    ...body,
+    username: optionalString(body, 'username', { maxLength: 64 }),
+    password: optionalString(body, 'password', { maxLength: 256, trim: false }),
+    currentPassword: optionalString(body, 'currentPassword', { maxLength: 256, trim: false }),
+    newPassword: optionalString(body, 'newPassword', { maxLength: 256, trim: false }),
+    country: optionalString(body, 'country', { maxLength: 2 }),
+    acceptPolicies: optionalBoolean(body, 'acceptPolicies'),
+    timezone: optionalString(body, 'timezone', { maxLength: 64 }),
+    locale: optionalString(body, 'locale', { maxLength: 64 }),
+    deviceType: optionalString(body, 'deviceType', { maxLength: 32 }),
+  };
+}
 
 const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
 
@@ -57,7 +73,9 @@ async function handleRegister(request: Request) {
     return tooManyRequests(ipCheck.retryAfterMs);
   }
 
-  const body = await readJsonBody<AuthPayload>(request);
+  const parsed = await readValidatedJsonBody(request, validateAuthPayload);
+  if ('error' in parsed) return parsed.error;
+  const body = parsed.value;
 
   if (!body?.username || !body.password) {
     authEventsTotal.inc({ event: 'register', result: 'invalid' });
@@ -158,7 +176,9 @@ async function handleLogin(request: Request) {
     return tooManyRequests(ipCheck.retryAfterMs);
   }
 
-  const body = await readJsonBody<AuthPayload>(request);
+  const parsed = await readValidatedJsonBody(request, validateAuthPayload);
+  if ('error' in parsed) return parsed.error;
+  const body = parsed.value;
 
   if (!body?.username || !body.password) {
     authEventsTotal.inc({ event: 'login', result: 'invalid' });

@@ -263,6 +263,27 @@ export const cacheOperationsTotal = new Counter({
   registers: [registry],
 });
 
+export const backgroundTaskRunsTotal = new Counter({
+  name: 'ayphr_background_task_runs_total',
+  help: 'Background task executions by task and result.',
+  labelNames: ['task', 'result'],
+  registers: [registry],
+});
+
+export const backgroundTaskFailuresTotal = new Counter({
+  name: 'ayphr_background_task_failures_total',
+  help: 'Background task failures by task.',
+  labelNames: ['task'],
+  registers: [registry],
+});
+
+export const backgroundTaskInFlight = new Gauge({
+  name: 'ayphr_background_tasks_in_flight',
+  help: 'Background tasks currently running.',
+  labelNames: ['task'],
+  registers: [registry],
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

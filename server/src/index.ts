@@ -4,6 +4,7 @@ import { reverifyAllDomains } from './lib/domainReverification';
 import { setActiveDevices, setProcessMaxFds, setProcessOpenFds, setProcessVirtualMemoryBytes, setTotalDevices, setTotalUsers } from './lib/metrics';
 import { getRedis, closeRedis } from './lib/redis';
 import { createLogger } from './lib/logger';
+import { runBackgroundTask, scheduleBackgroundTask } from './lib/backgroundTasks';
 import { API_PORT, METRICS_PORT, REDIS_URL } from './env';
 
 const log = createLogger('server');
@@ -52,10 +53,10 @@ async function refreshEntityCounts() {
   }
 }
 
-void refreshActiveDevices();
-void refreshEntityCounts();
-const activeDevicesTimer = setInterval(() => void refreshActiveDevices(), ACTIVE_DEVICE_REFRESH_MS);
-const entityCountTimer = setInterval(() => void refreshEntityCounts(), ENTITY_COUNT_REFRESH_MS);
+void runBackgroundTask('active-device-refresh', refreshActiveDevices);
+void runBackgroundTask('entity-count-refresh', refreshEntityCounts);
+const activeDevicesTimer = scheduleBackgroundTask('active-device-refresh', ACTIVE_DEVICE_REFRESH_MS, refreshActiveDevices);
+const entityCountTimer = scheduleBackgroundTask('entity-count-refresh', ENTITY_COUNT_REFRESH_MS, refreshEntityCounts);
 
 // Best-effort process-level gauges that prom-client does not expose under Bun
 // (file descriptors, virtual memory). Sourced from /proc on Linux containers.
@@ -81,10 +82,14 @@ async function refreshProcessMetrics() {
     log.warn({ error }, 'failed to refresh process metrics');
   }
 }
-void refreshProcessMetrics();
-const processMetricsTimer = setInterval(() => void refreshProcessMetrics(), PROCESS_METRICS_REFRESH_MS);
-const domainReverifyTimer = setInterval(() => void reverifyAllDomains().catch(() => {}), DOMAIN_REVERIFY_REFRESH_MS);
-void reverifyAllDomains().catch(() => {});
+void runBackgroundTask('process-metrics-refresh', refreshProcessMetrics);
+const processMetricsTimer = scheduleBackgroundTask('process-metrics-refresh', PROCESS_METRICS_REFRESH_MS, refreshProcessMetrics);
+const domainReverifyTimer = scheduleBackgroundTask(
+  'domain-reverification',
+  DOMAIN_REVERIFY_REFRESH_MS,
+  reverifyAllDomains,
+);
+void runBackgroundTask('domain-reverification', reverifyAllDomains);
 
 let shuttingDown = false;
 
