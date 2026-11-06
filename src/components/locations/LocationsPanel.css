@@ -185,7 +185,14 @@
 }
 
 .locations__location-card {
+  padding: 0.85rem 1rem;
   cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.locations__location-card:hover {
+  border-color: var(--border-focus);
+  background: var(--bg-elevated);
 }
 
 .locations__location-card__content {

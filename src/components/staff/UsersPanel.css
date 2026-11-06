@@ -167,14 +167,6 @@
   font-size: 0.85rem;
 }
 
-.users-panel__pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding-top: 0.5rem;
-}
-
 @media (max-width: 720px) {
   .users-panel__item {
     flex-direction: column;

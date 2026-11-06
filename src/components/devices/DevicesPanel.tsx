@@ -16,12 +16,13 @@ import {
 } from '@tabler/icons-react';
 import type { DataPoint, DeviceSummary, Location } from '@common';
 import { api } from '../../lib/api';
-import { Button, Card, ConfirmDialog, Input } from '../common';
+import { Button, Card, ConfirmDialog, Input, Pagination } from '../common';
 import { LineGraph } from '../graphs';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+const PAGE_SIZE = 5;
 
 function toDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
@@ -92,6 +93,7 @@ export const DevicesPanel = () => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [devicePage, setDevicePage] = useState(1);
   const [selectedSerial, setSelectedSerial] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('graphs');
   const [isLoading, setIsLoading] = useState(true);
@@ -145,6 +147,13 @@ export const DevicesPanel = () => {
     if (!selectedDevice?.locationId) return null;
     return locations.find((l) => l.id === selectedDevice.locationId) ?? null;
   }, [locations, selectedDevice]);
+
+  const deviceTotalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
+  const currentDevicePage = Math.min(devicePage, deviceTotalPages);
+  const visibleDevices = useMemo(
+    () => devices.slice((currentDevicePage - 1) * PAGE_SIZE, currentDevicePage * PAGE_SIZE),
+    [currentDevicePage, devices],
+  );
 
   // Sync settings form fields when selected device changes
   const [prevDeviceSerial, setPrevDeviceSerial] = useState<number | null>(null);
@@ -550,7 +559,7 @@ export const DevicesPanel = () => {
           </div>
         ) : (
           <div className="devices__grid">
-            {devices.map((device) => {
+            {visibleDevices.map((device) => {
               const deviceLoc = locations.find((l) => l.id === device.locationId);
               const online = isOnline(device);
               const reading = device.latestDataPoint;
@@ -593,6 +602,7 @@ export const DevicesPanel = () => {
             })}
           </div>
         )}
+        <Pagination page={currentDevicePage} totalPages={deviceTotalPages} onPageChange={setDevicePage} disabled={isRefreshing} />
       </div>
     );
   }
