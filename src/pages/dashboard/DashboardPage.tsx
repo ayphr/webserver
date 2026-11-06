@@ -163,6 +163,7 @@ export const DashboardPage = () => {
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -266,12 +267,20 @@ export const DashboardPage = () => {
   const navigate = useNavigate();
 
   const changeTab = (value: string) => {
+    if (value !== 'devices') {
+      setDeviceToOpen(null);
+    }
     setActivePage(value);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('tab', value);
       return next;
     }, { replace: true });
+  };
+
+  const openDevice = (serial: number) => {
+    setDeviceToOpen(serial);
+    changeTab('devices');
   };
 
   useEffect(() => {
@@ -550,6 +559,7 @@ export const DashboardPage = () => {
                   user={user}
                   credits={credits}
                   onNavigate={changeTab}
+                  onDeviceNavigate={openDevice}
                 />
               </DashboardPanel>
             )}
@@ -561,7 +571,7 @@ export const DashboardPage = () => {
                 className="dashboard-panel--devices"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <DevicesPanel />
+                  <DevicesPanel initialDeviceSerial={deviceToOpen} />
                 </Suspense>
               </DashboardPanel>
             )}
@@ -573,7 +583,7 @@ export const DashboardPage = () => {
                 className="dashboard-panel--wide"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <LocationsPanel />
+                  <LocationsPanel onDeviceNavigate={openDevice} />
                 </Suspense>
               </DashboardPanel>
             )}

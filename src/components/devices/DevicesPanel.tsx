@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -89,8 +89,11 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 type Period = '1h' | '24h' | '7d' | '30d' | 'all';
 type GraphMode = 'combined' | 'separate' | 'summary';
 type DetailTab = 'graphs' | 'settings';
+type Props = {
+  initialDeviceSerial?: number | null;
+};
 
-export const DevicesPanel = () => {
+export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -116,6 +119,7 @@ export const DevicesPanel = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isUnlinkOpen, setIsUnlinkOpen] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
+  const hasAppliedInitialDevice = useRef(false);
 
   const loadAll = useCallback(async () => {
     setError(null);
@@ -126,10 +130,21 @@ export const DevicesPanel = () => {
       ]);
       setDevices(loadedDevices);
       setLocations(loadedLocations);
+      if (
+        !hasAppliedInitialDevice.current &&
+        initialDeviceSerial !== null &&
+        initialDeviceSerial !== undefined &&
+        loadedDevices.some((device) => device.serial === initialDeviceSerial)
+      ) {
+        setSelectedSerial(initialDeviceSerial);
+        setDetailTab('graphs');
+        setView('detail');
+        hasAppliedInitialDevice.current = true;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
     }
-  }, []);
+  }, [initialDeviceSerial]);
 
   useEffect(() => {
     void (async () => {

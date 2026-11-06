@@ -128,9 +128,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border, #ddd);
   border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.locations__device-item:hover {
+  border-color: var(--border-focus);
+  background: var(--bg-elevated);
 }
 
 .locations__device-name {
@@ -149,6 +159,12 @@
 
 .locations__device-status.is-offline {
   color: #922b21;
+}
+
+.locations__device-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .locations__settings {
