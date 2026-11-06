@@ -13,6 +13,7 @@ import {
   handleApiNotFoundRoute,
   handleNotFoundRoute,
   handleOptionsRoute,
+  handleReadinessRoute,
   handleStatusRoute,
 } from './routes/util';
 import { handlePunishment, handleMe as handlePunishmentsMe } from './routes/punishments';
@@ -94,6 +95,7 @@ type RouteDefinition = {
 
 const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/status', handle: handleStatusRoute },
+  { method: 'GET', path: '/api/ready', handle: handleReadinessRoute },
 
   { method: 'POST', path: '/api/auth/register', handle: handleAuthRegister },
   { method: 'POST', path: '/api/auth/login', handle: handleLogin },

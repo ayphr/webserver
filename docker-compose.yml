@@ -48,7 +48,7 @@ services:
         - CMD-SHELL
         - >-
           node -e "const req = require('http').get({hostname:'127.0.0.1',
-          port:process.env.API_PORT || 80, path:'/api/status'}, res => { let b='';
+          port:process.env.API_PORT || 80, path:'/api/ready'}, res => { let b='';
           res.on('data', c => b += c); res.on('end', () => { try { if
           (res.statusCode !== 200) process.exit(1);
           } catch { process.exit(1); } }); }); req.on('error', () => process.exit(1));"
