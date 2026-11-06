@@ -4,7 +4,6 @@ import {
   IconArrowLeft,
   IconCheck,
   IconClock,
-  IconCpu,
   IconDatabase,
   IconDroplet,
   IconExternalLink,
@@ -256,35 +255,6 @@ export const DevicesPanel = () => {
     }
   };
 
-  // Metrics summary statistics for the period
-  const stats = useMemo(() => {
-    if (dataPoints.length === 0) return null;
-    const temps = dataPoints.map((p) => p.temperature);
-    const hums = dataPoints.map((p) => p.humidity);
-    const press = dataPoints.map((p) => p.airPressure);
-
-    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-
-    return {
-      temp: {
-        min: Math.min(...temps),
-        max: Math.max(...temps),
-        avg: avg(temps),
-      },
-      humidity: {
-        min: Math.min(...hums),
-        max: Math.max(...hums),
-        avg: avg(hums),
-      },
-      pressure: {
-        min: Math.min(...press),
-        max: Math.max(...press),
-        avg: avg(press),
-      },
-      count: dataPoints.length,
-    };
-  }, [dataPoints]);
-
   // Combined chart config & data without gradients or saturated colors
   const combinedData = useMemo(() => {
     const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
@@ -294,7 +264,7 @@ export const DevicesPanel = () => {
         {
           label: 'Temperature (°C)',
           data: dataPoints.map((p) => p.temperature),
-          borderColor: '#f8fafc',
+          borderColor: 'var(--accent-green-solid)',
           backgroundColor: 'transparent',
           yAxisID: 'y',
           tension: 0.25,
@@ -306,7 +276,7 @@ export const DevicesPanel = () => {
         {
           label: 'Humidity (%)',
           data: dataPoints.map((p) => p.humidity),
-          borderColor: '#cbd5e1',
+          borderColor: 'var(--accent-yellow-solid)',
           backgroundColor: 'transparent',
           borderDash: [5, 4],
           yAxisID: 'y1',
@@ -319,7 +289,7 @@ export const DevicesPanel = () => {
         {
           label: 'Air Pressure (hPa)',
           data: dataPoints.map((p) => p.airPressure),
-          borderColor: '#94a3b8',
+          borderColor: 'var(--text-primary)',
           backgroundColor: 'transparent',
           borderDash: [2, 3],
           yAxisID: 'y2',
@@ -333,133 +303,6 @@ export const DevicesPanel = () => {
     };
   }, [dataPoints, period]);
 
-  const combinedConfig = useMemo(
-    () => ({
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 200 },
-      interaction: {
-        mode: 'index' as const,
-        intersect: false,
-      },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top' as const,
-          labels: {
-            color: '#e2e8f0',
-            boxWidth: 16,
-            padding: 14,
-          },
-        },
-        tooltip: {
-          backgroundColor: 'rgba(20, 20, 20, 0.95)',
-          titleColor: '#ffffff',
-          bodyColor: '#cbd5e1',
-          borderColor: 'rgba(255, 255, 255, 0.15)',
-          borderWidth: 1,
-          padding: 10,
-        },
-      },
-      scales: {
-        x: {
-          grid: {
-            color: 'rgba(255, 255, 255, 0.05)',
-          },
-          ticks: {
-            color: '#94a3b8',
-            maxTicksLimit: 8,
-          },
-        },
-        y: {
-          type: 'linear' as const,
-          display: true,
-          position: 'left' as const,
-          title: {
-            display: true,
-            text: '°C',
-            color: '#94a3b8',
-          },
-          grid: {
-            color: 'rgba(255, 255, 255, 0.05)',
-          },
-          ticks: {
-            color: '#94a3b8',
-          },
-        },
-        y1: {
-          type: 'linear' as const,
-          display: true,
-          position: 'right' as const,
-          title: {
-            display: true,
-            text: '%',
-            color: '#94a3b8',
-          },
-          grid: {
-            drawOnChartArea: false,
-          },
-          ticks: {
-            color: '#94a3b8',
-          },
-        },
-        y2: {
-          type: 'linear' as const,
-          display: true,
-          position: 'right' as const,
-          title: {
-            display: true,
-            text: 'hPa',
-            color: '#94a3b8',
-          },
-          grid: {
-            drawOnChartArea: false,
-          },
-          ticks: {
-            color: '#94a3b8',
-          },
-        },
-      },
-    }),
-    [],
-  );
-
-  // Helper for separate charts with clean neutral styling (no gradients or distinct colors)
-  const createMetricConfig = (unit: string) => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 200 },
-    interaction: {
-      mode: 'index' as const,
-      intersect: false,
-    },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: 'rgba(20, 20, 20, 0.95)',
-        titleColor: '#ffffff',
-        bodyColor: '#cbd5e1',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        borderWidth: 1,
-        padding: 10,
-      },
-    },
-    scales: {
-      x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8', maxTicksLimit: 8 },
-      },
-      y: {
-        type: 'linear' as const,
-        display: true,
-        position: 'left' as const,
-        title: { display: true, text: unit, color: '#94a3b8' },
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8' },
-      },
-    },
-  });
-
   const tempSeparateData = useMemo(() => {
     const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
     return {
@@ -468,7 +311,7 @@ export const DevicesPanel = () => {
         {
           label: 'Temperature (°C)',
           data: dataPoints.map((p) => p.temperature),
-          borderColor: '#f8fafc',
+          borderColor: 'var(--accent-green-solid)',
           backgroundColor: 'transparent',
           tension: 0.25,
           fill: false,
@@ -488,7 +331,7 @@ export const DevicesPanel = () => {
         {
           label: 'Humidity (%)',
           data: dataPoints.map((p) => p.humidity),
-          borderColor: '#f8fafc',
+          borderColor: 'var(--accent-yellow-solid)',
           backgroundColor: 'transparent',
           tension: 0.25,
           fill: false,
@@ -508,7 +351,7 @@ export const DevicesPanel = () => {
         {
           label: 'Air Pressure (hPa)',
           data: dataPoints.map((p) => p.airPressure),
-          borderColor: '#f8fafc',
+          borderColor: 'var(--text-primary)',
           backgroundColor: 'transparent',
           tension: 0.25,
           fill: false,
@@ -609,7 +452,6 @@ export const DevicesPanel = () => {
 
   // DETAIL VIEW
   const online = isOnline(selectedDevice);
-  const latest = selectedDevice.latestDataPoint;
 
   return (
     <div className="devices">
@@ -645,26 +487,23 @@ export const DevicesPanel = () => {
           </span>
         </div>
 
-        <div className="devices__detail-meta">
-          <span>
-            <IconMapPin size={14} strokeWidth={1.75} />
-            {selectedLocation?.name ?? 'No location'}
-          </span>
-          <span>
-            <IconDatabase size={14} strokeWidth={1.75} />
-            {selectedDevice.dataPointCount.toLocaleString()} data points
-          </span>
-          <span>
-            <IconClock size={14} strokeWidth={1.75} />
-            Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
-          </span>
-        </div>
-
-        {latest && (
-          <div className="devices__detail-telemetry">
-            <TelemetryChips reading={latest} />
+        <div className="devices__detail-info-row">
+          <div className="devices__detail-meta">
+            <span>
+              <IconMapPin size={14} strokeWidth={1.75} />
+              {selectedLocation?.name ?? 'No location'}
+            </span>
+            <span>
+              <IconDatabase size={14} strokeWidth={1.75} />
+              {selectedDevice.dataPointCount.toLocaleString()} data points
+            </span>
+            <span>
+              <IconClock size={14} strokeWidth={1.75} />
+              Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
+            </span>
           </div>
-        )}
+          <TelemetryChips reading={selectedDevice.latestDataPoint} />
+        </div>
       </div>
 
       <div className="settings__tabs" role="tablist" aria-label="Device sections">
@@ -677,7 +516,7 @@ export const DevicesPanel = () => {
             className={`settings__tab ${detailTab === tab ? 'settings__tab--active' : ''}`}
             onClick={() => setDetailTab(tab)}
           >
-            {tab === 'graphs' ? 'Telemetry & Graphs' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'graphs' ? 'Graphs' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
@@ -747,90 +586,10 @@ export const DevicesPanel = () => {
               </div>
             ) : (
               <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''}`}>
-                {stats && (
-                  <div className="devices__metrics-summary">
-                    <div className="devices__summary-col">
-                      <div className="devices__summary-header">
-                        <IconThermometer size={16} strokeWidth={1.75} />
-                        <span>Temperature</span>
-                      </div>
-                      <div className="devices__summary-metrics">
-                        <div>
-                          <span className="summary-lbl">Min</span>
-                          <span className="summary-val">{stats.temp.min.toFixed(1)} °C</span>
-                        </div>
-                        <div>
-                          <span className="summary-lbl">Max</span>
-                          <span className="summary-val">{stats.temp.max.toFixed(1)} °C</span>
-                        </div>
-                        <div>
-                          <span className="summary-lbl">Avg</span>
-                          <span className="summary-val">{stats.temp.avg.toFixed(1)} °C</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="devices__summary-col">
-                      <div className="devices__summary-header">
-                        <IconDroplet size={16} strokeWidth={1.75} />
-                        <span>Humidity</span>
-                      </div>
-                      <div className="devices__summary-metrics">
-                        <div>
-                          <span className="summary-lbl">Min</span>
-                          <span className="summary-val">{stats.humidity.min.toFixed(1)} %</span>
-                        </div>
-                        <div>
-                          <span className="summary-lbl">Max</span>
-                          <span className="summary-val">{stats.humidity.max.toFixed(1)} %</span>
-                        </div>
-                        <div>
-                          <span className="summary-lbl">Avg</span>
-                          <span className="summary-val">{stats.humidity.avg.toFixed(1)} %</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="devices__summary-col">
-                      <div className="devices__summary-header">
-                        <IconGauge size={16} strokeWidth={1.75} />
-                        <span>Air Pressure</span>
-                      </div>
-                      <div className="devices__summary-metrics">
-                        <div>
-                          <span className="summary-lbl">Min</span>
-                          <span className="summary-val">{stats.pressure.min.toFixed(0)} hPa</span>
-                        </div>
-                        <div>
-                          <span className="summary-lbl">Max</span>
-                          <span className="summary-val">{stats.pressure.max.toFixed(0)} hPa</span>
-                        </div>
-                        <div>
-                          <span className="summary-lbl">Avg</span>
-                          <span className="summary-val">{stats.pressure.avg.toFixed(0)} hPa</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="devices__summary-col">
-                      <div className="devices__summary-header">
-                        <IconCpu size={16} strokeWidth={1.75} />
-                        <span>Telemetry Points</span>
-                      </div>
-                      <div className="devices__summary-metrics">
-                        <div>
-                          <span className="summary-lbl">Range count</span>
-                          <span className="summary-val">{stats.count.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {graphMode === 'combined' ? (
                   <div className="devices__chart-card">
                     <div className="devices__chart-container">
-                      <LineGraph data={combinedData} config={combinedConfig} />
+                      <LineGraph data={combinedData} config={{ showAxisLabels: false }} />
                     </div>
                   </div>
                 ) : (
@@ -843,7 +602,6 @@ export const DevicesPanel = () => {
                       <div className="devices__chart-container devices__chart-container--separate">
                         <LineGraph
                           data={tempSeparateData}
-                          config={createMetricConfig('°C')}
                         />
                       </div>
                     </div>
@@ -856,7 +614,6 @@ export const DevicesPanel = () => {
                       <div className="devices__chart-container devices__chart-container--separate">
                         <LineGraph
                           data={humiditySeparateData}
-                          config={createMetricConfig('%')}
                         />
                       </div>
                     </div>
@@ -869,7 +626,6 @@ export const DevicesPanel = () => {
                       <div className="devices__chart-container devices__chart-container--separate">
                         <LineGraph
                           data={pressureSeparateData}
-                          config={createMetricConfig('hPa')}
                         />
                       </div>
                     </div>
