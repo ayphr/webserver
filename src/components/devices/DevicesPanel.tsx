@@ -12,6 +12,8 @@ import {
   IconRefresh,
   IconThermometer,
   IconTrash,
+  IconWifi,
+  IconWifiOff,
 } from '@tabler/icons-react';
 import type { DataPoint, DeviceSummary, Location } from '@common';
 import { api } from '../../lib/api';
@@ -85,7 +87,7 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 }
 
 type Period = '1h' | '24h' | '7d' | '30d' | 'all';
-type GraphMode = 'combined' | 'separate';
+type GraphMode = 'combined' | 'separate' | 'summary';
 type DetailTab = 'graphs' | 'settings';
 
 export const DevicesPanel = () => {
@@ -576,13 +578,17 @@ export const DevicesPanel = () => {
                 >
                   <div className="devices__card-header">
                     <div className="devices__card-title-group">
-                      <span className={`devices__device-dot ${online ? 'is-online' : 'is-offline'}`} />
                       <span className="devices__card-name">{deviceLabel(device)}</span>
-                      <span className="devices__serial-pill">#{device.serial}</span>
+                      {device.name?.trim() && (
+                        <span className="devices__serial-pill">#{device.serial}</span>
+                      )}
                     </div>
-                    <span className={`devices__status-badge ${online ? 'is-online' : 'is-offline'}`}>
-                      <span className="devices__status-dot" />
-                      {online ? 'Online' : 'Offline'}
+                    <span
+                      className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
+                      title={online ? 'Online' : 'Offline'}
+                      aria-label={online ? 'Online' : 'Offline'}
+                    >
+                      {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
                     </span>
                   </div>
 
@@ -642,9 +648,12 @@ export const DevicesPanel = () => {
             <h3 className="devices__detail-title">{deviceLabel(selectedDevice)}</h3>
             <span className="devices__serial-pill">#{selectedDevice.serial}</span>
           </div>
-          <span className={`devices__status-badge ${online ? 'is-online' : 'is-offline'}`}>
-            <span className="devices__status-dot" />
-            {online ? 'Online' : 'Offline'}
+          <span
+            className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
+            title={online ? 'Online' : 'Offline'}
+            aria-label={online ? 'Online' : 'Offline'}
+          >
+            {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
           </span>
         </div>
 
@@ -728,6 +737,13 @@ export const DevicesPanel = () => {
                 >
                   Separate Graphs
                 </button>
+                <button
+                  type="button"
+                  className={`devices__control-btn ${graphMode === 'summary' ? 'is-active' : ''}`}
+                  onClick={() => setGraphMode('summary')}
+                >
+                  Summary
+                </button>
               </div>
             </div>
 
@@ -752,7 +768,7 @@ export const DevicesPanel = () => {
               </div>
             ) : (
               <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''}`}>
-                {stats && (
+                {stats && graphMode === 'summary' && (
                   <div className="devices__metrics-summary">
                     <div className="devices__summary-col">
                       <div className="devices__summary-header">
@@ -826,7 +842,7 @@ export const DevicesPanel = () => {
                       <LineGraph data={combinedData} config={combinedConfig} />
                     </div>
                   </div>
-                ) : (
+                ) : graphMode === 'separate' ? (
                   <div className="devices__separate-charts">
                     <div className="devices__chart-card">
                       <div className="devices__chart-header">
@@ -867,7 +883,7 @@ export const DevicesPanel = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
