@@ -153,18 +153,11 @@
   color: var(--text-muted, #666);
 }
 
-.locations__device-status.is-online {
-  color: #1e8449;
-}
-
-.locations__device-status.is-offline {
-  color: #922b21;
-}
-
 .locations__device-status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--text-muted);
 }
 
 .locations__settings {
