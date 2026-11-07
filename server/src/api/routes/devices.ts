@@ -16,7 +16,6 @@ import {
   getDeviceBySerial,
   getDeviceByTokenHash,
   getDevicesForOwnerUuid,
-  getUserFromUuid,
   invalidateDeviceStatsForOwner,
   pruneDataPointsForSerials,
   toPublicDevice,
@@ -52,6 +51,8 @@ const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
 const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
 const MAX_NAME_LENGTH = 64;
 const MAX_POINTS_PER_UPLOAD = 2_000;
+const DATA_POINT_PRUNE_COOLDOWN_MS = 5 * 60 * 1000;
+const lastDataPointPruneByOwner = new Map<string, number>();
 
 function parseSerial(value: unknown): number | null {
   let serial: number;
@@ -121,6 +122,28 @@ function getDeviceToken(body: Record<string, unknown> | null): string | null {
   const fromBody = body?.token;
   if (typeof fromBody === 'string' && fromBody.trim()) return fromBody.trim();
   return null;
+}
+
+async function pruneOwnerDataPoints(user: User, devices: DeviceDocument[]): Promise<boolean> {
+  const now = Date.now();
+  const lastPrunedAt = lastDataPointPruneByOwner.get(user.uuid) ?? 0;
+  if (now - lastPrunedAt < DATA_POINT_PRUNE_COOLDOWN_MS) return false;
+
+  lastDataPointPruneByOwner.set(user.uuid, now);
+  try {
+    const features = getPlanFeaturesForUser(user);
+    const cutoff = new Date(now - features.dataRetentionDays * 86_400_000);
+    const removed = await pruneDataPointsForSerials(
+      devices.map((device) => device.serial),
+      features.sharedMaxDataPointsPerUser,
+      cutoff,
+    );
+    return removed > 0;
+  } catch (error) {
+    lastDataPointPruneByOwner.delete(user.uuid);
+    console.error('Failed to prune data points:', error);
+    return false;
+  }
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -300,19 +323,8 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   await ensureDefaultLocation(user.uuid, user.username);
   const devices = await getDevicesForOwnerUuid(user.uuid);
 
-  try {
-    const features = getPlanFeaturesForUser(user);
-    const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
-    const removed = await pruneDataPointsForSerials(
-      devices.map((device) => device.serial),
-      features.sharedMaxDataPointsPerUser,
-      cutoff,
-    );
-    if (removed > 0) {
-      await invalidateDeviceStatsForOwner(user.uuid);
-    }
-  } catch (pruneError) {
-    console.error('Failed to prune data points:', pruneError);
+  if (await pruneOwnerDataPoints(user, devices)) {
+    await invalidateDeviceStatsForOwner(user.uuid);
   }
 
   const stats = await getDataPointStats(devices.map((device) => device.serial), user.uuid);
@@ -367,17 +379,6 @@ async function handleUpload(request: Request): Promise<Response> {
       upsertDataPoints(serial, points),
       updateDeviceLastUpload(serial, now),
     ]);
-
-    try {
-      const ownerDevices = await getDevicesForOwnerUuid(device.ownerUuid);
-      const serials = ownerDevices.map((owned) => owned.serial);
-      const owner = await getUserFromUuid(device.ownerUuid);
-      const features = getPlanFeaturesForUser(owner);
-      const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
-      await pruneDataPointsForSerials(serials, features.sharedMaxDataPointsPerUser, cutoff);
-    } catch (pruneError) {
-      console.error('Failed to prune data points:', pruneError);
-    }
 
     device.lastUploadAt = now;
     await cacheDevice(device);
