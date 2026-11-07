@@ -30,7 +30,7 @@
 
 .locations__limit {
   font-size: 0.9rem;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .locations__limit-warning {
@@ -52,7 +52,7 @@
   gap: 0.5rem;
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   background: transparent;
   cursor: pointer;
@@ -60,8 +60,8 @@
 }
 
 .locations__list-item.is-active {
-  background: var(--accent-soft, #eef);
-  border-color: var(--accent, #446);
+  background: var(--bg-elevated);
+  border-color: var(--border-focus);
 }
 
 .locations__default-badge {
@@ -78,7 +78,7 @@
 
 .locations__tab {
   padding: 0.4rem 0.8rem;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--border);
   border-radius: 0.4rem;
   background: transparent;
   cursor: pointer;
@@ -86,7 +86,7 @@
 }
 
 .locations__tab.is-active {
-  background: var(--accent, #446);
+  background: var(--bg-elevated);
   color: #fff;
 }
 
@@ -98,7 +98,7 @@
 
 .locations__stat {
   padding: 0.75rem;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   display: flex;
   flex-direction: column;
@@ -107,7 +107,7 @@
 
 .locations__stat-label {
   font-size: 0.8rem;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .locations__stat-value {
@@ -130,7 +130,7 @@
   align-items: center;
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   background: transparent;
   color: inherit;
@@ -150,7 +150,7 @@
 
 .locations__device-serial {
   font-size: 0.85rem;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .locations__device-status {
@@ -186,7 +186,7 @@
 }
 
 .locations__notice {
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .locations__title {
@@ -216,5 +216,5 @@
 
 .locations__location-card__meta {
   font-size: 0.85rem;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }

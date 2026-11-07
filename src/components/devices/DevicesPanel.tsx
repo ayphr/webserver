@@ -16,7 +16,7 @@ import {
   IconWifi,
   IconWifiOff,
 } from '@tabler/icons-react';
-import type { DataPoint, DeviceSummary, Location } from '@common';
+import { getPlanFeaturesForUser, type DataPoint, type DeviceSummary, type Location, type PublicUser } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
@@ -93,6 +93,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<PublicUser | null>(null);
+
+  const planFeatures = user ? getPlanFeaturesForUser(user) : null;
+  const maxDevices = planFeatures?.maxDevices ?? null;
+  const atDeviceLimit = maxDevices !== null && devices.length >= maxDevices;
 
   // Telemetry graph state
   const [period, setPeriod] = useState<Period>('24h');
@@ -132,12 +137,14 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const loadAll = useCallback(async () => {
     setError(null);
     try {
-      const [loadedDevices, loadedLocations] = await Promise.all([
+      const [loadedDevices, loadedLocations, userData] = await Promise.all([
         api.devices.listMine(),
         api.locations.listMine().catch(() => []),
+        api.users.me().catch(() => null)
       ]);
       setDevices(loadedDevices);
       setLocations(loadedLocations);
+      if (userData) setUser(userData.user);
       if (
         !hasAppliedInitialDevice.current &&
         initialDeviceSerial !== null &&
@@ -534,6 +541,13 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           </div>
         </div>
 
+        {maxDevices !== null && (
+          <p className="devices__limit">
+            Devices: {devices.length} / {maxDevices.toLocaleString()}
+            {atDeviceLimit && <span className="devices__limit-warning"> Device limit reached.</span>}
+          </p>
+        )}
+
         {error && (
           <div className="devices__error">
             <IconAlertCircle size={16} strokeWidth={1.75} />
@@ -748,7 +762,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   Summary
                 </button>
               </div>
-              </div>
+            </div>
 
             {dataError && (
               <div className="devices__error">

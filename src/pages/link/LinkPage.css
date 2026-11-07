@@ -20,7 +20,7 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
-  color: var(--text-danger, #ff6b6b);
+  color: var(--status-error);
 }
 
 .link-page__form {
@@ -44,14 +44,14 @@
   font-family: var(--font-family-mono);
   text-transform: uppercase;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-primary);
 }
 
 .link-page__code-input:focus {
   outline: none;
-  border-color: var(--text-primary, #fff);
+  border-color: var(--text-primary);
 }
 
 .link-page__result {

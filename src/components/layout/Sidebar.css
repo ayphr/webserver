@@ -190,7 +190,7 @@
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  background: var(--accent, hsl(210, 80%, 45%));
+  background: var(--bg-elevated);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -266,7 +266,7 @@
   left: 0;
   right: 0;
   z-index: 20;
-  background: var(--bg-surface, hsl(0, 0%, 10%));
+  background: var(--bg-surface);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 0.4rem;
@@ -313,7 +313,7 @@
 .n-sidebar__accountLogout {
   background: transparent;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-muted);
   padding: 0.4rem;
   border-radius: 6px;
   cursor: pointer;
@@ -329,7 +329,7 @@
 .n-sidebar__accountMenuItem--empty {
   padding: 0.4rem;
   font-size: 0.85rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-muted);
 }
 
 .n-sidebar__accountName {
