@@ -73,6 +73,16 @@ type Props = {
   initialDeviceSerial?: number | null;
 };
 
+
+
+function resolveCssColor(value: string): string {
+  if (!value.startsWith('var(')) return value;
+  if (typeof document === 'undefined') return value;
+  const name = value.slice(4, -1).trim();
+  const resolved = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return resolved || value;
+}
+
 export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
@@ -316,7 +326,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       datasets: enabledDefs.map((def) => ({
         label: def.label,
         data: dataPoints.map((p) => def.getValue(p)),
-        borderColor: def.color,
+        borderColor: resolveCssColor(def.color),
         backgroundColor: 'transparent',
         yAxisID: unitToScaleId.get(def.unit) ?? 'y',
         tension: 0.25,
@@ -431,7 +441,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             {
               label: def.label,
               data: dataPoints.map((p) => def.getValue(p)),
-              borderColor: def.color,
+              borderColor: resolveCssColor(def.color),
               backgroundColor: 'transparent',
               tension: 0.25,
               fill: false,
@@ -646,7 +656,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
               <div className="devices__series-selector">
                 <ToggleDropdown
-                  label="Series"
+                  buttonLabel="Series"
                   options={seriesLabels}
                   value={enabledLabels}
                   onChange={handleSeriesChange}

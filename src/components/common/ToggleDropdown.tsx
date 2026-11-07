@@ -9,9 +9,10 @@ export interface ToggleDropdownProps {
   onChange: (value: string[]) => void;
   placeholder?: string;
   className?: string;
+  buttonLabel?: string;
 }
 
-export const ToggleDropdown = ({ label, options, value, onChange, placeholder = 'Select', className = '' }: ToggleDropdownProps) => {
+export const ToggleDropdown = ({ label, options, value, onChange, placeholder = 'Select', className = '', buttonLabel }: ToggleDropdownProps) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +39,7 @@ export const ToggleDropdown = ({ label, options, value, onChange, placeholder = 
     <div className={`toggle-dropdown ${className}`} ref={containerRef}>
       {label && <label className="toggle-dropdown__label">{label}</label>}
       <button type="button" className="toggle-dropdown__toggle" onClick={() => setOpen((v) => !v)}>
-        {value.length ? value.join(', ') : placeholder} ▾
+        {buttonLabel ?? (value.length ? value.join(', ') : placeholder)} ▾
       </button>
       {open && (
         <div className="toggle-dropdown__menu">
