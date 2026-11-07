@@ -403,7 +403,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       responsive: true,
       maintainAspectRatio: false,
       font: { family: "'DM Sans', sans-serif" },
-      animation: { duration: 200 },
+      animation: { duration: 0 },
       interaction: { mode: 'index' as const, intersect: false },
       plugins: {
         legend: {
@@ -441,7 +441,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     font: {
       family: "'DM Sans', sans-serif",
     },
-    animation: { duration: 200 },
+    animation: { duration: 0 },
     interaction: {
       mode: 'index' as const,
       intersect: false,
@@ -834,7 +834,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
                 {graphMode === 'combined' ? (
                   <div className="devices__chart-card">
-                    <div className="devices__chart-container" style={{ position: 'relative' }}>
+                    <div className="devices__chart-container" style={{ position: 'relative' }} onContextMenu={(e) => e.preventDefault()}>
                       <LineGraph data={combinedData} config={combinedConfig} />
 
                     </div>
@@ -855,7 +855,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                           />
                           <h4>{def.label}</h4>
                         </div>
-                        <div className="devices__chart-container devices__chart-container--separate">
+                        <div className="devices__chart-container devices__chart-container--separate" onContextMenu={(e) => e.preventDefault()}>
                           <LineGraph data={data} config={config} />
                         </div>
                       </div>
