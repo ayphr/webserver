@@ -64,12 +64,16 @@ export async function getDataPointStats(
   const rows = await dataPoints
     .aggregate<{ _id: number; count: number; latest: DataPointDocument }>([
       { $match: { deviceSerial: { $in: serials } } },
-      { $sort: { timestamp: -1 } },
       {
         $group: {
           _id: '$deviceSerial',
           count: { $sum: 1 },
-          latest: { $first: '$$ROOT' },
+          latest: {
+            $top: {
+              output: '$$ROOT',
+              sortBy: { timestamp: -1 },
+            },
+          },
         },
       },
     ])
@@ -187,7 +191,12 @@ export async function getDataPointsForDevice(
 
   trackMongoOperation('find', DATA_POINTS_COLLECTION);
   if (totalCount <= max) {
-    const docs = await dataPoints.find(filter).sort({ timestamp: 1 }).toArray();
+    const docs = await dataPoints
+      .find(filter, {
+        projection: { _id: 0, timestamp: 1, temperature: 1, humidity: 1, airPressure: 1 },
+      })
+      .sort({ timestamp: 1 })
+      .toArray();
     return {
       points: docs.map((doc) => ({
         timestamp: doc.timestamp,
@@ -200,7 +209,12 @@ export async function getDataPointsForDevice(
   }
 
   if (totalCount <= 10000) {
-    const docs = await dataPoints.find(filter).sort({ timestamp: 1 }).toArray();
+    const docs = await dataPoints
+      .find(filter, {
+        projection: { _id: 0, timestamp: 1, temperature: 1, humidity: 1, airPressure: 1 },
+      })
+      .sort({ timestamp: 1 })
+      .toArray();
     const step = docs.length / max;
     const sampled: DataPoint[] = [];
     for (let i = 0; i < max; i++) {
@@ -228,7 +242,13 @@ export async function getDataPointsForDevice(
     return { points: sampled, totalCount };
   }
 
-  const recentDocs = await dataPoints.find(filter).sort({ timestamp: -1 }).limit(max).toArray();
+  const recentDocs = await dataPoints
+    .find(filter, {
+      projection: { _id: 0, timestamp: 1, temperature: 1, humidity: 1, airPressure: 1 },
+    })
+    .sort({ timestamp: -1 })
+    .limit(max)
+    .toArray();
   recentDocs.reverse();
   return {
     points: recentDocs.map((doc) => ({
@@ -240,5 +260,4 @@ export async function getDataPointsForDevice(
     totalCount,
   };
 }
-
 
