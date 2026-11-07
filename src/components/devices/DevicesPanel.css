@@ -293,8 +293,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.75rem;
+  overflow-x: auto;
 }
 
 .devices__period-selector,
