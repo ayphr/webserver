@@ -16,6 +16,7 @@ import {
   getDeviceBySerial,
   getDeviceByTokenHash,
   getDevicesForOwnerUuid,
+  getUserFromUuid,
   invalidateDeviceStatsForOwner,
   pruneDataPointsForSerials,
   toPublicDevice,
@@ -43,6 +44,7 @@ import {
 } from '../../lib/metrics';
 import { PAIRING_CODE_TTL_MS } from '../../env';
 import { PAIRING_CODE_LENGTH, type DataPoint, type DeviceSummary, type User, getPlanFeaturesForUser } from '@common';
+import { redisFixedWindow } from '../../lib/redis';
 
 const MAX_SERIAL = 0xFFFFFFFF;
 
@@ -52,7 +54,8 @@ const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pa
 const MAX_NAME_LENGTH = 64;
 const MAX_POINTS_PER_UPLOAD = 2_000;
 const DATA_POINT_PRUNE_COOLDOWN_MS = 5 * 60 * 1000;
-const lastDataPointPruneByOwner = new Map<string, number>();
+const DATA_POINT_PRUNE_KEY_PREFIX = 'ayphr:telemetry:prune:';
+const localDataPointPruneByOwner = new Map<string, number>();
 
 function parseSerial(value: unknown): number | null {
   let serial: number;
@@ -124,23 +127,55 @@ function getDeviceToken(body: Record<string, unknown> | null): string | null {
   return null;
 }
 
-async function pruneOwnerDataPoints(user: User, devices: DeviceDocument[]): Promise<boolean> {
+async function shouldPruneOwnerDataPoints(ownerUuid: string): Promise<boolean> {
   const now = Date.now();
-  const lastPrunedAt = lastDataPointPruneByOwner.get(user.uuid) ?? 0;
-  if (now - lastPrunedAt < DATA_POINT_PRUNE_COOLDOWN_MS) return false;
-
-  lastDataPointPruneByOwner.set(user.uuid, now);
   try {
-    const features = getPlanFeaturesForUser(user);
+    const { count } = await redisFixedWindow(
+      `${DATA_POINT_PRUNE_KEY_PREFIX}${ownerUuid}`,
+      DATA_POINT_PRUNE_COOLDOWN_MS,
+    );
+    return count === 1;
+  } catch {
+    const lastPrunedAt = localDataPointPruneByOwner.get(ownerUuid) ?? 0;
+    if (now - lastPrunedAt < DATA_POINT_PRUNE_COOLDOWN_MS) return false;
+
+    localDataPointPruneByOwner.set(ownerUuid, now);
+    if (localDataPointPruneByOwner.size > 10_000) {
+      for (const [uuid, timestamp] of localDataPointPruneByOwner) {
+        if (now - timestamp >= DATA_POINT_PRUNE_COOLDOWN_MS) localDataPointPruneByOwner.delete(uuid);
+      }
+      while (localDataPointPruneByOwner.size > 10_000) {
+        const oldestUuid = localDataPointPruneByOwner.keys().next().value;
+        if (oldestUuid === undefined) break;
+        localDataPointPruneByOwner.delete(oldestUuid);
+      }
+    }
+    return true;
+  }
+}
+
+async function pruneOwnerDataPoints(
+  ownerUuid: string,
+  user?: User,
+  devices?: DeviceDocument[],
+): Promise<boolean> {
+  if (!(await shouldPruneOwnerDataPoints(ownerUuid))) return false;
+
+  try {
+    const now = Date.now();
+    const owner = user ?? await getUserFromUuid(ownerUuid);
+    const ownerDevices = devices ?? await getDevicesForOwnerUuid(ownerUuid);
+    if (!owner) return false;
+
+    const features = getPlanFeaturesForUser(owner);
     const cutoff = new Date(now - features.dataRetentionDays * 86_400_000);
     const removed = await pruneDataPointsForSerials(
-      devices.map((device) => device.serial),
+      ownerDevices.map((device) => device.serial),
       features.sharedMaxDataPointsPerUser,
       cutoff,
     );
     return removed > 0;
   } catch (error) {
-    lastDataPointPruneByOwner.delete(user.uuid);
     console.error('Failed to prune data points:', error);
     return false;
   }
@@ -323,7 +358,7 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   await ensureDefaultLocation(user.uuid, user.username);
   const devices = await getDevicesForOwnerUuid(user.uuid);
 
-  if (await pruneOwnerDataPoints(user, devices)) {
+  if (await pruneOwnerDataPoints(user.uuid, user, devices)) {
     await invalidateDeviceStatsForOwner(user.uuid);
   }
 
@@ -382,6 +417,10 @@ async function handleUpload(request: Request): Promise<Response> {
 
     device.lastUploadAt = now;
     await cacheDevice(device);
+
+    if (await pruneOwnerDataPoints(device.ownerUuid)) {
+      await invalidateDeviceStatsForOwner(device.ownerUuid);
+    }
 
     telemetryRecordsAcceptedTotal.inc(points.length);
     telemetryRecordsPersistedTotal.inc(accepted);
