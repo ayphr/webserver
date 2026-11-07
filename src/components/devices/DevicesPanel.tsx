@@ -307,7 +307,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   };
 
   const handleOverlayMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+    const chart = chartRef.current;
+    const rect = chart ? chart.canvas.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     dragStartRef.current = { x, y };
@@ -317,7 +318,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
   const handleOverlayMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current || !dragStartRef.current) return;
-    const rect = e.currentTarget.getBoundingClientRect();
+    const chart = chartRef.current;
+    const rect = chart ? chart.canvas.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     lastMouseRef.current = { x, y };
@@ -329,7 +331,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const handleOverlayMouseUp = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current || !dragStartRef.current) return;
     const start = dragStartRef.current;
-    const rect = e.currentTarget.getBoundingClientRect();
+    const chart = chartRef.current;
+    const rect = chart ? chart.canvas.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const w = Math.abs(x - start.x);
