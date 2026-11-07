@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -13,40 +13,20 @@ import {
   IconRefresh,
   IconThermometer,
   IconTrash,
+  IconWifi,
+  IconWifiOff,
 } from '@tabler/icons-react';
 import type { DataPoint, DeviceSummary, Location } from '@common';
 import { api } from '../../lib/api';
+import { toDate } from '../../lib/date';
+import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { Button, Card, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
 
-const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const PAGE_SIZE = 5;
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
-
-function isOnline(device: DeviceSummary): boolean {
-  if (!device.lastUploadAt) return false;
-  return Date.now() - toDate(device.lastUploadAt).getTime() <= ONLINE_THRESHOLD_MS;
-}
-
-function formatRelativeTime(dateVal: Date | string | undefined): string {
-  if (!dateVal) return 'Never';
-  const resolved = toDate(dateVal);
-  const diffSecs = Math.floor((Date.now() - resolved.getTime()) / 1000);
-  if (diffSecs < 10) return 'Just now';
-  if (diffSecs < 60) return `${diffSecs}s ago`;
-  const diffMins = Math.floor(diffSecs / 60);
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
 
 function formatChartLabel(value: Date | string, period: string): string {
   const d = toDate(value);
@@ -87,10 +67,13 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 }
 
 type Period = '1h' | '24h' | '7d' | '30d' | 'all';
-type GraphMode = 'combined' | 'separate';
+type GraphMode = 'combined' | 'separate' | 'summary';
 type DetailTab = 'graphs' | 'settings';
+type Props = {
+  initialDeviceSerial?: number | null;
+};
 
-export const DevicesPanel = () => {
+export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -117,6 +100,7 @@ export const DevicesPanel = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isUnlinkOpen, setIsUnlinkOpen] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
+  const hasAppliedInitialDevice = useRef(false);
 
   const loadAll = useCallback(async () => {
     setError(null);
@@ -127,10 +111,21 @@ export const DevicesPanel = () => {
       ]);
       setDevices(loadedDevices);
       setLocations(loadedLocations);
+      if (
+        !hasAppliedInitialDevice.current &&
+        initialDeviceSerial !== null &&
+        initialDeviceSerial !== undefined &&
+        loadedDevices.some((device) => device.serial === initialDeviceSerial)
+      ) {
+        setSelectedSerial(initialDeviceSerial);
+        setDetailTab('graphs');
+        setView('detail');
+        hasAppliedInitialDevice.current = true;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
     }
-  }, []);
+  }, [initialDeviceSerial]);
 
   useEffect(() => {
     void (async () => {
@@ -279,6 +274,13 @@ export const DevicesPanel = () => {
     setEnabledSeries(ids);
   };
 
+  const precisionFor = (def: (typeof enabledDefs)[number]) => {
+    if (def.id === 'pressure') return 0;
+    if (def.unit === '°C' || def.unit === '%') return 1;
+    if (def.unit === 'hPa') return 1;
+    return 2;
+  };
+
   // Metrics summary statistics for the period
   const seriesStats = useMemo(() => {
     if (dataPoints.length === 0 || enabledDefs.length === 0) return [];
@@ -294,13 +296,6 @@ export const DevicesPanel = () => {
       };
     });
   }, [dataPoints, enabledDefs]);
-
-  const precisionFor = (def: (typeof enabledDefs)[number]) => {
-    if (def.id === 'pressure') return 0;
-    if (def.unit === '°C' || def.unit === '%') return 1;
-    if (def.unit === 'hPa') return 1;
-    return 2;
-  };
 
   // Unit grouping for combined chart axes
   const unitGroups = useMemo(() => Array.from(new Set(enabledDefs.map((d) => d.unit))), [enabledDefs]);
@@ -338,8 +333,8 @@ export const DevicesPanel = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scales: Record<string, any> = {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8', maxTicksLimit: 8 },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
       },
     };
     unitGroups.forEach((unit, i) => {
@@ -348,9 +343,9 @@ export const DevicesPanel = () => {
         type: 'linear',
         display: true,
         position: i === 0 ? 'left' : 'right',
-        title: { display: true, text: unit, color: '#94a3b8' },
-        grid: i === 0 ? { color: 'rgba(255, 255, 255, 0.05)' } : { drawOnChartArea: false },
-        ticks: { color: '#94a3b8' },
+        title: { display: true, text: unit, color: 'hsl(180, 1%, 53%)' },
+        grid: i === 0 ? { color: 'rgba(255, 255, 255, 0.08)' } : { drawOnChartArea: false },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
       };
     });
     if (unitGroups.length === 0) {
@@ -358,26 +353,27 @@ export const DevicesPanel = () => {
         type: 'linear',
         display: true,
         position: 'left',
-        title: { display: true, text: '', color: '#94a3b8' },
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8' },
+        title: { display: true, text: '', color: 'hsl(180, 1%, 53%)' },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
       };
     }
     return {
       responsive: true,
       maintainAspectRatio: false,
+      font: { family: "'DM Sans', sans-serif" },
       animation: { duration: 200 },
       interaction: { mode: 'index' as const, intersect: false },
       plugins: {
         legend: {
           display: true,
           position: 'top' as const,
-          labels: { color: '#e2e8f0', boxWidth: 16, padding: 14 },
+          labels: { color: 'hsla(180, 67%, 99%, 1)', boxWidth: 16, padding: 14 },
         },
         tooltip: {
-          backgroundColor: 'rgba(20, 20, 20, 0.95)',
-          titleColor: '#ffffff',
-          bodyColor: '#cbd5e1',
+          backgroundColor: 'rgba(18, 18, 18, 0.96)',
+          titleColor: 'hsla(180, 67%, 99%, 1)',
+          bodyColor: 'hsl(180, 1%, 53%)',
           borderColor: 'rgba(255, 255, 255, 0.15)',
           borderWidth: 1,
           padding: 10,
@@ -387,10 +383,12 @@ export const DevicesPanel = () => {
     };
   }, [unitGroups]);
 
-  // Helper for separate charts with clean neutral styling (no gradients or distinct colors)
   const createMetricConfig = (unit: string) => ({
     responsive: true,
     maintainAspectRatio: false,
+    font: {
+      family: "'DM Sans', sans-serif",
+    },
     animation: { duration: 200 },
     interaction: {
       mode: 'index' as const,
@@ -399,9 +397,9 @@ export const DevicesPanel = () => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'rgba(20, 20, 20, 0.95)',
-        titleColor: '#ffffff',
-        bodyColor: '#cbd5e1',
+        backgroundColor: 'rgba(18, 18, 18, 0.96)',
+        titleColor: 'hsla(180, 67%, 99%, 1)',
+        bodyColor: 'hsl(180, 1%, 53%)',
         borderColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 1,
         padding: 10,
@@ -409,16 +407,16 @@ export const DevicesPanel = () => {
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8', maxTicksLimit: 8 },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
       },
       y: {
         type: 'linear' as const,
         display: true,
         position: 'left' as const,
-        title: { display: true, text: unit, color: '#94a3b8' },
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#94a3b8' },
+        title: { display: true, text: unit, color: 'hsl(180, 1%, 53%)' },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
       },
     },
   });
@@ -490,7 +488,7 @@ export const DevicesPanel = () => {
           <div className="devices__grid">
             {visibleDevices.map((device) => {
               const deviceLoc = locations.find((l) => l.id === device.locationId);
-              const online = isOnline(device);
+              const online = isDeviceOnline(device);
               const reading = device.latestDataPoint;
 
               return (
@@ -502,13 +500,17 @@ export const DevicesPanel = () => {
                 >
                   <div className="devices__card-header">
                     <div className="devices__card-title-group">
-                      <span className={`devices__device-dot ${online ? 'is-online' : 'is-offline'}`} />
                       <span className="devices__card-name">{deviceLabel(device)}</span>
-                      <span className="devices__serial-pill">#{device.serial}</span>
+                      {device.name?.trim() && (
+                        <span className="devices__serial-pill">#{device.serial}</span>
+                      )}
                     </div>
-                    <span className={`devices__status-badge ${online ? 'is-online' : 'is-offline'}`}>
-                      <span className="devices__status-dot" />
-                      {online ? 'Online' : 'Offline'}
+                    <span
+                      className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
+                      title={online ? 'Online' : 'Offline'}
+                      aria-label={online ? 'Online' : 'Offline'}
+                    >
+                      {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
                     </span>
                   </div>
 
@@ -523,7 +525,7 @@ export const DevicesPanel = () => {
                     </span>
                     <span className="devices__card-lastseen">
                       <IconClock size={13} strokeWidth={1.75} />
-                      {formatRelativeTime(device.lastUploadAt)}
+                      {formatDeviceRelativeTime(device.lastUploadAt)}
                     </span>
                   </div>
                 </Card>
@@ -537,7 +539,7 @@ export const DevicesPanel = () => {
   }
 
   // DETAIL VIEW
-  const online = isOnline(selectedDevice);
+  const online = isDeviceOnline(selectedDevice);
   const latest = selectedDevice.latestDataPoint;
 
   return (
@@ -568,32 +570,37 @@ export const DevicesPanel = () => {
             <h3 className="devices__detail-title">{deviceLabel(selectedDevice)}</h3>
             <span className="devices__serial-pill">#{selectedDevice.serial}</span>
           </div>
-          <span className={`devices__status-badge ${online ? 'is-online' : 'is-offline'}`}>
-            <span className="devices__status-dot" />
-            {online ? 'Online' : 'Offline'}
+          <span
+            className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
+            title={online ? 'Online' : 'Offline'}
+            aria-label={online ? 'Online' : 'Offline'}
+          >
+            {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
           </span>
         </div>
 
-        <div className="devices__detail-meta">
-          <span>
-            <IconMapPin size={14} strokeWidth={1.75} />
-            {selectedLocation?.name ?? 'No location'}
-          </span>
-          <span>
-            <IconDatabase size={14} strokeWidth={1.75} />
-            {selectedDevice.dataPointCount.toLocaleString()} data points
-          </span>
-          <span>
-            <IconClock size={14} strokeWidth={1.75} />
-            Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
-          </span>
-        </div>
-
-        {latest && (
-          <div className="devices__detail-telemetry">
-            <TelemetryChips reading={latest} />
+        <div className="devices__detail-data-row">
+          <div className="devices__detail-meta">
+            <span>
+              <IconMapPin size={14} strokeWidth={1.75} />
+              {selectedLocation?.name ?? 'No location'}
+            </span>
+            <span>
+              <IconDatabase size={14} strokeWidth={1.75} />
+              {selectedDevice.dataPointCount.toLocaleString()} data points
+            </span>
+            <span>
+              <IconClock size={14} strokeWidth={1.75} />
+              Last seen {formatDeviceRelativeTime(selectedDevice.lastUploadAt)}
+            </span>
           </div>
-        )}
+
+          {latest && (
+            <div className="devices__detail-telemetry">
+              <TelemetryChips reading={latest} />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="settings__tabs" role="tablist" aria-label="Device sections">
@@ -662,6 +669,13 @@ export const DevicesPanel = () => {
                 >
                   Separate Graphs
                 </button>
+                <button
+                  type="button"
+                  className={`devices__control-btn ${graphMode === 'summary' ? 'is-active' : ''}`}
+                  onClick={() => setGraphMode('summary')}
+                >
+                  Summary
+                </button>
               </div>
             </div>
 
@@ -686,7 +700,7 @@ export const DevicesPanel = () => {
               </div>
             ) : (
               <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''}`}>
-                {seriesStats.length > 0 && (
+                {seriesStats.length > 0 && graphMode === 'summary' && (
                   <div className="devices__metrics-summary">
                     {seriesStats.map((s) => {
                       const prec = precisionFor(s.def);
@@ -743,14 +757,13 @@ export const DevicesPanel = () => {
                   </div>
                 )}
 
-
                 {graphMode === 'combined' ? (
                   <div className="devices__chart-card">
                     <div className="devices__chart-container">
                       <LineGraph data={combinedData} config={combinedConfig} />
                     </div>
                   </div>
-                ) : (
+                ) : graphMode === 'separate' ? (
                   <div className="devices__separate-charts">
                     {separateCharts.map(({ def, data, config }) => (
                       <div className="devices__chart-card" key={def.id}>
@@ -772,7 +785,7 @@ export const DevicesPanel = () => {
                       </div>
                     ))}
                   </div>
-                )}
+                ) : null}
 
               </div>
             )}

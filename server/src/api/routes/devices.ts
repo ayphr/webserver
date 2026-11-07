@@ -44,6 +44,7 @@ import {
 } from '../../lib/metrics';
 import { PAIRING_CODE_TTL_MS } from '../../env';
 import { PAIRING_CODE_LENGTH, type DataPoint, type DeviceSummary, type User, getPlanFeaturesForUser } from '@common';
+import { redisFixedWindow } from '../../lib/redis';
 
 const MAX_SERIAL = 0xFFFFFFFF;
 
@@ -52,6 +53,9 @@ const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
 const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
 const MAX_NAME_LENGTH = 64;
 const MAX_POINTS_PER_UPLOAD = 2_000;
+const DATA_POINT_PRUNE_COOLDOWN_MS = 5 * 60 * 1000;
+const DATA_POINT_PRUNE_KEY_PREFIX = 'ayphr:telemetry:prune:';
+const localDataPointPruneByOwner = new Map<string, number>();
 
 function parseSerial(value: unknown): number | null {
   let serial: number;
@@ -121,6 +125,60 @@ function getDeviceToken(body: Record<string, unknown> | null): string | null {
   const fromBody = body?.token;
   if (typeof fromBody === 'string' && fromBody.trim()) return fromBody.trim();
   return null;
+}
+
+async function shouldPruneOwnerDataPoints(ownerUuid: string): Promise<boolean> {
+  const now = Date.now();
+  try {
+    const { count } = await redisFixedWindow(
+      `${DATA_POINT_PRUNE_KEY_PREFIX}${ownerUuid}`,
+      DATA_POINT_PRUNE_COOLDOWN_MS,
+    );
+    return count === 1;
+  } catch {
+    const lastPrunedAt = localDataPointPruneByOwner.get(ownerUuid) ?? 0;
+    if (now - lastPrunedAt < DATA_POINT_PRUNE_COOLDOWN_MS) return false;
+
+    localDataPointPruneByOwner.set(ownerUuid, now);
+    if (localDataPointPruneByOwner.size > 10_000) {
+      for (const [uuid, timestamp] of localDataPointPruneByOwner) {
+        if (now - timestamp >= DATA_POINT_PRUNE_COOLDOWN_MS) localDataPointPruneByOwner.delete(uuid);
+      }
+      while (localDataPointPruneByOwner.size > 10_000) {
+        const oldestUuid = localDataPointPruneByOwner.keys().next().value;
+        if (oldestUuid === undefined) break;
+        localDataPointPruneByOwner.delete(oldestUuid);
+      }
+    }
+    return true;
+  }
+}
+
+async function pruneOwnerDataPoints(
+  ownerUuid: string,
+  user?: User,
+  devices?: DeviceDocument[],
+): Promise<boolean> {
+  if (!(await shouldPruneOwnerDataPoints(ownerUuid))) return false;
+
+  try {
+    const now = Date.now();
+    const owner = user ?? await getUserFromUuid(ownerUuid);
+    const ownerDevices = devices ?? await getDevicesForOwnerUuid(ownerUuid);
+    if (!owner) return false;
+
+    const features = getPlanFeaturesForUser(owner);
+    const cutoff = new Date(now - features.dataRetentionDays * 86_400_000);
+    const removed = await pruneDataPointsForSerials(
+      ownerDevices.map((device) => device.serial),
+      features.sharedMaxDataPointsPerUser,
+      cutoff,
+    );
+    return removed > 0;
+  } catch (error) {
+    console.error('Failed to prune data points:', error);
+    return false;
+  }
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -300,19 +358,8 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   await ensureDefaultLocation(user.uuid, user.username);
   const devices = await getDevicesForOwnerUuid(user.uuid);
 
-  try {
-    const features = getPlanFeaturesForUser(user);
-    const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
-    const removed = await pruneDataPointsForSerials(
-      devices.map((device) => device.serial),
-      features.sharedMaxDataPointsPerUser,
-      cutoff,
-    );
-    if (removed > 0) {
-      await invalidateDeviceStatsForOwner(user.uuid);
-    }
-  } catch (pruneError) {
-    console.error('Failed to prune data points:', pruneError);
+  if (await pruneOwnerDataPoints(user.uuid, user, devices)) {
+    await invalidateDeviceStatsForOwner(user.uuid);
   }
 
   const stats = await getDataPointStats(devices.map((device) => device.serial), user.uuid);
@@ -368,19 +415,12 @@ async function handleUpload(request: Request): Promise<Response> {
       updateDeviceLastUpload(serial, now),
     ]);
 
-    try {
-      const ownerDevices = await getDevicesForOwnerUuid(device.ownerUuid);
-      const serials = ownerDevices.map((owned) => owned.serial);
-      const owner = await getUserFromUuid(device.ownerUuid);
-      const features = getPlanFeaturesForUser(owner);
-      const cutoff = new Date(Date.now() - features.dataRetentionDays * 86_400_000);
-      await pruneDataPointsForSerials(serials, features.sharedMaxDataPointsPerUser, cutoff);
-    } catch (pruneError) {
-      console.error('Failed to prune data points:', pruneError);
-    }
-
     device.lastUploadAt = now;
     await cacheDevice(device);
+
+    if (await pruneOwnerDataPoints(device.ownerUuid)) {
+      await invalidateDeviceStatsForOwner(device.ownerUuid);
+    }
 
     telemetryRecordsAcceptedTotal.inc(points.length);
     telemetryRecordsPersistedTotal.inc(accepted);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Modal, Button } from './index';
 import { getBadgeIcon } from '../../lib/badges';
+import { toDate } from '../../lib/date';
 import { BADGES, SUBSCRIPTION_TIERS } from '@common';
 import type { AttachedSubscription, PublicUser, SubscriptionTier } from '@common';
 import './ManageSubscriptionsModal.css';
@@ -10,10 +11,6 @@ const MAX_REASON_LENGTH = 500;
 
 function getTierName(tier: SubscriptionTier): string {
   return BADGES.find((badge) => badge.id === tier)?.name ?? tier;
-}
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
 }
 
 function formatDate(value: Date | string): string {

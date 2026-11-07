@@ -2,6 +2,9 @@ import type { SocialLinkType, User } from '@common';
 import { getUsers, updateUser } from './db';
 import { getLatestDomainVerification } from './db';
 import { resolveDomainTxt } from './dns';
+import { createLogger } from './logger';
+
+const log = createLogger('domain-reverification');
 
 function isDomainSocialType(type: string): boolean {
   return type === 'website';
@@ -47,11 +50,16 @@ export async function reverifyUserDomains(user: User): Promise<User> {
 
 export async function reverifyAllDomains(): Promise<void> {
   const users = await getUsers();
+  let failures = 0;
   for (const user of users) {
     try {
       await reverifyUserDomains(user);
-    } catch {
-      // ignore
+    } catch (error) {
+      failures += 1;
+      log.warn({ error, userUuid: user.uuid }, 'domain reverification failed');
     }
+  }
+  if (failures > 0) {
+    throw new Error(`domain reverification failed for ${failures} of ${users.length} users`);
   }
 }

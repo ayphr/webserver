@@ -1,4 +1,5 @@
 import { CORS_ALLOWED_ORIGINS } from '../../env';
+import { getCols } from '../../lib/db';
 
 const DEFAULT_ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const DEFAULT_ALLOWED_HEADERS = 'Content-Type, Authorization';
@@ -59,6 +60,15 @@ export function handleOptionsRoute(request: Request) {
 
 export function handleStatusRoute(request: Request) {
   return addCorsHeaders(new Response('OK'), request);
+}
+
+export async function handleReadinessRoute(request: Request) {
+  try {
+    await getCols();
+    return addCorsHeaders(Response.json({ ready: true }), request);
+  } catch {
+    return addCorsHeaders(Response.json({ ready: false }, { status: 503 }), request);
+  }
 }
 
 export function handleApiNotFoundRoute(request: Request) {

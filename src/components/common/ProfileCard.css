@@ -52,12 +52,17 @@
   font-size: 0.98rem;
   line-height: 1.55;
   user-select: text;
-  cursor: text;
+  cursor: default;
 }
 
 .profile-card__bio,
 .profile-card__bio * {
   user-select: text;
+}
+
+.profile-card__bio .bio-text,
+.profile-card__bio .bio-text * {
+  cursor: text;
 }
 
 
@@ -107,6 +112,7 @@
   background-color: transparent;
   color: hsl(0, 0%, 72%);
   text-decoration: none;
+  cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -170,6 +176,10 @@
   font-size: 0.95rem;
   cursor: pointer;
   transition: border-color 0.2s;
+}
+
+.profile-card__form-select:disabled {
+  cursor: not-allowed;
 }
 
 .profile-card__form-select:hover {
@@ -242,6 +252,19 @@
   font-size: 0.88rem;
 }
 
+.profile-card__socialTypeSelect {
+  cursor: pointer;
+}
+
+.profile-card__socialValueInput {
+  cursor: text;
+}
+
+.profile-card__socialTypeSelect:disabled,
+.profile-card__socialValueInput:disabled {
+  cursor: not-allowed;
+}
+
 .profile-card__socialTypeSelect:hover,
 .profile-card__socialValueInput:hover {
   border-color: var(--text-muted);
@@ -297,6 +320,11 @@
   color: var(--text-primary);
   font-family: var(--font-family-base);
   font-size: 0.9rem;
+  cursor: text;
+}
+
+.profile-card__form-input:disabled {
+  cursor: not-allowed;
 }
 
 .profile-card__form-error {

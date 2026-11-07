@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
+import { toDate } from '../../lib/date';
 import type { Punishment, PublicUser, CreditBalance } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { ProfileCard, Button } from '../../components/common';
@@ -23,10 +24,6 @@ const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((
 import './DashboardPage.css';
 
 const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games']);
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
 
 function getRelativeTime(date: Date | string): string {
   const resolvedDate = toDate(date);
@@ -163,6 +160,7 @@ export const DashboardPage = () => {
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -266,12 +264,20 @@ export const DashboardPage = () => {
   const navigate = useNavigate();
 
   const changeTab = (value: string) => {
+    if (value !== 'devices') {
+      setDeviceToOpen(null);
+    }
     setActivePage(value);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('tab', value);
       return next;
     }, { replace: true });
+  };
+
+  const openDevice = (serial: number) => {
+    setDeviceToOpen(serial);
+    changeTab('devices');
   };
 
   useEffect(() => {
@@ -550,6 +556,7 @@ export const DashboardPage = () => {
                   user={user}
                   credits={credits}
                   onNavigate={changeTab}
+                  onDeviceNavigate={openDevice}
                 />
               </DashboardPanel>
             )}
@@ -561,7 +568,7 @@ export const DashboardPage = () => {
                 className="dashboard-panel--devices"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <DevicesPanel />
+                  <DevicesPanel initialDeviceSerial={deviceToOpen} />
                 </Suspense>
               </DashboardPanel>
             )}
@@ -573,7 +580,7 @@ export const DashboardPage = () => {
                 className="dashboard-panel--wide"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <LocationsPanel />
+                  <LocationsPanel onDeviceNavigate={openDevice} />
                 </Suspense>
               </DashboardPanel>
             )}

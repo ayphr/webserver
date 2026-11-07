@@ -9,31 +9,10 @@ import {
 import { PLAN_NAMES, type CreditBalance, type DeviceSummary, type Location, type PublicUser } from '@common';
 import { api } from '../../lib/api';
 import { formatCredits } from '../../lib/credits';
+import { toDate } from '../../lib/date';
+import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { UsernameDisplay } from '../common';
 import './OverviewPanel.css';
-
-const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
-
-function isOnline(device: DeviceSummary): boolean {
-  if (!device.lastUploadAt) return false;
-  return Date.now() - toDate(device.lastUploadAt).getTime() <= ONLINE_THRESHOLD_MS;
-}
-
-function formatRelativeTime(value: Date | string | undefined): string {
-  if (!value) return 'Never';
-  const diffSecs = Math.floor((Date.now() - toDate(value).getTime()) / 1000);
-  if (diffSecs < 10) return 'Just now';
-  if (diffSecs < 60) return `${diffSecs}s ago`;
-  const diffMins = Math.floor(diffSecs / 60);
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${Math.floor(diffHours / 24)}d ago`;
-}
 
 function deviceLabel(device: DeviceSummary): string {
   return device.name?.trim() || `Device ${device.serial}`;
@@ -43,9 +22,10 @@ type Props = {
   user: PublicUser;
   credits: CreditBalance | null;
   onNavigate: (tab: string) => void;
+  onDeviceNavigate: (serial: number) => void;
 };
 
-export const OverviewPanel = ({ user, credits, onNavigate }: Props) => {
+export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: Props) => {
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,7 +57,7 @@ export const OverviewPanel = ({ user, credits, onNavigate }: Props) => {
     };
   }, []);
 
-  const onlineCount = useMemo(() => devices.filter(isOnline).length, [devices]);
+  const onlineCount = useMemo(() => devices.filter(isDeviceOnline).length, [devices]);
 
   const recentDevices = useMemo(
     () =>
@@ -173,20 +153,20 @@ export const OverviewPanel = ({ user, credits, onNavigate }: Props) => {
             {recentDevices.map((device) => {
               const location = locations.find((item) => item.id === device.locationId);
               const reading = device.latestDataPoint;
-              const online = isOnline(device);
+              const online = isDeviceOnline(device);
 
               return (
                 <button
                   key={device.serial}
                   type="button"
                   className="overview__device"
-                  onClick={() => onNavigate('devices')}
+                  onClick={() => onDeviceNavigate(device.serial)}
                 >
                   <span className={`overview__device-status ${online ? 'is-online' : 'is-offline'}`} />
                   <span className="overview__device-main">
                     <span className="overview__device-name">{deviceLabel(device)}</span>
                     <span className="overview__device-meta">
-                      {location?.name ?? 'No location'} · {formatRelativeTime(device.lastUploadAt)}
+                      {location?.name ?? 'No location'} · {formatDeviceRelativeTime(device.lastUploadAt)}
                     </span>
                   </span>
                   <span className="overview__device-reading">
