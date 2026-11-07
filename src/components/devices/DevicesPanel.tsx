@@ -1001,7 +1001,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                     <Button variant="secondary" onClick={handleRedo} disabled={historyIndex >= history.length - 1} title="Redo">
                       Redo
                     </Button>
-                    <Button variant="primary" onClick={() => void handleSaveEdits()} disabled={pendingDeletions.size === 0}>
+                    <Button
+                      variant="primary"
+                      onClick={() => void handleSaveEdits()}
+                      disabled={pendingDeletions.size === 0 && JSON.stringify(pendingAnnotations) === JSON.stringify(annotations)}
+                    >
                       Save
                     </Button>
                     <Button variant="secondary" onClick={handleCancelEdit}>
@@ -1204,8 +1208,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                             <div
                               className="devices__context-menu"
                               style={{ left: contextMenu.x, top: contextMenu.y }}
+                              onMouseDown={(e) => e.stopPropagation()}
                             >
-                              <button type="button" onClick={startAnnotation}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startAnnotation();
+                                }}
+                              >
                                 Annotate
                               </button>
                             </div>
@@ -1214,6 +1225,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                             <div
                               className="devices__annotation-input"
                               style={{ left: annotationInput.x, top: annotationInput.y }}
+                              onMouseDown={(e) => e.stopPropagation()}
                             >
                               <input
                                 value={annotationText}
@@ -1225,7 +1237,13 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                                 placeholder="Annotation text"
                                 autoFocus
                               />
-                              <button type="button" onClick={saveAnnotation}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  saveAnnotation();
+                                }}
+                              >
                                 OK
                               </button>
                             </div>
@@ -1247,9 +1265,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                               <button
                                 type="button"
                                 className="devices__annotation-delete"
-                                onClick={() =>
-                                  setPendingAnnotations((prev) => prev.filter((a) => a.id !== pos.id))
-                                }
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingAnnotations((prev) => prev.filter((a) => a.id !== pos.id));
+                                }}
                               >
                                 ×
                               </button>

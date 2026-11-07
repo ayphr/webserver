@@ -674,7 +674,8 @@
 
 .devices__annotation {
   position: absolute;
-  z-index: 4;
+  z-index: 6;
+  pointer-events: auto;
   transform: translate(4px, -100%);
   background: rgba(0, 0, 0, 0.7);
   color: var(--text-primary);
@@ -715,9 +716,9 @@
 }
 
 .devices__annotation-input button {
-  background: var(--accent-green-solid);
-  border: none;
-  color: var(--bg-base);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
   border-radius: var(--radius-sm);
   padding: 0.2rem 0.5rem;
   font-size: 0.78rem;
