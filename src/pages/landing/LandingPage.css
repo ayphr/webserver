@@ -212,7 +212,7 @@
 
 .landing-hero__eyebrow {
   display: block;
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   font-size: 0.9rem;
   font-weight: 400;
   margin-bottom: 1.5rem;
