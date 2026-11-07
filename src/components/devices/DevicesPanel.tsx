@@ -113,14 +113,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const isDraggingRef = useRef(false);
   const lastMouseRef = useRef<{ x: number; y: number } | null>(null);
 
-  const [annotations, setAnnotations] = useState<{ id: string; index: number; text: string }[]>([]);
-  const [pendingAnnotations, setPendingAnnotations] = useState<{ id: string; index: number; text: string }[]>([]);
-  const activeAnnotations = isEditing ? pendingAnnotations : annotations;
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [annotationInput, setAnnotationInput] = useState<{ x: number; y: number; index: number } | null>(null);
-  const [annotationText, setAnnotationText] = useState('');
-  const [annotationPositions, setAnnotationPositions] = useState<{ id: string; x: number; y: number }[]>([]);
-
   const [showAxes, setShowAxes] = useState<boolean>(() => {
     try {
       const raw = window.localStorage.getItem('ayphr:device:showAxes');
@@ -383,88 +375,14 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   }, [isEditing]);
 
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (selectedSerial === null) {
-      setAnnotations([]);
-      return;
-    }
-    try {
-      const raw = window.localStorage.getItem(`ayphr:device:annotations:${selectedSerial}`);
-      if (raw) setAnnotations(JSON.parse(raw));
-      else setAnnotations([]);
-    } catch {
-      setAnnotations([]);
-    }
-  }, [selectedSerial]);
-
-  useEffect(() => {
-    if (selectedSerial === null) return;
-    try {
-      window.localStorage.setItem(`ayphr:device:annotations:${selectedSerial}`, JSON.stringify(annotations));
-    } catch {
-      // ignore
-    }
-  }, [annotations, selectedSerial]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
 
-
-  const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setContextMenu({ x, y });
-    lastMouseRef.current = { x, y };
-  };
-
-  const startAnnotation = () => {
-    if (!contextMenu) return;
-    const x = contextMenu.x;
-    const y = contextMenu.y;
-    // nearest data point
-    const chart = chartRef.current;
-    let index = 0;
-    if (chart) {
-      const meta = chart.getDatasetMeta(0);
-      if (meta?.data?.length) {
-        let best = 0;
-        let bestDist = Infinity;
-        meta.data.forEach((pt, i) => {
-          const d = Math.hypot(pt.x - x, pt.y - y);
-          if (d < bestDist) {
-            bestDist = d;
-            best = i;
-          }
-        });
-        index = best;
-      }
-    }
-    setAnnotationInput({ x, y, index });
-    setAnnotationText('');
-    setContextMenu(null);
-  };
-
-  const saveAnnotation = () => {
-    if (!annotationInput || !annotationText.trim()) {
-      setAnnotationInput(null);
-      return;
-    }
-    setPendingAnnotations((prev) => [
-      ...prev,
-      { id: `${Date.now()}`, index: annotationInput.index, text: annotationText.trim() },
-    ]);
-    setAnnotationInput(null);
-    setAnnotationText('');
-  };
 
 
 
   const handleCancelEdit = () => {
     setSelectedIndices(new Set());
     setPendingDeletions(new Set());
-    setPendingAnnotations([]);
     setDragRect(null);
     setIsEditing(false);
   };
@@ -521,7 +439,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       await api.devices.deleteDataPoints(selectedDevice.serial, timestamps);
       const removed = new Set(pendingDeletions);
       setDataPoints((prev) => prev.filter((_, idx) => !removed.has(idx)));
-      setAnnotations(pendingAnnotations);
+
     } catch (err) {
       setDataError(err instanceof Error ? err.message : 'Failed to delete data points');
     } finally {
@@ -649,20 +567,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     };
   }, [dataPoints, period, enabledDefs, unitToScaleId, selectedIndices, pendingDeletions]);
 
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const meta = chart.getDatasetMeta(0);
-    if (!meta?.data?.length) return;
-    const positions = activeAnnotations
-      .map((a) => {
-        const pt = meta.data[a.index];
-        if (!pt) return null;
-        return { id: a.id, x: pt.x, y: pt.y };
-      })
-      .filter((p): p is { id: string; x: number; y: number } => Boolean(p));
-    setAnnotationPositions(positions);
-  }, [activeAnnotations, dataPoints, combinedData]);
 
   const combinedConfig = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1004,7 +908,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                     <Button
                       variant="primary"
                       onClick={() => void handleSaveEdits()}
-                      disabled={pendingDeletions.size === 0 && JSON.stringify(pendingAnnotations) === JSON.stringify(annotations)}
+                      disabled={pendingDeletions.size === 0}
                     >
                       Save
                     </Button>
@@ -1045,7 +949,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   setGraphMode('combined');
                   setSelectedIndices(new Set());
                   setPendingDeletions(new Set());
-                  setPendingAnnotations([...annotations]);
                   setHistory([new Set()]);
                   setHistoryIndex(0);
                 }}
@@ -1191,7 +1094,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                           onMouseDown={handleOverlayMouseDown}
                           onMouseMove={handleOverlayMouseMove}
                           onMouseUp={handleOverlayMouseUp}
-                          onContextMenu={handleContextMenu}
                         >
                           {dragRect && (
                             <div
@@ -1204,79 +1106,10 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                               }}
                             />
                           )}
-                          {contextMenu && (
-                            <div
-                              className="devices__context-menu"
-                              style={{ left: contextMenu.x, top: contextMenu.y }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startAnnotation();
-                                }}
-                              >
-                                Annotate
-                              </button>
-                            </div>
-                          )}
-                          {annotationInput && (
-                            <div
-                              className="devices__annotation-input"
-                              style={{ left: annotationInput.x, top: annotationInput.y }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                value={annotationText}
-                                onChange={(e) => setAnnotationText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') saveAnnotation();
-                                  if (e.key === 'Escape') setAnnotationInput(null);
-                                }}
-                                placeholder="Annotation text"
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  saveAnnotation();
-                                }}
-                              >
-                                OK
-                              </button>
-                            </div>
-                          )}
+
                         </div>
                       )}
-                      {/* Annotations (visible in all modes) */}
-                      {annotationPositions.map((pos) => {
-                        const ann = activeAnnotations.find((a) => a.id === pos.id);
-                        if (!ann) return null;
-                        return (
-                          <div
-                            key={pos.id}
-                            className="devices__annotation"
-                            style={{ left: pos.x, top: pos.y }}
-                          >
-                            {ann.text}
-                            {isEditing && (
-                              <button
-                                type="button"
-                                className="devices__annotation-delete"
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPendingAnnotations((prev) => prev.filter((a) => a.id !== pos.id));
-                                }}
-                              >
-                                ×
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
+
                     </div>
                   </div>
                 ) : graphMode === 'separate' ? (
