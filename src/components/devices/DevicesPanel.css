@@ -697,3 +697,19 @@
   font-size: 0.78rem;
   white-space: nowrap;
 }
+
+.devices__annotation {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.devices__annotation-delete {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+}

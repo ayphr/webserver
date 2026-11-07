@@ -114,6 +114,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const lastMouseRef = useRef<{ x: number; y: number } | null>(null);
 
   const [annotations, setAnnotations] = useState<{ id: string; index: number; text: string }[]>([]);
+  const [pendingAnnotations, setPendingAnnotations] = useState<{ id: string; index: number; text: string }[]>([]);
+  const activeAnnotations = isEditing ? pendingAnnotations : annotations;
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [annotationInput, setAnnotationInput] = useState<{ x: number; y: number; index: number } | null>(null);
   const [annotationText, setAnnotationText] = useState('');
@@ -265,16 +267,17 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const toggleNearestPoint = (x: number, y: number) => {
     const chart = chartRef.current;
     if (!chart) return;
-    const meta = chart.getDatasetMeta(0);
-    if (!meta?.data?.length) return;
     let best = -1;
     let bestDist = Infinity;
-    meta.data.forEach((pt, i) => {
-      const d = Math.hypot(pt.x - x, pt.y - y);
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
-      }
+    chart.data.datasets.forEach((_ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      meta?.data?.forEach((pt, i) => {
+        const d = Math.hypot(pt.x - x, pt.y - y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      });
     });
     if (best >= 0 && bestDist < 24) {
       setSelectedIndices((prev) => {
@@ -289,19 +292,21 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const selectPointsInRect = (rect: { x: number; y: number; w: number; h: number }) => {
     const chart = chartRef.current;
     if (!chart) return;
-    const meta = chart.getDatasetMeta(0);
-    if (!meta?.data?.length) return;
-    const indices: number[] = [];
-    meta.data.forEach((pt, i) => {
-      if (
-        pt.x >= rect.x &&
-        pt.x <= rect.x + rect.w &&
-        pt.y >= rect.y &&
-        pt.y <= rect.y + rect.h
-      ) {
-        indices.push(i);
-      }
+    const selected = new Set<number>();
+    chart.data.datasets.forEach((_ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      meta?.data?.forEach((pt, i) => {
+        if (
+          pt.x >= rect.x &&
+          pt.x <= rect.x + rect.w &&
+          pt.y >= rect.y &&
+          pt.y <= rect.y + rect.h
+        ) {
+          selected.add(i);
+        }
+      });
     });
+    const indices = [...selected];
     setSelectedIndices((prev) => {
       const next = new Set(prev);
       indices.forEach((i) => next.add(i));
@@ -446,7 +451,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       setAnnotationInput(null);
       return;
     }
-    setAnnotations((prev) => [
+    setPendingAnnotations((prev) => [
       ...prev,
       { id: `${Date.now()}`, index: annotationInput.index, text: annotationText.trim() },
     ]);
@@ -459,6 +464,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const handleCancelEdit = () => {
     setSelectedIndices(new Set());
     setPendingDeletions(new Set());
+    setPendingAnnotations([]);
     setDragRect(null);
     setIsEditing(false);
   };
@@ -515,6 +521,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       await api.devices.deleteDataPoints(selectedDevice.serial, timestamps);
       const removed = new Set(pendingDeletions);
       setDataPoints((prev) => prev.filter((_, idx) => !removed.has(idx)));
+      setAnnotations(pendingAnnotations);
     } catch (err) {
       setDataError(err instanceof Error ? err.message : 'Failed to delete data points');
     } finally {
@@ -647,7 +654,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     if (!chart) return;
     const meta = chart.getDatasetMeta(0);
     if (!meta?.data?.length) return;
-    const positions = annotations
+    const positions = activeAnnotations
       .map((a) => {
         const pt = meta.data[a.index];
         if (!pt) return null;
@@ -655,7 +662,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       })
       .filter((p): p is { id: string; x: number; y: number } => Boolean(p));
     setAnnotationPositions(positions);
-  }, [annotations, dataPoints, combinedData]);
+  }, [activeAnnotations, dataPoints, combinedData]);
 
   const combinedConfig = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1034,6 +1041,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   setGraphMode('combined');
                   setSelectedIndices(new Set());
                   setPendingDeletions(new Set());
+                  setPendingAnnotations([...annotations]);
                   setHistory([new Set()]);
                   setHistoryIndex(0);
                 }}
@@ -1226,7 +1234,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                       )}
                       {/* Annotations (visible in all modes) */}
                       {annotationPositions.map((pos) => {
-                        const ann = annotations.find((a) => a.id === pos.id);
+                        const ann = activeAnnotations.find((a) => a.id === pos.id);
                         if (!ann) return null;
                         return (
                           <div
@@ -1235,6 +1243,17 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                             style={{ left: pos.x, top: pos.y }}
                           >
                             {ann.text}
+                            {isEditing && (
+                              <button
+                                type="button"
+                                className="devices__annotation-delete"
+                                onClick={() =>
+                                  setPendingAnnotations((prev) => prev.filter((a) => a.id !== pos.id))
+                                }
+                              >
+                                ×
+                              </button>
+                            )}
                           </div>
                         );
                       })}
