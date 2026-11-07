@@ -607,3 +607,7 @@
   display: flex;
   align-items: center;
 }
+
+.devices__series-selector {
+  min-width: 12rem;
+}
