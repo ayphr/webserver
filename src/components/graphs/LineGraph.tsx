@@ -13,8 +13,10 @@ import {
   type ChartData,
 } from 'chart.js';
 import type { LineGraphProps } from './types';
+import ZoomPlugin from 'chartjs-plugin-zoom';
 import { Line } from 'react-chartjs-2';
 
+ChartJS.register(ZoomPlugin);
 ChartJS.register(
   CategoryScale,
   LinearScale,
