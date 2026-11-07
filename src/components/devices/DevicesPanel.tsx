@@ -17,36 +17,14 @@ import {
 } from '@tabler/icons-react';
 import type { DataPoint, DeviceSummary, Location } from '@common';
 import { api } from '../../lib/api';
+import { toDate } from '../../lib/date';
+import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { Button, Card, ConfirmDialog, Input, Pagination } from '../common';
 import { LineGraph } from '../graphs';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
 
-const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const PAGE_SIZE = 5;
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
-
-function isOnline(device: DeviceSummary): boolean {
-  if (!device.lastUploadAt) return false;
-  return Date.now() - toDate(device.lastUploadAt).getTime() <= ONLINE_THRESHOLD_MS;
-}
-
-function formatRelativeTime(dateVal: Date | string | undefined): string {
-  if (!dateVal) return 'Never';
-  const resolved = toDate(dateVal);
-  const diffSecs = Math.floor((Date.now() - resolved.getTime()) / 1000);
-  if (diffSecs < 10) return 'Just now';
-  if (diffSecs < 60) return `${diffSecs}s ago`;
-  const diffMins = Math.floor(diffSecs / 60);
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
 
 function formatChartLabel(value: Date | string, period: string): string {
   const d = toDate(value);
@@ -581,7 +559,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           <div className="devices__grid">
             {visibleDevices.map((device) => {
               const deviceLoc = locations.find((l) => l.id === device.locationId);
-              const online = isOnline(device);
+              const online = isDeviceOnline(device);
               const reading = device.latestDataPoint;
 
               return (
@@ -618,7 +596,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                     </span>
                     <span className="devices__card-lastseen">
                       <IconClock size={13} strokeWidth={1.75} />
-                      {formatRelativeTime(device.lastUploadAt)}
+                      {formatDeviceRelativeTime(device.lastUploadAt)}
                     </span>
                   </div>
                 </Card>
@@ -632,7 +610,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   }
 
   // DETAIL VIEW
-  const online = isOnline(selectedDevice);
+  const online = isDeviceOnline(selectedDevice);
   const latest = selectedDevice.latestDataPoint;
 
   return (
@@ -684,7 +662,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             </span>
             <span>
               <IconClock size={14} strokeWidth={1.75} />
-              Last seen {formatRelativeTime(selectedDevice.lastUploadAt)}
+              Last seen {formatDeviceRelativeTime(selectedDevice.lastUploadAt)}
             </span>
           </div>
 

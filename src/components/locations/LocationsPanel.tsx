@@ -12,17 +12,12 @@ import {
 import type { DeviceSummary, Location, PublicUser } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
+import { isDeviceOnline as isOnline } from '../../lib/deviceActivity';
 import { Button, Card, ConfirmDialog, Input, Modal, Pagination } from '../common';
 import '../settings/SettingsPanel.css';
 import './LocationsPanel.css';
 
-const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const PAGE_SIZE = 5;
-
-function isOnline(device: DeviceSummary): boolean {
-  if (!device.lastUploadAt) return false;
-  return Date.now() - new Date(device.lastUploadAt).getTime() <= ONLINE_THRESHOLD_MS;
-}
 
 function average(values: number[]): number | null {
   if (values.length === 0) return null;

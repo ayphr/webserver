@@ -18,6 +18,7 @@ import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
 import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
 import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
+import { toDate } from '../../lib/date';
 import type { ProfileCountriesPayload, PublicUser, SocialLinkType, SocialLinks, UserRole, DomainChallengePayload } from '@common';
 import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '@common';
 import {
@@ -49,10 +50,6 @@ const SOCIAL_LINK_ICONS: Record<SocialLinkType, { label: string; icon: ReactNode
 function getInitialSocialLinkKey(links: SocialLinks): SocialLinkType {
   const first = Object.entries(links).find(([, value]) => typeof value === 'string' && value.trim().length > 0)?.[0];
   return (first as SocialLinkType) ?? 'website';
-}
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
 }
 
 function getRelativeTime(date: Date | string): string {
