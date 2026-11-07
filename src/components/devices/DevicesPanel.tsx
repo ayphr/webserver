@@ -969,7 +969,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 ))}
               </div>
 
-              <div className="devices__graphs-controls-right">
               <button
                 type="button"
                 className="devices__control-btn"
@@ -1025,7 +1024,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 >
                   Summary
                 </button>
-              </div>
               </div>
                 </>
               )}
