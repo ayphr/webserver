@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -108,8 +107,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [history, setHistory] = useState<Set<number>[]>([new Set()]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const chartRef = useRef<ChartJS<'line'> | null>(null);
-  const [dragRect, setDragRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [overlayStyle, setOverlayStyle] = useState<React.CSSProperties>({});
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
   const lastMouseRef = useRef<{ x: number; y: number } | null>(null);
@@ -307,75 +304,53 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     });
   };
 
-  const handleOverlayMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    const chart = chartRef.current;
-    const rect = chart ? chart.canvas.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    dragStartRef.current = { x, y };
-    isDraggingRef.current = true;
-    setDragRect({ x, y, w: 0, h: 0 });
-  };
-
-  const handleOverlayMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || !dragStartRef.current) return;
-    const chart = chartRef.current;
-    const rect = chart ? chart.canvas.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    lastMouseRef.current = { x, y };
-    const x0 = dragStartRef.current.x;
-    const y0 = dragStartRef.current.y;
-    setDragRect({ x: Math.min(x0, x), y: Math.min(y0, y), w: Math.abs(x - x0), h: Math.abs(y - y0) });
-  };
-
-  const handleOverlayMouseUp = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || !dragStartRef.current) return;
-    const start = dragStartRef.current;
-    const chart = chartRef.current;
-    const rect = chart ? chart.canvas.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const w = Math.abs(x - start.x);
-    const h = Math.abs(y - start.y);
-    isDraggingRef.current = false;
-    if (w < 5 && h < 5) {
-      toggleNearestPoint(x, y);
-    } else {
-      selectPointsInRect({ x: Math.min(start.x, x), y: Math.min(start.y, y), w, h });
-    }
-    dragStartRef.current = null;
-    setDragRect(null);
-  };
-
-
   useEffect(() => {
     if (!isEditing) return;
-    const handleUp = () => {
+    const chart = chartRef.current;
+    const canvas = chart?.canvas;
+    if (!canvas) return;
+
+    const getPos = (e: MouseEvent) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+
+    const down = (e: MouseEvent) => {
+      const pos = getPos(e);
+      dragStartRef.current = pos;
+      isDraggingRef.current = true;
+      lastMouseRef.current = pos;
+    };
+
+    const move = (e: MouseEvent) => {
       if (!isDraggingRef.current || !dragStartRef.current) return;
-      const last = lastMouseRef.current;
-      if (!last) {
-        isDraggingRef.current = false;
-        dragStartRef.current = null;
-        setDragRect(null);
-        return;
-      }
+      lastMouseRef.current = getPos(e);
+    };
+
+    const up = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !dragStartRef.current) return;
       const start = dragStartRef.current;
-      const x = last.x;
-      const y = last.y;
-      const w = Math.abs(x - start.x);
-      const h = Math.abs(y - start.y);
+      const pos = getPos(e);
+      const w = Math.abs(pos.x - start.x);
+      const h = Math.abs(pos.y - start.y);
       isDraggingRef.current = false;
       if (w < 5 && h < 5) {
-        toggleNearestPoint(x, y);
+        toggleNearestPoint(pos.x, pos.y);
       } else {
-        selectPointsInRect({ x: Math.min(start.x, x), y: Math.min(start.y, y), w, h });
+        selectPointsInRect({ x: Math.min(start.x, pos.x), y: Math.min(start.y, pos.y), w, h });
       }
       dragStartRef.current = null;
-      setDragRect(null);
+      lastMouseRef.current = null;
     };
-    window.addEventListener('mouseup', handleUp);
-    return () => window.removeEventListener('mouseup', handleUp);
+
+    canvas.addEventListener('mousedown', down);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', up);
+    return () => {
+      canvas.removeEventListener('mousedown', down);
+      canvas.removeEventListener('mousemove', move);
+      canvas.removeEventListener('mouseup', up);
+    };
   }, [isEditing]);
 
 
@@ -388,7 +363,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const handleCancelEdit = () => {
     setSelectedIndices(new Set());
     setPendingDeletions(new Set());
-    setDragRect(null);
     setIsEditing(false);
   };
 
@@ -571,29 +545,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       })),
     };
   }, [dataPoints, period, enabledDefs, unitToScaleId, selectedIndices, pendingDeletions]);
-
-  useEffect(() => {
-    if (!isEditing) return;
-    const update = () => {
-      const chart = chartRef.current;
-      if (!chart) return;
-      const canvas = chart.canvas;
-      const container = canvas.parentElement;
-      if (!container) return;
-      const cRect = canvas.getBoundingClientRect();
-      const pRect = container.getBoundingClientRect();
-      setOverlayStyle({
-        position: 'absolute',
-        left: cRect.left - pRect.left,
-        top: cRect.top - pRect.top,
-        width: cRect.width,
-        height: cRect.height,
-      });
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, [isEditing, dataPoints, combinedData]);
 
 
 
@@ -1002,6 +953,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 />
               </div>
 
+              <button
+                type="button"
+                className="devices__control-btn"
+                onClick={() => (chartRef.current as unknown as { resetZoom?: () => void })?.resetZoom?.()}
+                title="Reset zoom"
+              >
+                Reset zoom
+              </button>
+
               <div className="devices__mode-selector" role="group" aria-label="Graph display mode">
                 <button
                   type="button"
@@ -1115,28 +1075,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   <div className="devices__chart-card">
                     <div className="devices__chart-container" style={{ position: 'relative' }}>
                       <LineGraph ref={chartRef} data={combinedData} config={combinedConfig} />
-                      {isEditing && (
-                        <div
-                          className="devices__selection-overlay"
-                          style={overlayStyle}
-                          onMouseDown={handleOverlayMouseDown}
-                          onMouseMove={handleOverlayMouseMove}
-                          onMouseUp={handleOverlayMouseUp}
-                        >
-                          {dragRect && (
-                            <div
-                              className="devices__selection-rect"
-                              style={{
-                                left: dragRect.x,
-                                top: dragRect.y,
-                                width: dragRect.w,
-                                height: dragRect.h,
-                              }}
-                            />
-                          )}
-
-                        </div>
-                      )}
+                      {isEditing && null}
 
                     </div>
                   </div>
