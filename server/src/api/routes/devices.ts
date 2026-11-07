@@ -28,6 +28,9 @@ import {
   unlinkDevice,
   upsertDataPoints,
   type DeviceDocument,
+  getDeviceShare,
+  upsertDeviceShare,
+  getUserFromUsername,
 } from '../../lib/db';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
@@ -495,6 +498,100 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
   });
 });
 
+const handleExportData = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+
+  const url = new URL(request.url);
+  const format = url.searchParams.get('format');
+  if (format !== 'csv' && format !== 'json') return json({ error: 'invalid export format' }, 400);
+  const period = url.searchParams.get('period') ?? '24h';
+  const durations: Record<string, number | undefined> = {
+    '1h': 60 * 60 * 1000,
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+    all: undefined,
+  };
+  let since: Date | undefined;
+  let until: Date | undefined;
+  const fromParam = url.searchParams.get('from');
+  const toParam = url.searchParams.get('to');
+  if (fromParam) {
+    const parsed = parseTimestamp(fromParam);
+    if (parsed) since = parsed;
+  } else {
+    const duration = durations[period];
+    since = duration === undefined ? undefined : new Date(Date.now() - duration);
+  }
+  if (toParam) {
+    const parsed = parseTimestamp(toParam);
+    if (parsed) until = parsed;
+  }
+
+  const { points } = await getDataPointsForDevice(serial, { since, until, maxPoints: 1200 });
+  const body = format === 'json'
+    ? JSON.stringify(points)
+    : [
+        'timestamp,temperature,humidity,airPressure',
+        ...points.map((point) => [
+          new Date(point.timestamp).toISOString(),
+          point.temperature,
+          point.humidity,
+          point.airPressure,
+        ].join(',')),
+      ].join('\n');
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'content-type': format === 'json' ? 'application/json' : 'text/csv',
+      'content-disposition': `attachment; filename="device-${serial}.${format}"`,
+    },
+  });
+});
+
+const handleGetShare = requireAuth(async (_request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  const share = await getDeviceShare(serial, user.uuid);
+  return json({
+    share: share
+      ? { token: share.token, access: share.access, invitedUsernames: share.invitedUsernames }
+      : { token: null, access: 'restricted', invitedUsernames: [] },
+  });
+});
+
+const handleUpdateShare = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  const body = await readJsonBody(request);
+  const access = body?.access === 'anyone' ? 'anyone' : body?.access === 'restricted' ? 'restricted' : null;
+  const rawUsernames = body?.invitedUsernames;
+  if (!access || !Array.isArray(rawUsernames)) return json({ error: 'invalid share settings' }, 400);
+  const invitedUsernames = [...new Set(
+    rawUsernames
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  )].slice(0, 50);
+  for (const username of invitedUsernames) {
+    if (!(await getUserFromUsername(username))) return json({ error: `user not found: ${username}` }, 404);
+  }
+  const share = await upsertDeviceShare(serial, user.uuid, { access, invitedUsernames });
+  return json({
+    share: { token: share.token, access: share.access, invitedUsernames: share.invitedUsernames },
+  });
+});
+
 
 const handleDeleteDeviceDataPoints = requireAuth(async (request, user: User, params) => {
   const serial = parseSerial(params.serial);
@@ -572,6 +669,9 @@ export {
   handleListMine,
   handleGetBySerial,
   handleGetData as handleDeviceGetData,
+  handleExportData as handleDeviceExportData,
+  handleGetShare as handleDeviceGetShare,
+  handleUpdateShare as handleDeviceUpdateShare,
   handleDeleteDeviceDataPoints as handleDeviceDeleteDataPoints,
   handleUpdateDevice as handleDeviceUpdate,
   handleUnlinkDevice as handleDeviceUnlink,

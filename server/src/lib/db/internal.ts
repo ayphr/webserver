@@ -19,6 +19,7 @@ import {
   CONNECTIONS_COLLECTION,
   DOMAIN_VERIFICATIONS_COLLECTION,
   LOCATIONS_COLLECTION,
+  DEVICE_SHARES_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
@@ -66,6 +67,16 @@ export type DomainVerification = {
   verifiedAt?: Date;
 };
 
+export type DeviceShare = {
+  token: string;
+  serial: number;
+  ownerUuid: string;
+  access: 'restricted' | 'anyone';
+  invitedUsernames: string[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export let client: MongoClient | null = null;
 export let database: Db | null = null;
 export let connectPromise: Promise<Db> | null = null;
@@ -85,6 +96,7 @@ export interface Collections {
   connections: Collection<Connection>;
   domainVerifications: Collection<DomainVerification>;
   locations: Collection<Location>;
+  deviceShares: Collection<DeviceShare>;
 }
 
 export interface StoredAvatar {
@@ -201,7 +213,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     oauthTokens: db.collection<OAuthAccessToken>(OAUTH_TOKENS_COLLECTION),
     connections: db.collection<Connection>(CONNECTIONS_COLLECTION),
     domainVerifications: db.collection<DomainVerification>(DOMAIN_VERIFICATIONS_COLLECTION),
-    locations: db.collection<Location>(LOCATIONS_COLLECTION)
+    locations: db.collection<Location>(LOCATIONS_COLLECTION),
+    deviceShares: db.collection<DeviceShare>(DEVICE_SHARES_COLLECTION),
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -223,6 +236,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ code: 1 }, { unique: true })],
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
+    [DEVICE_SHARES_COLLECTION, () => cols.deviceShares.createIndex({ serial: 1 }, { unique: true })],
+    [DEVICE_SHARES_COLLECTION, () => cols.deviceShares.createIndex({ token: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ ownerUuid: 1 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex(
       { ownerUuid: 1, isDefault: 1 },

@@ -30,6 +30,24 @@
     background-color: hsl(0, 0%, 12%);
     border-color: hsl(0, 0%, 28%);
   }
+
+  .toggle-dropdown--compact {
+    min-width: max-content;
+  }
+
+  .toggle-dropdown--compact .toggle-dropdown__toggle {
+    width: max-content;
+    white-space: nowrap;
+  }
+
+  .toggle-dropdown--compact.is-open .toggle-dropdown__toggle,
+  .toggle-dropdown--compact.is-open .toggle-dropdown__menu {
+    min-width: 100%;
+  }
+
+  .toggle-dropdown--compact.is-open .toggle-dropdown__menu {
+    width: max-content;
+  }
 }
 
 .toggle-dropdown__menu {

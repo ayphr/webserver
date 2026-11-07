@@ -6,21 +6,28 @@ import {
   IconClock,
   IconCpu,
   IconDatabase,
+  IconDownload,
   IconDroplet,
   IconExternalLink,
   IconGauge,
   IconMapPin,
+  IconMaximize,
+  IconShare,
   IconRefresh,
   IconThermometer,
   IconTrash,
   IconWifi,
   IconWifiOff,
+  IconUserPlus,
+  IconCopy,
+  IconX,
 } from '@tabler/icons-react';
+import type { Chart } from 'chart.js';
 import type { DataPoint, DeviceSummary, Location } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
-import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
+import { Button, Card, ConfirmDialog, Input, Modal, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
 import '../settings/SettingsPanel.css';
@@ -28,15 +35,16 @@ import './DevicesPanel.css';
 
 const PAGE_SIZE = 5;
 
-function formatChartLabel(value: Date | string, period: string): string {
+function formatChartLabel(value: Date | string, period: string, timezone?: string): string {
   const d = toDate(value);
+  const timeOptions = timezone ? { timeZone: timezone } : {};
   if (period === '1h') {
-    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', ...timeOptions });
   }
   if (period === '24h') {
-    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...timeOptions });
   }
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...timeOptions })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...timeOptions })}`;
 }
 
 function deviceLabel(device: DeviceSummary): string {
@@ -67,7 +75,7 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 }
 
 type Period = '1h' | '24h' | '7d' | '30d' | 'all';
-type GraphMode = 'combined' | 'separate' | 'summary';
+type GraphMode = 'combined' | 'separate' | 'summary' | 'table';
 type DetailTab = 'graphs' | 'settings';
 type Props = {
   initialDeviceSerial?: number | null;
@@ -95,30 +103,70 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [error, setError] = useState<string | null>(null);
 
   // Telemetry graph state
-  const [period, setPeriod] = useState<Period>('24h');
+  const [period] = useState<Period>('24h');
   const [graphMode, setGraphMode] = useState<GraphMode>('combined');
   const { enabled: enabledSeries, setEnabled: setEnabledSeries } = useEnabledSeries();
-
-
-  const [showAxes, setShowAxes] = useState<boolean>(() => {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showAxes, setShowAxes] = useState(true);
+  const [showXAxis, setShowXAxis] = useState(true);
+  const [layers, setLayers] = useState<string[]>(['y-axis', 'x-axis']);
+  const [refreshInterval, setRefreshInterval] = useState(0);
+  const [timezone, setTimezone] = useState(() => {
     try {
-      const raw = window.localStorage.getItem('ayphr:device:showAxes');
-      return raw === null ? true : raw === 'true';
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     } catch {
-      return true;
+      return 'UTC';
     }
   });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem('ayphr:device:showAxes', String(showAxes));
-    } catch {
-      // ignore
-    }
-  }, [showAxes]);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [shareAccess, setShareAccess] = useState<'restricted' | 'anyone'>('restricted');
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [invitedUsers, setInvitedUsers] = useState<string[]>([]);
+  const [inviteInput, setInviteInput] = useState('');
+  const [isSavingShare, setIsSavingShare] = useState(false);
+  const chartRef = useRef<Chart<'line'> | null>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
+
+  const graphStorageKey = selectedSerial === null ? null : `ayphr:device:${selectedSerial}:graphPreferences`;
+  useEffect(() => {
+    if (selectedSerial === null) return;
+    try {
+      const raw = window.localStorage.getItem(`ayphr:device:${selectedSerial}:graphPreferences`);
+      const stored = raw ? JSON.parse(raw) as Partial<{ showAxes: boolean; showXAxis: boolean; layers: string[]; refreshInterval: number; timezone: string }> : {};
+      // These values intentionally reset when the device changes so preferences never leak across devices.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowAxes(stored.showAxes ?? true);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowXAxis(stored.showXAxis ?? true);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLayers(stored.layers ?? ['y-axis', 'x-axis']);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRefreshInterval(stored.refreshInterval ?? 0);
+      setTimezone(stored.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC');
+      setDataPoints([]);
+      setHasLoadedInitialData(false);
+    } catch {
+      setShowAxes(true);
+      setShowXAxis(true);
+      setLayers(['y-axis', 'x-axis']);
+      setRefreshInterval(0);
+      setTimezone('UTC');
+    }
+  }, [selectedSerial]);
+
+  useEffect(() => {
+    if (!graphStorageKey) return;
+    try {
+      window.localStorage.setItem(graphStorageKey, JSON.stringify({ showAxes, showXAxis, layers, refreshInterval, timezone }));
+    } catch {
+      // Local preferences are best effort.
+    }
+  }, [graphStorageKey, layers, refreshInterval, showAxes, showXAxis, timezone]);
 
   // Device settings state
   const [settingsName, setSettingsName] = useState('');
@@ -198,7 +246,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       setIsFetchingData(true);
       setDataError(null);
       try {
-        const res = await api.devices.getDataPoints(selectedSerial, { period });
+        const res = await api.devices.getDataPoints(selectedSerial, {
+          period,
+          from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
+          to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
+        });
         if (!cancelled) {
           setDataPoints(res.dataPoints);
           setHasLoadedInitialData(true);
@@ -219,20 +271,142 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [view, selectedSerial, detailTab, period]);
+  }, [view, selectedSerial, detailTab, period, dateFrom, dateTo]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await loadAll();
     if (selectedSerial !== null && detailTab === 'graphs') {
       try {
-        const res = await api.devices.getDataPoints(selectedSerial, { period });
+        const res = await api.devices.getDataPoints(selectedSerial, {
+          period,
+          from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
+          to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
+        });
         setDataPoints(res.dataPoints);
       } catch (err) {
         setDataError(err instanceof Error ? err.message : 'Failed to load telemetry data');
       }
     }
     setIsRefreshing(false);
+  }, [dateFrom, dateTo, detailTab, loadAll, period, selectedSerial]);
+
+  useEffect(() => {
+    if (refreshInterval <= 0 || view !== 'detail' || detailTab !== 'graphs') return;
+    const timer = window.setInterval(() => {
+      void handleRefresh();
+    }, refreshInterval * 1000);
+    return () => window.clearInterval(timer);
+  }, [refreshInterval, view, detailTab, handleRefresh]);
+
+  useEffect(() => {
+    if (view !== 'detail' || detailTab !== 'graphs') return;
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key.toLowerCase() === 'r') void handleRefresh();
+      if (event.key === '1') setGraphMode('combined');
+      if (event.key === '2') setGraphMode('separate');
+      if (event.key === '3') setGraphMode('summary');
+      if (event.key === '4') setGraphMode('table');
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [detailTab, handleRefresh, view]);
+
+  const downloadExport = async (format: 'csv' | 'json') => {
+    if (selectedSerial === null) return;
+    try {
+      const blob = await api.devices.exportData(selectedSerial, format, {
+        period,
+        from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
+        to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `device-${selectedSerial}.${format}`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDataError(err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`);
+    }
+  };
+
+  const downloadPng = () => {
+    const chart = chartRef.current;
+    if (!chart?.toBase64Image) return;
+    const anchor = document.createElement('a');
+    anchor.href = chart.toBase64Image();
+    anchor.download = `device-${selectedSerial ?? 'telemetry'}.png`;
+    anchor.click();
+  };
+
+  const toggleLayer = (labels: string[]) => {
+    setLayers(labels);
+    setShowAxes(labels.includes('y-axis'));
+    setShowXAxis(labels.includes('x-axis'));
+  };
+
+  const getShareUrl = (token: string | null) => {
+    const params = new URLSearchParams({ device: String(selectedSerial ?? '') });
+    params.set('from', dateFrom);
+    params.set('to', dateTo);
+    if (token) params.set('share', token);
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  };
+
+  const openShareDialog = async () => {
+    if (selectedSerial === null) return;
+    try {
+     const share = await api.devices.getShare(selectedSerial);
+     setShareAccess(share.access);
+     setShareToken(share.token);
+     setInvitedUsers(share.invitedUsernames);
+     setIsShareOpen(true);
+    } catch (err) {
+     setDataError(err instanceof Error ? err.message : 'Failed to load share settings');
+    }
+  };
+
+  const saveShare = async () => {
+    if (selectedSerial === null) return;
+    setIsSavingShare(true);
+    try {
+     const share = await api.devices.updateShare(selectedSerial, {
+       access: shareAccess,
+       invitedUsernames: invitedUsers,
+     });
+     setShareToken(share.token);
+    } catch (err) {
+     setDataError(err instanceof Error ? err.message : 'Failed to save share settings');
+    } finally {
+     setIsSavingShare(false);
+    }
+  };
+
+  const addInvite = () => {
+    const username = inviteInput.trim().replace(/^@/, '').toLowerCase();
+    if (username && !invitedUsers.includes(username)) setInvitedUsers((current) => [...current, username]);
+    setInviteInput('');
+  };
+
+  const copyShareLink = async () => {
+    try {
+     let token = shareToken;
+     if (!token && selectedSerial !== null) {
+       const share = await api.devices.updateShare(selectedSerial, {
+         access: shareAccess,
+         invitedUsernames: invitedUsers,
+       });
+       token = share.token;
+       setShareToken(token);
+     }
+     if (!token) return;
+     await navigator.clipboard.writeText(getShareUrl(token));
+     setDataError('Share link copied to clipboard.');
+    } catch (err) {
+     setDataError(err instanceof Error ? err.message : 'Failed to copy share link');
+    }
   };
 
   const handleSelectDevice = (device: DeviceSummary) => {
@@ -348,15 +522,21 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
   // Combined chart config & data
   const combinedData = useMemo(() => {
-    const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
+    const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period, timezone));
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
-    return {
-      labels,
-      datasets: enabledDefs.map((def) => ({
+    const datasets = enabledDefs.map((def) => {
+      const values = dataPoints.map((p) => def.getValue(p));
+      const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+      const deviation = values.length
+        ? Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length)
+        : 0;
+      return {
         label: def.label,
-        data: dataPoints.map((p) => def.getValue(p)),
+        data: values,
         borderColor: resolveCssColor(def.color),
-        backgroundColor: 'transparent',
+        backgroundColor: layers.includes('anomalies')
+          ? values.map((value) => Math.abs(value - average) > deviation * 2 ? 'var(--status-error)' : resolveCssColor(def.color))
+          : 'transparent',
         yAxisID: unitToScaleId.get(def.unit) ?? 'y',
         tension: 0.25,
         fill: false,
@@ -364,9 +544,68 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         borderDash: def.dash,
         pointRadius,
         pointHoverRadius: 4,
-      })),
+      };
+    });
+    const primary = enabledDefs[0];
+    if (primary && layers.includes('thresholds')) {
+      const values = dataPoints.map((p) => primary.getValue(p));
+      const average = values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1);
+      const deviation = Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / Math.max(values.length, 1));
+      datasets.push(
+        {
+          label: 'Threshold upper',
+          data: values.map(() => average + deviation * 2),
+          borderColor: 'rgba(248, 113, 113, 0.45)',
+          backgroundColor: 'rgba(248, 113, 113, 0.08)',
+          yAxisID: unitToScaleId.get(primary.unit) ?? 'y',
+          borderDash: [4, 4],
+          fill: false,
+          borderWidth: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          tension: 0,
+        },
+        {
+          label: 'Threshold lower',
+          data: values.map(() => average - deviation * 2),
+          borderColor: 'rgba(248, 113, 113, 0.45)',
+          backgroundColor: 'rgba(248, 113, 113, 0.08)',
+          yAxisID: unitToScaleId.get(primary.unit) ?? 'y',
+          borderDash: [4, 4],
+          fill: false,
+          borderWidth: 1,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          tension: 0,
+        },
+      );
+    }
+    if (primary && layers.includes('forecast') && dataPoints.length > 1) {
+      const values = dataPoints.map((p) => primary.getValue(p));
+      const last = values.length - 1;
+      const meanX = last / 2;
+      const meanY = values.reduce((sum, value) => sum + value, 0) / values.length;
+      const slope = values.reduce((sum, value, index) => sum + (index - meanX) * (value - meanY), 0)
+        / Math.max(values.reduce((sum, _, index) => sum + (index - meanX) ** 2, 0), 1);
+      datasets.push({
+        label: 'Forecast trend',
+        data: values.map((_, index) => meanY + slope * (index - meanX)),
+        borderColor: 'rgba(96, 165, 250, 0.9)',
+        backgroundColor: 'transparent',
+        yAxisID: unitToScaleId.get(primary.unit) ?? 'y',
+        borderDash: [8, 4],
+        fill: false,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        tension: 0,
+      });
+    }
+    return {
+      labels,
+      datasets,
     };
-  }, [dataPoints, period, enabledDefs, unitToScaleId]);
+  }, [dataPoints, period, enabledDefs, layers, timezone, unitToScaleId]);
 
 
 
@@ -374,6 +613,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scales: Record<string, any> = {
       x: {
+        display: showXAxis,
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
       },
@@ -433,7 +673,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       },
       scales,
     };
-  }, [unitGroups, showAxes]);
+  }, [unitGroups, showAxes, showXAxis]);
 
   const createMetricConfig = (unit: string, showAxes: boolean) => ({
     responsive: true,
@@ -489,7 +729,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       enabledDefs.map((def) => ({
         def,
         data: {
-          labels: dataPoints.map((p) => formatChartLabel(p.timestamp, period)),
+          labels: dataPoints.map((p) => formatChartLabel(p.timestamp, period, timezone)),
           datasets: [
             {
               label: def.label,
@@ -507,7 +747,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         },
         config: createMetricConfig(def.unit, showAxes),
       })),
-    [dataPoints, period, enabledDefs, showAxes],
+    [dataPoints, period, enabledDefs, showAxes, timezone],
   );
 
   if (isLoading) {
@@ -546,6 +786,26 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             <IconDatabase size={28} strokeWidth={1.5} />
             <h3>No devices yet</h3>
             <p>Use &quot;Add device&quot; to open ayphr.com/link and enter the code shown on your device.</p>
+          </div>
+        ) : graphMode === 'table' ? (
+          <div className="devices__table-wrap">
+            <table className="devices__data-table">
+              <caption className="sr-only">Telemetry data</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Timestamp</th>
+                  {enabledDefs.map((def) => <th scope="col" key={def.id}>{def.shortLabel} ({def.unit})</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {dataPoints.map((point) => (
+                  <tr key={new Date(point.timestamp).toISOString()}>
+                    <td>{new Date(point.timestamp).toLocaleString(undefined, { timeZone: timezone, timeZoneName: 'short' })}</td>
+                    {enabledDefs.map((def) => <td key={def.id}>{def.getValue(point).toFixed(2)}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="devices__grid">
@@ -686,25 +946,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         {detailTab === 'graphs' && (
           <div className="devices__graphs">
             <div className="devices__graphs-controls" onContextMenu={(e) => e.preventDefault()}>
-              <div className="devices__period-selector" role="group" aria-label="Time period">
-                {(['1h', '24h', '7d', '30d', 'all'] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    className={`devices__control-btn ${period === p ? 'is-active' : ''}`}
-                    onClick={() => setPeriod(p)}
-                  >
-                    {p === '1h'
-                      ? 'Past 1h'
-                      : p === '24h'
-                        ? 'Past 24h'
-                        : p === '7d'
-                          ? 'Past 7d'
-                          : p === '30d'
-                            ? 'Past 30d'
-                            : 'All Time'}
-                  </button>
-                ))}
+              <div className="devices__date-picker" role="group" aria-label="Date range">
+                <label>
+                  From
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                </label>
+                <label>
+                  To
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                </label>
               </div>
 
               <div className="devices__series-selector">
@@ -714,16 +964,42 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   value={enabledLabels}
                   onChange={handleSeriesChange}
                   placeholder="Series"
+                  className="toggle-dropdown--compact"
                 />
               </div>
 
-              <div className="devices__axes-toggle">
-                <Checkbox
-                  label="Y axes"
-                  checked={showAxes}
-                  onChange={(e) => setShowAxes(e.target.checked)}
+              <div className="devices__layers-selector">
+                <ToggleDropdown
+                  buttonLabel="Layers"
+                  options={['y-axis', 'x-axis', 'thresholds', 'anomalies', 'forecast', 'synchronized crosshair', 'shareable links', 'fullscreen chart button']}
+                  value={layers}
+                  onChange={toggleLayer}
+                  placeholder="Layers"
+                  className="toggle-dropdown--compact"
                 />
               </div>
+
+              <label className="devices__refresh-control">
+                Refresh
+                <select value={refreshInterval} onChange={(e) => setRefreshInterval(Number(e.target.value))}>
+                  <option value={0}>Off</option>
+                  <option value={15}>15s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              </label>
+
+              <label className="devices__refresh-control">
+                Timezone
+                <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+                  <option value={timezone}>{timezone}</option>
+                  {timezone !== 'UTC' && <option value="UTC">UTC</option>}
+                  {timezone !== 'America/New_York' && <option value="America/New_York">New York</option>}
+                  {timezone !== 'Europe/London' && <option value="Europe/London">London</option>}
+                  {timezone !== 'Asia/Tokyo' && <option value="Asia/Tokyo">Tokyo</option>}
+                </select>
+              </label>
 
               <div className="devices__mode-selector" role="group" aria-label="Graph display mode">
                 <button
@@ -747,6 +1023,20 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 >
                   Summary
                 </button>
+                <button
+                  type="button"
+                  className={`devices__control-btn ${graphMode === 'table' ? 'is-active' : ''}`}
+                  onClick={() => setGraphMode('table')}
+                >
+                  Table
+                </button>
+              </div>
+              <div className="devices__export-actions" aria-label="Export and chart actions">
+                <button type="button" className="devices__icon-btn" onClick={() => void downloadExport('csv')} title="Export CSV" aria-label="Export CSV"><IconDownload size={16} /> CSV</button>
+                <button type="button" className="devices__icon-btn" onClick={() => void downloadExport('json')} title="Export JSON" aria-label="Export JSON">JSON</button>
+                <button type="button" className="devices__icon-btn" onClick={downloadPng} title="Export PNG" aria-label="Export PNG">PNG</button>
+                <button type="button" className="devices__icon-btn" onClick={() => void chartContainerRef.current?.requestFullscreen?.()} title="Fullscreen chart" aria-label="Fullscreen chart"><IconMaximize size={16} /></button>
+                <button type="button" className="devices__icon-btn" onClick={() => void openShareDialog()} title="Share chart" aria-label="Share chart"><IconShare size={16} /></button>
               </div>
               </div>
 
@@ -834,8 +1124,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
                 {graphMode === 'combined' ? (
                   <div className="devices__chart-card">
-                    <div className="devices__chart-container" style={{ position: 'relative' }} onContextMenu={(e) => e.preventDefault()}>
-                      <LineGraph data={combinedData} config={combinedConfig} />
+                    <div ref={chartContainerRef} className="devices__chart-container" style={{ position: 'relative' }} onContextMenu={(e) => e.preventDefault()}>
+                      <LineGraph ref={chartRef} data={combinedData} config={combinedConfig} />
 
                     </div>
                   </div>
@@ -933,6 +1223,90 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 Unlink device
               </Button>
             </div>
+
+            <Modal
+              isOpen={isShareOpen}
+              onClose={() => setIsShareOpen(false)}
+              title="Share chart"
+              showCancel={false}
+              size="md"
+            >
+              <div className="devices__share-modal">
+                <p className="devices__share-description">
+                  Choose who can view this chart and invite specific Ayphr users.
+                </p>
+
+                <div className="devices__share-access" role="group" aria-label="Link access">
+                  <button
+                    type="button"
+                    className={`devices__share-access-option ${shareAccess === 'restricted' ? 'is-selected' : ''}`}
+                    onClick={() => setShareAccess('restricted')}
+                  >
+                    <strong>Restricted</strong>
+                    <span>Only you and invited people can view</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`devices__share-access-option ${shareAccess === 'anyone' ? 'is-selected' : ''}`}
+                    onClick={() => setShareAccess('anyone')}
+                  >
+                    <strong>Anyone with the link</strong>
+                    <span>Anyone who has the link can view</span>
+                  </button>
+                </div>
+
+                {shareAccess === 'restricted' && (
+                  <div className="devices__share-invites">
+                    <label htmlFor="share-invite-username">Invite people</label>
+                    <div className="devices__share-invite-row">
+                      <Input
+                        id="share-invite-username"
+                        value={inviteInput}
+                        onChange={(event) => setInviteInput(event.target.value)}
+                        placeholder="Username"
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            addInvite();
+                          }
+                        }}
+                      />
+                      <Button variant="secondary" onClick={addInvite}>
+                        <IconUserPlus size={16} />
+                        Add
+                      </Button>
+                    </div>
+                    {invitedUsers.length > 0 && (
+                      <div className="devices__share-user-list" aria-label="Invited people">
+                        {invitedUsers.map((username) => (
+                          <span className="devices__share-user" key={username}>
+                            @{username}
+                            <button type="button" onClick={() => setInvitedUsers((current) => current.filter((value) => value !== username))} aria-label={`Remove ${username}`}>
+                              <IconX size={14} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="devices__share-link-row">
+                  <Input readOnly value={shareToken ? getShareUrl(shareToken) : 'Save settings to create a link'} aria-label="Share link" />
+                  <Button variant="secondary" onClick={() => void copyShareLink()} disabled={!shareToken && isSavingShare}>
+                    <IconCopy size={16} />
+                    Copy
+                  </Button>
+                </div>
+
+                <div className="devices__share-footer">
+                  <Button variant="secondary" onClick={() => setIsShareOpen(false)}>Cancel</Button>
+                  <Button variant="primary" onClick={() => void saveShare()} isLoading={isSavingShare}>
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </Modal>
 
             <ConfirmDialog
               isOpen={isUnlinkOpen}

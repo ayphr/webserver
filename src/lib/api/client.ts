@@ -160,6 +160,20 @@ export function createRequestClient(config: ApiClientConfig = {}) {
     return typeof body === 'string' ? body : '';
   }
 
+  async function requestBlob(path: string, options: RequestOptions = {}) {
+    const headers = new Headers(options.headers);
+    const token = options.auth === false ? null : readStoredToken(storageKey);
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const requestOptions = { ...options } as RequestInit & { body?: unknown };
+    delete requestOptions.body;
+    const response = await fetch(buildUrl(baseUrl, path), { ...requestOptions, headers });
+    if (!response.ok) {
+      const message = await response.text();
+      throw new ApiError(message || `Request failed with status ${response.status}`, response.status, message, response.url);
+    }
+    return response.blob();
+  }
+
   return {
     baseUrl,
     getAuthToken() {
@@ -173,6 +187,7 @@ export function createRequestClient(config: ApiClientConfig = {}) {
     },
     requestJson,
     requestText,
+    requestBlob,
   };
 }
 

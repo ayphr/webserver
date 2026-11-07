@@ -28,6 +28,7 @@ export const OAUTH_TOKENS_COLLECTION = 'oauth_tokens';
 export const CONNECTIONS_COLLECTION = 'connections';
 export const DOMAIN_VERIFICATIONS_COLLECTION = 'domain_verifications';
 export const LOCATIONS_COLLECTION = 'locations';
+export const DEVICE_SHARES_COLLECTION = 'device_shares';
 
 export const API_PORT = envNumber('API_PORT', 7233);
 export const METRICS_PORT = envNumber('METRICS_PORT', 7234);

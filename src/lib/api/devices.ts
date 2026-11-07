@@ -29,6 +29,25 @@ export function createDevicesApi(client: RequestClient) {
       const path = `/api/devices/${serial}/data${query ? `?${query}` : ''}`;
       return client.requestJson<DeviceDataPointsPayload>(path);
     },
+    async exportData(serial: number, format: 'csv' | 'json', options?: { period?: string; from?: string; to?: string }) {
+      const params = new URLSearchParams({ format });
+      if (options?.period) params.set('period', options.period);
+      if (options?.from) params.set('from', options.from);
+      if (options?.to) params.set('to', options.to);
+      return client.requestBlob(`/api/devices/${serial}/data/export?${params.toString()}`);
+    },
+    async getShare(serial: number) {
+      const response = await client.requestJson<{
+        share: { token: string | null; access: 'restricted' | 'anyone'; invitedUsernames: string[] };
+      }>(`/api/devices/${serial}/share`);
+      return response.share;
+    },
+    async updateShare(serial: number, input: { access: 'restricted' | 'anyone'; invitedUsernames: string[] }) {
+      const response = await client.requestJson<{
+        share: { token: string; access: 'restricted' | 'anyone'; invitedUsernames: string[] };
+      }>(`/api/devices/${serial}/share`, { method: 'PUT', body: input });
+      return response.share;
+    },
     async deleteDataPoints(serial: number, timestamps: (Date | string)[]) {
       return client.requestJson<{ serial: number; removed: number }>(`/api/devices/${serial}/data`, {
         method: 'DELETE',

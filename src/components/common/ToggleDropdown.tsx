@@ -36,7 +36,7 @@ export const ToggleDropdown = ({ label, options, value, onChange, placeholder = 
   };
 
   return (
-    <div className={`toggle-dropdown ${className}`} ref={containerRef}>
+    <div className={`toggle-dropdown ${className} ${open ? 'is-open' : ''}`} ref={containerRef}>
       {label && <label className="toggle-dropdown__label">{label}</label>}
       <button type="button" className="toggle-dropdown__toggle" onClick={() => setOpen((v) => !v)}>
         {buttonLabel ?? (value.length ? value.join(', ') : placeholder)} ▾

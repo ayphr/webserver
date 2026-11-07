@@ -13,6 +13,7 @@ export type SeriesId =
   | 'wetBulb'
   | 'humidityRatio'
   | 'moistAirDensity'
+  | 'airDensityAltitude'
   | 'enthalpy'
   | 'apparentTemp'
   | 'dewPointDeficit';
@@ -152,6 +153,17 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.moistAirDensity(p.temperature, p.humidity, p.airPressure),
+  },
+  {
+    id: 'airDensityAltitude',
+    label: 'Air-Density Altitude (m)',
+    shortLabel: 'Density Altitude',
+    unit: 'm',
+    color: 'var(--accent-cyan-solid)',
+    dash: [6, 3],
+    defaultEnabled: false,
+    isCalculated: true,
+    getValue: (p) => 44330 * (1 - Math.pow(P.moistAirDensity(p.temperature, p.humidity, p.airPressure) / 1.225, 0.234969)),
   },
   {
     id: 'enthalpy',
