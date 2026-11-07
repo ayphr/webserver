@@ -10,6 +10,7 @@ import {
 } from '@tabler/icons-react';
 import type { SessionInfo } from '@common';
 import { api } from '../../lib/api';
+import { toDate } from '../../lib/date';
 import { Button, ConfirmDialog, Modal } from '../common';
 import './SessionsModal.css';
 
@@ -19,10 +20,6 @@ export interface SessionsModalProps {
 }
 
 const regionDisplayNames = new Intl.DisplayNames(['en'], { type: 'region' });
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
 
 function getRelativeTime(date: Date | string): string {
   const resolved = toDate(date);

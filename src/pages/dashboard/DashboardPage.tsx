@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
+import { toDate } from '../../lib/date';
 import type { Punishment, PublicUser, CreditBalance } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { ProfileCard, Button } from '../../components/common';
@@ -23,10 +24,6 @@ const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((
 import './DashboardPage.css';
 
 const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games']);
-
-function toDate(value: Date | string): Date {
-  return value instanceof Date ? value : new Date(value);
-}
 
 function getRelativeTime(date: Date | string): string {
   const resolvedDate = toDate(date);
