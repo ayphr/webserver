@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import type { LineGraphProps } from './types';
 import { Line } from 'react-chartjs-2';
+import { memo } from 'react';
 
 ChartJS.register(
   CategoryScale,
@@ -25,6 +26,6 @@ ChartJS.register(
   Filler
 );
 
-export function LineGraph({ data, config }: Readonly<LineGraphProps>) {
+export const LineGraph = memo(function LineGraph({ data, config }: Readonly<LineGraphProps>) {
   return <Line options={config as ChartOptions<'line'>} data={data as ChartData<'line'>} />;
-}
+});
