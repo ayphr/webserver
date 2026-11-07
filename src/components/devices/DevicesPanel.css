@@ -611,3 +611,24 @@
 .devices__series-selector {
   min-width: 12rem;
 }
+
+.devices__selection-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  z-index: 5;
+}
+
+.devices__selection-rect {
+  position: absolute;
+  border: 1px solid rgba(239, 68, 68, 0.9);
+  background: rgba(239, 68, 68, 0.15);
+  pointer-events: none;
+}
+
+.devices__editing-status {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
