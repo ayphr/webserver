@@ -15,7 +15,6 @@
 
 .devices__actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -683,5 +682,18 @@
   padding: 0.15rem 0.35rem;
   border-radius: var(--radius-sm);
   pointer-events: none;
+  white-space: nowrap;
+}
+
+.devices__edit-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  overflow-x: auto;
+}
+
+.devices__edit-actions .button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
   white-space: nowrap;
 }

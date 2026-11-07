@@ -978,7 +978,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   <div className="devices__editing-status">
                     <span>{selectedIndices.size} selected · {pendingDeletions.size} to delete</span>
                   </div>
-                  <div className="devices__actions">
+                  <div className="devices__actions devices__edit-actions">
                     <Button variant="secondary" onClick={handleSelectAll}>
                       Select all
                     </Button>
