@@ -457,6 +457,8 @@
   height: 400px;
   min-height: 400px;
   padding-top: 0.75rem;
+  touch-action: none;
+  overflow: hidden;
 }
 
 .devices__separate-charts {
