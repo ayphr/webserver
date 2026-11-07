@@ -10,7 +10,6 @@ import {
   IconExternalLink,
   IconGauge,
   IconMapPin,
-  IconPencil,
   IconRefresh,
   IconThermometer,
   IconTrash,
@@ -23,7 +22,6 @@ import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
-import type { Chart as ChartJS } from 'chart.js';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
@@ -101,15 +99,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [graphMode, setGraphMode] = useState<GraphMode>('combined');
   const { enabled: enabledSeries, setEnabled: setEnabledSeries } = useEnabledSeries();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const [pendingDeletions, setPendingDeletions] = useState<Set<number>>(new Set());
-  const [history, setHistory] = useState<Set<number>[]>([new Set()]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const chartRef = useRef<ChartJS<'line'> | null>(null);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isDraggingRef = useRef(false);
-  const lastMouseRef = useRef<{ x: number; y: number } | null>(null);
 
   const [showAxes, setShowAxes] = useState<boolean>(() => {
     try {
@@ -254,104 +243,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
 
 
-  const toggleNearestPoint = (x: number, y: number) => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    let best = -1;
-    let bestDist = Infinity;
-    chart.data.datasets.forEach((_ds, di) => {
-      const meta = chart.getDatasetMeta(di);
-      meta?.data?.forEach((pt, i) => {
-        const d = Math.hypot(pt.x - x, pt.y - y);
-        if (d < bestDist) {
-          bestDist = d;
-          best = i;
-        }
-      });
-    });
-    if (best >= 0 && bestDist < 24) {
-      setSelectedIndices((prev) => {
-        const next = new Set(prev);
-        if (next.has(best)) next.delete(best);
-        else next.add(best);
-        return next;
-      });
-    }
-  };
-
-  const selectPointsInRect = (rect: { x: number; y: number; w: number; h: number }) => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const selected = new Set<number>();
-    chart.data.datasets.forEach((_ds, di) => {
-      const meta = chart.getDatasetMeta(di);
-      meta?.data?.forEach((pt, i) => {
-        if (
-          pt.x >= rect.x &&
-          pt.x <= rect.x + rect.w &&
-          pt.y >= rect.y &&
-          pt.y <= rect.y + rect.h
-        ) {
-          selected.add(i);
-        }
-      });
-    });
-    const indices = [...selected];
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      indices.forEach((i) => next.add(i));
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (!isEditing) return;
-    const chart = chartRef.current;
-    const canvas = chart?.canvas;
-    if (!canvas) return;
-
-    const getPos = (e: MouseEvent) => {
-      const r = canvas.getBoundingClientRect();
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-
-    const down = (e: MouseEvent) => {
-      const pos = getPos(e);
-      dragStartRef.current = pos;
-      isDraggingRef.current = true;
-      lastMouseRef.current = pos;
-    };
-
-    const move = (e: MouseEvent) => {
-      if (!isDraggingRef.current || !dragStartRef.current) return;
-      lastMouseRef.current = getPos(e);
-    };
-
-    const up = (e: MouseEvent) => {
-      if (!isDraggingRef.current || !dragStartRef.current) return;
-      const start = dragStartRef.current;
-      const pos = getPos(e);
-      const w = Math.abs(pos.x - start.x);
-      const h = Math.abs(pos.y - start.y);
-      isDraggingRef.current = false;
-      if (w < 5 && h < 5) {
-        toggleNearestPoint(pos.x, pos.y);
-      } else {
-        selectPointsInRect({ x: Math.min(start.x, pos.x), y: Math.min(start.y, pos.y), w, h });
-      }
-      dragStartRef.current = null;
-      lastMouseRef.current = null;
-    };
-
-    canvas.addEventListener('mousedown', down);
-    canvas.addEventListener('mousemove', move);
-    canvas.addEventListener('mouseup', up);
-    return () => {
-      canvas.removeEventListener('mousedown', down);
-      canvas.removeEventListener('mousemove', move);
-      canvas.removeEventListener('mouseup', up);
-    };
-  }, [isEditing]);
 
 
 
@@ -360,71 +251,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
 
 
-  const handleCancelEdit = () => {
-    setSelectedIndices(new Set());
-    setPendingDeletions(new Set());
-    setIsEditing(false);
-  };
-
-
-  const pushHistory = (next: Set<number>) => {
-    const newHistory = history.slice(0, historyIndex + 1).concat(new Set(next));
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-    setPendingDeletions(new Set(next));
-  };
-
-  const handleMarkDelete = () => {
-    if (selectedIndices.size === 0) return;
-    const next = new Set(pendingDeletions);
-    selectedIndices.forEach((i) => next.add(i));
-    pushHistory(next);
-    setSelectedIndices(new Set());
-  };
-
-  const handleUndo = () => {
-    if (historyIndex <= 0) return;
-    const newIndex = historyIndex - 1;
-    setHistoryIndex(newIndex);
-    setPendingDeletions(new Set(history[newIndex]));
-  };
-
-  const handleRedo = () => {
-    if (historyIndex >= history.length - 1) return;
-    const newIndex = historyIndex + 1;
-    setHistoryIndex(newIndex);
-    setPendingDeletions(new Set(history[newIndex]));
-  };
-
-  const handleSelectAll = () => {
-    setSelectedIndices(new Set(dataPoints.map((_, i) => i).filter((i) => !pendingDeletions.has(i))));
-  };
-
-  const handleDeselectAll = () => {
-    setSelectedIndices(new Set());
-  };
-
-  const handleSaveEdits = async () => {
-    if (!selectedDevice) {
-      handleCancelEdit();
-      return;
-    }
-    if (pendingDeletions.size === 0) {
-      handleCancelEdit();
-      return;
-    }
-    const timestamps = [...pendingDeletions].map((idx) => dataPoints[idx]?.timestamp).filter(Boolean) as (Date | string)[];
-    try {
-      await api.devices.deleteDataPoints(selectedDevice.serial, timestamps);
-      const removed = new Set(pendingDeletions);
-      setDataPoints((prev) => prev.filter((_, idx) => !removed.has(idx)));
-
-    } catch (err) {
-      setDataError(err instanceof Error ? err.message : 'Failed to delete data points');
-    } finally {
-      handleCancelEdit();
-    }
-  };
 
   const handleSaveSettings = async () => {
     if (!selectedDevice) return;
@@ -523,10 +349,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   // Combined chart config & data
   const combinedData = useMemo(() => {
     const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
-    const pointRadius = dataPoints.map((_, i) => (selectedIndices.has(i) || pendingDeletions.has(i) ? 6 : dataPoints.length > 80 ? 0 : 2));
-    const pointBackgroundColor = dataPoints.map((_, i) =>
-      pendingDeletions.has(i) ? '#ef4444' : selectedIndices.has(i) ? '#3b82f6' : 'transparent',
-    );
+    const pointRadius = dataPoints.length > 80 ? 0 : 2;
     return {
       labels,
       datasets: enabledDefs.map((def) => ({
@@ -540,11 +363,10 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         borderWidth: 2,
         borderDash: def.dash,
         pointRadius,
-        pointBackgroundColor,
         pointHoverRadius: 4,
       })),
     };
-  }, [dataPoints, period, enabledDefs, unitToScaleId, selectedIndices, pendingDeletions]);
+  }, [dataPoints, period, enabledDefs, unitToScaleId]);
 
 
 
@@ -600,18 +422,18 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         zoom: {
           zoom: {
             wheel: { enabled: true },
-            pinch: { enabled: !isEditing },
+            pinch: { enabled: true },
             mode: 'x',
           },
           pan: {
-            enabled: !isEditing,
+            enabled: true,
             mode: 'x',
           },
         },
       },
       scales,
     };
-  }, [unitGroups, showAxes, isEditing]);
+  }, [unitGroups, showAxes]);
 
   const createMetricConfig = (unit: string, showAxes: boolean) => ({
     responsive: true,
@@ -864,41 +686,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         {detailTab === 'graphs' && (
           <div className="devices__graphs">
             <div className="devices__graphs-controls">
-              {isEditing ? (
-                <>
-                  <div className="devices__editing-status">
-                    <span>{selectedIndices.size} selected · {pendingDeletions.size} to delete</span>
-                  </div>
-                  <div className="devices__actions devices__edit-actions">
-                    <Button variant="secondary" onClick={handleSelectAll}>
-                      Select all
-                    </Button>
-                    <Button variant="secondary" onClick={handleDeselectAll} disabled={selectedIndices.size === 0}>
-                      Deselect
-                    </Button>
-                    <Button variant="danger" onClick={handleMarkDelete} disabled={selectedIndices.size === 0} title="Delete selected">
-                      <IconTrash size={16} strokeWidth={1.75} />
-                    </Button>
-                    <Button variant="secondary" onClick={handleUndo} disabled={historyIndex <= 0} title="Undo">
-                      Undo
-                    </Button>
-                    <Button variant="secondary" onClick={handleRedo} disabled={historyIndex >= history.length - 1} title="Redo">
-                      Redo
-                    </Button>
-                    <Button
-                      variant="primary"
-                      onClick={() => void handleSaveEdits()}
-                      disabled={pendingDeletions.size === 0}
-                    >
-                      Save
-                    </Button>
-                    <Button variant="secondary" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
               <div className="devices__period-selector" role="group" aria-label="Time period">
                 {(['1h', '24h', '7d', '30d', 'all'] as const).map((p) => (
                   <button
@@ -920,21 +707,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 ))}
               </div>
 
-              <button
-                type="button"
-                className="devices__control-btn"
-                onClick={() => {
-                  setIsEditing(true);
-                  setGraphMode('combined');
-                  setSelectedIndices(new Set());
-                  setPendingDeletions(new Set());
-                  setHistory([new Set()]);
-                  setHistoryIndex(0);
-                }}
-                title="Edit data points"
-              >
-                <IconPencil size={16} strokeWidth={1.75} />
-              </button>
               <div className="devices__series-selector">
                 <ToggleDropdown
                   buttonLabel="Series"
@@ -976,8 +748,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   Summary
                 </button>
               </div>
-                </>
-              )}
               </div>
 
             {dataError && (
@@ -993,7 +763,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 <IconRefresh className="devices__spin-icon" size={24} strokeWidth={2} />
                 <p>Loading telemetry history...</p>
               </div>
-            ) : dataPoints.length === 0 || (!isEditing && enabledDefs.length === 0) ? (
+            ) : dataPoints.length === 0 || enabledDefs.length === 0 ? (
               <div className="devices__empty">
                 <IconDatabase size={28} strokeWidth={1.5} />
                 <h3>{dataPoints.length === 0 ? 'No data points found' : 'No series selected'}</h3>
@@ -1065,8 +835,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 {graphMode === 'combined' ? (
                   <div className="devices__chart-card">
                     <div className="devices__chart-container" style={{ position: 'relative' }}>
-                      <LineGraph ref={chartRef} data={combinedData} config={combinedConfig} />
-                      {isEditing && null}
+                      <LineGraph data={combinedData} config={combinedConfig} />
 
                     </div>
                   </div>
