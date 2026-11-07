@@ -595,3 +595,15 @@
   color: var(--text-muted);
   line-height: 1.5;
 }
+
+.devices__graphs-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.devices__axes-toggle {
+  display: flex;
+  align-items: center;
+}

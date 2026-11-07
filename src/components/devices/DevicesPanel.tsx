@@ -20,7 +20,7 @@ import type { DataPoint, DeviceSummary, Location } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
-import { Button, Card, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
+import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
 import '../settings/SettingsPanel.css';
@@ -98,6 +98,22 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [period, setPeriod] = useState<Period>('24h');
   const [graphMode, setGraphMode] = useState<GraphMode>('combined');
   const { enabled: enabledSeries, setEnabled: setEnabledSeries } = useEnabledSeries();
+
+  const [showAxes, setShowAxes] = useState<boolean>(() => {
+    try {
+      const raw = window.localStorage.getItem('ayphr:device:showAxes');
+      return raw === null ? true : raw === 'true';
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('ayphr:device:showAxes', String(showAxes));
+    } catch {
+      // ignore
+    }
+  }, [showAxes]);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
@@ -351,9 +367,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       const id = i === 0 ? 'y' : `y${i}`;
       scales[id] = {
         type: 'linear',
-        display: true,
+        display: showAxes,
         position: i === 0 ? 'left' : 'right',
-        title: { display: true, text: unit, color: 'hsl(180, 1%, 53%)' },
+        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
         grid: i === 0 ? { color: 'rgba(255, 255, 255, 0.08)' } : { drawOnChartArea: false },
         ticks: { color: 'hsl(180, 1%, 53%)' },
       };
@@ -361,9 +377,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     if (unitGroups.length === 0) {
       scales.y = {
         type: 'linear',
-        display: true,
+        display: showAxes,
         position: 'left',
-        title: { display: true, text: '', color: 'hsl(180, 1%, 53%)' },
+        title: { display: showAxes, text: '', color: 'hsl(180, 1%, 53%)' },
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: { color: 'hsl(180, 1%, 53%)' },
       };
@@ -391,9 +407,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       },
       scales,
     };
-  }, [unitGroups]);
+  }, [unitGroups, showAxes]);
 
-  const createMetricConfig = (unit: string) => ({
+  const createMetricConfig = (unit: string, showAxes: boolean) => ({
     responsive: true,
     maintainAspectRatio: false,
     font: {
@@ -422,9 +438,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       },
       y: {
         type: 'linear' as const,
-        display: true,
+        display: showAxes,
         position: 'left' as const,
-        title: { display: true, text: unit, color: 'hsl(180, 1%, 53%)' },
+        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: { color: 'hsl(180, 1%, 53%)' },
       },
@@ -452,9 +468,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             },
           ],
         },
-        config: createMetricConfig(def.unit),
+        config: createMetricConfig(def.unit, showAxes),
       })),
-    [dataPoints, period, enabledDefs],
+    [dataPoints, period, enabledDefs, showAxes],
   );
 
   if (isLoading) {
@@ -654,6 +670,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 ))}
               </div>
 
+              <div className="devices__graphs-controls-right">
               <div className="devices__series-selector">
                 <ToggleDropdown
                   buttonLabel="Series"
@@ -661,6 +678,14 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   value={enabledLabels}
                   onChange={handleSeriesChange}
                   placeholder="Series"
+                />
+              </div>
+
+              <div className="devices__axes-toggle">
+                <Checkbox
+                  label="Show Y axes"
+                  checked={showAxes}
+                  onChange={(e) => setShowAxes(e.target.checked)}
                 />
               </div>
 
@@ -686,6 +711,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 >
                   Summary
                 </button>
+              </div>
               </div>
             </div>
 
