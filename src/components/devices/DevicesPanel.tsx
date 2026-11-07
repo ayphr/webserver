@@ -599,7 +599,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         },
         zoom: {
           zoom: {
-            wheel: { enabled: !isEditing },
+            wheel: { enabled: true },
             pinch: { enabled: !isEditing },
             mode: 'x',
           },
