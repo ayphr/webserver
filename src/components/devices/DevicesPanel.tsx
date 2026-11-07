@@ -109,6 +109,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [historyIndex, setHistoryIndex] = useState(0);
   const chartRef = useRef<ChartJS<'line'> | null>(null);
   const [dragRect, setDragRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [overlayStyle, setOverlayStyle] = useState<React.CSSProperties>({});
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
   const lastMouseRef = useRef<{ x: number; y: number } | null>(null);
@@ -383,6 +384,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
 
 
+
   const handleCancelEdit = () => {
     setSelectedIndices(new Set());
     setPendingDeletions(new Set());
@@ -569,6 +571,30 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       })),
     };
   }, [dataPoints, period, enabledDefs, unitToScaleId, selectedIndices, pendingDeletions]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const update = () => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const canvas = chart.canvas;
+      const container = canvas.parentElement;
+      if (!container) return;
+      const cRect = canvas.getBoundingClientRect();
+      const pRect = container.getBoundingClientRect();
+      setOverlayStyle({
+        position: 'absolute',
+        left: cRect.left - pRect.left,
+        top: cRect.top - pRect.top,
+        width: cRect.width,
+        height: cRect.height,
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [isEditing, dataPoints, combinedData]);
+
 
 
   const combinedConfig = useMemo(() => {
@@ -1094,6 +1120,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                       {isEditing && (
                         <div
                           className="devices__selection-overlay"
+                          style={overlayStyle}
                           onMouseDown={handleOverlayMouseDown}
                           onMouseMove={handleOverlayMouseMove}
                           onMouseUp={handleOverlayMouseUp}
