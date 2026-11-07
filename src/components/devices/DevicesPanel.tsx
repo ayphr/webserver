@@ -953,15 +953,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 />
               </div>
 
-              <button
-                type="button"
-                className="devices__control-btn"
-                onClick={() => (chartRef.current as unknown as { resetZoom?: () => void })?.resetZoom?.()}
-                title="Reset zoom"
-              >
-                Reset zoom
-              </button>
-
               <div className="devices__mode-selector" role="group" aria-label="Graph display mode">
                 <button
                   type="button"
