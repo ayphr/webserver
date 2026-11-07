@@ -18,6 +18,7 @@ import type {
 } from '@common';
   
 import { cacheDel, cacheGet, cacheSet } from '../cache';
+import { deleteDeviceShareBySerial, deleteDeviceSharesByOwnerUuid } from './deviceShares';
 
 export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
   const devices = await getCollection('devices');
@@ -28,6 +29,7 @@ export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
 
   trackMongoOperation('deleteMany', DEVICES_COLLECTION);
   await devices.deleteMany({ ownerUuid });
+  await deleteDeviceSharesByOwnerUuid(ownerUuid);
 
   await cacheDel(
     DEVICE_CACHE,
@@ -229,6 +231,7 @@ export async function unlinkDevice(serial: number, ownerUuid: string): Promise<b
   const result = await devices.deleteOne({ serial, ownerUuid });
 
   if (result.deletedCount > 0) {
+    await deleteDeviceShareBySerial(serial);
     const dataPoints = await getCollection('dataPoints');
     trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);
     await dataPoints.deleteMany({ deviceSerial: serial });

@@ -101,6 +101,18 @@ export function createRequestClient(config: ApiClientConfig = {}) {
   const storageKey = config.storageKey ?? 'ayphr-api-token';
   const onUnauthorized = config.onUnauthorized;
 
+  const handleUnauthorized = (token: string | null) => {
+    if (!token) return;
+    removeStoredAccount(token);
+    writeStoredToken(storageKey, null);
+    const remaining = getStoredAccounts();
+    if (remaining.length > 0) {
+      setActiveToken(remaining[0].token);
+      writeStoredToken(storageKey, remaining[0].token);
+    }
+    onUnauthorized?.();
+  };
+
   async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const headers = new Headers(options.headers);
     const token = options.auth === false ? null : readStoredToken(storageKey);
@@ -134,16 +146,7 @@ export function createRequestClient(config: ApiClientConfig = {}) {
         ?? (responseBody as ApiErrorBody | null)?.message
         ?? `Request failed with status ${response.status}`;
 
-      if (response.status === 401 && token) {
-        removeStoredAccount(token);
-        writeStoredToken(storageKey, null);
-        const remaining = getStoredAccounts();
-        if (remaining.length > 0) {
-          setActiveToken(remaining[0].token);
-          writeStoredToken(storageKey, remaining[0].token);
-        }
-        onUnauthorized?.();
-      }
+      if (response.status === 401) handleUnauthorized(token);
 
       throw new ApiError(errorMessage, response.status, responseBody, response.url);
     }
@@ -169,6 +172,7 @@ export function createRequestClient(config: ApiClientConfig = {}) {
     const response = await fetch(buildUrl(baseUrl, path), { ...requestOptions, headers });
     if (!response.ok) {
       const message = await response.text();
+      if (response.status === 401) handleUnauthorized(token);
       throw new ApiError(message || `Request failed with status ${response.status}`, response.status, message, response.url);
     }
     return response.blob();

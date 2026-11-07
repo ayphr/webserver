@@ -261,6 +261,34 @@ export async function getDataPointsForDevice(
   };
 }
 
+export async function getAllDataPointsForDevice(
+  serial: number,
+  options?: { since?: Date; until?: Date },
+): Promise<DataPoint[]> {
+  const dataPoints = await getCollection('dataPoints');
+  const filter: Record<string, unknown> = { deviceSerial: serial };
+  if (options?.since || options?.until) {
+    const tsFilter: Record<string, unknown> = {};
+    if (options.since) tsFilter.$gte = options.since;
+    if (options.until) tsFilter.$lte = options.until;
+    filter.timestamp = tsFilter;
+  }
+
+  trackMongoOperation('find', DATA_POINTS_COLLECTION);
+  const docs = await dataPoints
+    .find(filter, {
+      projection: { _id: 0, timestamp: 1, temperature: 1, humidity: 1, airPressure: 1 },
+    })
+    .sort({ timestamp: 1 })
+    .toArray();
+  return docs.map((doc) => ({
+    timestamp: doc.timestamp,
+    temperature: doc.temperature,
+    humidity: doc.humidity,
+    airPressure: doc.airPressure,
+  }));
+}
+
 
 export async function deleteDataPointsForDevice(serial: number, timestamps: Date[]): Promise<number> {
   if (timestamps.length === 0) return 0;

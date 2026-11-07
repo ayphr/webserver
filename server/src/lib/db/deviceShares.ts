@@ -7,6 +7,24 @@ export async function getDeviceShare(serial: number, ownerUuid: string) {
   return shares.findOne({ serial, ownerUuid }, { projection: { _id: 0 } });
 }
 
+export async function getDeviceShareByToken(token: string) {
+  const shares = await getCollection('deviceShares');
+  trackMongoOperation('findOne', 'device_shares');
+  return shares.findOne({ token }, { projection: { _id: 0 } });
+}
+
+export async function deleteDeviceShareBySerial(serial: number) {
+  const shares = await getCollection('deviceShares');
+  trackMongoOperation('deleteOne', 'device_shares');
+  await shares.deleteOne({ serial });
+}
+
+export async function deleteDeviceSharesByOwnerUuid(ownerUuid: string) {
+  const shares = await getCollection('deviceShares');
+  trackMongoOperation('deleteMany', 'device_shares');
+  await shares.deleteMany({ ownerUuid });
+}
+
 export async function upsertDeviceShare(
   serial: number,
   ownerUuid: string,
@@ -14,17 +32,31 @@ export async function upsertDeviceShare(
 ) {
   const shares = await getCollection('deviceShares');
   const now = new Date();
-  const existing = await shares.findOne({ serial, ownerUuid });
-  const share: DeviceShare = {
-    token: existing?.token ?? randomUUID(),
-    serial,
-    ownerUuid,
-    access: input.access,
-    invitedUsernames: input.invitedUsernames,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
-  trackMongoOperation('replaceOne', 'device_shares');
-  await shares.replaceOne({ serial, ownerUuid }, normalizeDateValues(share), { upsert: true });
+  const newToken = randomUUID();
+  trackMongoOperation('findOneAndUpdate', 'device_shares');
+  const updated = await shares.findOneAndUpdate(
+    { serial },
+    {
+      $set: normalizeDateValues({
+        ownerUuid,
+        access: input.access,
+        invitedUsernames: input.invitedUsernames,
+        updatedAt: now,
+      }),
+      $setOnInsert: normalizeDateValues({
+        token: newToken,
+        serial,
+        createdAt: now,
+      }),
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+  if (updated) {
+    return updated;
+  }
+  const share = await shares.findOne({ serial, ownerUuid }, { projection: { _id: 0 } });
+  if (!share) {
+    throw new Error('failed to upsert device share');
+  }
   return share;
 }

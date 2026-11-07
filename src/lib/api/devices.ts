@@ -29,6 +29,17 @@ export function createDevicesApi(client: RequestClient) {
       const path = `/api/devices/${serial}/data${query ? `?${query}` : ''}`;
       return client.requestJson<DeviceDataPointsPayload>(path);
     },
+    async getSharedDataPoints(
+      serial: number,
+      shareToken: string,
+      options?: { period?: string; from?: string; to?: string },
+    ) {
+      const params = new URLSearchParams({ share: shareToken });
+      if (options?.period) params.set('period', options.period);
+      if (options?.from) params.set('from', options.from);
+      if (options?.to) params.set('to', options.to);
+      return client.requestJson<DeviceDataPointsPayload>(`/api/devices/${serial}/shared-data?${params.toString()}`, { auth: false });
+    },
     async exportData(serial: number, format: 'csv' | 'json', options?: { period?: string; from?: string; to?: string }) {
       const params = new URLSearchParams({ format });
       if (options?.period) params.set('period', options.period);

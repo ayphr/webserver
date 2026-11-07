@@ -35,9 +35,12 @@ import './DevicesPanel.css';
 
 const PAGE_SIZE = 5;
 
-function formatChartLabel(value: Date | string, period: string, timezone?: string): string {
+function formatChartLabel(value: Date | string, period: string, timezone?: string, includeDate = false): string {
   const d = toDate(value);
   const timeOptions = timezone ? { timeZone: timezone } : {};
+  if (includeDate) {
+    return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...timeOptions })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...timeOptions })}`;
+  }
   if (period === '1h') {
     return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', ...timeOptions });
   }
@@ -79,6 +82,9 @@ type GraphMode = 'combined' | 'separate' | 'summary' | 'table';
 type DetailTab = 'graphs' | 'settings';
 type Props = {
   initialDeviceSerial?: number | null;
+  initialDateFrom?: string;
+  initialDateTo?: string;
+  initialShareToken?: string | null;
 };
 
 
@@ -91,7 +97,51 @@ function resolveCssColor(value: string): string {
   return resolved || value;
 }
 
-export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
+function getTimeZoneOffsetMs(date: Date, timezone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date);
+  const pick = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0');
+  const asUtc = Date.UTC(
+    pick('year'),
+    pick('month') - 1,
+    pick('day'),
+    pick('hour'),
+    pick('minute'),
+    pick('second'),
+  );
+  return asUtc - date.getTime();
+}
+
+function toTimezoneBoundaryIso(dateValue: string, timezone: string, endOfDay: boolean): string | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (!match) return undefined;
+  const [, yearPart, monthPart, dayPart] = match;
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  const day = Number(dayPart);
+  const hour = endOfDay ? 23 : 0;
+  const minute = endOfDay ? 59 : 0;
+  const second = endOfDay ? 59 : 0;
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
+  const firstPass = utcGuess - getTimeZoneOffsetMs(new Date(utcGuess), timezone);
+  const corrected = firstPass - getTimeZoneOffsetMs(new Date(firstPass), timezone);
+  return new Date(corrected).toISOString();
+}
+
+export const DevicesPanel = ({
+  initialDeviceSerial = null,
+  initialDateFrom = '',
+  initialDateTo = '',
+  initialShareToken = null,
+}: Props) => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -106,8 +156,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [period] = useState<Period>('24h');
   const [graphMode, setGraphMode] = useState<GraphMode>('combined');
   const { enabled: enabledSeries, setEnabled: setEnabledSeries } = useEnabledSeries();
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(initialDateFrom);
+  const [dateTo, setDateTo] = useState(initialDateTo);
   const [showAxes, setShowAxes] = useState(true);
   const [showXAxis, setShowXAxis] = useState(true);
   const [layers, setLayers] = useState<string[]>(['y-axis', 'x-axis']);
@@ -131,6 +181,16 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [activeShareToken, setActiveShareToken] = useState<string | null>(initialShareToken);
+
+  useEffect(() => {
+    setDateFrom(initialDateFrom);
+    setDateTo(initialDateTo);
+  }, [initialDateFrom, initialDateTo]);
+
+  useEffect(() => {
+    setActiveShareToken(initialShareToken);
+  }, [initialShareToken]);
 
   const graphStorageKey = selectedSerial === null ? null : `ayphr:device:${selectedSerial}:graphPreferences`;
   useEffect(() => {
@@ -238,6 +298,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   }
 
   // Load telemetry data points when a device is selected and tab is 'graphs'
+  const fromIso = useMemo(
+    () => (dateFrom ? toTimezoneBoundaryIso(dateFrom, timezone, false) : undefined),
+    [dateFrom, timezone],
+  );
+  const toIso = useMemo(
+    () => (dateTo ? toTimezoneBoundaryIso(dateTo, timezone, true) : undefined),
+    [dateTo, timezone],
+  );
+
   useEffect(() => {
     if (view !== 'detail' || selectedSerial === null || detailTab !== 'graphs') return;
     let cancelled = false;
@@ -246,10 +315,16 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       setIsFetchingData(true);
       setDataError(null);
       try {
-        const res = await api.devices.getDataPoints(selectedSerial, {
+        const res = activeShareToken
+          ? await api.devices.getSharedDataPoints(selectedSerial, activeShareToken, {
+            period,
+            from: fromIso,
+            to: toIso,
+          })
+          : await api.devices.getDataPoints(selectedSerial, {
           period,
-          from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
-          to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
+          from: fromIso,
+          to: toIso,
         });
         if (!cancelled) {
           setDataPoints(res.dataPoints);
@@ -271,17 +346,23 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [view, selectedSerial, detailTab, period, dateFrom, dateTo]);
+  }, [view, selectedSerial, detailTab, period, fromIso, toIso, activeShareToken]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await loadAll();
     if (selectedSerial !== null && detailTab === 'graphs') {
       try {
-        const res = await api.devices.getDataPoints(selectedSerial, {
+        const res = activeShareToken
+          ? await api.devices.getSharedDataPoints(selectedSerial, activeShareToken, {
+            period,
+            from: fromIso,
+            to: toIso,
+          })
+          : await api.devices.getDataPoints(selectedSerial, {
           period,
-          from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
-          to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
+          from: fromIso,
+          to: toIso,
         });
         setDataPoints(res.dataPoints);
       } catch (err) {
@@ -289,7 +370,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       }
     }
     setIsRefreshing(false);
-  }, [dateFrom, dateTo, detailTab, loadAll, period, selectedSerial]);
+  }, [detailTab, loadAll, period, selectedSerial, fromIso, toIso, activeShareToken]);
 
   useEffect(() => {
     if (refreshInterval <= 0 || view !== 'detail' || detailTab !== 'graphs') return;
@@ -318,8 +399,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     try {
       const blob = await api.devices.exportData(selectedSerial, format, {
         period,
-        from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
-        to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
+        from: fromIso,
+        to: toIso,
       });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -331,6 +412,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       setDataError(err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`);
     }
   };
+
+  const includeDateInLabels = useMemo(() => {
+    if (period !== '1h' && period !== '24h') return true;
+    if (dateFrom && dateTo) return dateFrom !== dateTo;
+    return Boolean(dateFrom || dateTo);
+  }, [period, dateFrom, dateTo]);
 
   const downloadPng = () => {
     const chart = chartRef.current;
@@ -348,9 +435,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   };
 
   const getShareUrl = (token: string | null) => {
-    const params = new URLSearchParams({ device: String(selectedSerial ?? '') });
-    params.set('from', dateFrom);
-    params.set('to', dateTo);
+    const params = new URLSearchParams({ tab: 'devices', device: String(selectedSerial ?? '') });
+    if (dateFrom) params.set('from', dateFrom);
+    if (dateTo) params.set('to', dateTo);
     if (token) params.set('share', token);
     return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   };
@@ -361,6 +448,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
      const share = await api.devices.getShare(selectedSerial);
      setShareAccess(share.access);
      setShareToken(share.token);
+     setActiveShareToken(share.token);
      setInvitedUsers(share.invitedUsernames);
      setIsShareOpen(true);
     } catch (err) {
@@ -377,6 +465,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
        invitedUsernames: invitedUsers,
      });
      setShareToken(share.token);
+     setActiveShareToken(share.token);
     } catch (err) {
      setDataError(err instanceof Error ? err.message : 'Failed to save share settings');
     } finally {
@@ -400,6 +489,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
        });
        token = share.token;
        setShareToken(token);
+       setActiveShareToken(token);
      }
      if (!token) return;
      await navigator.clipboard.writeText(getShareUrl(token));
@@ -411,6 +501,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
   const handleSelectDevice = (device: DeviceSummary) => {
     setSelectedSerial(device.serial);
+    setActiveShareToken(null);
     setDetailTab('graphs');
     setView('detail');
   };
@@ -522,7 +613,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
   // Combined chart config & data
   const combinedData = useMemo(() => {
-    const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period, timezone));
+    const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period, timezone, includeDateInLabels));
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
     const datasets = enabledDefs.map((def) => {
       const values = dataPoints.map((p) => def.getValue(p));
@@ -530,19 +621,23 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       const deviation = values.length
         ? Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length)
         : 0;
+      const anomalyColor = resolveCssColor('var(--status-error)');
+      const anomalies = values.map((value) => Math.abs(value - average) > deviation * 2);
       return {
         label: def.label,
         data: values,
         borderColor: resolveCssColor(def.color),
         backgroundColor: layers.includes('anomalies')
-          ? values.map((value) => Math.abs(value - average) > deviation * 2 ? 'var(--status-error)' : resolveCssColor(def.color))
+          ? anomalies.map((isAnomaly) => (isAnomaly ? anomalyColor : resolveCssColor(def.color)))
           : 'transparent',
         yAxisID: unitToScaleId.get(def.unit) ?? 'y',
         tension: 0.25,
         fill: false,
         borderWidth: 2,
         borderDash: def.dash,
-        pointRadius,
+        pointRadius: layers.includes('anomalies')
+          ? anomalies.map((isAnomaly) => (isAnomaly ? Math.max(pointRadius, 3) : pointRadius))
+          : pointRadius,
         pointHoverRadius: 4,
       };
     });
@@ -605,7 +700,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       labels,
       datasets,
     };
-  }, [dataPoints, period, enabledDefs, layers, timezone, unitToScaleId]);
+  }, [dataPoints, period, enabledDefs, layers, timezone, unitToScaleId, includeDateInLabels]);
 
 
 
@@ -675,7 +770,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     };
   }, [unitGroups, showAxes, showXAxis]);
 
-  const createMetricConfig = (unit: string, showAxes: boolean) => ({
+  const createMetricConfig = (unit: string, showAxes: boolean, showXAxis: boolean) => ({
     responsive: true,
     maintainAspectRatio: false,
     font: {
@@ -710,6 +805,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     },
     scales: {
       x: {
+        display: showXAxis,
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
       },
@@ -729,7 +825,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       enabledDefs.map((def) => ({
         def,
         data: {
-          labels: dataPoints.map((p) => formatChartLabel(p.timestamp, period, timezone)),
+          labels: dataPoints.map((p) => formatChartLabel(p.timestamp, period, timezone, includeDateInLabels)),
           datasets: [
             {
               label: def.label,
@@ -745,10 +841,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             },
           ],
         },
-        config: createMetricConfig(def.unit, showAxes),
+        config: createMetricConfig(def.unit, showAxes, showXAxis),
       })),
-    [dataPoints, period, enabledDefs, showAxes, timezone],
+    [dataPoints, period, enabledDefs, showAxes, showXAxis, timezone, includeDateInLabels],
   );
+  const canUseCombinedChartActions = graphMode === 'combined' && dataPoints.length > 0 && enabledDefs.length > 0;
 
   if (isLoading) {
     return <p className="devices__notice">Loading devices...</p>;
@@ -786,26 +883,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             <IconDatabase size={28} strokeWidth={1.5} />
             <h3>No devices yet</h3>
             <p>Use &quot;Add device&quot; to open ayphr.com/link and enter the code shown on your device.</p>
-          </div>
-        ) : graphMode === 'table' ? (
-          <div className="devices__table-wrap">
-            <table className="devices__data-table">
-              <caption className="sr-only">Telemetry data</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Timestamp</th>
-                  {enabledDefs.map((def) => <th scope="col" key={def.id}>{def.shortLabel} ({def.unit})</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {dataPoints.map((point) => (
-                  <tr key={new Date(point.timestamp).toISOString()}>
-                    <td>{new Date(point.timestamp).toLocaleString(undefined, { timeZone: timezone, timeZoneName: 'short' })}</td>
-                    {enabledDefs.map((def) => <td key={def.id}>{def.getValue(point).toFixed(2)}</td>)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         ) : (
           <div className="devices__grid">
@@ -971,7 +1048,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
               <div className="devices__layers-selector">
                 <ToggleDropdown
                   buttonLabel="Layers"
-                  options={['y-axis', 'x-axis', 'thresholds', 'anomalies', 'forecast', 'synchronized crosshair', 'shareable links', 'fullscreen chart button']}
+                  options={['y-axis', 'x-axis', 'thresholds', 'anomalies', 'forecast']}
                   value={layers}
                   onChange={toggleLayer}
                   placeholder="Layers"
@@ -1034,8 +1111,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
               <div className="devices__export-actions" aria-label="Export and chart actions">
                 <button type="button" className="devices__icon-btn" onClick={() => void downloadExport('csv')} title="Export CSV" aria-label="Export CSV"><IconDownload size={16} /> CSV</button>
                 <button type="button" className="devices__icon-btn" onClick={() => void downloadExport('json')} title="Export JSON" aria-label="Export JSON">JSON</button>
-                <button type="button" className="devices__icon-btn" onClick={downloadPng} title="Export PNG" aria-label="Export PNG">PNG</button>
-                <button type="button" className="devices__icon-btn" onClick={() => void chartContainerRef.current?.requestFullscreen?.()} title="Fullscreen chart" aria-label="Fullscreen chart"><IconMaximize size={16} /></button>
+                <button type="button" className="devices__icon-btn" onClick={downloadPng} title="Export PNG" aria-label="Export PNG" disabled={!canUseCombinedChartActions}>PNG</button>
+                <button type="button" className="devices__icon-btn" onClick={() => void chartContainerRef.current?.requestFullscreen?.()} title="Fullscreen chart" aria-label="Fullscreen chart" disabled={!canUseCombinedChartActions}><IconMaximize size={16} /></button>
                 <button type="button" className="devices__icon-btn" onClick={() => void openShareDialog()} title="Share chart" aria-label="Share chart"><IconShare size={16} /></button>
               </div>
               </div>
@@ -1151,6 +1228,26 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                       </div>
                     ))}
                   </div>
+                ) : graphMode === 'table' ? (
+                  <div className="devices__table-wrap">
+                    <table className="devices__data-table">
+                      <caption className="sr-only">Telemetry data</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Timestamp</th>
+                          {enabledDefs.map((def) => <th scope="col" key={def.id}>{def.shortLabel} ({def.unit})</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dataPoints.map((point) => (
+                          <tr key={new Date(point.timestamp).toISOString()}>
+                            <td>{new Date(point.timestamp).toLocaleString(undefined, { timeZone: timezone, timeZoneName: 'short' })}</td>
+                            {enabledDefs.map((def) => <td key={def.id}>{def.getValue(point).toFixed(2)}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : null}
 
               </div>
@@ -1224,90 +1321,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
               </Button>
             </div>
 
-            <Modal
-              isOpen={isShareOpen}
-              onClose={() => setIsShareOpen(false)}
-              title="Share chart"
-              showCancel={false}
-              size="md"
-            >
-              <div className="devices__share-modal">
-                <p className="devices__share-description">
-                  Choose who can view this chart and invite specific Ayphr users.
-                </p>
-
-                <div className="devices__share-access" role="group" aria-label="Link access">
-                  <button
-                    type="button"
-                    className={`devices__share-access-option ${shareAccess === 'restricted' ? 'is-selected' : ''}`}
-                    onClick={() => setShareAccess('restricted')}
-                  >
-                    <strong>Restricted</strong>
-                    <span>Only you and invited people can view</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`devices__share-access-option ${shareAccess === 'anyone' ? 'is-selected' : ''}`}
-                    onClick={() => setShareAccess('anyone')}
-                  >
-                    <strong>Anyone with the link</strong>
-                    <span>Anyone who has the link can view</span>
-                  </button>
-                </div>
-
-                {shareAccess === 'restricted' && (
-                  <div className="devices__share-invites">
-                    <label htmlFor="share-invite-username">Invite people</label>
-                    <div className="devices__share-invite-row">
-                      <Input
-                        id="share-invite-username"
-                        value={inviteInput}
-                        onChange={(event) => setInviteInput(event.target.value)}
-                        placeholder="Username"
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            addInvite();
-                          }
-                        }}
-                      />
-                      <Button variant="secondary" onClick={addInvite}>
-                        <IconUserPlus size={16} />
-                        Add
-                      </Button>
-                    </div>
-                    {invitedUsers.length > 0 && (
-                      <div className="devices__share-user-list" aria-label="Invited people">
-                        {invitedUsers.map((username) => (
-                          <span className="devices__share-user" key={username}>
-                            @{username}
-                            <button type="button" onClick={() => setInvitedUsers((current) => current.filter((value) => value !== username))} aria-label={`Remove ${username}`}>
-                              <IconX size={14} />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="devices__share-link-row">
-                  <Input readOnly value={shareToken ? getShareUrl(shareToken) : 'Save settings to create a link'} aria-label="Share link" />
-                  <Button variant="secondary" onClick={() => void copyShareLink()} disabled={!shareToken && isSavingShare}>
-                    <IconCopy size={16} />
-                    Copy
-                  </Button>
-                </div>
-
-                <div className="devices__share-footer">
-                  <Button variant="secondary" onClick={() => setIsShareOpen(false)}>Cancel</Button>
-                  <Button variant="primary" onClick={() => void saveShare()} isLoading={isSavingShare}>
-                    Save
-                  </Button>
-                </div>
-              </div>
-            </Modal>
-
             <ConfirmDialog
               isOpen={isUnlinkOpen}
               title="Unlink Device"
@@ -1326,6 +1339,90 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        title="Share chart"
+        showCancel={false}
+        size="md"
+      >
+        <div className="devices__share-modal">
+          <p className="devices__share-description">
+            Choose who can view this chart and invite specific Ayphr users.
+          </p>
+
+          <div className="devices__share-access" role="group" aria-label="Link access">
+            <button
+              type="button"
+              className={`devices__share-access-option ${shareAccess === 'restricted' ? 'is-selected' : ''}`}
+              onClick={() => setShareAccess('restricted')}
+            >
+              <strong>Restricted</strong>
+              <span>Only you and invited people can view</span>
+            </button>
+            <button
+              type="button"
+              className={`devices__share-access-option ${shareAccess === 'anyone' ? 'is-selected' : ''}`}
+              onClick={() => setShareAccess('anyone')}
+            >
+              <strong>Anyone with the link</strong>
+              <span>Anyone who has the link can view</span>
+            </button>
+          </div>
+
+          {shareAccess === 'restricted' && (
+            <div className="devices__share-invites">
+              <label htmlFor="share-invite-username">Invite people</label>
+              <div className="devices__share-invite-row">
+                <Input
+                  id="share-invite-username"
+                  value={inviteInput}
+                  onChange={(event) => setInviteInput(event.target.value)}
+                  placeholder="Username"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      addInvite();
+                    }
+                  }}
+                />
+                <Button variant="secondary" onClick={addInvite}>
+                  <IconUserPlus size={16} />
+                  Add
+                </Button>
+              </div>
+              {invitedUsers.length > 0 && (
+                <div className="devices__share-user-list" aria-label="Invited people">
+                  {invitedUsers.map((username) => (
+                    <span className="devices__share-user" key={username}>
+                      @{username}
+                      <button type="button" onClick={() => setInvitedUsers((current) => current.filter((value) => value !== username))} aria-label={`Remove ${username}`}>
+                        <IconX size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="devices__share-link-row">
+            <Input readOnly value={shareToken ? getShareUrl(shareToken) : 'Save settings to create a link'} aria-label="Share link" />
+            <Button variant="secondary" onClick={() => void copyShareLink()} disabled={!shareToken && isSavingShare}>
+              <IconCopy size={16} />
+              Copy
+            </Button>
+          </div>
+
+          <div className="devices__share-footer">
+            <Button variant="secondary" onClick={() => setIsShareOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={() => void saveShare()} isLoading={isSavingShare}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

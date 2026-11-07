@@ -25,6 +25,13 @@ import './DashboardPage.css';
 
 const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games']);
 
+function parseDeviceSerial(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
 function getRelativeTime(date: Date | string): string {
   const resolvedDate = toDate(date);
   const now = new Date();
@@ -144,8 +151,9 @@ export const DashboardPage = () => {
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchTab = searchParams.get('tab');
   const [activePage, setActivePage] = useState<string>(() => {
-    const tab = searchParams.get('tab');
+    const tab = searchTab;
     return tab && VALID_TABS.has(tab) ? tab : getStoredDefaultTab();
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -160,7 +168,9 @@ export const DashboardPage = () => {
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
-  const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
+  const [deviceToOpen, setDeviceToOpen] = useState<number | null>(() => (
+    (searchTab === 'devices' ? parseDeviceSerial(searchParams.get('device')) : null)
+  ));
 
   useEffect(() => {
     const load = async () => {
@@ -262,6 +272,9 @@ export const DashboardPage = () => {
   };
 
   const navigate = useNavigate();
+  const initialDateFrom = searchParams.get('from') ?? '';
+  const initialDateTo = searchParams.get('to') ?? '';
+  const initialShareToken = searchParams.get('share');
 
   const changeTab = (value: string) => {
     if (value !== 'devices') {
@@ -271,14 +284,36 @@ export const DashboardPage = () => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('tab', value);
+      if (value !== 'devices') {
+        next.delete('device');
+        next.delete('from');
+        next.delete('to');
+        next.delete('share');
+      }
       return next;
     }, { replace: true });
   };
 
   const openDevice = (serial: number) => {
     setDeviceToOpen(serial);
-    changeTab('devices');
+    setActivePage('devices');
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', 'devices');
+      next.set('device', String(serial));
+      return next;
+    }, { replace: true });
   };
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && VALID_TABS.has(tab) && tab !== activePage) {
+      setActivePage(tab);
+    }
+    if (tab === 'devices') {
+      setDeviceToOpen(parseDeviceSerial(searchParams.get('device')));
+    }
+  }, [activePage, searchParams]);
 
   useEffect(() => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
@@ -568,7 +603,12 @@ export const DashboardPage = () => {
                 className="dashboard-panel--devices"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <DevicesPanel initialDeviceSerial={deviceToOpen} />
+                  <DevicesPanel
+                    initialDeviceSerial={deviceToOpen}
+                    initialDateFrom={initialDateFrom}
+                    initialDateTo={initialDateTo}
+                    initialShareToken={initialShareToken}
+                  />
                 </Suspense>
               </DashboardPanel>
             )}

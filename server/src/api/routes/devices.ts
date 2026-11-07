@@ -1,6 +1,6 @@
 import { json, readJsonBody } from '../../lib/http';
 import { randomBytes, randomInt } from 'node:crypto';
-import { requireAuth } from '../auth';
+import { getUserFromRequest, requireAuth } from '../auth';
 import {
   cacheDevice,
   countDevices,
@@ -13,6 +13,7 @@ import {
   markDevicePairingLinked,
   getDataPointStats,
   getDataPointsForDevice,
+  getAllDataPointsForDevice,
   deleteDataPointsForDevice,
   getDeviceBySerial,
   getDeviceByTokenHash,
@@ -29,6 +30,7 @@ import {
   upsertDataPoints,
   type DeviceDocument,
   getDeviceShare,
+  getDeviceShareByToken,
   upsertDeviceShare,
   getUserFromUsername,
 } from '../../lib/db';
@@ -498,6 +500,78 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
   });
 });
 
+const handleGetSharedData = async (request: Request, params: Record<string, string>) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const url = new URL(request.url);
+  const token = url.searchParams.get('share')?.trim();
+  if (!token) return json({ error: 'share token required' }, 401);
+
+  const share = await getDeviceShareByToken(token);
+  if (!share || share.serial !== serial) return json({ error: 'invalid share token' }, 404);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device || device.ownerUuid !== share.ownerUuid) return json({ error: 'not found' }, 404);
+
+  if (share.access === 'restricted') {
+    const viewer = await getUserFromRequest(request);
+    if (!viewer) return json({ error: 'forbidden' }, 403);
+    const viewerName = viewer.username?.trim().toLowerCase();
+    const isInvited = viewerName ? share.invitedUsernames.includes(viewerName) : false;
+    if (viewer.uuid !== share.ownerUuid && !isInvited) {
+      return json({ error: 'forbidden' }, 403);
+    }
+  }
+
+  const period = url.searchParams.get('period') ?? '24h';
+  const fromParam = url.searchParams.get('from');
+  const toParam = url.searchParams.get('to');
+
+  let since: Date | undefined;
+  let until: Date | undefined;
+  const now = Date.now();
+
+  if (fromParam) {
+    const parsed = parseTimestamp(fromParam);
+    if (parsed) since = parsed;
+  } else {
+    switch (period) {
+      case '1h':
+        since = new Date(now - 60 * 60 * 1000);
+        break;
+      case '24h':
+        since = new Date(now - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        since = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        since = new Date(now - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'all':
+        since = undefined;
+        break;
+      default:
+        since = new Date(now - 24 * 60 * 60 * 1000);
+        break;
+    }
+  }
+
+  if (toParam) {
+    const parsed = parseTimestamp(toParam);
+    if (parsed) until = parsed;
+  }
+
+  const { points, totalCount } = await getDataPointsForDevice(serial, { since, until, maxPoints: 1200 });
+  return json({
+    serial,
+    period,
+    dataPoints: points,
+    totalCount,
+  });
+};
+
 const handleExportData = requireAuth(async (request, user: User, params) => {
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
@@ -532,7 +606,7 @@ const handleExportData = requireAuth(async (request, user: User, params) => {
     if (parsed) until = parsed;
   }
 
-  const { points } = await getDataPointsForDevice(serial, { since, until, maxPoints: 1200 });
+  const points = await getAllDataPointsForDevice(serial, { since, until });
   const body = format === 'json'
     ? JSON.stringify(points)
     : [
@@ -669,6 +743,7 @@ export {
   handleListMine,
   handleGetBySerial,
   handleGetData as handleDeviceGetData,
+  handleGetSharedData as handleDeviceGetSharedData,
   handleExportData as handleDeviceExportData,
   handleGetShare as handleDeviceGetShare,
   handleUpdateShare as handleDeviceUpdateShare,
