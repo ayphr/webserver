@@ -183,29 +183,17 @@ export const DevicesPanel = ({
   const [dataError, setDataError] = useState<string | null>(null);
   const [activeShareToken, setActiveShareToken] = useState<string | null>(initialShareToken);
 
-  useEffect(() => {
-    setDateFrom(initialDateFrom);
-    setDateTo(initialDateTo);
-  }, [initialDateFrom, initialDateTo]);
-
-  useEffect(() => {
-    setActiveShareToken(initialShareToken);
-  }, [initialShareToken]);
-
   const graphStorageKey = selectedSerial === null ? null : `ayphr:device:${selectedSerial}:graphPreferences`;
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (selectedSerial === null) return;
     try {
       const raw = window.localStorage.getItem(`ayphr:device:${selectedSerial}:graphPreferences`);
       const stored = raw ? JSON.parse(raw) as Partial<{ showAxes: boolean; showXAxis: boolean; layers: string[]; refreshInterval: number; timezone: string }> : {};
       // These values intentionally reset when the device changes so preferences never leak across devices.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowAxes(stored.showAxes ?? true);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowXAxis(stored.showXAxis ?? true);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLayers(stored.layers ?? ['y-axis', 'x-axis']);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRefreshInterval(stored.refreshInterval ?? 0);
       setTimezone(stored.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC');
       setDataPoints([]);
@@ -218,6 +206,7 @@ export const DevicesPanel = ({
       setTimezone('UTC');
     }
   }, [selectedSerial]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!graphStorageKey) return;

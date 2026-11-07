@@ -306,16 +306,6 @@ export const DashboardPage = () => {
   };
 
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab && VALID_TABS.has(tab) && tab !== activePage) {
-      setActivePage(tab);
-    }
-    if (tab === 'devices') {
-      setDeviceToOpen(parseDeviceSerial(searchParams.get('device')));
-    }
-  }, [activePage, searchParams]);
-
-  useEffect(() => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
       changeTab('overview');
     }

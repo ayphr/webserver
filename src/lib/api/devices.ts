@@ -38,7 +38,7 @@ export function createDevicesApi(client: RequestClient) {
       if (options?.period) params.set('period', options.period);
       if (options?.from) params.set('from', options.from);
       if (options?.to) params.set('to', options.to);
-      return client.requestJson<DeviceDataPointsPayload>(`/api/devices/${serial}/shared-data?${params.toString()}`, { auth: false });
+      return client.requestJson<DeviceDataPointsPayload>(`/api/devices/${serial}/shared-data?${params.toString()}`);
     },
     async exportData(serial: number, format: 'csv' | 'json', options?: { period?: string; from?: string; to?: string }) {
       const params = new URLSearchParams({ format });
