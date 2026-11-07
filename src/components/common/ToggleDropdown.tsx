@@ -52,7 +52,9 @@ export const ToggleDropdown = ({ label, options, value, onChange, placeholder = 
                 className={`toggle-dropdown__item ${enabled ? 'toggle-dropdown__item--active' : ''}`}
                 onClick={() => toggle(opt)}
               >
-                <span className="toggle-dropdown__tick">{enabled ? <IconCheck size={16} /> : null}</span>
+                <span className={`toggle-dropdown__checkbox ${enabled ? 'is-checked' : ''}`}>
+                  {enabled ? <IconCheck size={12} strokeWidth={3.5} /> : null}
+                </span>
                 {opt}
               </button>
             );

@@ -77,3 +77,22 @@
   color: var(--text-primary);
   font-weight: 700;
 }
+
+.toggle-dropdown__checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  border: 1px solid hsl(0, 0%, 28%);
+  border-radius: 0.25rem;
+  background-color: hsl(0, 0%, 10%);
+  color: transparent;
+}
+
+.toggle-dropdown__checkbox.is-checked {
+  background-color: hsl(0, 0%, 20%);
+  border-color: hsl(0, 0%, 40%);
+  color: var(--text-primary);
+}
