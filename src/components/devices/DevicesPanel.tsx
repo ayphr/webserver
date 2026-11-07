@@ -685,7 +685,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         {/* GRAPHS TAB */}
         {detailTab === 'graphs' && (
           <div className="devices__graphs">
-            <div className="devices__graphs-controls">
+            <div className="devices__graphs-controls" onContextMenu={(e) => e.preventDefault()}>
               <div className="devices__period-selector" role="group" aria-label="Time period">
                 {(['1h', '24h', '7d', '30d', 'all'] as const).map((p) => (
                   <button

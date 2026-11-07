@@ -295,7 +295,7 @@
   justify-content: space-between;
   flex-wrap: nowrap;
   gap: 0.75rem;
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .devices__period-selector,
