@@ -1,3 +1,4 @@
+import ZoomPlugin from 'chartjs-plugin-zoom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -15,6 +16,7 @@ import type { LineGraphProps } from './types';
 import { Line } from 'react-chartjs-2';
 import { memo } from 'react';
 
+ChartJS.register(ZoomPlugin);
 ChartJS.register(
   CategoryScale,
   LinearScale,

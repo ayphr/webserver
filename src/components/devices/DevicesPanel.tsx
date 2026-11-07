@@ -404,6 +404,17 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           borderWidth: 1,
           padding: 10,
         },
+        zoom: {
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x',
+          },
+          pan: {
+            enabled: true,
+            mode: 'x',
+          },
+        },
       },
       scales,
     };
@@ -429,6 +440,17 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         borderColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 1,
         padding: 10,
+      },
+      zoom: {
+        zoom: {
+          wheel: { enabled: true },
+          pinch: { enabled: true },
+          mode: 'x',
+        },
+        pan: {
+          enabled: true,
+          mode: 'x',
+        },
       },
     },
     scales: {
