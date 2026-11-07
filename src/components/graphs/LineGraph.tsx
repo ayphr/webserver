@@ -1,4 +1,4 @@
-import ZoomPlugin from 'chartjs-plugin-zoom';
+import { forwardRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,9 +14,7 @@ import {
 } from 'chart.js';
 import type { LineGraphProps } from './types';
 import { Line } from 'react-chartjs-2';
-import { memo } from 'react';
 
-ChartJS.register(ZoomPlugin);
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -25,9 +23,10 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 );
 
-export const LineGraph = memo(function LineGraph({ data, config }: Readonly<LineGraphProps>) {
-  return <Line options={config as ChartOptions<'line'>} data={data as ChartData<'line'>} />;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const LineGraph = forwardRef<any, LineGraphProps>(function LineGraph({ data, config }, ref) {
+  return <Line ref={ref} options={config as ChartOptions<'line'>} data={data as ChartData<'line'>} />;
 });

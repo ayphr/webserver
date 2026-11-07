@@ -29,6 +29,12 @@ export function createDevicesApi(client: RequestClient) {
       const path = `/api/devices/${serial}/data${query ? `?${query}` : ''}`;
       return client.requestJson<DeviceDataPointsPayload>(path);
     },
+    async deleteDataPoints(serial: number, timestamps: (Date | string)[]) {
+      return client.requestJson<{ serial: number; removed: number }>(`/api/devices/${serial}/data`, {
+        method: 'DELETE',
+        body: { timestamps },
+      });
+    },
     async update(serial: number, input: { name?: string; locationId?: string }) {
       const response = await client.requestJson<DeviceUpdatePayload>(`/api/devices/${serial}`, {
         method: 'PATCH',

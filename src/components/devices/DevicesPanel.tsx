@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -10,6 +11,7 @@ import {
   IconExternalLink,
   IconGauge,
   IconMapPin,
+  IconPencil,
   IconRefresh,
   IconThermometer,
   IconTrash,
@@ -22,6 +24,7 @@ import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
+import type { Chart as ChartJS } from 'chart.js';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
@@ -98,6 +101,13 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [period, setPeriod] = useState<Period>('24h');
   const [graphMode, setGraphMode] = useState<GraphMode>('combined');
   const { enabled: enabledSeries, setEnabled: setEnabledSeries } = useEnabledSeries();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const chartRef = useRef<ChartJS<'line'> | null>(null);
+  const [dragRect, setDragRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
 
   const [showAxes, setShowAxes] = useState<boolean>(() => {
     try {
@@ -240,6 +250,114 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     setView('detail');
   };
 
+
+
+  const toggleNearestPoint = (x: number, y: number) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const meta = chart.getDatasetMeta(0);
+    if (!meta?.data?.length) return;
+    let best = -1;
+    let bestDist = Infinity;
+    meta.data.forEach((pt, i) => {
+      const d = Math.hypot(pt.x - x, pt.y - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    if (best >= 0 && bestDist < 24) {
+      setSelectedIndices((prev) => {
+        const next = new Set(prev);
+        if (next.has(best)) next.delete(best);
+        else next.add(best);
+        return next;
+      });
+    }
+  };
+
+  const selectPointsInRect = (rect: { x: number; y: number; w: number; h: number }) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const meta = chart.getDatasetMeta(0);
+    if (!meta?.data?.length) return;
+    const indices: number[] = [];
+    meta.data.forEach((pt, i) => {
+      if (
+        pt.x >= rect.x &&
+        pt.x <= rect.x + rect.w &&
+        pt.y >= rect.y &&
+        pt.y <= rect.y + rect.h
+      ) {
+        indices.push(i);
+      }
+    });
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      indices.forEach((i) => next.add(i));
+      return next;
+    });
+  };
+
+  const handleOverlayMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    dragStartRef.current = { x, y };
+    isDraggingRef.current = true;
+    setDragRect({ x, y, w: 0, h: 0 });
+  };
+
+  const handleOverlayMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current || !dragStartRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const x0 = dragStartRef.current.x;
+    const y0 = dragStartRef.current.y;
+    setDragRect({ x: Math.min(x0, x), y: Math.min(y0, y), w: Math.abs(x - x0), h: Math.abs(y - y0) });
+  };
+
+  const handleOverlayMouseUp = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current || !dragStartRef.current) return;
+    const start = dragStartRef.current;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const w = Math.abs(x - start.x);
+    const h = Math.abs(y - start.y);
+    isDraggingRef.current = false;
+    if (w < 5 && h < 5) {
+      toggleNearestPoint(x, y);
+    } else {
+      selectPointsInRect({ x: Math.min(start.x, x), y: Math.min(start.y, y), w, h });
+    }
+    dragStartRef.current = null;
+    setDragRect(null);
+  };
+
+  const handleCancelEdit = () => {
+    setSelectedIndices(new Set());
+    setDragRect(null);
+    setIsEditing(false);
+  };
+
+  const handleSaveEdits = async () => {
+    if (!selectedDevice || selectedIndices.size === 0) {
+      handleCancelEdit();
+      return;
+    }
+    const timestamps = [...selectedIndices].map((idx) => dataPoints[idx]?.timestamp).filter(Boolean) as (Date | string)[];
+    try {
+      await api.devices.deleteDataPoints(selectedDevice.serial, timestamps);
+      setDataPoints((prev) => prev.filter((_, idx) => !selectedIndices.has(idx)));
+    } catch (err) {
+      setDataError(err instanceof Error ? err.message : 'Failed to delete data points');
+    } finally {
+      handleCancelEdit();
+    }
+  };
+
   const handleSaveSettings = async () => {
     if (!selectedDevice) return;
     setIsSavingSettings(true);
@@ -337,6 +455,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   // Combined chart config & data
   const combinedData = useMemo(() => {
     const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
+    const pointRadius = dataPoints.map((_, i) => (selectedIndices.has(i) ? 6 : dataPoints.length > 80 ? 0 : 2));
+    const pointBackgroundColor = dataPoints.map((_, i) => (selectedIndices.has(i) ? '#ef4444' : 'transparent'));
     return {
       labels,
       datasets: enabledDefs.map((def) => ({
@@ -349,11 +469,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         fill: false,
         borderWidth: 2,
         borderDash: def.dash,
-        pointRadius: dataPoints.length > 80 ? 0 : 2,
+        pointRadius,
+        pointBackgroundColor,
         pointHoverRadius: 4,
       })),
     };
-  }, [dataPoints, period, enabledDefs, unitToScaleId]);
+  }, [dataPoints, period, enabledDefs, unitToScaleId, selectedIndices]);
 
   const combinedConfig = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -406,19 +527,19 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         },
         zoom: {
           zoom: {
-            wheel: { enabled: true },
-            pinch: { enabled: true },
+            wheel: { enabled: !isEditing },
+            pinch: { enabled: !isEditing },
             mode: 'x',
           },
           pan: {
-            enabled: true,
+            enabled: !isEditing,
             mode: 'x',
           },
         },
       },
       scales,
     };
-  }, [unitGroups, showAxes]);
+  }, [unitGroups, showAxes, isEditing]);
 
   const createMetricConfig = (unit: string, showAxes: boolean) => ({
     responsive: true,
@@ -671,6 +792,22 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         {detailTab === 'graphs' && (
           <div className="devices__graphs">
             <div className="devices__graphs-controls">
+              {isEditing ? (
+                <>
+                  <div className="devices__editing-status">
+                    <span>{selectedIndices.size} selected</span>
+                  </div>
+                  <div className="devices__actions">
+                    <Button variant="primary" onClick={() => void handleSaveEdits()} disabled={selectedIndices.size === 0}>
+                      Save ({selectedIndices.size})
+                    </Button>
+                    <Button variant="secondary" onClick={handleCancelEdit}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
               <div className="devices__period-selector" role="group" aria-label="Time period">
                 {(['1h', '24h', '7d', '30d', 'all'] as const).map((p) => (
                   <button
@@ -693,6 +830,18 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
               </div>
 
               <div className="devices__graphs-controls-right">
+              <button
+                type="button"
+                className="devices__control-btn"
+                onClick={() => {
+                  setIsEditing(true);
+                  setGraphMode('combined');
+                  setSelectedIndices(new Set());
+                }}
+                title="Edit data points"
+              >
+                <IconPencil size={16} strokeWidth={1.75} />
+              </button>
               <div className="devices__series-selector">
                 <ToggleDropdown
                   buttonLabel="Series"
@@ -735,7 +884,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 </button>
               </div>
               </div>
-            </div>
+                </>
+              )}
+              </div>
 
             {dataError && (
               <div className="devices__error">
@@ -817,8 +968,29 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
                 {graphMode === 'combined' ? (
                   <div className="devices__chart-card">
-                    <div className="devices__chart-container">
-                      <LineGraph data={combinedData} config={combinedConfig} />
+                    <div className="devices__chart-container" style={{ position: 'relative' }}>
+                      <LineGraph ref={chartRef} data={combinedData} config={combinedConfig} />
+                      {isEditing && (
+                        <div
+                          className="devices__selection-overlay"
+                          onMouseDown={handleOverlayMouseDown}
+                          onMouseMove={handleOverlayMouseMove}
+                          onMouseUp={handleOverlayMouseUp}
+                          onMouseLeave={handleOverlayMouseUp}
+                        >
+                          {dragRect && (
+                            <div
+                              className="devices__selection-rect"
+                              style={{
+                                left: dragRect.x,
+                                top: dragRect.y,
+                                width: dragRect.w,
+                                height: dragRect.h,
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : graphMode === 'separate' ? (

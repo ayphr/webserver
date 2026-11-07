@@ -261,3 +261,14 @@ export async function getDataPointsForDevice(
   };
 }
 
+
+export async function deleteDataPointsForDevice(serial: number, timestamps: Date[]): Promise<number> {
+  if (timestamps.length === 0) return 0;
+  const dataPoints = await getCollection('dataPoints');
+  trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);
+  const result = await dataPoints.deleteMany({
+    deviceSerial: serial,
+    timestamp: { $in: timestamps },
+  });
+  return result.deletedCount ?? 0;
+}

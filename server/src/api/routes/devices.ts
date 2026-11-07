@@ -13,6 +13,7 @@ import {
   markDevicePairingLinked,
   getDataPointStats,
   getDataPointsForDevice,
+  deleteDataPointsForDevice,
   getDeviceBySerial,
   getDeviceByTokenHash,
   getDevicesForOwnerUuid,
@@ -494,6 +495,29 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
   });
 });
 
+
+const handleDeleteDeviceDataPoints = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+
+  const body = await readJsonBody(request);
+  const rawTimestamps = Array.isArray(body?.timestamps) ? body.timestamps : [];
+  const timestamps: Date[] = [];
+  for (const value of rawTimestamps) {
+    const parsed = parseTimestamp(value);
+    if (parsed) timestamps.push(parsed);
+  }
+  if (timestamps.length === 0) return json({ error: 'invalid timestamps' }, 400);
+
+  const removed = await deleteDataPointsForDevice(serial, timestamps);
+  invalidateDeviceStatsForOwner(user.uuid);
+  return json({ serial, removed }, 200);
+});
+
 const handleUpdateDevice = requireAuth(async (request, user: User, params) => {
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
@@ -548,6 +572,7 @@ export {
   handleListMine,
   handleGetBySerial,
   handleGetData as handleDeviceGetData,
+  handleDeleteDeviceDataPoints as handleDeviceDeleteDataPoints,
   handleUpdateDevice as handleDeviceUpdate,
   handleUnlinkDevice as handleDeviceUnlink,
   handleRequestPairing,
