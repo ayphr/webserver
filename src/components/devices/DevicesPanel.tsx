@@ -968,7 +968,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
               <div className="devices__axes-toggle">
                 <Checkbox
-                  label="Show Y axes"
+                  label="Y axes"
                   checked={showAxes}
                   onChange={(e) => setShowAxes(e.target.checked)}
                 />

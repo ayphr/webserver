@@ -609,6 +609,7 @@
 .devices__axes-toggle {
   display: flex;
   align-items: center;
+  white-space: nowrap;
 }
 
 .devices__series-selector {
