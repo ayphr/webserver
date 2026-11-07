@@ -901,11 +901,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 <IconRefresh className="devices__spin-icon" size={24} strokeWidth={2} />
                 <p>Loading telemetry history...</p>
               </div>
-            ) : dataPoints.length === 0 ? (
+            ) : dataPoints.length === 0 || (!isEditing && enabledDefs.length === 0) ? (
               <div className="devices__empty">
                 <IconDatabase size={28} strokeWidth={1.5} />
-                <h3>No data points found</h3>
-                <p>No telemetry recorded for this device during the selected time period.</p>
+                <h3>{dataPoints.length === 0 ? 'No data points found' : 'No series selected'}</h3>
+                <p>
+                  {dataPoints.length === 0
+                    ? 'No telemetry recorded for this device during the selected time period.'
+                    : 'Select at least one series from the Series dropdown to display the graph.'}
+                </p>
               </div>
             ) : (
               <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''}`}>
