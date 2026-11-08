@@ -18,7 +18,15 @@ export type {
   PipelineStepAST,
   QueryAST,
 } from './ast';
-export { compileQuery, parseQuery, evaluateQuery, validateQuery } from './utils';
+export { compileQuery, parseQuery, evaluateQuery, validateQuery, estimateQueryComputeUnits } from './utils';
+export {
+  estimateComputeUnits,
+  estimatePredicateUnits,
+  estimatePipelineStepUnits,
+  estimateExpressionUnits,
+  type ComputeCostPart,
+  type ComputeEstimate,
+} from './cost';
 export {
   Compiler,
   type PredicateFn,

@@ -4,17 +4,18 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView } from '@codemirror/view';
 import {
   IconAlertCircle,
+  IconBolt,
   IconBraces,
   IconDownload,
   IconExternalLink,
   IconPlayerPlay,
   IconTable,
 } from '@tabler/icons-react';
-import type { DeviceQueryPayload } from '@common';
+import { estimateQueryComputeUnits, validateQuery, type DeviceQueryPayload } from '@common';
 import { api } from '../../lib/api';
 import { DEVICE_PERIODS, devicePeriodLabel, type DevicePeriod } from '../../lib/devicePeriod';
 import { downloadRows, slugifyFilename, type ExportRow } from '../../lib/export';
-import { tqlAutocompletion, tqlLanguage } from '../../lib/tqlEditor';
+import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/tqlEditor';
 import { Button, Modal } from '../common';
 import './DeviceQueryModal.css';
 
@@ -91,10 +92,32 @@ export const DeviceQueryModal = ({
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'json'>('table');
 
+  const trimmedQuery = query.trim();
+  const validation = useMemo(() => {
+    if (!trimmedQuery) {
+      return { valid: false, error: 'Enter a TQL query before running it.' };
+    }
+    return validateQuery(trimmedQuery);
+  }, [trimmedQuery]);
+
+  const computeEstimate = useMemo(() => {
+    if (!validation.valid) return null;
+    try {
+      return estimateQueryComputeUnits(trimmedQuery);
+    } catch {
+      return null;
+    }
+  }, [trimmedQuery, validation.valid]);
+
+  const validationError = validation.valid
+    ? null
+    : validation.error ?? 'This TQL query is invalid.';
+  const currentError = error ?? validationError;
+  const canRun = validation.valid && !isRunning;
+
   const rows = useMemo(() => (result ? resultRows(result.result) : []), [result]);
   const columns = useMemo(() => joinColumns(rows.slice(0, MAX_PREVIEW_ROWS)), [rows]);
   const previewRows = rows.slice(0, MAX_PREVIEW_ROWS);
-  const hasResult = result !== null;
   const exportBasename = slugifyFilename(
     `${deviceName}-query-${new Date().toISOString().slice(0, 10)}`,
     `device-${serial}-query`,
@@ -106,6 +129,7 @@ export const DeviceQueryModal = ({
       setError('Enter a TQL query before running it.');
       return;
     }
+    if (!validation.valid) return;
 
     setIsRunning(true);
     setError(null);
@@ -162,19 +186,34 @@ export const DeviceQueryModal = ({
             </a>
           </div>
 
-          <Button
-            variant="primary"
-            onClick={() => void handleRun()}
-            isLoading={isRunning}
-            disabled={isRunning}
-          >
-            <IconPlayerPlay size={16} strokeWidth={2} />
-            Run query
-            <span className="device-query__keybind" aria-hidden="true">
-              <kbd>{IS_MAC ? '⌘' : 'Ctrl'}</kbd>
-              <kbd>↵</kbd>
-            </span>
-          </Button>
+          <div className="device-query__run-group">
+            {computeEstimate && (
+              <span
+                className="device-query__compute"
+                title={[
+                  'Estimated compute units:',
+                  ...computeEstimate.parts.map((part) => `${part.label}: +${part.units}`),
+                ].join('\n')}
+              >
+                <IconBolt size={13} strokeWidth={2} />
+                {computeEstimate.units} CU
+              </span>
+            )}
+
+            <Button
+              variant="primary"
+              onClick={() => void handleRun()}
+              isLoading={isRunning}
+              disabled={!canRun}
+            >
+              <IconPlayerPlay size={16} strokeWidth={2} />
+              Run query
+              <span className="device-query__keybind" aria-hidden="true">
+                <kbd>{IS_MAC ? '⌘' : 'Ctrl'}</kbd>
+                <kbd>↵</kbd>
+              </span>
+            </Button>
+          </div>
         </div>
 
         <div
@@ -190,23 +229,19 @@ export const DeviceQueryModal = ({
             value={query}
             height="240px"
             theme={oneDark}
-            extensions={[tqlLanguage, tqlAutocompletion, EditorView.lineWrapping]}
+            extensions={[tqlLanguage, tqlAutocompletion, tqlLinter, tqlHover, EditorView.lineWrapping]}
             basicSetup={{ autocompletion: false }}
-            onChange={(value) => setQuery(value)}
+            onChange={(value) => {
+              setQuery(value);
+              setError(null);
+            }}
           />
         </div>
 
-        {error && (
+        {currentError && (
           <div className="device-query__error" role="alert">
             <IconAlertCircle size={17} strokeWidth={1.75} />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {!hasResult && !error && (
-          <div className="device-query__example">
-            <strong>Example</strong>
-            <code>{DEFAULT_QUERY}</code>
+            <span>{currentError}</span>
           </div>
         )}
 

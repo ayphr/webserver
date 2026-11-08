@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  estimateQueryComputeUnits,
   evaluateQuery,
   parseQuery,
   validateQuery,
@@ -329,6 +330,43 @@ describe('TQL Query Engine', () => {
       expect(ast.pipeline.length).toBe(2);
       expect(ast.pipeline[0].type).toBe('sortDescending');
       expect(ast.pipeline[1].type).toBe('limit');
+    });
+  });
+
+  describe('Compute unit estimation', () => {
+    it('returns a breakdown for a valid query', () => {
+      const estimate = estimateQueryComputeUnits('findAll(p -> {tempC > 20})');
+      expect(estimate.units).toBeGreaterThan(0);
+      expect(estimate.parts[0]?.label).toBe('Scan dataset');
+      expect(estimate.parts.some((part) => part.label === 'Filter conditions')).toBe(true);
+      expect(estimate.parts.reduce((sum, part) => sum + part.units, 0)).toBeCloseTo(estimate.units);
+    });
+
+    it('charges more for expensive pipeline operations', () => {
+      const filtered = estimateQueryComputeUnits('findAll(p -> {tempC > 20})');
+      const sorted = estimateQueryComputeUnits(
+        'findAll(p -> {tempC > 20}) then sortDescending(timestamp)',
+      );
+      const resampled = estimateQueryComputeUnits(
+        'findAll(p -> {tempC > 20}) then resample("1h", "avg", tempC)',
+      );
+
+      expect(sorted.units).toBeGreaterThan(filtered.units);
+      expect(resampled.units).toBeGreaterThan(sorted.units);
+      expect(sorted.parts.some((part) => part.label === 'sortDescending')).toBe(true);
+      expect(resampled.parts.some((part) => part.label === 'resample')).toBe(true);
+    });
+
+    it('charges more for heavier filter conditions', () => {
+      const simple = estimateQueryComputeUnits('findAll(p -> {tempC > 20})');
+      const complex = estimateQueryComputeUnits(
+        'findAll(p -> {tempC > 20} & {status == "ACTIVE"} & {tempC between 0 and 30})',
+      );
+      expect(complex.units).toBeGreaterThan(simple.units);
+    });
+
+    it('rejects invalid queries', () => {
+      expect(() => estimateQueryComputeUnits('not a query')).toThrow();
     });
   });
 });
