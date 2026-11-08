@@ -45,6 +45,33 @@ function formatChartLabel(value: Date | string, period: string): string {
   return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+function chartPeriodDuration(period: Period): number | null {
+  switch (period) {
+    case '1h':
+      return 60 * 60 * 1000;
+    case '24h':
+      return 24 * 60 * 60 * 1000;
+    case '7d':
+      return 7 * 24 * 60 * 60 * 1000;
+    case '30d':
+      return 30 * 24 * 60 * 60 * 1000;
+    case 'all':
+      return null;
+  }
+}
+
+function getChartTimeBounds(dataPoints: DataPoint[], period: Period): { min: number; max: number } | null {
+  if (dataPoints.length === 0) return null;
+
+  const timestamps = dataPoints.map((point) => toDate(point.timestamp).getTime());
+  const min = Math.min(...timestamps);
+  const max = Math.max(...timestamps);
+  if (min !== max) return { min, max };
+
+  const padding = (chartPeriodDuration(period) ?? 60 * 60 * 1000) / 2;
+  return { min: min - padding, max: max + padding };
+}
+
 function deviceLabel(device: DeviceSummary): string {
   return device.name?.trim() || `Device ${device.serial}`;
 }
@@ -363,6 +390,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     return map;
   }, [unitGroups]);
 
+  const chartTimeBounds = useMemo(
+    () => getChartTimeBounds(dataPoints, period),
+    [dataPoints, period],
+  );
+
   // Combined chart config & data
   const combinedData = useMemo(() => {
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
@@ -393,6 +425,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     const scales: Record<string, any> = {
       x: {
         type: 'linear',
+        ...(chartTimeBounds ?? {}),
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
           color: 'hsl(180, 1%, 53%)',
@@ -460,7 +493,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       },
       scales,
     };
-  }, [period, unitGroups, showAxes]);
+  }, [chartTimeBounds, period, unitGroups, showAxes]);
 
   const createMetricConfig = useCallback((unit: string, showAxes: boolean) => ({
     responsive: true,
@@ -502,6 +535,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     scales: {
       x: {
         type: 'linear' as const,
+        ...(chartTimeBounds ?? {}),
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
           color: 'hsl(180, 1%, 53%)',
@@ -518,7 +552,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         ticks: { color: 'hsl(180, 1%, 53%)' },
       },
     },
-  }), [period]);
+  }), [chartTimeBounds, period]);
 
   const separateCharts = useMemo(
     () =>
