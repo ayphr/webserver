@@ -104,6 +104,24 @@ export type DeviceDataPointsPayload = {
   totalCount: number;
 };
 
+export type DeviceQueryRequest = {
+  query: string;
+  period?: string;
+  from?: string;
+  to?: string;
+};
+
+export type DeviceQueryPayload = {
+  serial: number;
+  query: string;
+  result: unknown;
+  rowCount: number | null;
+  dataPointCount: number;
+  totalCount: number;
+  truncated: boolean;
+  durationMs: number;
+};
+
 export type DeviceUpdateRequest = {
   name?: string;
   locationId?: string;

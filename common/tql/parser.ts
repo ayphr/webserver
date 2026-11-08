@@ -17,7 +17,7 @@ export class Parser {
   }
 
   public parse(): QueryAST {
-    let action: RootClauseType = 'findAll';
+    let action: RootClauseType;
 
     if (this.match('FIND_ALL') || this.match('SELECT')) {
       action = 'findAll';

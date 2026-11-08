@@ -23,6 +23,7 @@ export {
   Compiler,
   type PredicateFn,
   type QueryExecutor,
+  type QueryResult,
   getNestedValue,
   setNestedValue,
   parseDurationMs,

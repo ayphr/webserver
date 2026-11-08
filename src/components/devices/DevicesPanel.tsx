@@ -8,9 +8,11 @@ import {
   IconDatabase,
   IconDroplet,
   IconExternalLink,
+  IconFileDownload,
   IconGauge,
   IconMapPin,
   IconRefresh,
+  IconTerminal2,
   IconThermometer,
   IconTrash,
   IconWifi,
@@ -23,6 +25,9 @@ import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivi
 import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
+import type { DevicePeriod } from '../../lib/devicePeriod';
+import { DeviceQueryModal } from './DeviceQueryModal';
+import { DeviceExportModal } from './DeviceExportModal';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
 
@@ -66,7 +71,7 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
   );
 }
 
-type Period = '1h' | '24h' | '7d' | '30d' | 'all';
+type Period = DevicePeriod;
 type GraphMode = 'combined' | 'separate' | 'summary';
 type DetailTab = 'graphs' | 'settings';
 type Props = {
@@ -90,6 +95,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [devicePage, setDevicePage] = useState(1);
   const [selectedSerial, setSelectedSerial] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('graphs');
+  const [isQueryOpen, setIsQueryOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -245,6 +252,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const handleSelectDevice = (device: DeviceSummary) => {
     setSelectedSerial(device.serial);
     setDetailTab('graphs');
+    setIsQueryOpen(false);
+    setIsExportOpen(false);
     setView('detail');
   };
 
@@ -629,11 +638,30 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       )}
 
       <div className="devices__toolbar">
-        <Button variant="secondary" onClick={() => setView('list')}>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setIsQueryOpen(false);
+            setIsExportOpen(false);
+            setView('list');
+          }}
+        >
           <IconArrowLeft size={16} strokeWidth={1.75} />
           Back to devices
         </Button>
         <div className="devices__actions">
+          <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
+            <IconTerminal2 size={16} strokeWidth={1.75} />
+            New query
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setIsExportOpen(true)}
+            disabled={dataPoints.length === 0}
+          >
+            <IconFileDownload size={16} strokeWidth={1.75} />
+            Export
+          </Button>
           <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
             <IconRefresh size={16} strokeWidth={1.75} />
             Refresh
@@ -966,6 +994,24 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           </div>
         )}
       </div>
+
+      <DeviceQueryModal
+        key={`query-${selectedDevice.serial}-${period}`}
+        isOpen={isQueryOpen}
+        onClose={() => setIsQueryOpen(false)}
+        serial={selectedDevice.serial}
+        deviceName={deviceLabel(selectedDevice)}
+        defaultPeriod={period}
+      />
+
+      <DeviceExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        deviceName={deviceLabel(selectedDevice)}
+        period={period}
+        dataPoints={dataPoints}
+        series={enabledDefs}
+      />
     </div>
   );
 };

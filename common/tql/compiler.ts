@@ -5,8 +5,52 @@ import type {
 } from './ast';
 
 export type PredicateFn<T> = (point: T) => boolean;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type QueryExecutor<T> = (dataset: T[]) => any;
+
+export type QueryResult<T extends TelemetryPoint = TelemetryPoint> =
+  | T[]
+  | Record<string, unknown>
+  | number
+  | boolean
+  | null;
+
+export type QueryExecutor<T extends TelemetryPoint> = (dataset: T[]) => QueryResult<T>;
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && !Number.isNaN(value);
+}
+
+/**
+ * Compares two values the same way JS relational operators do. Returns `NaN`
+ * when neither side is comparable, which makes `<`, `<=`, `>` and `>=` all
+ * evaluate to false exactly like the language semantics.
+ */
+function compareValues(a: unknown, b: unknown): number {
+  const left = a instanceof Date ? a.getTime() : a;
+  const right = b instanceof Date ? b.getTime() : b;
+
+  if (typeof left === 'number' && typeof right === 'number') {
+    if (Number.isNaN(left) || Number.isNaN(right)) return Number.NaN;
+    return left === right ? 0 : left < right ? -1 : 1;
+  }
+
+  if (typeof left === 'string' && typeof right === 'string') {
+    return left === right ? 0 : left < right ? -1 : 1;
+  }
+
+  if (typeof left === 'boolean' && typeof right === 'boolean') {
+    return left === right ? 0 : left ? 1 : -1;
+  }
+
+  const numericLeft = Number(left);
+  const numericRight = Number(right);
+  if (!Number.isNaN(numericLeft) && !Number.isNaN(numericRight)) {
+    return numericLeft === numericRight ? 0 : numericLeft < numericRight ? -1 : 1;
+  }
+
+  const stringLeft = String(left);
+  const stringRight = String(right);
+  return stringLeft === stringRight ? 0 : stringLeft < stringRight ? -1 : 1;
+}
 
 /**
  * Resolves a property from an object, supporting nested dot-notation paths
@@ -18,11 +62,10 @@ export function getNestedValue(obj: unknown, path: string): unknown {
   if (path in record) return record[path];
 
   const parts = path.split('.');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = obj;
+  let current: unknown = obj;
   for (const part of parts) {
     if (current === null || current === undefined || typeof current !== 'object') return undefined;
-    current = current[part];
+    current = (current as Record<string, unknown>)[part];
   }
   return current;
 }
@@ -32,15 +75,18 @@ export function getNestedValue(obj: unknown, path: string): unknown {
  */
 export function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split('.');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = obj;
+  let current: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
     if (!part) continue;
-    if (current[part] === undefined || current[part] === null || typeof current[part] !== 'object') {
-      current[part] = {};
+    const existing = current[part];
+    if (existing === undefined || existing === null || typeof existing !== 'object') {
+      const next: Record<string, unknown> = {};
+      current[part] = next;
+      current = next;
+    } else {
+      current = existing as Record<string, unknown>;
     }
-    current = current[part];
   }
   const lastPart = parts[parts.length - 1];
   if (lastPart) {
@@ -172,12 +218,12 @@ export class Compiler {
           if (targetValue === undefined) return false;
 
           switch (op) {
-            case '<': return (val as any) < (targetValue as any);
-            case '<=': return (val as any) <= (targetValue as any);
-            case '>': return (val as any) > (targetValue as any);
-            case '>=': return (val as any) >= (targetValue as any);
-            case '==': return (val as any) === (targetValue as any);
-            case '!=': return (val as any) !== (targetValue as any);
+            case '<': return compareValues(val, targetValue) < 0;
+            case '<=': return compareValues(val, targetValue) <= 0;
+            case '>': return compareValues(val, targetValue) > 0;
+            case '>=': return compareValues(val, targetValue) >= 0;
+            case '==': return val === targetValue;
+            case '!=': return val !== targetValue;
           }
         };
       }
@@ -207,7 +253,7 @@ export class Compiler {
         const { field, negated, values } = ast;
         return (point: T) => {
           const val = getNestedValue(point, field);
-          const has = values.includes(val as any);
+          const has = values.some((candidate) => candidate === val);
           return negated ? !has : has;
         };
       }
@@ -217,7 +263,7 @@ export class Compiler {
         return (point: T) => {
           const val = getNestedValue(point, field);
           if (val === undefined || val === null) return false;
-          return (val as any) >= (min as any) && (val as any) <= (max as any);
+          return compareValues(val, min) >= 0 && compareValues(val, max) <= 0;
         };
       }
 
@@ -287,19 +333,18 @@ export class Compiler {
   public static compilePipeline<T extends TelemetryPoint>(ast: QueryAST): QueryExecutor<T> {
     const filterFn = Compiler.compilePredicate<T>(ast.filter);
 
-    return (dataset: T[]): any => {
+    return (dataset: T[]): QueryResult<T> => {
       // 1. Initial filter phase
-      let results: any = dataset.filter(filterFn);
+      let rows: T[] = dataset.filter(filterFn);
+      let terminal: { value: QueryResult<T> } | null = null;
 
       // 2. Sequential pipeline operations
       for (const step of ast.pipeline) {
-        if (!Array.isArray(results)) {
-          break; // Terminal operation already executed
-        }
+        if (terminal) break; // Terminal operation already executed
 
         switch (step.type) {
           case 'timeRange': {
-            results = results.filter((pt) => {
+            rows = rows.filter((pt) => {
               const t = typeof pt.timestamp === 'number'
                 ? pt.timestamp
                 : new Date(pt.timestamp).getTime();
@@ -313,7 +358,7 @@ export class Compiler {
             const field = step.field || 'timestamp';
             const isAsc = step.type === 'sortAscending';
 
-            results.sort((a, b) => {
+            rows.sort((a, b) => {
               const rawA = getNestedValue(a, field);
               const rawB = getNestedValue(b, field);
               const valA = rawA instanceof Date ? rawA.getTime() : rawA;
@@ -322,44 +367,43 @@ export class Compiler {
               if (valA === undefined || valA === null) return isAsc ? 1 : -1;
               if (valB === undefined || valB === null) return isAsc ? -1 : 1;
 
-              if ((valA as any) < (valB as any)) return isAsc ? -1 : 1;
-              if ((valA as any) > (valB as any)) return isAsc ? 1 : -1;
-              return 0;
+              const comparison = compareValues(valA, valB);
+              return isAsc ? comparison : -comparison;
             });
             break;
           }
 
           case 'limit': {
-            results = results.slice(0, step.count);
+            rows = rows.slice(0, step.count);
             break;
           }
 
           case 'offset': {
-            results = results.slice(step.count);
+            rows = rows.slice(step.count);
             break;
           }
 
           case 'head': {
-            results = results.slice(0, step.count);
+            rows = rows.slice(0, step.count);
             break;
           }
 
           case 'tail': {
-            results = results.slice(Math.max(0, results.length - step.count));
+            rows = rows.slice(Math.max(0, rows.length - step.count));
             break;
           }
 
           case 'slice': {
-            results = step.end !== undefined
-              ? results.slice(step.start, step.end)
-              : results.slice(step.start);
+            rows = step.end !== undefined
+              ? rows.slice(step.start, step.end)
+              : rows.slice(step.start);
             break;
           }
 
           case 'select':
           case 'project': {
             const keep = new Set(['timestamp', ...step.fields]);
-            results = results.map((pt) => {
+            rows = rows.map((pt) => {
               const projected: Record<string, unknown> = {};
               for (const key of keep) {
                 const val = getNestedValue(pt, key);
@@ -372,7 +416,7 @@ export class Compiler {
 
           case 'omit': {
             const remove = new Set(step.fields);
-            results = results.map((pt) => {
+            rows = rows.map((pt) => {
               const clone = { ...pt };
               for (const key of remove) {
                 delete clone[key];
@@ -383,7 +427,7 @@ export class Compiler {
           }
 
           case 'rename': {
-            results = results.map((pt) => {
+            rows = rows.map((pt) => {
               const clone = { ...pt };
               const val = getNestedValue(clone, step.from);
               if (val !== undefined) {
@@ -398,7 +442,7 @@ export class Compiler {
           case 'distinct':
           case 'dedup': {
             const seen = new Set<string>();
-            results = results.filter((pt) => {
+            rows = rows.filter((pt) => {
               const key = step.field ? String(getNestedValue(pt, step.field)) : JSON.stringify(pt);
               if (seen.has(key)) return false;
               seen.add(key);
@@ -409,7 +453,7 @@ export class Compiler {
 
           case 'dropNulls': {
             const fields = step.fields;
-            results = results.filter((pt) => {
+            rows = rows.filter((pt) => {
               for (const f of fields) {
                 const v = getNestedValue(pt, f);
                 if (v === null || v === undefined) return false;
@@ -420,7 +464,7 @@ export class Compiler {
           }
 
           case 'fill': {
-            results = results.map((pt) => {
+            rows = rows.map((pt) => {
               const clone = { ...pt };
               const v = getNestedValue(clone, step.field);
               if (v === null || v === undefined) {
@@ -433,7 +477,7 @@ export class Compiler {
 
           case 'fillPrevious': {
             let lastVal: unknown = undefined;
-            results = results.map((pt) => {
+            rows = rows.map((pt) => {
               const clone = { ...pt };
               const v = getNestedValue(clone, step.field);
               if (v !== null && v !== undefined) {
@@ -447,7 +491,7 @@ export class Compiler {
           }
 
           case 'clamp': {
-            results = results.map((pt) => {
+            rows = rows.map((pt) => {
               const clone = { ...pt };
               const v = getNestedValue(clone, step.field);
               if (typeof v === 'number') {
@@ -460,7 +504,7 @@ export class Compiler {
           }
 
           case 'compute': {
-            results = results.map((pt) => {
+            rows = rows.map((pt) => {
               const clone = { ...pt };
               const evaluated = evaluateMath(step.expression, clone);
               if (evaluated !== null) {
@@ -474,7 +518,7 @@ export class Compiler {
           case 'movingAverage': {
             const win = Math.max(1, step.windowSize);
             const target = step.targetField || step.field;
-            results = results.map((pt, idx, arr) => {
+            rows = rows.map((pt, idx, arr) => {
               const clone = { ...pt };
               const startIdx = Math.max(0, idx - win + 1);
               let sum = 0;
@@ -500,7 +544,7 @@ export class Compiler {
             const target = step.targetField || (step.type === 'rate' ? `${step.field}_rate` : `${step.field}_diff`);
             const isRate = step.type === 'rate';
 
-            results = results.map((pt, idx, arr) => {
+            rows = rows.map((pt, idx, arr) => {
               const clone = { ...pt };
               if (idx === 0) {
                 setNestedValue(clone, target, 0);
@@ -535,17 +579,17 @@ export class Compiler {
           case 'window':
           case 'resample': {
             const intervalMs = parseDurationMs(step.duration);
-            if (intervalMs <= 0 || results.length === 0) break;
+            if (intervalMs <= 0 || rows.length === 0) break;
 
             // Sort chronologically first
-            results.sort((a: any, b: any) => {
+            rows.sort((a, b) => {
               const tA = typeof a.timestamp === 'number' ? a.timestamp : new Date(a.timestamp).getTime();
               const tB = typeof b.timestamp === 'number' ? b.timestamp : new Date(b.timestamp).getTime();
               return tA - tB;
             });
 
-            const buckets = new Map<number, any[]>();
-            for (const pt of results) {
+            const buckets = new Map<number, T[]>();
+            for (const pt of rows) {
               const t = typeof pt.timestamp === 'number' ? pt.timestamp : new Date(pt.timestamp).getTime();
               const bucketKey = Math.floor(t / intervalMs) * intervalMs;
               let list = buckets.get(bucketKey);
@@ -556,11 +600,11 @@ export class Compiler {
               list.push(pt);
             }
 
-            const resampled: any[] = [];
+            const resampled: T[] = [];
             for (const [bucketTime, items] of buckets.entries()) {
               const values = items
                 .map((it) => getNestedValue(it, step.field))
-                .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+                .filter(isFiniteNumber);
 
               let aggValue: number | null = null;
               if (values.length > 0) {
@@ -580,52 +624,52 @@ export class Compiler {
                 timestamp: bucketTime,
                 [step.field]: aggValue,
                 count: items.length,
-              });
+              } as unknown as T);
             }
 
-            results = resampled;
+            rows = resampled;
             break;
           }
 
           case 'aggregate': {
             const field = step.field;
             if (step.function === 'count' && !field) {
-              results = results.length;
+              terminal = { value: rows.length };
               break;
             }
 
             const values = field
-              ? results
-                  .map((it: any) => getNestedValue(it, field))
-                  .filter((v: any): v is number => typeof v === 'number' && !Number.isNaN(v))
+              ? rows
+                  .map((it) => getNestedValue(it, field))
+                  .filter(isFiniteNumber)
               : [];
 
             if (values.length === 0) {
-              results = null;
+              terminal = { value: null };
               break;
             }
 
             switch (step.function) {
-              case 'count': results = values.length; break;
-              case 'sum': results = values.reduce((s: number, v: number) => s + v, 0); break;
-              case 'avg': results = values.reduce((s: number, v: number) => s + v, 0) / values.length; break;
-              case 'min': results = Math.min(...values); break;
-              case 'max': results = Math.max(...values); break;
-              case 'first': results = values[0] ?? null; break;
-              case 'last': results = values[values.length - 1] ?? null; break;
+              case 'count': terminal = { value: values.length }; break;
+              case 'sum': terminal = { value: values.reduce((s, v) => s + v, 0) }; break;
+              case 'avg': terminal = { value: values.reduce((s, v) => s + v, 0) / values.length }; break;
+              case 'min': terminal = { value: Math.min(...values) }; break;
+              case 'max': terminal = { value: Math.max(...values) }; break;
+              case 'first': terminal = { value: values[0] ?? null }; break;
+              case 'last': terminal = { value: values[values.length - 1] ?? null }; break;
               case 'median': {
                 const sorted = [...values].sort((a, b) => a - b);
                 const mid = Math.floor(sorted.length / 2);
                 const midVal = sorted[mid] ?? 0;
                 const prevMidVal = sorted[mid - 1] ?? 0;
-                results = sorted.length % 2 !== 0 ? midVal : (prevMidVal + midVal) / 2;
+                terminal = { value: sorted.length % 2 !== 0 ? midVal : (prevMidVal + midVal) / 2 };
                 break;
               }
               case 'stddev': {
-                const avg = values.reduce((s: number, v: number) => s + v, 0) / values.length;
-                const squareDiffs = values.map((v: number) => Math.pow(v - avg, 2));
-                const avgSquareDiff = squareDiffs.reduce((s: number, v: number) => s + v, 0) / values.length;
-                results = Math.sqrt(avgSquareDiff);
+                const avg = values.reduce((s, v) => s + v, 0) / values.length;
+                const squareDiffs = values.map((v) => Math.pow(v - avg, 2));
+                const avgSquareDiff = squareDiffs.reduce((s, v) => s + v, 0) / values.length;
+                terminal = { value: Math.sqrt(avgSquareDiff) };
                 break;
               }
             }
@@ -634,73 +678,76 @@ export class Compiler {
 
           case 'summary': {
             const targetFields = step.fields;
-            const firstResult = results[0];
-            const fieldsToSummarize = targetFields || (results.length > 0 && firstResult
+            const firstResult = rows[0];
+            const fieldsToSummarize = targetFields || (rows.length > 0 && firstResult
               ? Object.keys(firstResult).filter((k) => k !== 'timestamp')
               : []);
 
             const summaryStats: Record<string, { count: number; min: number; max: number; avg: number; sum: number; stddev: number }> = {};
 
             for (const f of fieldsToSummarize) {
-              const vals = results
-                .map((it: any) => getNestedValue(it, f))
-                .filter((v: any): v is number => typeof v === 'number' && !Number.isNaN(v));
+              const vals = rows
+                .map((it) => getNestedValue(it, f))
+                .filter(isFiniteNumber);
 
               if (vals.length > 0) {
                 const count = vals.length;
-                const sum = vals.reduce((s: number, v: number) => s + v, 0);
+                const sum = vals.reduce((s, v) => s + v, 0);
                 const avg = sum / count;
                 const min = Math.min(...vals);
                 const max = Math.max(...vals);
-                const stddev = Math.sqrt(vals.map((v: number) => Math.pow(v - avg, 2)).reduce((s: number, v: number) => s + v, 0) / count);
+                const stddev = Math.sqrt(vals.map((v) => Math.pow(v - avg, 2)).reduce((s, v) => s + v, 0) / count);
                 summaryStats[f] = { count, min, max, avg, sum, stddev };
               }
             }
 
-            results = {
-              count: results.length,
-              fields: summaryStats,
+            terminal = {
+              value: {
+                count: rows.length,
+                fields: summaryStats,
+              },
             };
             break;
           }
 
           case 'groupBy': {
-            const groups: Record<string, any[]> = {};
-            for (const pt of results) {
+            const groups: Record<string, T[]> = {};
+            for (const pt of rows) {
               const key = String(getNestedValue(pt, step.field) ?? 'unknown');
               if (!groups[key]) groups[key] = [];
               groups[key].push(pt);
             }
-            results = groups;
+            terminal = { value: groups };
             break;
           }
 
           case 'filter': {
             const subFilter = Compiler.compilePredicate<T>(step.filter);
-            results = results.filter(subFilter);
+            rows = rows.filter(subFilter);
             break;
           }
         }
       }
 
-      // 3. Apply root query action (unless results is already a scalar / summary)
-      if (Array.isArray(results)) {
-        switch (ast.action) {
-          case 'findAll':
-          case 'select':
-            return results;
-          case 'findFirst':
-            return results[0] ?? null;
-          case 'findLast':
-            return results[results.length - 1] ?? null;
-          case 'count':
-            return results.length;
-          case 'exists':
-            return results.length > 0;
-        }
+      // 3. Terminal operations return their scalar/summary result directly.
+      if (terminal) return terminal.value;
+
+      // 4. Apply root query action.
+      switch (ast.action) {
+        case 'findAll':
+        case 'select':
+          return rows;
+        case 'findFirst':
+          return rows[0] ?? null;
+        case 'findLast':
+          return rows[rows.length - 1] ?? null;
+        case 'count':
+          return rows.length;
+        case 'exists':
+          return rows.length > 0;
       }
 
-      return results;
+      return rows;
     };
   }
 }

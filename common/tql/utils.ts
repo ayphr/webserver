@@ -1,4 +1,4 @@
-import { Compiler, Lexer, Parser, type QueryAST, type QueryExecutor, type TelemetryPoint } from '.';
+import { Compiler, Lexer, Parser, type QueryAST, type QueryExecutor, type QueryResult, type TelemetryPoint } from '.';
 
 export function parseQuery(queryString: string): QueryAST {
   const lexer = new Lexer(queryString);
@@ -15,8 +15,7 @@ export function compileQuery<T extends TelemetryPoint = TelemetryPoint>(queryStr
 export function evaluateQuery<T extends TelemetryPoint = TelemetryPoint>(
   queryString: string,
   dataset: T[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): any {
+): QueryResult<T> {
   const executor = compileQuery<T>(queryString);
   return executor(dataset);
 }

@@ -13,6 +13,7 @@ import {
   markDevicePairingLinked,
   getDataPointStats,
   getDataPointsForDevice,
+  getDataPointsForQuery,
   deleteDataPointsForDevice,
   getDeviceBySerial,
   getDeviceByTokenHash,
@@ -44,7 +45,15 @@ import {
   telemetryUploadErrorsTotal,
 } from '../../lib/metrics';
 import { PAIRING_CODE_TTL_MS } from '../../env';
-import { PAIRING_CODE_LENGTH, type DataPoint, type DeviceSummary, type User, getPlanFeaturesForUser } from '@common';
+import {
+  PAIRING_CODE_LENGTH,
+  compileQuery,
+  type DataPoint,
+  type DeviceQueryRequest,
+  type DeviceSummary,
+  type User,
+  getPlanFeaturesForUser,
+} from '@common';
 import { redisFixedWindow } from '../../lib/redis';
 
 const MAX_SERIAL = 0xFFFFFFFF;
@@ -52,8 +61,11 @@ const MAX_SERIAL = 0xFFFFFFFF;
 const pairingRequestLimiter = createRateLimiter(15 * 60 * 1000, 20, 'pairing-request');
 const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
 const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
+const deviceQueryLimiter = createRateLimiter(60 * 1000, 60, 'device-query');
 const MAX_NAME_LENGTH = 64;
 const MAX_POINTS_PER_UPLOAD = 2_000;
+const MAX_QUERY_LENGTH = 10_000;
+const MAX_QUERY_POINTS = 50_000;
 const DATA_POINT_PRUNE_COOLDOWN_MS = 5 * 60 * 1000;
 const DATA_POINT_PRUNE_KEY_PREFIX = 'ayphr:telemetry:prune:';
 const localDataPointPruneByOwner = new Map<string, number>();
@@ -437,19 +449,7 @@ async function handleUpload(request: Request): Promise<Response> {
   }
 }
 
-const handleGetData = requireAuth(async (request, user: User, params) => {
-  const serial = parseSerial(params.serial);
-  if (serial === null) return json({ error: 'invalid serial' }, 400);
-
-  const device = await getDeviceBySerial(serial);
-  if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
-
-  const url = new URL(request.url);
-  const period = url.searchParams.get('period') ?? '24h';
-  const fromParam = url.searchParams.get('from');
-  const toParam = url.searchParams.get('to');
-
+function resolveTimeRange(period: string, fromParam?: string | null, toParam?: string | null) {
   let since: Date | undefined;
   let until: Date | undefined;
   const now = Date.now();
@@ -485,6 +485,24 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
     if (parsed) until = parsed;
   }
 
+  return { since, until };
+}
+
+const handleGetData = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+
+  const url = new URL(request.url);
+  const period = url.searchParams.get('period') ?? '24h';
+  const fromParam = url.searchParams.get('from');
+  const toParam = url.searchParams.get('to');
+
+  const { since, until } = resolveTimeRange(period, fromParam, toParam);
+
   const { points, totalCount } = await getDataPointsForDevice(serial, { since, until, maxPoints: 1200 });
 
   return json({
@@ -492,6 +510,62 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
     period,
     dataPoints: points,
     totalCount,
+  });
+});
+
+const handleQueryDeviceData = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const queryCheck = await deviceQueryLimiter.check(`user:${user.uuid}`);
+  if (!queryCheck.allowed) return tooManyRequests(queryCheck.retryAfterMs);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+
+  const body = await readJsonBody<DeviceQueryRequest>(request);
+  const query = typeof body?.query === 'string' ? body.query.trim() : '';
+  if (!query) return json({ error: 'query is required' }, 400);
+  if (query.length > MAX_QUERY_LENGTH) {
+    return json({ error: `query must be ${MAX_QUERY_LENGTH.toLocaleString()} characters or fewer` }, 400);
+  }
+
+  let executor: ReturnType<typeof compileQuery>;
+  try {
+    executor = compileQuery(query);
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : 'invalid query' }, 400);
+  }
+
+  const period = typeof body?.period === 'string' && body.period ? body.period : '24h';
+  const fromParam = typeof body?.from === 'string' ? body.from : null;
+  const toParam = typeof body?.to === 'string' ? body.to : null;
+  const { since, until } = resolveTimeRange(period, fromParam, toParam);
+
+  const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
+    since,
+    until,
+    maxPoints: MAX_QUERY_POINTS,
+  });
+
+  const startedAt = performance.now();
+  let result: unknown;
+  try {
+    result = executor(points as unknown as Parameters<typeof executor>[0]);
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : 'query failed' }, 400);
+  }
+
+  return json({
+    serial,
+    query,
+    result,
+    rowCount: Array.isArray(result) ? result.length : null,
+    dataPointCount: points.length,
+    totalCount,
+    truncated,
+    durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
   });
 });
 
@@ -572,6 +646,7 @@ export {
   handleListMine,
   handleGetBySerial,
   handleGetData as handleDeviceGetData,
+  handleQueryDeviceData as handleDeviceQuery,
   handleDeleteDeviceDataPoints as handleDeviceDeleteDataPoints,
   handleUpdateDevice as handleDeviceUpdate,
   handleUnlinkDevice as handleDeviceUnlink,

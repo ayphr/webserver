@@ -32,6 +32,12 @@ describe('router', () => {
     expect(match?.params.serial).toBe('42');
   });
 
+  test('matches device query route', () => {
+    const match = matchRoute('POST', '/api/devices/42/query');
+    expect(match?.template).toBe('/api/devices/:serial/query');
+    expect(match?.params.serial).toBe('42');
+  });
+
   test('matches device update and unlink routes', () => {
     const patchMatch = matchRoute('PATCH', '/api/devices/42');
     expect(patchMatch?.template).toBe('/api/devices/:serial');

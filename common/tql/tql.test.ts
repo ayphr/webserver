@@ -66,6 +66,12 @@ const mockDataset: SensorData[] = [
   },
 ];
 
+type QueryRow = SensorData & Record<string, unknown>;
+
+function evaluateRows(query: string): QueryRow[] {
+  return evaluateQuery<SensorData>(query, mockDataset) as unknown as QueryRow[];
+}
+
 describe('TQL Query Engine', () => {
   describe('Query Roots & Actions', () => {
     it('findAll returns matching array of points', () => {
@@ -207,7 +213,7 @@ describe('TQL Query Engine', () => {
 
     it('projects fields with select and omit', () => {
       const qSelect = 'findAll(p -> {tempC > 0}) then select(tempC, status)';
-      const resSelect = evaluateQuery<any>(qSelect, mockDataset);
+      const resSelect = evaluateRows(qSelect);
       expect(resSelect[0]).toEqual({
         timestamp: 1700000000000,
         tempC: 20.0,
@@ -215,38 +221,38 @@ describe('TQL Query Engine', () => {
       });
 
       const qOmit = 'findAll(p -> {tempC > 0}) then omit(device, pressure, targetTemp)';
-      const resOmit = evaluateQuery<any>(qOmit, mockDataset);
+      const resOmit = evaluateRows(qOmit);
       expect(resOmit[0].device).toBeUndefined();
       expect(resOmit[0].tempC).toBe(20.0);
     });
 
     it('renames properties with rename', () => {
       const q = 'findAll(p -> {tempC == 20.0}) then rename(tempC, celsius)';
-      const res = evaluateQuery<any>(q, mockDataset);
+      const res = evaluateRows(q);
       expect(res[0].celsius).toBe(20.0);
       expect(res[0].tempC).toBeUndefined();
     });
 
     it('fills missing values and clamps numeric boundaries', () => {
       const qFill = 'findAll(p -> {tempC > 0}) then fill(humidity, 0)';
-      const resFill = evaluateQuery<any>(qFill, mockDataset);
+      const resFill = evaluateRows(qFill);
       expect(resFill[3].humidity).toBe(0);
 
       const qClamp = 'findAll(p -> {tempC > 0}) then clamp(tempC, 20.0, 25.0)';
-      const resClamp = evaluateQuery<any>(qClamp, mockDataset);
-      expect(resClamp.map((r: any) => r.tempC)).toEqual([20.0, 22.0, 25.0, 25.0, 20.0]);
+      const resClamp = evaluateRows(qClamp);
+      expect(resClamp.map((r) => r.tempC)).toEqual([20.0, 22.0, 25.0, 25.0, 20.0]);
     });
 
     it('evaluates safe arithmetic with compute', () => {
       const q = 'findAll(p -> {tempC > 0}) then compute(tempF, (tempC * 1.8) + 32)';
-      const res = evaluateQuery<any>(q, mockDataset);
+      const res = evaluateRows(q);
       expect(res[0].tempF).toBeCloseTo(68.0);
       expect(res[1].tempF).toBeCloseTo(71.6);
     });
 
     it('computes rolling movingAverage', () => {
       const q = 'findAll(p -> {tempC > 0}) then movingAverage(tempC, 2, rollAvg)';
-      const res = evaluateQuery<any>(q, mockDataset);
+      const res = evaluateRows(q);
       expect(res[0].rollAvg).toBe(20.0);
       expect(res[1].rollAvg).toBe(21.0); // (20 + 22) / 2
       expect(res[2].rollAvg).toBe(23.75); // (22 + 25.5) / 2
@@ -254,12 +260,12 @@ describe('TQL Query Engine', () => {
 
     it('computes diff and rate of change', () => {
       const qDiff = 'findAll(p -> {tempC > 0}) then diff(tempC, deltaTemp)';
-      const resDiff = evaluateQuery<any>(qDiff, mockDataset);
+      const resDiff = evaluateRows(qDiff);
       expect(resDiff[0].deltaTemp).toBe(0);
       expect(resDiff[1].deltaTemp).toBe(2.0); // 22 - 20
 
       const qRate = 'findAll(p -> {tempC > 0}) then rate(tempC, tempRate)';
-      const resRate = evaluateQuery<any>(qRate, mockDataset);
+      const resRate = evaluateRows(qRate);
       // delta 2.0 over 60 seconds = 2/60 = 0.0333 °C/sec
       expect(resRate[1].tempRate).toBeCloseTo(2 / 60);
     });
@@ -280,7 +286,10 @@ describe('TQL Query Engine', () => {
 
     it('generates complete statistical summary with summary()', () => {
       const q = 'findAll(p -> {tempC > 0}) then summary(tempC, pressure)';
-      const res = evaluateQuery<any>(q, mockDataset);
+      const res = evaluateQuery<SensorData>(q, mockDataset) as unknown as {
+        count: number;
+        fields: Record<string, { count: number; min: number; max: number; avg: number }>;
+      };
       expect(res.count).toBe(5);
       expect(res.fields.tempC.min).toBe(18.0);
       expect(res.fields.tempC.max).toBe(30.0);
@@ -290,14 +299,14 @@ describe('TQL Query Engine', () => {
 
     it('groups by field using groupBy', () => {
       const q = 'findAll(p -> {tempC > 0}) then groupBy(status)';
-      const groups = evaluateQuery<any>(q, mockDataset);
+      const groups = evaluateQuery<SensorData>(q, mockDataset) as unknown as Record<string, SensorData[]>;
       expect(Object.keys(groups).sort()).toEqual(['ACTIVE', 'CRITICAL', 'WARN_HIGH_TEMP']);
       expect(groups.ACTIVE.length).toBe(3);
     });
 
     it('resamples into time buckets', () => {
       const q = 'findAll(p -> {tempC > 0}) then resample("2m", "avg", tempC)';
-      const res = evaluateQuery<any>(q, mockDataset);
+      const res = evaluateRows(q);
       expect(res.length).toBeGreaterThan(0);
       expect(typeof res[0].timestamp).toBe('number');
       expect(typeof res[0].tempC).toBe('number');

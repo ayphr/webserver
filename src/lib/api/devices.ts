@@ -5,6 +5,8 @@ import type {
   DevicePairingRequestPayload,
   DevicePairingTokenPayload,
   DevicePayload,
+  DeviceQueryPayload,
+  DeviceQueryRequest,
   DeviceUnlinkPayload,
   DeviceUpdatePayload,
 } from '@common';
@@ -33,6 +35,12 @@ export function createDevicesApi(client: RequestClient) {
       return client.requestJson<{ serial: number; removed: number }>(`/api/devices/${serial}/data`, {
         method: 'DELETE',
         body: { timestamps },
+      });
+    },
+    async query(serial: number, input: DeviceQueryRequest) {
+      return client.requestJson<DeviceQueryPayload>(`/api/devices/${serial}/query`, {
+        method: 'POST',
+        body: input,
       });
     },
     async update(serial: number, input: { name?: string; locationId?: string }) {
