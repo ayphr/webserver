@@ -16,7 +16,7 @@ import { api } from '../../lib/api';
 import { DEVICE_PERIODS, devicePeriodLabel, type DevicePeriod } from '../../lib/devicePeriod';
 import { downloadRows, slugifyFilename, type ExportRow } from '../../lib/export';
 import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/tqlEditor';
-import { Button, Modal } from '../common';
+import { Button, Modal, Tooltip } from '../common';
 import './DeviceQueryModal.css';
 
 const DEFAULT_QUERY = `findAll(p -> { temperature > 20 })
@@ -188,16 +188,12 @@ export const DeviceQueryModal = ({
 
           <div className="device-query__run-group">
             {computeEstimate && (
-              <span
-                className="device-query__compute"
-                title={[
-                  'Estimated compute units:',
-                  ...computeEstimate.parts.map((part) => `${part.label}: +${part.units}`),
-                ].join('\n')}
-              >
-                <IconBolt size={13} strokeWidth={2} />
-                {computeEstimate.units} CU
-              </span>
+              <Tooltip content="Relative compute cost of this query. Higher means more work.">
+                <span className="device-query__compute">
+                  <IconBolt size={13} strokeWidth={2} />
+                  {computeEstimate.units} CU
+                </span>
+              </Tooltip>
             )}
 
             <Button

@@ -19,27 +19,27 @@ export interface ComputeEstimate {
 }
 
 /** Fixed cost of walking the candidate dataset once. */
-const SCAN_BASELINE = 5;
+const SCAN_BASELINE = 0.5;
 
 const ROOT_ACTION_UNITS: Record<QueryAST['action'], number> = {
-  findAll: 1,
-  select: 1,
-  findFirst: 0.5,
-  findLast: 0.5,
-  count: 2,
-  exists: 2,
+  findAll: 0.1,
+  select: 0.1,
+  findFirst: 0.05,
+  findLast: 0.05,
+  count: 0.2,
+  exists: 0.2,
 };
 
 const AGGREGATION_UNITS: Record<AggregationFunction, number> = {
-  count: 0.5,
-  first: 0.5,
-  last: 0.5,
-  avg: 1,
-  min: 1,
-  max: 1,
-  sum: 1,
-  median: 2,
-  stddev: 2,
+  count: 0.05,
+  first: 0.05,
+  last: 0.05,
+  avg: 0.1,
+  min: 0.1,
+  max: 0.1,
+  sum: 0.1,
+  median: 0.2,
+  stddev: 0.2,
 };
 
 const PIPELINE_LABELS: Record<PipelineStepAST['type'], string> = {
@@ -74,7 +74,7 @@ const PIPELINE_LABELS: Record<PipelineStepAST['type'], string> = {
 };
 
 function roundUnits(value: number): number {
-  return Math.round(value * 10) / 10;
+  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -86,22 +86,22 @@ export function estimatePredicateUnits(node: ASTNode): number {
   switch (node.type) {
     case 'standard':
       // Comparing two fields requires a second property lookup.
-      return typeof node.value === 'object' ? 1.5 : 1;
+      return typeof node.value === 'object' ? 0.15 : 0.1;
     case 'tolerance':
-      return 2;
+      return 0.2;
     case 'in':
-      return 1 + node.values.length * 0.2;
+      return 0.1 + node.values.length * 0.02;
     case 'between':
-      return 2;
+      return 0.2;
     case 'nullCheck':
     case 'presence':
-      return 0.5;
+      return 0.05;
     case 'stringPattern':
-      return node.op === '=~' || node.op === '!~' ? 2.5 : 1.5;
+      return node.op === '=~' || node.op === '!~' ? 0.25 : 0.15;
     case 'not':
-      return 0.5 + estimatePredicateUnits(node.expr);
+      return 0.05 + estimatePredicateUnits(node.expr);
     case 'logical':
-      return 0.5 + estimatePredicateUnits(node.left) + estimatePredicateUnits(node.right);
+      return 0.05 + estimatePredicateUnits(node.left) + estimatePredicateUnits(node.right);
   }
 }
 
@@ -111,7 +111,7 @@ export function estimatePredicateUnits(node: ASTNode): number {
  */
 export function estimateExpressionUnits(expression: string): number {
   const tokens = expression.match(/[a-zA-Z_][\w.]*|\d+(?:\.\d+)?|[+\-*/%()]/g) ?? [];
-  return 1 + tokens.length * 0.25;
+  return 0.1 + tokens.length * 0.025;
 }
 
 /**
@@ -122,47 +122,47 @@ export function estimatePipelineStepUnits(step: PipelineStepAST): number {
   switch (step.type) {
     case 'sortAscending':
     case 'sortDescending':
-      return 8;
+      return 0.8;
     case 'limit':
     case 'offset':
     case 'head':
     case 'tail':
     case 'slice':
-      return 0.5;
+      return 0.05;
     case 'timeRange':
-      return 1;
+      return 0.1;
     case 'select':
     case 'project':
     case 'omit':
-      return 0.5 + step.fields.length * 0.1;
+      return 0.05 + step.fields.length * 0.01;
     case 'rename':
     case 'fill':
     case 'fillPrevious':
     case 'clamp':
-      return 1;
+      return 0.1;
     case 'distinct':
     case 'dedup':
-      return 5;
+      return 0.5;
     case 'dropNulls':
-      return 1 + step.fields.length * 0.2;
+      return 0.1 + step.fields.length * 0.02;
     case 'movingAverage':
-      return 6;
+      return 0.6;
     case 'rate':
     case 'diff':
-      return 2;
+      return 0.2;
     case 'window':
     case 'resample':
-      return 10 + AGGREGATION_UNITS[step.aggregation];
+      return 1 + AGGREGATION_UNITS[step.aggregation];
     case 'aggregate':
-      return 3 + AGGREGATION_UNITS[step.function];
+      return 0.3 + AGGREGATION_UNITS[step.function];
     case 'summary':
-      return 4 + (step.fields ? step.fields.length * 2 : 6);
+      return 0.4 + (step.fields ? step.fields.length * 0.2 : 0.6);
     case 'filter':
-      return 2 + estimatePredicateUnits(step.filter);
+      return 0.2 + estimatePredicateUnits(step.filter);
     case 'compute':
-      return 2 + estimateExpressionUnits(step.expression);
+      return 0.2 + estimateExpressionUnits(step.expression);
     case 'groupBy':
-      return 5;
+      return 0.5;
   }
 }
 
@@ -182,9 +182,10 @@ export function estimateComputeUnits(ast: QueryAST): ComputeEstimate {
     parts.push({ label: PIPELINE_LABELS[step.type], units: estimatePipelineStepUnits(step) });
   }
 
-  const total = parts.reduce((sum, part) => sum + part.units, 0);
+  const rounded = parts.map((part) => ({ ...part, units: roundUnits(part.units) }));
+  const total = rounded.reduce((sum, part) => sum + part.units, 0);
   return {
     units: roundUnits(total),
-    parts: parts.map((part) => ({ ...part, units: roundUnits(part.units) })),
+    parts: rounded,
   };
 }
