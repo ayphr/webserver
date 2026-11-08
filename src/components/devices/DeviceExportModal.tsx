@@ -116,12 +116,7 @@ export const DeviceExportModal = ({
           </button>
         </div>
 
-        {rows.length > 0 ? (
-          <div className="device-export__preview">
-            <span className="device-export__preview-label">Preview</span>
-            <code>{columns.join(' · ')}</code>
-          </div>
-        ) : (
+        {rows.length === 0 && (
           <div className="device-export__empty">
             There are no data points to export for this period.
           </div>

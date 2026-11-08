@@ -6,9 +6,9 @@ import {
   IconAlertCircle,
   IconBraces,
   IconDownload,
+  IconExternalLink,
   IconPlayerPlay,
   IconTable,
-  IconTerminal2,
 } from '@tabler/icons-react';
 import type { DeviceQueryPayload } from '@common';
 import { api } from '../../lib/api';
@@ -23,6 +23,8 @@ const DEFAULT_QUERY = `findAll(p -> { temperature > 20 })
   then limit(100)`;
 
 const MAX_PREVIEW_ROWS = 250;
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
 function resultRows(result: unknown): ExportRow[] {
   if (Array.isArray(result)) {
@@ -133,35 +135,31 @@ export const DeviceQueryModal = ({
       showCancel={false}
     >
       <div className="device-query">
-        <div className="device-query__intro">
-          <div className="device-query__intro-icon">
-            <IconTerminal2 size={20} strokeWidth={1.75} />
-          </div>
-          <div>
-            <p>
-              Write a <strong>TQL</strong> query to explore this device&apos;s telemetry. Queries run on the
-              server and the results can be exported as CSV or JSON.
-            </p>
-            <p className="device-query__hint">
-              Tip: press <kbd>Cmd</kbd>/<kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run. Suggestions appear as you
-              type.
-            </p>
-          </div>
-        </div>
-
         <div className="device-query__toolbar">
-          <div className="device-query__period" role="group" aria-label="Query time period">
-            {DEVICE_PERIODS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`device-query__period-btn ${period === value ? 'is-active' : ''}`}
-                onClick={() => setPeriod(value)}
-                disabled={isRunning}
-              >
-                {devicePeriodLabel(value)}
-              </button>
-            ))}
+          <div className="device-query__toolbar-left">
+            <div className="device-query__period" role="group" aria-label="Query time period">
+              {DEVICE_PERIODS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`device-query__period-btn ${period === value ? 'is-active' : ''}`}
+                  onClick={() => setPeriod(value)}
+                  disabled={isRunning}
+                >
+                  {devicePeriodLabel(value)}
+                </button>
+              ))}
+            </div>
+
+            <a
+              className="device-query__docs-link"
+              href="https://docs.ayphr.com/tql/overview/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              TQL docs
+              <IconExternalLink size={13} strokeWidth={1.75} />
+            </a>
           </div>
 
           <Button
@@ -172,6 +170,10 @@ export const DeviceQueryModal = ({
           >
             <IconPlayerPlay size={16} strokeWidth={2} />
             Run query
+            <span className="device-query__keybind" aria-hidden="true">
+              <kbd>{IS_MAC ? '⌘' : 'Ctrl'}</kbd>
+              <kbd>↵</kbd>
+            </span>
           </Button>
         </div>
 

@@ -36,21 +36,21 @@
   flex-direction: column;
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 1001;
+}
 
-  :is(--sm) {
-    width: 90%;
-    max-width: 400px;
-  }
+.modal--sm {
+  width: 90%;
+  max-width: 400px;
+}
 
-  :is(--md) {
-    width: 90%;
-    max-width: 600px;
-  }
+.modal--md {
+  width: 90%;
+  max-width: 600px;
+}
 
-  :is(--lg) {
-    width: 90%;
-    max-width: 900px;
-  }
+.modal--lg {
+  width: 90%;
+  max-width: 900px;
 }
 
 @keyframes slideUp {

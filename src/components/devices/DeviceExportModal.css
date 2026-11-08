@@ -80,16 +80,29 @@
   background: var(--bg-elevated);
 }
 
+.device-export__format:focus-visible {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 2px;
+}
+
+.device-export .button:focus-visible {
+  outline-color: var(--text-muted);
+}
+
 .device-export__format.is-active {
-  border-color: var(--accent-green);
-  background: hsla(129, 77%, 43%, 0.08);
+  border-color: var(--text-muted);
+  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
 .device-export__format > svg {
   flex: 0 0 auto;
   margin-top: 0.1rem;
-  color: var(--accent-green-solid);
+  color: var(--text-muted);
+}
+
+.device-export__format.is-active > svg {
+  color: var(--text-primary);
 }
 
 .device-export__format > span {
@@ -109,32 +122,6 @@
   color: var(--text-muted);
   font-size: 0.75rem;
   line-height: 1.4;
-}
-
-.device-export__preview {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-}
-
-.device-export__preview-label {
-  color: var(--text-dim);
-  font-size: 0.7rem;
-  font-weight: var(--font-weight-md);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.device-export__preview code {
-  overflow-x: auto;
-  color: var(--text-muted);
-  font-family: var(--font-family-mono);
-  font-size: 0.76rem;
-  white-space: nowrap;
 }
 
 .device-export__empty {
