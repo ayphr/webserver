@@ -36,10 +36,15 @@ export class Parser {
     }
 
     this.consume('LPAREN', "Expected '(' after query action");
-    const varToken = this.consume('IDENTIFIER', 'Expected variable identifier');
-    this.consume('ARROW', "Expected '->'");
 
-    const filterAST = this.parseExpression();
+    let varName = 'p';
+    let filter: ASTNode | undefined;
+    if (!this.check('RPAREN')) {
+      const varToken = this.consume('IDENTIFIER', 'Expected variable identifier');
+      varName = varToken.value;
+      this.consume('ARROW', "Expected '->'");
+      filter = this.parseExpression();
+    }
 
     this.consume('RPAREN', "Expected ')' ending query clause");
 
@@ -50,8 +55,8 @@ export class Parser {
 
     return {
       action,
-      varName: varToken.value,
-      filter: filterAST,
+      varName,
+      filter,
       pipeline,
     };
   }

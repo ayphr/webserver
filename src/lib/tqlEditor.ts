@@ -101,31 +101,35 @@ export interface TqlDoc {
 export const TQL_DOCS: Record<string, TqlDoc> = {
   // Query roots
   findAll: {
-    signature: 'findAll(p -> { condition })',
-    description: 'Returns every telemetry point that matches the condition.',
+    signature: 'findAll(p -> { condition })  ·  findAll()',
+    description:
+      'Returns every telemetry point that matches the condition. Call findAll() with no arguments to skip filtering.',
     example: 'findAll(p -> { temperature > 20 })',
   },
   findFirst: {
-    signature: 'findFirst(p -> { condition })',
-    description: 'Returns the first telemetry point that matches the condition, or null.',
+    signature: 'findFirst(p -> { condition })  ·  findFirst()',
+    description:
+      'Returns the first telemetry point that matches the condition, or null. Call findFirst() to take the first point without filtering.',
   },
   findLast: {
-    signature: 'findLast(p -> { condition })',
-    description: 'Returns the last telemetry point that matches the condition, or null.',
+    signature: 'findLast(p -> { condition })  ·  findLast()',
+    description:
+      'Returns the last telemetry point that matches the condition, or null. Call findLast() to take the last point without filtering.',
   },
   count: {
-    signature: 'count(p -> { condition })  ·  then count(field?)',
+    signature: 'count(p -> { condition })  ·  count()',
     description:
-      'As a query root, counts matching points. As a pipeline step, counts values in a field (or rows when no field is given).',
+      'As a query root, counts matching points (all points when called as count()). As a pipeline step, counts values in a field (or rows when no field is given).',
   },
   exists: {
-    signature: 'exists(p -> { condition })',
-    description: 'Returns true when at least one telemetry point matches the condition.',
+    signature: 'exists(p -> { condition })  ·  exists()',
+    description:
+      'Returns true when at least one telemetry point matches the condition. Call exists() with no arguments to check whether any points exist.',
   },
   select: {
-    signature: 'select(p -> { condition })  ·  then select(field, ...)',
+    signature: 'select(p -> { condition })  ·  select()  ·  then select(field, ...)',
     description:
-      'As a query root, returns matching points (alias of findAll). As a pipeline step, projects only the listed fields.',
+      'As a query root, returns matching points (alias of findAll; select() skips filtering). As a pipeline step, projects only the listed fields.',
   },
 
   // Pipeline structure
@@ -577,7 +581,8 @@ export const tqlLinter = linter((view): Diagnostic[] => {
   if (result.valid || !result.error) return [];
 
   const rawPosition = errorPosition(result.error);
-  let from = rawPosition === null ? 0 : Math.min(rawPosition, doc.length);
+  if (rawPosition === null) return [];
+  let from = Math.min(rawPosition, doc.length);
   const line = view.state.doc.lineAt(from);
   const rest = line.text.slice(from - line.from);
   const token = /^[\w.]+/.exec(rest);

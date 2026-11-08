@@ -176,7 +176,10 @@ export function estimateComputeUnits(ast: QueryAST): ComputeEstimate {
     { label: 'Root action', units: ROOT_ACTION_UNITS[ast.action] },
   ];
 
-  parts.push({ label: 'Filter conditions', units: estimatePredicateUnits(ast.filter) });
+  const filterUnits = ast.filter ? estimatePredicateUnits(ast.filter) : 0;
+  if (filterUnits > 0) {
+    parts.push({ label: 'Filter conditions', units: filterUnits });
+  }
 
   for (const step of ast.pipeline) {
     parts.push({ label: PIPELINE_LABELS[step.type], units: estimatePipelineStepUnits(step) });

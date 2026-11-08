@@ -115,6 +115,6 @@ export type PipelineStepAST =
 export interface QueryAST {
   action: RootClauseType;
   varName: string;
-  filter: ASTNode;
+  filter?: ASTNode;
   pipeline: PipelineStepAST[];
 }

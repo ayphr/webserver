@@ -331,7 +331,9 @@ export class Compiler {
    * Compiles an AST into an optimized pipeline execution closure.
    */
   public static compilePipeline<T extends TelemetryPoint>(ast: QueryAST): QueryExecutor<T> {
-    const filterFn = Compiler.compilePredicate<T>(ast.filter);
+    const filterFn = ast.filter
+      ? Compiler.compilePredicate<T>(ast.filter)
+      : () => true;
 
     return (dataset: T[]): QueryResult<T> => {
       // 1. Initial filter phase

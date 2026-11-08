@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { EditorView } from '@codemirror/view';
+import { EditorView, tooltips } from '@codemirror/view';
 import {
   IconAlertCircle,
   IconBolt,
@@ -225,7 +225,14 @@ export const DeviceQueryModal = ({
             value={query}
             height="240px"
             theme={oneDark}
-            extensions={[tqlLanguage, tqlAutocompletion, tqlLinter, tqlHover, EditorView.lineWrapping]}
+            extensions={[
+              tqlLanguage,
+              tqlAutocompletion,
+              tqlLinter,
+              tqlHover,
+              tooltips({ parent: document.body }),
+              EditorView.lineWrapping,
+            ]}
             basicSetup={{ autocompletion: false }}
             onChange={(value) => {
               setQuery(value);

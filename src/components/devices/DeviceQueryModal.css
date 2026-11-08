@@ -151,8 +151,11 @@
   padding-bottom: 1px;
 }
 
-.device-query__editor .cm-tooltip {
-  z-index: 10000;
+body .cm-tooltip {
+  z-index: 10000 !important;
+}
+
+body .cm-tooltip:not(.cm-tooltip-autocomplete) {
   max-width: 340px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -161,7 +164,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
-.device-query__editor .cm-tooltip.cm-tooltip-hover {
+body .cm-tooltip.cm-tooltip-hover {
   padding: 0;
 }
 

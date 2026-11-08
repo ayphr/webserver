@@ -314,6 +314,22 @@ describe('TQL Query Engine', () => {
     });
   });
 
+  describe('Empty query roots', () => {
+    it('treats missing arguments as no filter', () => {
+      expect(evaluateRows('findAll()')).toHaveLength(mockDataset.length);
+      expect(evaluateRows('select()')).toHaveLength(mockDataset.length);
+      expect(evaluateQuery('findFirst()', mockDataset)).toEqual(mockDataset[0]);
+      expect(evaluateQuery('findLast()', mockDataset)).toEqual(mockDataset[mockDataset.length - 1]);
+      expect(evaluateQuery('count()', mockDataset)).toBe(mockDataset.length);
+      expect(evaluateQuery('exists()', mockDataset)).toBe(true);
+    });
+
+    it('supports pipelines after an empty root', () => {
+      expect(evaluateRows('findAll() then limit(2)')).toHaveLength(2);
+      expect(validateQuery('findAll() then sortDescending(timestamp)').valid).toBe(true);
+    });
+  });
+
   describe('Validation & AST Parsing', () => {
     it('validates correct and incorrect queries', () => {
       expect(validateQuery('findAll(p -> {tempC < 25})').valid).toBe(true);
@@ -326,7 +342,7 @@ describe('TQL Query Engine', () => {
       const ast = parseQuery('findAll(pt -> {tempC ~0.5~= 22} & !{status == "OFFLINE"}) then sortDescending(timestamp) then limit(10)');
       expect(ast.action).toBe('findAll');
       expect(ast.varName).toBe('pt');
-      expect(ast.filter.type).toBe('logical');
+      expect(ast.filter?.type).toBe('logical');
       expect(ast.pipeline.length).toBe(2);
       expect(ast.pipeline[0].type).toBe('sortDescending');
       expect(ast.pipeline[1].type).toBe('limit');
