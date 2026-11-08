@@ -124,13 +124,14 @@
 }
 
 .device-query__editor {
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: hsl(0, 0%, 10%);
 }
 
 .device-query__editor .cm-editor {
+  border-radius: var(--radius-md);
   font-family: var(--font-family-mono);
   font-size: 0.84rem;
 }
@@ -151,6 +152,7 @@
 }
 
 .device-query__editor .cm-tooltip {
+  z-index: 10000;
   max-width: 340px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
