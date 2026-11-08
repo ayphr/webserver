@@ -1,9 +1,34 @@
-import { Compiler, Lexer, Parser, type QueryExecutor, type TelemetryPoint } from '.';
+import { Compiler, Lexer, Parser, type QueryAST, type QueryExecutor, type TelemetryPoint } from '.';
 
-export function compileQuery<T extends TelemetryPoint = TelemetryPoint>(queryString: string): QueryExecutor<T> {
+export function parseQuery(queryString: string): QueryAST {
   const lexer = new Lexer(queryString);
   const tokens = lexer.tokenize();
   const parser = new Parser(tokens);
-  const ast = parser.parse();
+  return parser.parse();
+}
+
+export function compileQuery<T extends TelemetryPoint = TelemetryPoint>(queryString: string): QueryExecutor<T> {
+  const ast = parseQuery(queryString);
   return Compiler.compilePipeline<T>(ast);
+}
+
+export function evaluateQuery<T extends TelemetryPoint = TelemetryPoint>(
+  queryString: string,
+  dataset: T[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  const executor = compileQuery<T>(queryString);
+  return executor(dataset);
+}
+
+export function validateQuery(queryString: string): { valid: boolean; error?: string } {
+  try {
+    parseQuery(queryString);
+    return { valid: true };
+  } catch (err) {
+    return {
+      valid: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
