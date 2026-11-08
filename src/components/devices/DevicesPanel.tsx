@@ -24,6 +24,7 @@ import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
+import type { LineGraphPoint } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
 import type { DevicePeriod } from '../../lib/devicePeriod';
 import { DeviceQueryModal } from './DeviceQueryModal';
@@ -364,13 +365,14 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
   // Combined chart config & data
   const combinedData = useMemo(() => {
-    const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
     return {
-      labels,
       datasets: enabledDefs.map((def) => ({
         label: def.label,
-        data: dataPoints.map((p) => def.getValue(p)),
+        data: dataPoints.map<LineGraphPoint>((p) => ({
+          x: toDate(p.timestamp).getTime(),
+          y: def.getValue(p),
+        })),
         borderColor: resolveCssColor(def.color),
         backgroundColor: 'transparent',
         yAxisID: unitToScaleId.get(def.unit) ?? 'y',
@@ -382,7 +384,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         pointHoverRadius: 4,
       })),
     };
-  }, [dataPoints, period, enabledDefs, unitToScaleId]);
+  }, [dataPoints, enabledDefs, unitToScaleId]);
 
 
 
@@ -390,8 +392,13 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scales: Record<string, any> = {
       x: {
+        type: 'linear',
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
+        ticks: {
+          color: 'hsl(180, 1%, 53%)',
+          maxTicksLimit: 8,
+          callback: (value: number | string) => formatChartLabel(new Date(Number(value)), period),
+        },
       },
     };
     unitGroups.forEach((unit, i) => {
@@ -434,6 +441,10 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           borderColor: 'rgba(255, 255, 255, 0.15)',
           borderWidth: 1,
           padding: 10,
+          callbacks: {
+            title: (items: { parsed: { x: number } }[]) =>
+              items.length > 0 ? formatChartLabel(new Date(items[0].parsed.x), period) : '',
+          },
         },
         zoom: {
           zoom: {
@@ -449,9 +460,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       },
       scales,
     };
-  }, [unitGroups, showAxes]);
+  }, [period, unitGroups, showAxes]);
 
-  const createMetricConfig = (unit: string, showAxes: boolean) => ({
+  const createMetricConfig = useCallback((unit: string, showAxes: boolean) => ({
     responsive: true,
     maintainAspectRatio: false,
     font: {
@@ -471,6 +482,10 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         borderColor: 'rgba(255, 255, 255, 0.15)',
         borderWidth: 1,
         padding: 10,
+        callbacks: {
+          title: (items: { parsed: { x: number } }[]) =>
+            items.length > 0 ? formatChartLabel(new Date(items[0].parsed.x), period) : '',
+        },
       },
       zoom: {
         zoom: {
@@ -486,8 +501,13 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     },
     scales: {
       x: {
+        type: 'linear' as const,
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
+        ticks: {
+          color: 'hsl(180, 1%, 53%)',
+          maxTicksLimit: 8,
+          callback: (value: number | string) => formatChartLabel(new Date(Number(value)), period),
+        },
       },
       y: {
         type: 'linear' as const,
@@ -498,18 +518,20 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         ticks: { color: 'hsl(180, 1%, 53%)' },
       },
     },
-  });
+  }), [period]);
 
   const separateCharts = useMemo(
     () =>
       enabledDefs.map((def) => ({
         def,
         data: {
-          labels: dataPoints.map((p) => formatChartLabel(p.timestamp, period)),
           datasets: [
             {
               label: def.label,
-              data: dataPoints.map((p) => def.getValue(p)),
+              data: dataPoints.map<LineGraphPoint>((p) => ({
+                x: toDate(p.timestamp).getTime(),
+                y: def.getValue(p),
+              })),
               borderColor: resolveCssColor(def.color),
               backgroundColor: 'transparent',
               tension: 0.25,
@@ -523,7 +545,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         },
         config: createMetricConfig(def.unit, showAxes),
       })),
-    [dataPoints, period, enabledDefs, showAxes],
+    [createMetricConfig, dataPoints, enabledDefs, showAxes],
   );
 
   if (isLoading) {
