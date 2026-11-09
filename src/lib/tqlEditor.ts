@@ -104,7 +104,7 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
     signature: 'findAll(p -> { condition })  ·  findAll()',
     description:
       'Returns every telemetry point that matches the condition. Call findAll() with no arguments to skip filtering.',
-    example: 'findAll(p -> { temperature > 20 })',
+    example: 'findAll(p -> { p.temperature > 20 })',
   },
   findFirst: {
     signature: 'findFirst(p -> { condition })  ·  findFirst()',
@@ -136,7 +136,7 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
   then: {
     signature: 'then <operation>(...)',
     description: 'Chains another operation onto the query. Operations run in the order they are written.',
-    example: 'findAll(p -> { temperature > 20 }) then limit(100)',
+    example: 'findAll(p -> { p.temperature > 20 }) then limit(100)',
   },
   sortAscending: {
     signature: 'sortAscending(field?)',
@@ -285,7 +285,7 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
     example: 'then compute(tempF, (temperature * 1.8) + 32)',
   },
   filter: {
-    signature: 'filter(p -> { condition })',
+    signature: 'filter(p -> { p.condition })',
     description: 'Applies another condition later in the pipeline.',
   },
 
@@ -368,8 +368,9 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
 
   // Operators
   '->': {
-    signature: 'p -> { condition }',
-    description: 'Separates the lambda variable from the condition block.',
+    signature: 'p -> { p.condition }',
+    description:
+      'Separates the lambda variable from the condition block. Fields inside the block can be prefixed with that variable (for example p.temperature).',
   },
   '>': { signature: 'field > value', description: 'Greater than.' },
   '>=': { signature: 'field >= value', description: 'Greater than or equal to.' },

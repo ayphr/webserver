@@ -186,6 +186,72 @@ describe('TQL Query Engine', () => {
     });
   });
 
+  describe('Lambda-prefixed field references', () => {
+    it('resolves standard comparisons prefixed with the lambda variable', () => {
+      const q = 'findAll(p -> {p.tempC > 21})';
+      const results = evaluateQuery<SensorData>(q, mockDataset);
+      expect(results.length).toBe(3);
+      expect(results.map((r: SensorData) => r.tempC)).toEqual([22.0, 25.5, 30.0]);
+    });
+
+    it('resolves nested paths prefixed with the lambda variable', () => {
+      const q = 'findAll(p -> {p.device.battery >= 90})';
+      const results = evaluateQuery<SensorData>(q, mockDataset);
+      expect(results.length).toBe(2);
+    });
+
+    it('supports prefixed field-to-field comparisons', () => {
+      const q = 'findAll(p -> {p.tempC > p.targetTemp})';
+      const results = evaluateQuery<SensorData>(q, mockDataset);
+      expect(results.length).toBe(3);
+    });
+
+    it('supports prefixed tolerance and dynamic center fields', () => {
+      const absolute = evaluateQuery<SensorData>('findAll(p -> {p.tempC ~1~= 21})', mockDataset);
+      expect(absolute.length).toBe(2);
+
+      const dynamic = evaluateQuery<SensorData>('findAll(p -> {p.tempC ~1~= p.targetTemp})', mockDataset);
+      expect(dynamic.length).toBe(2);
+    });
+
+    it('supports prefixed set, range, null, presence, and string conditions', () => {
+      expect(evaluateQuery<SensorData>('findAll(p -> {p.status in ["WARN_HIGH_TEMP", "CRITICAL"]})', mockDataset).length).toBe(2);
+      expect(evaluateQuery<SensorData>('findAll(p -> {p.tempC between 21 and 26})', mockDataset).length).toBe(2);
+      expect(evaluateQuery<SensorData>('findAll(p -> {p.humidity is null})', mockDataset).length).toBe(1);
+      expect(evaluateQuery<SensorData>('findAll(p -> {p.pressure exists})', mockDataset).length).toBe(5);
+      expect(evaluateQuery<SensorData>('findAll(p -> {p.device.model startsWith "ESP32-PRO"})', mockDataset).length).toBe(3);
+      expect(evaluateQuery<SensorData>('findAll(p -> {p.status =~ "^(WARN|CRITICAL)"})', mockDataset).length).toBe(2);
+    });
+
+    it('supports custom lambda variable names', () => {
+      const q = 'findAll(pt -> {pt.tempC > 21})';
+      expect(evaluateQuery<SensorData>(q, mockDataset).length).toBe(3);
+
+      const qReading = 'findLast(reading -> {reading.humidity is null})';
+      const res = evaluateQuery<SensorData>(qReading, mockDataset);
+      expect(res).not.toBeNull();
+      expect(res.tempC).toBe(30.0);
+    });
+
+    it('still accepts bare field references and mixed styles', () => {
+      expect(evaluateQuery<SensorData>('findAll(p -> {tempC > 21})', mockDataset).length).toBe(3);
+      expect(evaluateQuery<SensorData>('findAll(p -> {p.tempC > targetTemp})', mockDataset).length).toBe(3);
+      expect(evaluateQuery<SensorData>('findAll(p -> {tempC > p.targetTemp})', mockDataset).length).toBe(3);
+    });
+
+    it('resolves prefixed fields in logical and negated expressions', () => {
+      const q = 'findAll(p -> !{p.status == "ACTIVE"} & ({p.device.battery < 50} | {p.tempC > 28}))';
+      const results = evaluateQuery<SensorData>(q, mockDataset);
+      expect(results.length).toBe(1);
+      expect(results[0].status).toBe('CRITICAL');
+    });
+
+    it('resolves prefixed fields in pipeline filter steps', () => {
+      const q = 'findAll(p -> {tempC > 0}) then filter(q -> {q.tempC > 21})';
+      expect(evaluateQuery<SensorData>(q, mockDataset).length).toBe(3);
+    });
+  });
+
   describe('Pipeline Operations', () => {
     it('sorts ascending and descending', () => {
       const qAsc = 'findAll(p -> {tempC > 0}) then sortAscending(tempC)';

@@ -71,6 +71,16 @@ export function getNestedValue(obj: unknown, path: string): unknown {
 }
 
 /**
+ * Strips the optional lambda variable prefix from a field reference so that
+ * both `temperature` and `p.temperature` resolve against the point itself.
+ */
+export function normalizeFieldPath(field: string, varName?: string): string {
+  if (!varName) return field;
+  const prefix = `${varName}.`;
+  return field.startsWith(prefix) ? field.slice(prefix.length) : field;
+}
+
+/**
  * Sets a property on an object, supporting nested dot-notation paths.
  */
 export function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
@@ -202,18 +212,24 @@ export function evaluateMath(expression: string, point: TelemetryPoint): number 
 }
 
 export class Compiler {
-  public static compilePredicate<T extends TelemetryPoint>(ast: ASTNode): PredicateFn<T> {
+  public static compilePredicate<T extends TelemetryPoint>(
+    ast: ASTNode,
+    varName?: string,
+  ): PredicateFn<T> {
     switch (ast.type) {
       case 'standard': {
-        const { field, op, value } = ast;
+        const { op, value } = ast;
+        const field = normalizeFieldPath(ast.field, varName);
+        const valueField =
+          typeof value === 'object' && value !== null && 'field' in value
+            ? normalizeFieldPath(value.field, varName)
+            : undefined;
         return (point: T) => {
           const val = getNestedValue(point, field);
           if (val === undefined) return false;
 
           const targetValue =
-            typeof value === 'object' && value !== null && 'field' in value
-              ? getNestedValue(point, value.field)
-              : value;
+            valueField !== undefined ? getNestedValue(point, valueField) : value;
 
           if (targetValue === undefined) return false;
 
@@ -229,15 +245,18 @@ export class Compiler {
       }
 
       case 'tolerance': {
-        const { field, delta, isPercent, center } = ast;
+        const { delta, isPercent, center } = ast;
+        const field = normalizeFieldPath(ast.field, varName);
+        const centerField =
+          typeof center === 'object' && center !== null && 'field' in center
+            ? normalizeFieldPath(center.field, varName)
+            : undefined;
         return (point: T) => {
           const val = getNestedValue(point, field);
           if (typeof val !== 'number') return false;
 
           const centerVal =
-            typeof center === 'object' && center !== null && 'field' in center
-              ? getNestedValue(point, center.field)
-              : center;
+            centerField !== undefined ? getNestedValue(point, centerField) : center;
 
           if (typeof centerVal !== 'number') return false;
 
@@ -250,7 +269,8 @@ export class Compiler {
       }
 
       case 'in': {
-        const { field, negated, values } = ast;
+        const { negated, values } = ast;
+        const field = normalizeFieldPath(ast.field, varName);
         return (point: T) => {
           const val = getNestedValue(point, field);
           const has = values.some((candidate) => candidate === val);
@@ -259,7 +279,8 @@ export class Compiler {
       }
 
       case 'between': {
-        const { field, min, max } = ast;
+        const { min, max } = ast;
+        const field = normalizeFieldPath(ast.field, varName);
         return (point: T) => {
           const val = getNestedValue(point, field);
           if (val === undefined || val === null) return false;
@@ -268,7 +289,8 @@ export class Compiler {
       }
 
       case 'nullCheck': {
-        const { field, check } = ast;
+        const { check } = ast;
+        const field = normalizeFieldPath(ast.field, varName);
         return (point: T) => {
           const val = getNestedValue(point, field);
           const isNull = val === null || val === undefined;
@@ -277,7 +299,8 @@ export class Compiler {
       }
 
       case 'presence': {
-        const { field, check } = ast;
+        const { check } = ast;
+        const field = normalizeFieldPath(ast.field, varName);
         return (point: T) => {
           const val = getNestedValue(point, field);
           const exists = val !== undefined;
@@ -286,7 +309,8 @@ export class Compiler {
       }
 
       case 'stringPattern': {
-        const { field, op, pattern } = ast;
+        const { op, pattern } = ast;
+        const field = normalizeFieldPath(ast.field, varName);
         let regex: RegExp | null = null;
         if (op === '=~' || op === '!~') {
           try {
@@ -313,13 +337,13 @@ export class Compiler {
       }
 
       case 'not': {
-        const innerFn = Compiler.compilePredicate<T>(ast.expr);
+        const innerFn = Compiler.compilePredicate<T>(ast.expr, varName);
         return (point: T) => !innerFn(point);
       }
 
       case 'logical': {
-        const leftFn = Compiler.compilePredicate<T>(ast.left);
-        const rightFn = Compiler.compilePredicate<T>(ast.right);
+        const leftFn = Compiler.compilePredicate<T>(ast.left, varName);
+        const rightFn = Compiler.compilePredicate<T>(ast.right, varName);
         return ast.op === '&'
           ? (point: T) => leftFn(point) && rightFn(point)
           : (point: T) => leftFn(point) || rightFn(point);
@@ -332,7 +356,7 @@ export class Compiler {
    */
   public static compilePipeline<T extends TelemetryPoint>(ast: QueryAST): QueryExecutor<T> {
     const filterFn = ast.filter
-      ? Compiler.compilePredicate<T>(ast.filter)
+      ? Compiler.compilePredicate<T>(ast.filter, ast.varName)
       : () => true;
 
     return (dataset: T[]): QueryResult<T> => {
@@ -724,7 +748,7 @@ export class Compiler {
           }
 
           case 'filter': {
-            const subFilter = Compiler.compilePredicate<T>(step.filter);
+            const subFilter = Compiler.compilePredicate<T>(step.filter, step.varName);
             rows = rows.filter(subFilter);
             break;
           }

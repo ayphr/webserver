@@ -19,7 +19,7 @@ import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/t
 import { Button, Modal, Tooltip } from '../common';
 import './DeviceQueryModal.css';
 
-const DEFAULT_QUERY = `findAll(p -> { temperature > 20 })
+const DEFAULT_QUERY = `findAll(p -> { p.temperature > 20 })
   then sortDescending(timestamp)
   then limit(100)`;
 
