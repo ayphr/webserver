@@ -338,18 +338,16 @@
   width: 2.25rem;
   height: 2.25rem;
   padding: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
+  border: none;
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .devices__fullscreen-btn:hover:not(:disabled) {
   color: var(--text-primary);
-  border-color: var(--border-focus);
-  background: var(--bg-elevated);
+  background: transparent;
 }
 
 .devices__fullscreen-btn:disabled {

@@ -46,6 +46,24 @@ function formatChartLabel(value: Date | string, period: string): string {
   return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+/** Break lines wherever consecutive samples are further apart than 4x the median
+ * sample interval, so real outages show up as gaps instead of straight lines. */
+function computeGapThreshold(points: DataPoint[]): number | undefined {
+  if (points.length < 3) return undefined;
+  const times = points
+    .map((p) => toDate(p.timestamp).getTime())
+    .sort((a, b) => a - b);
+  const deltas: number[] = [];
+  for (let i = 1; i < times.length; i += 1) {
+    const delta = times[i] - times[i - 1];
+    if (delta > 0) deltas.push(delta);
+  }
+  if (deltas.length === 0) return undefined;
+  deltas.sort((a, b) => a - b);
+  const median = deltas[Math.floor(deltas.length / 2)];
+  return median * 4;
+}
+
 function deviceLabel(device: DeviceSummary): string {
   return device.name?.trim() || `Device ${device.serial}`;
 }
@@ -88,6 +106,75 @@ function resolveCssColor(value: string): string {
   const name = value.slice(4, -1).trim();
   const resolved = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return resolved || value;
+}
+
+function createMetricConfig(unit: string, showAxes: boolean, period: Period) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    font: {
+      family: "'DM Sans', sans-serif",
+    },
+    animation: { duration: 300 },
+    interaction: {
+      mode: 'nearest' as const,
+      axis: 'x' as const,
+      intersect: false,
+    },
+    plugins: {
+      decimation: {
+        enabled: true,
+        algorithm: 'lttb' as const,
+        samples: 400,
+        threshold: 500,
+      },
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(18, 18, 18, 0.96)',
+        titleColor: 'hsla(180, 67%, 99%, 1)',
+        bodyColor: 'hsl(180, 1%, 53%)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
+        padding: 10,
+        callbacks: {
+          title: (items: { parsed: { x: number } }[]) => {
+            const x = items[0]?.parsed?.x;
+            return typeof x === 'number' ? formatChartLabel(new Date(x), period) : '';
+          },
+        },
+      },
+      zoom: {
+        zoom: {
+          wheel: { enabled: true },
+          pinch: { enabled: true },
+          mode: 'x',
+        },
+        pan: {
+          enabled: true,
+          mode: 'x',
+        },
+      },
+    },
+    scales: {
+      x: {
+        type: 'linear' as const,
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: {
+          color: 'hsl(180, 1%, 53%)',
+          maxTicksLimit: 8,
+          callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
+        },
+      },
+      y: {
+        type: 'linear' as const,
+        display: showAxes,
+        position: 'left' as const,
+        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
+      },
+    },
+  };
 }
 
 export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
@@ -381,14 +468,19 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   }, [unitGroups]);
 
   // Combined chart config & data
+  const gapThreshold = useMemo(() => computeGapThreshold(dataPoints), [dataPoints]);
+
   const combinedData = useMemo(() => {
-    const labels = dataPoints.map((p) => formatChartLabel(p.timestamp, period));
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
     return {
-      labels,
       datasets: enabledDefs.map((def) => ({
         label: def.label,
-        data: dataPoints.map((p) => def.getValue(p)),
+        data: dataPoints.map((p) => ({
+          x: toDate(p.timestamp).getTime(),
+          y: def.getValue(p),
+        })),
+        parsing: false,
+        spanGaps: gapThreshold,
         borderColor: resolveCssColor(def.color),
         backgroundColor: 'transparent',
         yAxisID: unitToScaleId.get(def.unit) ?? 'y',
@@ -400,7 +492,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         pointHoverRadius: 4,
       })),
     };
-  }, [dataPoints, period, enabledDefs, unitToScaleId]);
+  }, [dataPoints, enabledDefs, unitToScaleId, gapThreshold]);
 
 
 
@@ -408,8 +500,13 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scales: Record<string, any> = {
       x: {
+        type: 'linear',
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
+        ticks: {
+          color: 'hsl(180, 1%, 53%)',
+          maxTicksLimit: 8,
+          callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
+        },
       },
     };
     unitGroups.forEach((unit, i) => {
@@ -437,9 +534,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       responsive: true,
       maintainAspectRatio: false,
       font: { family: "'DM Sans', sans-serif" },
-      animation: { duration: 0 },
-      interaction: { mode: 'index' as const, intersect: false },
+      animation: { duration: 300 },
+      interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
       plugins: {
+        decimation: {
+          enabled: true,
+          algorithm: 'lttb' as const,
+          samples: 400,
+          threshold: 500,
+        },
         legend: {
           display: true,
           position: 'top' as const,
@@ -452,6 +555,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           borderColor: 'rgba(255, 255, 255, 0.15)',
           borderWidth: 1,
           padding: 10,
+          callbacks: {
+            title: (items: { parsed: { x: number } }[]) => {
+              const x = items[0]?.parsed?.x;
+              return typeof x === 'number' ? formatChartLabel(new Date(x), period) : '';
+            },
+          },
         },
         zoom: {
           zoom: {
@@ -467,67 +576,22 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       },
       scales,
     };
-  }, [unitGroups, showAxes]);
-
-  const createMetricConfig = (unit: string, showAxes: boolean) => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    font: {
-      family: "'DM Sans', sans-serif",
-    },
-    animation: { duration: 0 },
-    interaction: {
-      mode: 'index' as const,
-      intersect: false,
-    },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: 'rgba(18, 18, 18, 0.96)',
-        titleColor: 'hsla(180, 67%, 99%, 1)',
-        bodyColor: 'hsl(180, 1%, 53%)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        borderWidth: 1,
-        padding: 10,
-      },
-      zoom: {
-        zoom: {
-          wheel: { enabled: true },
-          pinch: { enabled: true },
-          mode: 'x',
-        },
-        pan: {
-          enabled: true,
-          mode: 'x',
-        },
-      },
-    },
-    scales: {
-      x: {
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)', maxTicksLimit: 8 },
-      },
-      y: {
-        type: 'linear' as const,
-        display: showAxes,
-        position: 'left' as const,
-        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)' },
-      },
-    },
-  });
+  }, [unitGroups, showAxes, period]);
 
   const separateCharts = useMemo(
     () =>
       enabledDefs.map((def) => ({
         def,
         data: {
-          labels: dataPoints.map((p) => formatChartLabel(p.timestamp, period)),
           datasets: [
             {
               label: def.label,
-              data: dataPoints.map((p) => def.getValue(p)),
+              data: dataPoints.map((p) => ({
+                x: toDate(p.timestamp).getTime(),
+                y: def.getValue(p),
+              })),
+              parsing: false,
+              spanGaps: gapThreshold,
               borderColor: resolveCssColor(def.color),
               backgroundColor: 'transparent',
               tension: 0.25,
@@ -539,9 +603,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             },
           ],
         },
-        config: createMetricConfig(def.unit, showAxes),
+        config: createMetricConfig(def.unit, showAxes, period),
       })),
-    [dataPoints, period, enabledDefs, showAxes],
+    [dataPoints, period, enabledDefs, showAxes, gapThreshold],
   );
 
   if (isLoading) {

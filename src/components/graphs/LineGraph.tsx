@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   Filler,
+  Decimation,
   type ChartOptions,
   type ChartData,
 } from 'chart.js';
@@ -17,6 +18,7 @@ import ZoomPlugin from 'chartjs-plugin-zoom';
 import { Line } from 'react-chartjs-2';
 
 ChartJS.register(ZoomPlugin);
+ChartJS.register(Decimation);
 ChartJS.register(
   CategoryScale,
   LinearScale,

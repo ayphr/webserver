@@ -1,8 +1,15 @@
 import type { ChartData, ChartOptions } from 'chart.js';
 
+export type LineGraphPoint = {
+  x: number;
+  y: number;
+};
+
 export type LineGraphAxisData = {
   label: string;
-  data: number[];
+  data: number[] | LineGraphPoint[];
+  parsing?: boolean;
+  spanGaps?: boolean | number;
   borderColor: string;
   backgroundColor: string;
   yAxisID?: string;
@@ -63,7 +70,7 @@ export type LineGraphConfig = ChartOptions<'line'> | {
 };
 
 export type LineGraphData = ChartData<'line'> | {
-  labels: string[];
+  labels?: string[];
   datasets: LineGraphAxisData[];
 };
 
