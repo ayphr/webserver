@@ -46,7 +46,7 @@ function formatChartLabel(value: Date | string, period: string): string {
   return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-/** Break lines wherever consecutive samples are further apart than 4x the median
+/** Break lines wherever consecutive samples are further apart than 10x the median
  * sample interval, so real outages show up as gaps instead of straight lines. */
 function computeGapThreshold(points: DataPoint[]): number | undefined {
   if (points.length < 3) return undefined;
@@ -61,7 +61,7 @@ function computeGapThreshold(points: DataPoint[]): number | undefined {
   if (deltas.length === 0) return undefined;
   deltas.sort((a, b) => a - b);
   const median = deltas[Math.floor(deltas.length / 2)];
-  return median * 4;
+  return median * 10;
 }
 
 function deviceLabel(device: DeviceSummary): string {
@@ -112,21 +112,25 @@ function createMetricConfig(unit: string, showAxes: boolean, period: Period) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    parsing: false,
     font: {
       family: "'DM Sans', sans-serif",
     },
-    animation: { duration: 300 },
+    animation: { duration: 250 },
+    transitions: {
+      zoom: { animation: { duration: 0 } },
+      active: { animation: { duration: 0 } },
+    },
     interaction: {
-      mode: 'nearest' as const,
-      axis: 'x' as const,
+      mode: 'index' as const,
       intersect: false,
     },
     plugins: {
       decimation: {
         enabled: true,
         algorithm: 'lttb' as const,
-        samples: 400,
-        threshold: 500,
+        samples: 300,
+        threshold: 350,
       },
       legend: { display: false },
       tooltip: {
@@ -480,6 +484,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           y: def.getValue(p),
         })),
         parsing: false,
+        normalized: true,
         spanGaps: gapThreshold,
         borderColor: resolveCssColor(def.color),
         backgroundColor: 'transparent',
@@ -533,15 +538,20 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     return {
       responsive: true,
       maintainAspectRatio: false,
+      parsing: false,
       font: { family: "'DM Sans', sans-serif" },
-      animation: { duration: 300 },
-      interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
+      animation: { duration: 250 },
+      transitions: {
+        zoom: { animation: { duration: 0 } },
+        active: { animation: { duration: 0 } },
+      },
+      interaction: { mode: 'index' as const, intersect: false },
       plugins: {
         decimation: {
           enabled: true,
           algorithm: 'lttb' as const,
-          samples: 400,
-          threshold: 500,
+          samples: 300,
+          threshold: 350,
         },
         legend: {
           display: true,
@@ -591,6 +601,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 y: def.getValue(p),
               })),
               parsing: false,
+              normalized: true,
               spanGaps: gapThreshold,
               borderColor: resolveCssColor(def.color),
               backgroundColor: 'transparent',

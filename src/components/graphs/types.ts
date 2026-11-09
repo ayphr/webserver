@@ -9,6 +9,7 @@ export type LineGraphAxisData = {
   label: string;
   data: number[] | LineGraphPoint[];
   parsing?: boolean;
+  normalized?: boolean;
   spanGaps?: boolean | number;
   borderColor: string;
   backgroundColor: string;
