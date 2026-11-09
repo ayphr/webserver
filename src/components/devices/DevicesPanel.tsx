@@ -11,6 +11,8 @@ import {
   IconFileDownload,
   IconGauge,
   IconMapPin,
+  IconMaximize,
+  IconMinimize,
   IconRefresh,
   IconTerminal2,
   IconThermometer,
@@ -109,6 +111,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   // Telemetry graph state
   const [period, setPeriod] = useState<Period>('24h');
   const [graphMode, setGraphMode] = useState<GraphMode>('combined');
+  const [isGraphFullscreen, setIsGraphFullscreen] = useState(false);
   const { enabled: enabledSeries, setEnabled: setEnabledSeries } = useEnabledSeries();
 
 
@@ -127,6 +130,21 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       // ignore
     }
   }, [showAxes]);
+
+  // Handle fullscreen graph overlay: escape to close and prevent background scrolling
+  useEffect(() => {
+    if (!isGraphFullscreen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsGraphFullscreen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isGraphFullscreen]);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
@@ -627,6 +645,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   // DETAIL VIEW
   const online = isDeviceOnline(selectedDevice);
   const latest = selectedDevice.latestDataPoint;
+  const canFullscreenGraph =
+    detailTab === 'graphs' && dataPoints.length > 0 && enabledDefs.length > 0 && graphMode !== 'summary';
 
   return (
     <div className="devices">
@@ -650,6 +670,23 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
           Back to devices
         </Button>
         <div className="devices__actions">
+          {detailTab === 'graphs' && (
+            <button
+              type="button"
+              className="devices__fullscreen-btn"
+              onClick={() => setIsGraphFullscreen((current) => !current)}
+              disabled={!canFullscreenGraph}
+              title={isGraphFullscreen ? 'Exit fullscreen' : 'View graph fullscreen'}
+              aria-label={isGraphFullscreen ? 'Exit fullscreen' : 'View graph fullscreen'}
+              aria-pressed={isGraphFullscreen}
+            >
+              {isGraphFullscreen ? (
+                <IconMinimize size={18} strokeWidth={1.75} />
+              ) : (
+                <IconMaximize size={18} strokeWidth={1.75} />
+              )}
+            </button>
+          )}
           <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
             <IconTerminal2 size={16} strokeWidth={1.75} />
             New query
@@ -816,7 +853,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                 </p>
               </div>
             ) : (
-              <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''}`}>
+              <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''} ${isGraphFullscreen ? 'is-fullscreen' : ''}`}>
                 {seriesStats.length > 0 && graphMode === 'summary' && (
                   <div className="devices__metrics-summary">
                     {seriesStats.map((s) => {
