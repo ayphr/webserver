@@ -68,6 +68,56 @@ function deviceLabel(device: DeviceSummary): string {
   return device.name?.trim() || `Device ${device.serial}`;
 }
 
+const GRAPH_INITIAL_WINDOW_MS = 10 * 60 * 1000;
+const GRAPH_INITIAL_MIN_SAMPLES = 5;
+const GRAPH_MAX_ZOOM_IN_MS = 30 * 1000;
+const GRAPH_ZOOM_OUT_PADDING = 0.02;
+const GRAPH_INITIAL_HEADROOM = 0.1;
+
+type GraphWindow = {
+  initialMin: number;
+  initialMax: number;
+  limitMin: number;
+  limitMax: number;
+};
+
+function computeGraphWindow(points: DataPoint[]): GraphWindow | null {
+  if (points.length === 0) return null;
+  const times = points.map((p) => toDate(p.timestamp).getTime());
+  const extentMin = times[0];
+  const extentMax = times[times.length - 1];
+
+  if (extentMax <= extentMin) {
+    return {
+      initialMin: extentMax - GRAPH_INITIAL_WINDOW_MS / 2,
+      initialMax: extentMax + GRAPH_INITIAL_WINDOW_MS / 2,
+      limitMin: extentMax - GRAPH_INITIAL_WINDOW_MS,
+      limitMax: extentMax + GRAPH_INITIAL_WINDOW_MS,
+    };
+  }
+
+  let initialMin = extentMax - GRAPH_INITIAL_WINDOW_MS;
+  let firstVisible = times.findIndex((t) => t >= initialMin);
+  
+  if (firstVisible < 0) firstVisible = times.length - 1;
+
+  if (times.length - firstVisible < GRAPH_INITIAL_MIN_SAMPLES) {
+    initialMin = times[Math.max(0, times.length - GRAPH_INITIAL_MIN_SAMPLES)];
+  }
+  
+  initialMin = Math.min(initialMin, extentMax - GRAPH_MAX_ZOOM_IN_MS);
+  initialMin = Math.max(initialMin, extentMin);
+
+  const initialMax = extentMax + (extentMax - initialMin) * GRAPH_INITIAL_HEADROOM;
+  const padding = (extentMax - extentMin) * GRAPH_ZOOM_OUT_PADDING;
+  return {
+    initialMin,
+    initialMax,
+    limitMin: extentMin - padding,
+    limitMax: Math.max(extentMax + padding, initialMax),
+  };
+}
+
 function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
   if (!reading) {
     return <span className="devices__no-data">No telemetry data recorded</span>;
@@ -108,7 +158,7 @@ function resolveCssColor(value: string): string {
   return resolved || value;
 }
 
-function createMetricConfig(unit: string, showAxes: boolean, period: Period) {
+function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoomWindow: GraphWindow | null) {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -157,11 +207,19 @@ function createMetricConfig(unit: string, showAxes: boolean, period: Period) {
           enabled: true,
           mode: 'x',
         },
+        ...(zoomWindow
+          ? {
+              limits: {
+                x: { min: zoomWindow.limitMin, max: zoomWindow.limitMax, minRange: GRAPH_MAX_ZOOM_IN_MS },
+              },
+            }
+          : {}),
       },
     },
     scales: {
       x: {
         type: 'linear' as const,
+        ...(zoomWindow ? { min: zoomWindow.initialMin, max: zoomWindow.initialMax } : {}),
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
           color: 'hsl(180, 1%, 53%)',
@@ -473,6 +531,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
   // Combined chart config & data
   const gapThreshold = useMemo(() => computeGapThreshold(dataPoints), [dataPoints]);
+  const graphWindow = useMemo(() => computeGraphWindow(dataPoints), [dataPoints]);
 
   const combinedData = useMemo(() => {
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
@@ -506,6 +565,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
     const scales: Record<string, any> = {
       x: {
         type: 'linear',
+        ...(graphWindow ? { min: graphWindow.initialMin, max: graphWindow.initialMax } : {}),
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
           color: 'hsl(180, 1%, 53%)',
@@ -582,11 +642,18 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             enabled: true,
             mode: 'x',
           },
+          ...(graphWindow
+            ? {
+                limits: {
+                  x: { min: graphWindow.limitMin, max: graphWindow.limitMax, minRange: GRAPH_MAX_ZOOM_IN_MS },
+                },
+              }
+            : {}),
         },
       },
       scales,
     };
-  }, [unitGroups, showAxes, period]);
+  }, [unitGroups, showAxes, period, graphWindow]);
 
   const separateCharts = useMemo(
     () =>
@@ -614,9 +681,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
             },
           ],
         },
-        config: createMetricConfig(def.unit, showAxes, period),
+        config: createMetricConfig(def.unit, showAxes, period, graphWindow),
       })),
-    [dataPoints, period, enabledDefs, showAxes, gapThreshold],
+    [dataPoints, period, enabledDefs, showAxes, gapThreshold, graphWindow],
   );
 
   if (isLoading) {
