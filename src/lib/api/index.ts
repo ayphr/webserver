@@ -13,6 +13,7 @@ import { createProfileApi } from './profile';
 import { createSessionsApi } from './sessions';
 import { createSubscriptionsApi } from './subscriptions';
 import { createCreditsApi } from './credits';
+import { createTeamsApi } from './teams';
 
 export const API_BASE_URL = import.meta.env.DEV
   ? 'http://localhost:7233'
@@ -34,6 +35,7 @@ export type AyphrApiClient = RequestClient & {
   sessions: ReturnType<typeof createSessionsApi>;
   subscriptions: ReturnType<typeof createSubscriptionsApi>;
   credits: ReturnType<typeof createCreditsApi>;
+  teams: ReturnType<typeof createTeamsApi>;
 };
 
 export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
@@ -67,6 +69,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     sessions: createSessionsApi(client),
     subscriptions: createSubscriptionsApi(client),
     credits: createCreditsApi(client),
+    teams: createTeamsApi(client),
   };
 }
 

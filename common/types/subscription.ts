@@ -35,6 +35,9 @@ export const PURCHASABLE_SUBSCRIPTION_TIERS: readonly SubscriptionTier[] = [
   'lite',
   'plus',
   'ultra',
+  'team-lite',
+  'team-plus',
+  'team-ultra',
 ];
 
 export function isPurchasableTier(value: unknown): value is SubscriptionTier {
@@ -62,6 +65,7 @@ export type PaidSubscription = {
   currentPeriodStart: Date | null;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  quantity?: number;
   createdAt: Date;
   updatedAt: Date;
 };

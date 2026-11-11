@@ -130,9 +130,14 @@ export const SubscriptionPanel = () => {
   const trialDays = payload?.trialDays ?? 7;
   const plans = useMemo(() => payload?.plans ?? [], [payload]);
 
-  const planTiers = useMemo(() => {
+  const individualPlanTiers = useMemo(() => {
     const available = new Set(plans.map((plan) => plan.tier));
-    return SUBSCRIPTION_TIERS.filter((tier) => available.has(tier));
+    return SUBSCRIPTION_TIERS.filter((tier) => available.has(tier) && !tier.startsWith('team-'));
+  }, [plans]);
+
+  const teamPlanTiers = useMemo(() => {
+    const available = new Set(plans.map((plan) => plan.tier));
+    return SUBSCRIPTION_TIERS.filter((tier) => available.has(tier) && tier.startsWith('team-'));
   }, [plans]);
 
   const handleCheckout = async (plan: SubscriptionPlan) => {
@@ -247,8 +252,32 @@ export const SubscriptionPanel = () => {
             </div>
           </div>
 
+          <h4 className="subscription__plan-group-title">Individual plans</h4>
           <div className="subscription__plan-grid">
-            {planTiers.map((tier) => {
+            {individualPlanTiers.map((tier) => {
+              const plan = plans.find((item) => item.tier === tier && item.interval === billingInterval);
+              if (!plan) return null;
+
+              return (
+                <PlanCard
+                  key={tier}
+                  plan={plan}
+                  currentTier={null}
+                  isPending={pendingKey === `${tier}:${billingInterval}`}
+                  disabled={pendingKey !== null}
+                  trialDays={trialDays}
+                  onSelect={handleCheckout}
+                />
+              );
+            })}
+          </div>
+
+          <h4 className="subscription__plan-group-title">Team plans</h4>
+          <p className="subscription__plan-group-description">
+            One subscription covers the whole team. The manager pays, and members are added separately.
+          </p>
+          <div className="subscription__plan-grid">
+            {teamPlanTiers.map((tier) => {
               const plan = plans.find((item) => item.tier === tier && item.interval === billingInterval);
               if (!plan) return null;
 

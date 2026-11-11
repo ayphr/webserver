@@ -81,6 +81,17 @@ import {
   handleSubscriptionMe,
   handleSubscriptionPortal,
 } from './routes/subscriptions';
+import {
+  handleTeamMe,
+  handleTeamMembersList,
+  handleTeamMemberAdd,
+  handleTeamMemberRoleUpdate,
+  handleTeamMemberRemove,
+  handleTeamAuditLogs,
+  handleTeamInvitesList,
+  handleTeamInviteRevoke,
+  handleTeamInviteAccept,
+} from './routes/teams';
 import { handleListMine as handleSessionsListMine, handleRevoke as handleSessionRevoke } from './routes/sessions';
 import {
   handleCountries,
@@ -139,6 +150,34 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/subscriptions/auto-renew', handle: handleSubscriptionAutoRenew },
   { method: 'POST', path: '/api/subscriptions/portal', handle: handleSubscriptionPortal },
   { method: 'DELETE', path: '/api/subscriptions/attached/:id', handle: handleSubscriptionCancelGranted },
+
+  { method: 'GET', path: '/api/team', handle: handleTeamMe },
+  { method: 'GET', path: '/api/team/me', handle: handleTeamMe },
+  { method: 'GET', path: '/api/teams', handle: handleTeamMe },
+  { method: 'GET', path: '/api/teams/me', handle: handleTeamMe },
+  { method: 'GET', path: '/api/team/members', handle: handleTeamMembersList },
+  { method: 'GET', path: '/api/teams/members', handle: handleTeamMembersList },
+  { method: 'POST', path: '/api/team/members', handle: handleTeamMemberAdd },
+  { method: 'POST', path: '/api/teams/members', handle: handleTeamMemberAdd },
+  { method: 'PATCH', path: '/api/team/members/:uuid', handle: handleTeamMemberRoleUpdate },
+  { method: 'PATCH', path: '/api/teams/members/:uuid', handle: handleTeamMemberRoleUpdate },
+  { method: 'PATCH', path: '/api/team/members/:uuid/role', handle: handleTeamMemberRoleUpdate },
+  { method: 'PATCH', path: '/api/teams/members/:uuid/role', handle: handleTeamMemberRoleUpdate },
+  { method: 'DELETE', path: '/api/team/members/:uuid', handle: handleTeamMemberRemove },
+  { method: 'DELETE', path: '/api/teams/members/:uuid', handle: handleTeamMemberRemove },
+  { method: 'GET', path: '/api/team/audit', handle: handleTeamAuditLogs },
+  { method: 'GET', path: '/api/teams/audit', handle: handleTeamAuditLogs },
+  { method: 'GET', path: '/api/team/audit-logs', handle: handleTeamAuditLogs },
+  { method: 'GET', path: '/api/teams/audit-logs', handle: handleTeamAuditLogs },
+  { method: 'GET', path: '/api/team/logs', handle: handleTeamAuditLogs },
+  { method: 'GET', path: '/api/teams/logs', handle: handleTeamAuditLogs },
+
+  { method: 'GET', path: '/api/team/invites', handle: handleTeamInvitesList },
+  { method: 'GET', path: '/api/teams/invites', handle: handleTeamInvitesList },
+  { method: 'DELETE', path: '/api/team/invites/:id', handle: handleTeamInviteRevoke },
+  { method: 'DELETE', path: '/api/teams/invites/:id', handle: handleTeamInviteRevoke },
+  { method: 'POST', path: '/api/team/invites/accept', handle: handleTeamInviteAccept },
+  { method: 'POST', path: '/api/teams/invites/accept', handle: handleTeamInviteAccept },
 
   { method: 'GET', path: '/api/sessions', handle: handleSessionsListMine },
   { method: 'DELETE', path: '/api/sessions/:id', handle: handleSessionRevoke },

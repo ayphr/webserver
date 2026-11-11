@@ -2,7 +2,7 @@ import { Binary, Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection } from '@common';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection, type Team, type TeamAuditLog, type TeamInvite } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -100,6 +100,9 @@ export interface Collections {
   domainVerifications: Collection<DomainVerification>;
   locations: Collection<Location>;
   emailCodes: Collection<EmailCode>;
+  teams: Collection<Team>;
+  teamAuditLogs: Collection<TeamAuditLog>;
+  teamInvites: Collection<TeamInvite>;
 }
 
 export interface StoredAvatar {
@@ -217,7 +220,10 @@ export async function setupCollections(db: Db): Promise<Collections> {
     connections: db.collection<Connection>(CONNECTIONS_COLLECTION),
     domainVerifications: db.collection<DomainVerification>(DOMAIN_VERIFICATIONS_COLLECTION),
     locations: db.collection<Location>(LOCATIONS_COLLECTION),
-    emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION)
+    emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION),
+    teams: db.collection<Team>('teams'),
+    teamAuditLogs: db.collection<TeamAuditLog>('team_audit_logs'),
+    teamInvites: db.collection<TeamInvite>('team_invites')
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [

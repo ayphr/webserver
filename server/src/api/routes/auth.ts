@@ -37,6 +37,7 @@ import { authEventsTotal, userRegistrationsByCountry } from '../../lib/metrics';
 import { getUserCount } from '../../lib/db/users';
 import { setTotalUsers } from '../../lib/metrics';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
+import { getTeamInviteByToken, acceptTeamInvite } from '../../lib/db/teams';
 
 type AuthPayload = JsonObject & {
   username?: string;
@@ -185,6 +186,18 @@ async function handleRegister(request: Request) {
 
   try {
     await createUser(user);
+
+    const inviteToken = typeof body.inviteToken === 'string' ? body.inviteToken.trim() : '';
+    if (inviteToken) {
+      try {
+        const invite = await getTeamInviteByToken(inviteToken);
+        if (invite && !invite.acceptedAt && invite.expiresAt.getTime() > Date.now() && invite.email === user.email?.toLowerCase()) {
+          await acceptTeamInvite({ invite, user });
+        }
+      } catch (inviteError) {
+        console.error('Failed to accept team invite during registration:', inviteError);
+      }
+    }
   } catch (error) {
     // The unique username/email indexes are the source of truth, closing the
     // check-then-insert race.

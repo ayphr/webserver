@@ -146,6 +146,7 @@ export function mapStripeSubscription(
     currentPeriodStart: period.start,
     currentPeriodEnd: period.end,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    quantity: firstItem?.quantity ?? 1,
     createdAt: new Date(subscription.created * 1000),
     updatedAt: now,
   };
@@ -182,6 +183,7 @@ export async function createCheckoutSession(params: {
   userUuid: string;
   successUrl: string;
   cancelUrl: string;
+  quantity?: number;
 }): Promise<string | null> {
   const stripe = getStripe();
   if (!stripe) return null;
@@ -189,7 +191,7 @@ export async function createCheckoutSession(params: {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: params.customerId,
-    line_items: [{ price: params.priceId, quantity: 1 }],
+    line_items: [{ price: params.priceId, quantity: params.quantity ?? 1 }],
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
     allow_promotion_codes: true,
@@ -223,6 +225,35 @@ export async function retrieveStripeSubscription(id: string): Promise<Stripe.Sub
   if (!stripe) return null;
 
   return stripe.subscriptions.retrieve(id);
+}
+
+export async function updateSubscriptionQuantity(
+  stripeSubscriptionId: string,
+  quantity: number,
+): Promise<Stripe.Subscription | null> {
+  const stripe = getStripe();
+  if (!stripe) return null;
+
+  const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  const item = subscription.items.data[0];
+  if (!item) return null;
+
+  return stripe.subscriptions.update(stripeSubscriptionId, {
+    items: [{ id: item.id, quantity }],
+    proration_behavior: 'none',
+  });
+}
+
+export async function cancelStripeSubscription(stripeSubscriptionId: string): Promise<boolean> {
+  const stripe = getStripe();
+  if (!stripe) return false;
+  try {
+    await stripe.subscriptions.cancel(stripeSubscriptionId);
+    return true;
+  } catch (error) {
+    log.warn({ error, stripeSubscriptionId }, 'failed to cancel Stripe subscription');
+    return false;
+  }
 }
 
 export async function setStripeSubscriptionAutoRenew(

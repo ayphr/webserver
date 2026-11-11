@@ -62,6 +62,8 @@ export type User = {
   stripeCustomerId?: string;
   paidSubscriptions?: PaidSubscription[];
   attachedSubscriptions?: AttachedSubscription[];
+  teamId?: string;
+  teamRole?: 'member' | 'helper' | 'manager';
   credits?: UserCredits;
   trustedDevices?: string[];
 };

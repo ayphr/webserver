@@ -277,6 +277,7 @@ export type SubscriptionMePayload = {
 export type SubscriptionCheckoutRequest = {
   tier: SubscriptionTier;
   interval: BillingInterval;
+  quantity?: number;
 };
 
 export type SubscriptionCheckoutPayload = {

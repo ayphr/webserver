@@ -14,10 +14,10 @@ export function createSubscriptionsApi(client: RequestClient) {
     async me() {
       return client.requestJson<SubscriptionMePayload>('/api/subscriptions/me');
     },
-    async checkout(tier: SubscriptionTier, interval: BillingInterval) {
+    async checkout(tier: SubscriptionTier, interval: BillingInterval, quantity?: number) {
       const response = await client.requestJson<SubscriptionCheckoutPayload>('/api/subscriptions/checkout', {
         method: 'POST',
-        body: { tier, interval } satisfies SubscriptionCheckoutRequest,
+        body: { tier, interval, quantity } satisfies SubscriptionCheckoutRequest,
       });
       return response.url;
     },

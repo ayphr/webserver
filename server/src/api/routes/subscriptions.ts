@@ -207,12 +207,21 @@ const handleSubscriptionCheckout = requireAuth(async (request, user) => {
   const body = await readJsonBody(request);
   const tier = body?.tier;
   const interval = body?.interval;
+  const quantityRaw = body?.quantity;
   if (!isSubscriptionTier(tier)) {
     return json({ error: 'tier must be a valid subscription tier' }, 400);
   }
 
   if (!isBillingInterval(interval)) {
     return json({ error: 'interval must be "month" or "year"' }, 400);
+  }
+
+  let quantity = 1;
+  if (quantityRaw !== undefined && quantityRaw !== null) {
+    if (typeof quantityRaw !== 'number' || !Number.isInteger(quantityRaw) || quantityRaw < 1) {
+      return json({ error: 'quantity must be a positive integer' }, 400);
+    }
+    quantity = quantityRaw;
   }
 
   if (!isPurchasableTier(tier)) {
@@ -238,6 +247,7 @@ const handleSubscriptionCheckout = requireAuth(async (request, user) => {
     priceId,
     tier,
     userUuid: user.uuid,
+    quantity,
     successUrl: `${CLIENT_URL}/dashboard?tab=subscription&checkout=success`,
     cancelUrl: `${CLIENT_URL}/dashboard?tab=subscription&checkout=cancel`,
   });

@@ -40,6 +40,8 @@ const iconFor = (id: string) => {
       return <IconUsers size={18} />;
     case 'my-apps':
       return <IconApps size={18} />;
+    case 'team':
+      return <IconUsers size={18} />;
     case 'jail':
       return <IconBan size={18} />;
     default:
@@ -57,6 +59,7 @@ type Props = {
   isSuspended?: boolean;
   isStaff?: boolean;
   isDeveloper?: boolean;
+  isTeamMember?: boolean;
   credits?: CreditBalance | null;
   accounts?: StoredAccount[];
   activeToken?: string | null;
@@ -75,6 +78,7 @@ export const Sidebar: React.FC<Props> = ({
   isSuspended = false,
   isStaff = false,
   isDeveloper = false,
+  isTeamMember = false,
   credits = null,
   accounts = [],
   activeToken = null,
@@ -82,8 +86,10 @@ export const Sidebar: React.FC<Props> = ({
   onLogoutAccount,
   pinned = false,
 }) => {
+  const teamTabs: Tab[] = isTeamMember ? [{ id: 'team', name: 'Team' }] : [];
   const visibleTabs = [
     ...tabs,
+    ...teamTabs,
     ...(isDeveloper ? developerTabs : []),
     ...(isStaff ? staffTabs : []),
   ];

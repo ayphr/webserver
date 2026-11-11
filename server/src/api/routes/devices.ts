@@ -30,6 +30,7 @@ import {
   upsertDataPoints,
   type DeviceDocument,
 } from '../../lib/db';
+import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole } from '../../lib/db/teams';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
@@ -248,6 +249,8 @@ const handleLink = requireAuth(async (request, user: User) => {
   const userCheck = await linkCodeLimiter.check(`user:${user.uuid}`);
   if (!userCheck.allowed) return tooManyRequests(userCheck.retryAfterMs);
 
+  const scopeUuid = await getTeamScopeUuid(user);
+
   const body = await readJsonBody(request);
   const code = typeof body?.code === 'string' ? body.code.trim().toUpperCase() : '';
   if (!code) return json({ error: 'invalid code' }, 400);
@@ -257,7 +260,7 @@ const handleLink = requireAuth(async (request, user: User) => {
   let resolvedLocationId: string | null = null;
   if (requestedLocationId) {
     const requestedLocation = await getLocationById(requestedLocationId);
-    if (requestedLocation?.ownerUuid !== user.uuid) {
+    if (requestedLocation?.ownerUuid !== scopeUuid) {
       return json({ error: 'invalid location' }, 400);
     }
     resolvedLocationId = requestedLocation.id;
@@ -283,7 +286,7 @@ const handleLink = requireAuth(async (request, user: User) => {
   let device: DeviceDocument;
 
   if (existing) {
-    if (existing.ownerUuid !== user.uuid) {
+    if (existing.ownerUuid !== scopeUuid) {
       return json({ error: 'forbidden' }, 403);
     }
 
@@ -294,7 +297,14 @@ const handleLink = requireAuth(async (request, user: User) => {
     }
     device = { ...existing, tokenHash, tokenCreatedAt: pairing.createdAt };
   } else {
-    const ownedDevices = await getDevicesForOwnerUuid(user.uuid);
+    const team = await getTeamForUser(user);
+    if (team) {
+      const role = getTeamRole(user);
+      if (role === 'member') {
+        return json({ error: 'Forbidden' }, 403);
+      }
+    }
+    const ownedDevices = await getDevicesForOwnerUuid(scopeUuid);
     const maxDevices = getPlanFeaturesForUser(user).maxDevices;
     if (ownedDevices.length >= maxDevices) {
       return json({ error: 'device limit reached for your plan' }, 409);
@@ -304,15 +314,17 @@ const handleLink = requireAuth(async (request, user: User) => {
     if (resolvedLocationId) {
       locationId = resolvedLocationId;
     } else {
-      const defaultLocation = await ensureDefaultLocation(user.uuid, user.username);
+      const scopeUsername = await getTeamScopeUsername(user);
+      const defaultLocation = await ensureDefaultLocation(scopeUuid, scopeUsername);
       locationId = defaultLocation.id;
     }
 
+    const scopeUsername = await getTeamScopeUsername(user);
     const newDevice: DeviceDocument = {
       serial,
       name,
-      ownerUuid: user.uuid,
-      ownerUsername: user.username,
+      ownerUuid: scopeUuid,
+      ownerUsername: scopeUsername,
       locationId,
       registeredAt: now,
       tokenHash,
@@ -368,14 +380,16 @@ const handleFetchPairingToken = async (request: Request, params: { code?: string
 };
 
 const handleListMine = requireAuth(async (_request, user: User) => {
-  await ensureDefaultLocation(user.uuid, user.username);
-  const devices = await getDevicesForOwnerUuid(user.uuid);
+  const scopeUuid = await getTeamScopeUuid(user);
+  const scopeUsername = await getTeamScopeUsername(user);
+  await ensureDefaultLocation(scopeUuid, scopeUsername);
+  const devices = await getDevicesForOwnerUuid(scopeUuid);
 
-  if (await pruneOwnerDataPoints(user.uuid, user, devices)) {
-    await invalidateDeviceStatsForOwner(user.uuid);
+  if (await pruneOwnerDataPoints(scopeUuid, user, devices)) {
+    await invalidateDeviceStatsForOwner(scopeUuid);
   }
 
-  const stats = await getDataPointStats(devices.map((device) => device.serial), user.uuid);
+  const stats = await getDataPointStats(devices.map((device) => device.serial), scopeUuid);
 
   const summaries: DeviceSummary[] = devices.map((device) => {
     const stat = stats.get(device.serial);
@@ -396,7 +410,8 @@ const handleGetBySerial = requireAuth(async (_request, user: User, params) => {
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
 
-  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   return json({ device: toPublicDevice(device) });
 });
@@ -574,9 +589,19 @@ const handleDeleteDeviceDataPoints = requireAuth(async (request, user: User, par
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
 
+  const scopeUuid = await getTeamScopeUuid(user);
+  const team = await getTeamForUser(user);
+
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  if (team) {
+    const role = getTeamRole(user);
+    if (role !== 'manager') {
+      return json({ error: 'Forbidden' }, 403);
+    }
+  }
 
   const body = await readJsonBody(request);
   const rawTimestamps = Array.isArray(body?.timestamps) ? body.timestamps : [];
@@ -588,7 +613,7 @@ const handleDeleteDeviceDataPoints = requireAuth(async (request, user: User, par
   if (timestamps.length === 0) return json({ error: 'invalid timestamps' }, 400);
 
   const removed = await deleteDataPointsForDevice(serial, timestamps);
-  invalidateDeviceStatsForOwner(user.uuid);
+  invalidateDeviceStatsForOwner(scopeUuid);
   return json({ serial, removed }, 200);
 });
 
@@ -596,9 +621,11 @@ const handleUpdateDevice = requireAuth(async (request, user: User, params) => {
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
 
+  const scopeUuid = await getTeamScopeUuid(user);
+
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const body = await readJsonBody(request);
   const patch: { name?: string; locationId?: string } = {};
@@ -613,14 +640,14 @@ const handleUpdateDevice = requireAuth(async (request, user: User, params) => {
     const locId = typeof body.locationId === 'string' ? body.locationId.trim() : '';
     if (locId) {
       const location = await getLocationById(locId);
-      if (!location || location.ownerUuid !== user.uuid) {
+      if (!location || location.ownerUuid !== scopeUuid) {
         return json({ error: 'invalid location' }, 400);
       }
       patch.locationId = location.id;
     }
   }
 
-  const updated = await updateDevice(serial, user.uuid, patch);
+  const updated = await updateDevice(serial, scopeUuid, patch);
   if (!updated) return json({ error: 'failed to update device' }, 500);
 
   return json({ device: toPublicDevice(updated) });
@@ -630,11 +657,22 @@ const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
 
+  const scopeUuid = await getTeamScopeUuid(user);
+  const team = await getTeamForUser(user);
+
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
-  const unlinked = await unlinkDevice(serial, user.uuid);
+  // Role check: deleting requires manager (or individual owner).
+  if (team) {
+    const role = getTeamRole(user);
+    if (role !== 'manager') {
+      return json({ error: 'Forbidden' }, 403);
+    }
+  }
+
+  const unlinked = await unlinkDevice(serial, scopeUuid);
   if (!unlinked) return json({ error: 'failed to unlink device' }, 500);
 
   return json({ unlinked: true, serial });
