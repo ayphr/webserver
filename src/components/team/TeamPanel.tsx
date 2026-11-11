@@ -32,6 +32,7 @@ export function TeamPanel() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, []);
 
@@ -76,7 +77,7 @@ export function TeamPanel() {
         <ul>
           {members.map((m) => (
             <li key={m.uuid}>
-              {m.username} — {m.role}
+              {m.username} - {m.role}
               <select value={m.role} onChange={(e) => handleRoleChange(m.uuid, e.target.value as TeamRole)}>
                 <option value="member">member</option>
                 <option value="helper">helper</option>
