@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Input, Modal, Select } from '../common';
+import { IconUserPlus } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite } from '@common';
 import './TeamPanel.css';
 
@@ -17,8 +18,7 @@ export function TeamPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [role, setRole] = useState<TeamRole>('member');
 
   const load = async () => {
@@ -46,16 +46,17 @@ export function TeamPanel() {
   }, []);
 
   const handleInvite = async () => {
-    if (!username.trim() && !email.trim()) return;
+    const value = identifier.trim();
+    if (!value) return;
     setError(null);
+    const isEmail = value.includes('@');
     try {
       await api.teams.addMember({
-        username: username.trim() || undefined,
-        email: email.trim() || undefined,
+        username: isEmail ? undefined : value,
+        email: isEmail ? value : undefined,
         role,
       });
-      setUsername('');
-      setEmail('');
+      setIdentifier('');
       setRole('member');
       setIsInviteOpen(false);
       await load();
@@ -99,10 +100,13 @@ export function TeamPanel() {
     <div className="team-panel">
       <header className="team-panel__header">
         <h3 className="team-panel__title">{team.name ?? 'Team'}</h3>
-        <Button onClick={() => setIsInviteOpen(true)}>Invite member</Button>
+        <Button variant="secondary" onClick={() => setIsInviteOpen(true)}>
+          <IconUserPlus size={16} />
+          Invite member
+        </Button>
       </header>
 
-      <section className="team-panel__section">
+      <section className="team-panel__section team-panel__section--plain">
         <h4 className="team-panel__section-title">Members</h4>
         <ul className="team-panel__list team-panel__list--plain">
           {members.map((m) => (
@@ -148,24 +152,19 @@ export function TeamPanel() {
       <Modal
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
+        onConfirm={handleInvite}
         title="Invite a team member"
+        confirmText="Send invite"
+        cancelText="Close"
+        confirmDisabled={!identifier.trim()}
       >
         <div className="team-panel__invite-form">
           <Input
-            label="Username"
-            placeholder="Existing user (optional)"
-            helperText="For an existing Ayphr account"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            fullWidth
-          />
-          <Input
-            label="Email"
-            type="email"
-            placeholder="name@example.com"
-            helperText="For new or existing users"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            label="Username or email"
+            placeholder="username or name@example.com"
+            helperText="Existing account is added; new emails receive an invite"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             fullWidth
           />
           <Select
@@ -175,9 +174,6 @@ export function TeamPanel() {
             options={ROLE_OPTIONS}
             fullWidth
           />
-          <Button onClick={handleInvite} fullWidth>
-            Send invite / Add
-          </Button>
         </div>
       </Modal>
     </div>
