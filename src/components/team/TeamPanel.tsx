@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Input, Select } from '../common';
-import type { Team, TeamMember, TeamAuditLog, TeamRole, TeamInvite } from '@common';
+import { Button, Input, Modal, Select } from '../common';
+import type { Team, TeamMember, TeamRole, TeamInvite } from '@common';
 import './TeamPanel.css';
 
 const ROLE_OPTIONS = [
@@ -14,9 +14,9 @@ export function TeamPanel() {
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<TeamInvite[]>([]);
-  const [logs, setLogs] = useState<TeamAuditLog[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<TeamRole>('member');
@@ -33,11 +33,6 @@ export function TeamPanel() {
       } catch {
         setInvites([]);
       }
-      try {
-        setLogs(await api.teams.auditLogs());
-      } catch {
-        setLogs([]);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load team');
     } finally {
@@ -50,7 +45,7 @@ export function TeamPanel() {
     void load();
   }, []);
 
-  const handleAdd = async () => {
+  const handleInvite = async () => {
     if (!username.trim() && !email.trim()) return;
     setError(null);
     try {
@@ -61,9 +56,11 @@ export function TeamPanel() {
       });
       setUsername('');
       setEmail('');
+      setRole('member');
+      setIsInviteOpen(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add member');
+      setError(err instanceof Error ? err.message : 'Failed to invite member');
     }
   };
 
@@ -102,14 +99,14 @@ export function TeamPanel() {
     <div className="team-panel">
       <header className="team-panel__header">
         <h3 className="team-panel__title">{team.name ?? 'Team'}</h3>
-        <span className="team-panel__badge">{team.tier}</span>
+        <Button onClick={() => setIsInviteOpen(true)}>Invite member</Button>
       </header>
 
       <section className="team-panel__section">
         <h4 className="team-panel__section-title">Members</h4>
-        <ul className="team-panel__list">
+        <ul className="team-panel__list team-panel__list--plain">
           {members.map((m) => (
-            <li key={m.uuid} className="team-panel__list-item">
+            <li key={m.uuid} className="team-panel__member-row">
               <div className="team-panel__member-info">
                 <span className="team-panel__member-name">{m.username}</span>
                 <span className="team-panel__member-role">{m.role}</span>
@@ -127,34 +124,14 @@ export function TeamPanel() {
             </li>
           ))}
         </ul>
-
-        <div className="team-panel__add">
-          <Input
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <Input
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <Select
-            value={role}
-            onChange={(e) => setRole(e.target.value as TeamRole)}
-            options={ROLE_OPTIONS}
-          />
-          <Button onClick={handleAdd}>Add / Invite</Button>
-        </div>
       </section>
 
       {invites.length > 0 && (
         <section className="team-panel__section">
           <h4 className="team-panel__section-title">Pending invites</h4>
-          <ul className="team-panel__list">
+          <ul className="team-panel__list team-panel__list--plain">
             {invites.map((invite) => (
-              <li key={invite.id} className="team-panel__list-item">
+              <li key={invite.id} className="team-panel__member-row">
                 <div className="team-panel__member-info">
                   <span className="team-panel__member-name">{invite.email}</span>
                   <span className="team-panel__member-role">{invite.role}</span>
@@ -168,21 +145,41 @@ export function TeamPanel() {
         </section>
       )}
 
-      <section className="team-panel__section">
-        <h4 className="team-panel__section-title">Audit log</h4>
-        <ul className="team-panel__list">
-          {logs.map((log) => (
-            <li key={log.id} className="team-panel__list-item">
-              <span className="team-panel__audit-action">{log.action}</span>
-              <span className="team-panel__audit-meta">
-                by {log.actorUsername}
-                {log.targetUsername ? ` → ${log.targetUsername}` : ''}
-              </span>
-            </li>
-          ))}
-          {logs.length === 0 && <li className="team-panel__empty">No audit entries yet.</li>}
-        </ul>
-      </section>
+      <Modal
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        title="Invite a team member"
+      >
+        <div className="team-panel__invite-form">
+          <Input
+            label="Username"
+            placeholder="Existing user (optional)"
+            helperText="For an existing Ayphr account"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            fullWidth
+          />
+          <Input
+            label="Email"
+            type="email"
+            placeholder="name@example.com"
+            helperText="For new or existing users"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            fullWidth
+          />
+          <Select
+            label="Role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as TeamRole)}
+            options={ROLE_OPTIONS}
+            fullWidth
+          />
+          <Button onClick={handleInvite} fullWidth>
+            Send invite / Add
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -41,7 +41,9 @@ const iconFor = (id: string) => {
     case 'my-apps':
       return <IconApps size={18} />;
     case 'team':
-      return <IconUsers size={18} />;
+      return <IconUsersGroup size={18} />;
+    case 'team-audit':
+      return <IconClipboardList size={18} />;
     case 'jail':
       return <IconBan size={18} />;
     default:
@@ -60,6 +62,7 @@ type Props = {
   isStaff?: boolean;
   isDeveloper?: boolean;
   isTeamMember?: boolean;
+  isTeamManager?: boolean;
   credits?: CreditBalance | null;
   accounts?: StoredAccount[];
   activeToken?: string | null;
@@ -79,6 +82,7 @@ export const Sidebar: React.FC<Props> = ({
   isStaff = false,
   isDeveloper = false,
   isTeamMember = false,
+  isTeamManager = false,
   credits = null,
   accounts = [],
   activeToken = null,
@@ -86,7 +90,12 @@ export const Sidebar: React.FC<Props> = ({
   onLogoutAccount,
   pinned = false,
 }) => {
-  const teamTabs: Tab[] = isTeamMember ? [{ id: 'team', name: 'Team' }] : [];
+  const teamTabs: Tab[] = isTeamMember
+    ? [
+        { id: 'team', name: 'Team' },
+        ...(isTeamManager ? [{ id: 'team-audit', name: 'Team audit' }] : []),
+      ]
+    : [];
   const visibleTabs = [
     ...tabs,
     ...teamTabs,

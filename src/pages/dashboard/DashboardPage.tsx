@@ -20,11 +20,12 @@ const ConnectionsPanel = lazy(() => import('../../components/connections/Connect
 const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
 const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
 const TeamPanel = lazy(() => import('../../components/team/TeamPanel').then((m) => ({ default: m.TeamPanel })));
+const TeamAuditPanel = lazy(() => import('../../components/team/TeamAuditPanel').then((m) => ({ default: m.TeamAuditPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team']);
+const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit']);
 
 function getRelativeTime(date: Date | string): string {
   const resolvedDate = toDate(date);
@@ -191,6 +192,7 @@ export const DashboardPage = () => {
   const isStaff = user?.role === 'staff';
   const isDeveloper = user?.developerAccount === true;
   const isTeamMember = Boolean(user?.teamId) || (user?.subscription?.tier ?? '').startsWith('team-');
+  const isTeamManager = user?.teamRole === 'manager' || ((user?.subscription?.tier ?? '').startsWith('team-') && !user?.teamId);
 
   const handleSelfPunishment = async () => {
     // Refresh user data to get the updated suspension status.
@@ -498,7 +500,7 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} isTeamMember={isTeamMember} pinned={sidebarPinned} credits={credits} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main">
           <DashboardPanel title="Dashboard">
             <p>Could not load user profile.</p>
@@ -510,7 +512,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} isTeamMember={isTeamMember} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
@@ -678,9 +680,17 @@ export const DashboardPage = () => {
             )}
 
             {activePage === 'team' && isTeamMember && (
-              <DashboardPanel title="Team" description="Manage your team members and audit logs" className="dashboard-panel--full">
+              <DashboardPanel title="Team" description="Manage your team members" className="dashboard-panel--full">
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <TeamPanel />
+                </Suspense>
+              </DashboardPanel>
+            )}
+
+            {activePage === 'team-audit' && isTeamManager && (
+              <DashboardPanel title="Team audit log" description="Recent team activity" className="dashboard-panel--full">
+                <Suspense fallback={<DashboardContentSkeleton />}>
+                  <TeamAuditPanel />
                 </Suspense>
               </DashboardPanel>
             )}
