@@ -27,8 +27,14 @@ export async function getTeamForUser(user: Pick<User, 'uuid' | 'teamId' | 'paidS
 
   // A user with an active paid team subscription is an implicit team manager.
   const paid = getActivePaidSubscription(user as Pick<User, 'paidSubscriptions'>);
-  if (paid && paid.tier.startsWith('team-')) {
+  if (paid?.tier.startsWith('team-')) {
     return ensureTeamForManager(user.uuid, paid.tier);
+  }
+
+  // Attached (granted) team subscriptions also create a team, with no seat billing.
+  const attached = (user.attachedSubscriptions ?? []).find((s) => s.tier.startsWith('team-') && (s.expiresAt === null || new Date(s.expiresAt).getTime() > Date.now()));
+  if (attached) {
+    return ensureTeamForManager(user.uuid, attached.tier);
   }
 
   return null;
@@ -43,7 +49,7 @@ export async function ensureTeamForManager(managerUuid: string, tier?: string): 
 
   const paid = getActivePaidSubscription(user);
   const resolvedTier = (tier ?? paid?.tier) as string | undefined;
-  if (!resolvedTier || !resolvedTier.startsWith('team-')) return null;
+  if (!resolvedTier?.startsWith('team-')) return null;
 
   const now = new Date();
   const team: Team = {
@@ -353,7 +359,11 @@ export async function acceptTeamInvite(params: {
 
 export async function getTeamSeatLimit(team: Team, manager: User): Promise<number> {
   const paid = getActivePaidSubscription(manager);
-  const seats = paid?.quantity ?? 1;
-  const planMax = (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? seats;
-  return Math.min(seats, planMax);
+  if (paid?.tier === team.tier) {
+    const seats = paid.quantity ?? 1;
+    const planMax = (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? seats;
+    return Math.min(seats, planMax);
+  }
+  // Attached/granted team plans: no seat billing, use plan max.
+  return (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
 }
