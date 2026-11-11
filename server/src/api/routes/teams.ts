@@ -4,7 +4,6 @@ import {
   getTeamForUser,
   ensureTeamForManager,
   getTeamMembers,
-  addTeamMember as addMember,
   removeTeamMember as removeMember,
   updateTeamMemberRole as updateRole,
   getTeamAuditLogs,
@@ -74,6 +73,7 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
   const username = typeof body?.username === 'string' ? body.username.trim() : '';
   const uuid = typeof body?.uuid === 'string' ? body.uuid.trim() : '';
   const email = typeof body?.email === 'string' ? body.email.trim() : '';
+  const migrateData = body?.migrateData === true;
   const roleRaw = body?.role;
   const role: TeamRole = isTeamRole(roleRaw) ? roleRaw : 'member';
 
@@ -81,44 +81,20 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
     return json({ error: 'username, uuid, or email is required' }, 400);
   }
 
-  // If an email is provided and no matching account exists, create an invite instead.
+  // Resolve target (if any) for validation.
   let target = uuid ? await getUserFromUuid(uuid) : username ? await getUserFromUsername(username) : null;
   if (!target && email) {
     target = await getUserByEmail(email);
   }
 
-  if (!target && email) {
-    const members = await getTeamMembers(team.id);
-    const seatLimit = await getTeamSeatLimit(team, user);
-    if (members.length >= seatLimit) {
-      return json({ error: 'team member limit reached' }, 409);
-    }
-
-    const invite = await createTeamInvite({ team, actor: user, email, role });
-
-    // Send invite email (best effort).
-    try {
-      const { sendEmail } = await import('../../lib/email');
-      const { CLIENT_URL } = await import('../../env');
-      const link = `${CLIENT_URL}/team/invite/${invite.token}`;
-      await sendEmail({
-        to: email,
-        subject: 'You have been invited to join an Ayphr team',
-        html: `<p>You have been invited to join a team on Ayphr.</p><p><a href="${link}">Accept invitation</a></p>`,
-        text: `You have been invited to join a team on Ayphr. Accept: ${link}`,
-      });
-    } catch {
-      // ignore
-    }
-
-    return json({ invite }, 201);
+  if (target) {
+    if (target.uuid === user.uuid) return json({ error: 'cannot add yourself' }, 400);
+    if (target.teamId) return json({ error: 'user already belongs to a team' }, 409);
   }
 
-  if (!target) return json({ error: 'user not found' }, 404);
-  if (target.uuid === user.uuid) return json({ error: 'cannot add yourself' }, 400);
-
-  if (target.teamId) {
-    return json({ error: 'user already belongs to a team' }, 409);
+  const inviteEmail = target?.email ?? (email.includes('@') ? email : '');
+  if (!inviteEmail) {
+    return json({ error: 'a valid email is required to invite this user' }, 400);
   }
 
   const members = await getTeamMembers(team.id);
@@ -127,29 +103,24 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
     return json({ error: 'team member limit reached' }, 409);
   }
 
-  await addMember({ team, manager: user, target, role });
+  const invite = await createTeamInvite({ team, actor: user, email: inviteEmail, role, migrateData });
 
-  // Notify the added user by email (best effort).
+  // Send invite email (best effort).
   try {
     const { sendEmail } = await import('../../lib/email');
+    const { CLIENT_URL } = await import('../../env');
+    const link = `${CLIENT_URL}/team/invite/${invite.token}`;
     await sendEmail({
-      to: target.email ?? '',
-      subject: 'You have been added to an Ayphr team',
-      html: `<p>You have been added to a team on Ayphr by ${user.username}.</p>`,
-      text: `You have been added to a team on Ayphr by ${user.username}.`,
+      to: inviteEmail,
+      subject: 'You have been invited to join an Ayphr team',
+      html: `<p>You have been invited to join a team on Ayphr by ${user.username}.</p>${migrateData ? '<p>Accepting will move your existing devices and locations into the team.</p>' : ''}<p><a href="${link}">Accept invitation</a></p>`,
+      text: `You have been invited to join a team on Ayphr by ${user.username}.${migrateData ? ' Accepting will move your existing devices and locations into the team.' : ''} Accept: ${link}`,
     });
   } catch {
     // ignore
   }
 
-  const member = {
-    uuid: target.uuid,
-    username: target.username,
-    role,
-    joinedAt: new Date(),
-  };
-
-  return json({ member }, 201);
+  return json({ invite }, 201);
 });
 
 const handleTeamMemberRoleUpdate = requireAuth(async (request, user: User, params) => {

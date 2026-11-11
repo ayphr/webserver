@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Input, Modal, Select } from '../common';
+import { Button, Checkbox, Input, Modal, Select } from '../common';
 import { IconUserPlus } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite } from '@common';
 import './TeamPanel.css';
@@ -20,6 +20,7 @@ export function TeamPanel() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [role, setRole] = useState<TeamRole>('member');
+  const [migrateData, setMigrateData] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -55,9 +56,11 @@ export function TeamPanel() {
         username: isEmail ? undefined : value,
         email: isEmail ? value : undefined,
         role,
+        migrateData,
       });
       setIdentifier('');
       setRole('member');
+      setMigrateData(false);
       setIsInviteOpen(false);
       await load();
     } catch (err) {
@@ -173,6 +176,11 @@ export function TeamPanel() {
             onChange={(e) => setRole(e.target.value as TeamRole)}
             options={ROLE_OPTIONS}
             fullWidth
+          />
+          <Checkbox
+            label="Migrate their existing devices and locations into the team"
+            checked={migrateData}
+            onChange={(e) => setMigrateData(e.target.checked)}
           />
         </div>
       </Modal>

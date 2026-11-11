@@ -268,11 +268,13 @@ export async function createTeamInvite(params: {
   actor: User;
   email: string;
   role: TeamRole;
+  migrateData?: boolean;
 }): Promise<TeamInvite> {
-  const { team, actor, email, role } = params;
+  const { team, actor, email, role, migrateData } = params;
   const now = new Date();
   const token = (await import('node:crypto')).randomBytes(32).toString('hex');
   const invite: TeamInvite = {
+    migrateData: migrateData ?? false,
     id: randomUUID(),
     teamId: team.id,
     email: email.toLowerCase().trim(),
@@ -309,6 +311,29 @@ export async function revokeTeamInvite(teamId: string, inviteId: string): Promis
   return result.deletedCount > 0;
 }
 
+
+async function migrateUserDataToTeam(userUuid: string, team: Team): Promise<void> {
+  const manager = await getUserFromUuid(team.managerUuid);
+  const scopeUuid = team.managerUuid;
+  const scopeUsername = manager?.username ?? '';
+
+  const devices = await getCollection('devices');
+  trackMongoOperation('updateMany', 'devices');
+  await devices.updateMany({ ownerUuid: userUuid }, { $set: { ownerUuid: scopeUuid, ownerUsername: scopeUsername } });
+
+  const locations = await getCollection('locations');
+  trackMongoOperation('updateMany', 'locations');
+  await locations.updateMany({ ownerUuid: userUuid }, { $set: { ownerUuid: scopeUuid, ownerUsername: scopeUsername } });
+
+  try {
+    const { invalidateDeviceCachesForOwner } = await import('./devices');
+    await invalidateDeviceCachesForOwner(userUuid);
+    await invalidateDeviceCachesForOwner(scopeUuid);
+  } catch {
+    // ignore
+  }
+}
+
 export async function acceptTeamInvite(params: {
   invite: TeamInvite;
   user: User;
@@ -339,6 +364,10 @@ export async function acceptTeamInvite(params: {
   }
 
   await setUserTeamMembership(user.uuid, team.id, invite.role);
+
+  if (invite.migrateData) {
+    await migrateUserDataToTeam(user.uuid, team);
+  }
 
   const invites = await getCollection('teamInvites');
   trackMongoOperation('updateOne', 'team_invites');
