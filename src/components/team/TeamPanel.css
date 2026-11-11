@@ -1,0 +1,139 @@
+.team-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.team-panel__loading,
+.team-panel__empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.team-panel__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  background: rgba(255, 100, 100, 0.08);
+  color: var(--status-error);
+  font-size: 0.85rem;
+}
+
+.team-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.team-panel__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-hv);
+  color: var(--text-primary);
+}
+
+.team-panel__badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.team-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.team-panel__section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-md);
+  color: var(--text-primary);
+}
+
+.team-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.team-panel__list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.team-panel__member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.team-panel__member-name {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-md);
+}
+
+.team-panel__member-role {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.team-panel__member-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.team-panel__add {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .team-panel__add {
+    grid-template-columns: 1fr;
+  }
+  .team-panel__list-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .team-panel__member-actions {
+    justify-content: flex-end;
+  }
+}
+
+.team-panel__audit-action {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-md);
+}
+
+.team-panel__audit-meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}

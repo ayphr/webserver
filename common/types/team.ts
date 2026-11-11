@@ -52,6 +52,7 @@ export type TeamAuditLogListPayload = {
 export type TeamMemberAddRequest = {
   username?: string;
   uuid?: string;
+  email?: string;
   role?: TeamRole;
 };
 
