@@ -166,3 +166,9 @@
   background: transparent;
   padding: 0;
 }
+
+.team-panel__edit-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}

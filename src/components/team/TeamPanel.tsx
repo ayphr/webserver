@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Checkbox, Input, Modal, Select } from '../common';
-import { IconUserPlus } from '@tabler/icons-react';
+import { IconUserPlus, IconEdit } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite } from '@common';
 import './TeamPanel.css';
 
@@ -18,6 +18,8 @@ export function TeamPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [editRole, setEditRole] = useState<TeamRole>('member');
   const [identifier, setIdentifier] = useState('');
   const [role, setRole] = useState<TeamRole>('member');
   const [migrateData, setMigrateData] = useState(false);
@@ -68,18 +70,22 @@ export function TeamPanel() {
     }
   };
 
-  const handleRoleChange = async (uuid: string, newRole: TeamRole) => {
+  const handleEditSave = async () => {
+    if (!editingMember) return;
     try {
-      await api.teams.updateRole(uuid, { role: newRole });
+      await api.teams.updateRole(editingMember.uuid, { role: editRole });
+      setEditingMember(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update role');
     }
   };
 
-  const handleRemove = async (uuid: string) => {
+  const handleEditRemove = async () => {
+    if (!editingMember) return;
     try {
-      await api.teams.removeMember(uuid);
+      await api.teams.removeMember(editingMember.uuid);
+      setEditingMember(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove member');
@@ -118,16 +124,16 @@ export function TeamPanel() {
                 <span className="team-panel__member-name">{m.username}</span>
                 <span className="team-panel__member-role">{m.role}</span>
               </div>
-              <div className="team-panel__member-actions">
-                <Select
-                  value={m.role}
-                  onChange={(e) => handleRoleChange(m.uuid, e.target.value as TeamRole)}
-                  options={ROLE_OPTIONS}
-                />
-                <Button variant="danger" onClick={() => handleRemove(m.uuid)}>
-                  Remove
-                </Button>
-              </div>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setEditingMember(m);
+                  setEditRole(m.role);
+                }}
+              >
+                <IconEdit size={16} />
+                Edit
+              </Button>
             </li>
           ))}
         </ul>
@@ -182,6 +188,28 @@ export function TeamPanel() {
             checked={migrateData}
             onChange={(e) => setMigrateData(e.target.checked)}
           />
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(editingMember)}
+        onClose={() => setEditingMember(null)}
+        title={editingMember ? `Edit ${editingMember.username}` : 'Edit member'}
+      >
+        <div className="team-panel__invite-form">
+          <Select
+            label="Role"
+            value={editRole}
+            onChange={(e) => setEditRole(e.target.value as TeamRole)}
+            options={ROLE_OPTIONS}
+            fullWidth
+          />
+          <div className="team-panel__edit-actions">
+            <Button variant="danger" onClick={handleEditRemove}>
+              Remove from team
+            </Button>
+            <Button onClick={handleEditSave}>Save</Button>
+          </div>
         </div>
       </Modal>
     </div>
