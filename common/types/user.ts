@@ -63,11 +63,12 @@ export type User = {
   paidSubscriptions?: PaidSubscription[];
   attachedSubscriptions?: AttachedSubscription[];
   credits?: UserCredits;
+  trustedDevices?: string[];
 };
 
 export type PublicUser = Omit<
   User,
-  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar' | 'gameBests' | 'email' | 'emailVerifiedAt'
+  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar' | 'gameBests' | 'email' | 'emailVerifiedAt' | 'trustedDevices'
 > & {
   badges: BadgeId[];
   avatarUrl?: string;

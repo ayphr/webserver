@@ -11,7 +11,7 @@ import { getEmailValidationError } from '@common/utils/email';
 import { EMAIL_CODE_LENGTH } from '@common';
 
 type AuthMode = 'login' | 'signup';
-type AuthStep = 'form' | 'email-code' | 'forgot' | 'forgot-code';
+type AuthStep = 'form' | 'email-code' | 'forgot' | 'forgot-code' | 'device-code';
 
 interface FormData {
   username: string;
@@ -222,13 +222,35 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
       return;
     }
 
+    if (mode === 'login' && step === 'device-code') {
+      if (code.length !== EMAIL_CODE_LENGTH) {
+        setAuthError(`Enter the ${EMAIL_CODE_LENGTH}-digit code sent to your email`);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        await api.auth.verifyDeviceLogin({ username: formData.username, code });
+        navigate(redirectTo);
+      } catch (error) {
+        setAuthError(error instanceof Error ? error.message : 'Failed to verify code. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     // default: form step
     if (!validateForm()) return;
     setIsLoading(true);
     try {
       if (mode === 'login') {
-        await api.auth.login({ username: formData.username, password: formData.password });
-        navigate(redirectTo);
+        const result = await api.auth.login({ username: formData.username, password: formData.password });
+        if ('requiresDeviceVerification' in result && result.requiresDeviceVerification) {
+          setCode('');
+          setStep('device-code');
+        } else {
+          navigate(redirectTo);
+        }
       } else {
         await api.auth.requestEmailCode({ email: formData.email!.trim() });
         setCode('');
@@ -282,6 +304,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   if (isSignup && step === 'email-code') title = 'Verify Your Email';
   if (mode === 'login' && step === 'forgot') title = 'Reset Password';
   if (mode === 'login' && step === 'forgot-code') title = 'Reset Password';
+  if (mode === 'login' && step === 'device-code') title = 'Verify Your Login';
 
   return (
     <div className="auth-page">
@@ -404,6 +427,43 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                 <div className="auth-form__resend">
                   <Button variant="secondary" onClick={handleResend} disabled={resendCooldown > 0 || isLoading}>
                     {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                  </Button>
+                  <Button variant="secondary" onClick={() => { setStep('form'); setCode(''); setAuthError(null); }} disabled={isLoading}>
+                    Back to log in
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {mode === 'login' && step === 'device-code' && (
+              <form onSubmit={handleSubmit} className="auth-form">
+                <p className="auth-form__code-hint">
+                  We noticed a sign-in from a new device. We sent a {EMAIL_CODE_LENGTH}-digit code to your email. Enter it to finish signing in.
+                </p>
+                <CodeInput value={code} onChange={setCode} />
+                <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
+                  Verify &amp; Sign In
+                </Button>
+                <div className="auth-form__resend">
+                  <Button variant="secondary" onClick={async () => {
+                    if (isLoading) return;
+                    setIsLoading(true);
+                    setAuthError(null);
+                    try {
+                      const result = await api.auth.login({ username: formData.username, password: formData.password });
+                      if ('requiresDeviceVerification' in result && result.requiresDeviceVerification) {
+                        setCode('');
+                        setResendCooldown(RESEND_COOLDOWN_SECONDS);
+                      } else {
+                        navigate(redirectTo);
+                      }
+                    } catch (error) {
+                      setAuthError(error instanceof Error ? error.message : 'Failed to resend code.');
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }} disabled={isLoading}>
+                    Resend code
                   </Button>
                   <Button variant="secondary" onClick={() => { setStep('form'); setCode(''); setAuthError(null); }} disabled={isLoading}>
                     Back to log in

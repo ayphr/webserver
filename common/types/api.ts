@@ -237,6 +237,11 @@ export type EmailConfirmPayload = {
   user: SelfUser;
 };
 
+export type DeviceVerificationRequiredPayload = {
+  requiresDeviceVerification: true;
+  expiresAt: Date;
+};
+
 export type StaffSubscriptionAttachRequest = {
   tier: SubscriptionTier;
   expiresAt?: string | null;

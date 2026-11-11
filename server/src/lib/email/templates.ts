@@ -1,4 +1,7 @@
 import { EMAIL_CODE_LENGTH } from '@common';
+import { CLIENT_URL } from '../../env';
+
+const LOGO_URL = `${CLIENT_URL}/logo.png`;
 
 // Branding taken from src/index.css (dark theme).
 const COLORS = {
@@ -16,7 +19,7 @@ const COLORS = {
 const FONT_BASE = "'DM Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const FONT_MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace";
 
-const TITLE_BY_PURPOSE: Record<'register' | 'reset' | 'change', { subject: string; heading: string; intro: string }> = {
+const TITLE_BY_PURPOSE: Record<EmailCodePurpose, { subject: string; heading: string; intro: string }> = {
   register: {
     subject: 'Your Ayphr verification code',
     heading: 'Verify your email',
@@ -31,6 +34,11 @@ const TITLE_BY_PURPOSE: Record<'register' | 'reset' | 'change', { subject: strin
     subject: 'Your Ayphr email confirmation code',
     heading: 'Confirm your email',
     intro: 'Enter this code to confirm your new email address for your Ayphr account.',
+  },
+  login: {
+    subject: 'Your Ayphr login code',
+    heading: 'Verify your login',
+    intro: 'We noticed a sign-in from a new device. Enter this code to finish signing in.',
   },
 };
 
@@ -92,6 +100,57 @@ https://ayphr.com`;
   return { subject, html, text };
 }
 
+export type NotificationEmailParams = {
+  heading: string;
+  subject: string;
+  intro: string;
+  lines?: string[];
+};
+
+export function buildNotificationEmail(params: NotificationEmailParams): { subject: string; html: string; text: string } {
+  const lines = params.lines ?? [];
+  const bodyRows = lines
+    .map(
+      (line) => `
+    <tr>
+      <td style="padding:4px 32px;text-align:center;">
+        <p style="margin:0;font-family:${FONT_BASE};font-size:14px;line-height:1.5;color:${COLORS.textMuted};">${escapeHtml(line)}</p>
+      </td>
+    </tr>`,
+    )
+    .join('');
+
+  const bodyHtml = `
+    <tr>
+      <td style="padding:8px 32px 0;text-align:center;">
+        <h1 style="margin:0 0 8px;font-family:${FONT_BASE};font-size:22px;font-weight:700;letter-spacing:-0.01em;color:${COLORS.textPrimary};">${escapeHtml(params.heading)}</h1>
+        <p style="margin:0 0 4px;font-family:${FONT_BASE};font-size:15px;line-height:1.5;color:${COLORS.textMuted};">${escapeHtml(params.intro)}</p>
+      </td>
+    </tr>
+    ${bodyRows}
+    <tr>
+      <td style="padding:16px 32px 24px;text-align:center;">
+        <p style="margin:0;font-family:${FONT_BASE};font-size:12px;color:${COLORS.textDim};line-height:1.5;">If you didn't do this, you can secure your account by changing your password.</p>
+      </td>
+    </tr>
+  `;
+
+  const html = renderLayout({ heading: params.heading, bodyHtml, preview: params.intro });
+
+  const text = `${params.heading}
+
+${params.intro}
+
+${lines.join('\n')}
+
+If you didn't do this, you can secure your account by changing your password.
+
+Ayphr
+https://ayphr.com`;
+
+  return { subject: params.subject, html, text };
+}
+
 type LayoutParams = { heading: string; bodyHtml: string; preview: string };
 
 function renderLayout({ bodyHtml, preview }: LayoutParams): string {
@@ -119,7 +178,7 @@ function renderLayout({ bodyHtml, preview }: LayoutParams): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;background-color:${COLORS.surface};border:1px solid ${COLORS.borderSubtle};border-radius:14px;">
           <tr>
             <td style="padding:28px 32px 0;text-align:center;">
-              <span style="font-family:${FONT_BASE};font-size:20px;font-weight:800;letter-spacing:0.08em;color:${COLORS.textPrimary};text-decoration:none;">AYPHR</span>
+              <img src="${LOGO_URL}" alt="Ayphr" width="140" style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;height:auto;max-width:140px;" />
             </td>
           </tr>
           ${bodyHtml}

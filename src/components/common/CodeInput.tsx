@@ -8,12 +8,6 @@ export interface CodeInputProps {
   disabled?: boolean;
   autoFocus?: boolean;
   ariaLabel?: string;
-  inputMode?: 'numeric' | 'text';
-  autoCapitalize?: 'none' | 'characters' | 'sentences' | 'words';
-  /** Transform applied to each entered character (e.g. to uppercase). */
-  transform?: (char: string) => string;
-  /** Whether a character is allowed. Defaults to digits only. */
-  accept?: (char: string) => boolean;
 }
 
 export const CodeInput = ({
@@ -23,10 +17,6 @@ export const CodeInput = ({
   disabled = false,
   autoFocus = false,
   ariaLabel = 'Verification code',
-  inputMode = 'numeric',
-  autoCapitalize = 'none',
-  transform = (c) => c,
-  accept = (c) => /[0-9]/.test(c),
 }: CodeInputProps) => {
   const inputRefs = useRef<HTMLInputElement[]>([]);
 
@@ -41,12 +31,7 @@ export const CodeInput = ({
   };
 
   const applyPaste = (startIndex: number, text: string) => {
-    const cleaned = text
-      .split('')
-      .map((c) => transform(c))
-      .filter((c) => accept(c))
-      .join('')
-      .slice(0, length);
+    const cleaned = text.replace(/\D/g, '').slice(0, length);
     const arr = value.split('');
     while (arr.length < length) arr.push('');
     for (let i = 0; i < cleaned.length; i += 1) {
@@ -59,19 +44,13 @@ export const CodeInput = ({
   };
 
   const handleChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    const transformed = raw.split('').map((c) => transform(c)).join('');
-    const val = transformed.split('').filter((c) => accept(c)).join('');
+    const val = e.target.value.replace(/\D/g, '');
     if (val.length > 1) {
-      applyPaste(index, raw);
+      applyPaste(index, val);
       return;
     }
-    if (val.length === 1) {
-      setCodeAt(index, val);
-      if (index < length - 1) inputRefs.current[index + 1]?.focus();
-    } else if (raw === '') {
-      setCodeAt(index, '');
-    }
+    setCodeAt(index, val);
+    if (val && index < length - 1) inputRefs.current[index + 1]?.focus();
   };
 
   const handlePaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -99,8 +78,8 @@ export const CodeInput = ({
           ref={(el) => { if (el) inputRefs.current[i] = el; }}
           className="code-input__box"
           type="text"
-          inputMode={inputMode}
-          autoCapitalize={autoCapitalize}
+          inputMode="numeric"
+          pattern="[0-9]*"
           autoComplete="one-time-code"
           maxLength={1}
           value={char}

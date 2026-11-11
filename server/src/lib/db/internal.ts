@@ -56,7 +56,7 @@ export type DevicePairing = {
   fetched?: boolean;
 };
 
-export type EmailCodePurpose = 'register' | 'reset' | 'change';
+export type EmailCodePurpose = 'register' | 'reset' | 'change' | 'login';
 
 export type EmailCode = {
   codeHash: string;

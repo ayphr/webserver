@@ -29,7 +29,8 @@ import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { normalizeEmail, getEmailValidationError } from '@common/utils/email';
 import { getUserByEmail } from '../../lib/db';
-import { verifyEmailCode } from '../../lib/email';
+import { verifyEmailCode, sendEmailCode, buildNotificationEmail, sendEmail } from '../../lib/email';
+import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { authEventsTotal, userRegistrationsByCountry } from '../../lib/metrics';
@@ -72,6 +73,12 @@ function validateAuthPayload(value: unknown): AuthPayload {
 const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
 
 const registerLimiter = createRateLimiter(60 * 60 * 1000, 10, 'register');
+
+function deviceFingerprint(request: Request): string | null {
+  const userAgent = request.headers.get('user-agent');
+  if (!userAgent) return null;
+  return hashToken(userAgent);
+}
 const loginLimiter = createRateLimiter(15 * 60 * 1000, 20, 'login');
 async function handleRegister(request: Request) {
   const ipCheck = await registerLimiter.check(`ip:${getClientIp(request)}`);
@@ -154,6 +161,7 @@ async function handleRegister(request: Request) {
     username,
     email,
     emailVerifiedAt: now,
+    trustedDevices: deviceFingerprint(request) ? [deviceFingerprint(request)!] : undefined,
     role: 'user',
     bio: DEFAULT_BIO,
     socialLinks: {},
@@ -247,10 +255,92 @@ async function handleLogin(request: Request) {
 
   const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
 
+  const fingerprint = deviceFingerprint(request);
+  const trusted = user.trustedDevices ?? [];
+  const isNewDevice = Boolean(fingerprint) && trusted.length > 0 && !trusted.includes(fingerprint!) && Boolean(user.email && user.emailVerifiedAt);
+
+  if (isNewDevice) {
+    const result = await sendEmailCode({ email: user.email!, purpose: 'login', userUuid: user.uuid });
+    if (result.status === 'sent') {
+      authEventsTotal.inc({ event: 'login', result: 'device_verification' });
+      return json({ requiresDeviceVerification: true, expiresAt: result.expiresAt }, 200);
+    }
+    if (result.status === 'rate_limited') {
+      authEventsTotal.inc({ event: 'login', result: 'rate_limited' });
+      return tooManyRequests(result.retryAfterMs);
+    }
+    // Fall through to normal login if email delivery fails, to avoid lockout.
+    authEventsTotal.inc({ event: 'login', result: 'email_delivery_failed' });
+  }
+
+  // Trust this device (first login or already trusted).
+  if (fingerprint && !trusted.includes(fingerprint)) {
+    user.trustedDevices = [...trusted, fingerprint];
+    await updateUser(user);
+  }
+
   const now = new Date();
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
   authEventsTotal.inc({ event: 'login', result: 'success' });
+
+  const policyStatus = await getPolicyStatus(user);
+
+  return json({
+    user: toSelfUser(user),
+    token,
+    suspension: activeSuspension,
+    policyStatus,
+    expiresAt: getExpiryDate(now),
+  });
+}
+
+const loginVerifyLimiter = createRateLimiter(15 * 60 * 1000, 10, 'login-verify');
+
+async function handleVerifyLogin(request: Request) {
+  const ipCheck = await loginVerifyLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) {
+    authEventsTotal.inc({ event: 'login_verify', result: 'rate_limited' });
+    return tooManyRequests(ipCheck.retryAfterMs);
+  }
+
+  const parsed = await readValidatedJsonBody(request, validateAuthPayload);
+  if ('error' in parsed) return parsed.error;
+  const body = parsed.value;
+
+  if (!body?.username || !body.code) {
+    authEventsTotal.inc({ event: 'login_verify', result: 'invalid' });
+    return json({ error: 'username and verification code are required' }, 400);
+  }
+
+  const username = body.username.trim();
+  const code = body.code.trim();
+
+  const user = await getUserFromUsername(username);
+  if (!user || !user.email || !user.emailVerifiedAt) {
+    authEventsTotal.inc({ event: 'login_verify', result: 'invalid' });
+    return json({ error: 'invalid or expired code' }, 400);
+  }
+
+  const verifyResult = await verifyEmailCode({ email: user.email, purpose: 'login', code, userUuid: user.uuid });
+  if (verifyResult.status !== 'verified') {
+    authEventsTotal.inc({ event: 'login_verify', result: 'invalid_code' });
+    return json({ error: 'invalid or expired code' }, 400);
+  }
+
+  const fingerprint = deviceFingerprint(request);
+  const trusted = user.trustedDevices ?? [];
+  if (fingerprint && !trusted.includes(fingerprint)) {
+    user.trustedDevices = [...trusted, fingerprint];
+    await updateUser(user);
+  }
+
+  const activeSuspension = await getActiveSuspensionForUserUuid(user.uuid);
+
+  const now = new Date();
+  const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
+
+  authEventsTotal.inc({ event: 'login_verify', result: 'success' });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -339,11 +429,22 @@ const handleChangePassword = requireAuth(async (request, user) => {
   }
 
   user.auth.passwordHash = await createPasswordHash(newPassword);
+  user.trustedDevices = [];
   await updateUser(user);
 
   // Changing the password signs out every device, including this one.
   await endAllSessions(user);
   authEventsTotal.inc({ event: 'password_change', result: 'success' });
+
+  if (user.email) {
+    const template = buildNotificationEmail({
+      subject: 'Your Ayphr password was changed',
+      heading: 'Password changed',
+      intro: 'The password for your Ayphr account was just changed.',
+      lines: ['If you made this change, no further action is needed.'],
+    });
+    void sendEmail({ to: user.email, subject: template.subject, html: template.html, text: template.text });
+  }
 
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
@@ -373,4 +474,4 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
-export { handleRegister, handleLogin, handleMe, handleLogout, handleLogoutAll, handleLogoutOthers, handleAcceptPolicies, handleChangePassword, handleDeleteAccount };
+export { handleRegister, handleLogin, handleVerifyLogin, handleMe, handleLogout, handleLogoutAll, handleLogoutOthers, handleAcceptPolicies, handleChangePassword, handleDeleteAccount };

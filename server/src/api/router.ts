@@ -3,6 +3,7 @@ import {
   handleChangePassword,
   handleDeleteAccount,
   handleLogin,
+  handleVerifyLogin,
   handleLogout,
   handleLogoutAll,
   handleLogoutOthers,
@@ -108,6 +109,7 @@ const ROUTES: readonly RouteDefinition[] = [
 
   { method: 'POST', path: '/api/auth/register', handle: handleAuthRegister },
   { method: 'POST', path: '/api/auth/login', handle: handleLogin },
+  { method: 'POST', path: '/api/auth/login/verify', handle: handleVerifyLogin },
   { method: 'GET', path: '/api/auth/me', handle: handleAuthMe },
   { method: 'POST', path: '/api/auth/logout', handle: handleLogout },
   { method: 'POST', path: '/api/auth/logout-all', handle: handleLogoutAll },

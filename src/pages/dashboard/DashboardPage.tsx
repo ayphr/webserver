@@ -317,7 +317,7 @@ export const DashboardPage = () => {
           icon: <IconMail size={18} strokeWidth={1.75} />,
           title: 'Email',
           description: user?.email
-            ? `${user.email}${user.emailVerifiedAt ? ` — verified ${formatDisplayDate(user.emailVerifiedAt)}` : ''}`
+            ? `${user.email}${user.emailVerifiedAt ? ` (verified ${formatDisplayDate(user.emailVerifiedAt)})` : ''}`
             : 'Add a verified email address to secure your account.',
           label: user?.email ? 'Change email' : 'Set email',
           variant: 'secondary',

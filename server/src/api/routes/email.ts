@@ -13,7 +13,7 @@ import { normalizeEmail, getEmailValidationError } from '@common/utils/email';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { authEventsTotal } from '../../lib/metrics';
-import { verifyEmailCode, sendEmailCode } from '../../lib/email';
+import { verifyEmailCode, sendEmailCode, buildNotificationEmail, sendEmail } from '../../lib/email';
 
 type EmailPayload = JsonObject & {
   email?: string;
@@ -168,10 +168,22 @@ async function handleResetPassword(request: Request) {
   }
 
   user.auth.passwordHash = await createPasswordHash(newPassword);
+  user.trustedDevices = [];
   await updateUser(user);
   await endAllSessions(user);
 
   authEventsTotal.inc({ event: 'password_reset', result: 'success' });
+
+  if (user.email) {
+    const template = buildNotificationEmail({
+      subject: 'Your Ayphr password was reset',
+      heading: 'Password reset',
+      intro: 'The password for your Ayphr account was just reset.',
+      lines: ['If you made this change, no further action is needed.'],
+    });
+    void sendEmail({ to: user.email, subject: template.subject, html: template.html, text: template.text });
+  }
+
   return new Response(null, { status: 204 });
 }
 
@@ -251,11 +263,33 @@ const handleEmailConfirm = requireAuth(async (request, user) => {
     return json({ error: 'invalid or expired code' }, 400);
   }
 
+  const previousEmail = user.email && user.email !== email ? user.email : null;
+
   user.email = email;
   user.emailVerifiedAt = new Date();
+  user.trustedDevices = [];
   await updateUser(user);
 
   authEventsTotal.inc({ event: 'email_confirm', result: 'success' });
+
+  if (previousEmail) {
+    const template = buildNotificationEmail({
+      subject: 'Your Ayphr email was changed',
+      heading: 'Email changed',
+      intro: 'The email address on your Ayphr account was just changed.',
+      lines: [`Your new email address is ${email}.`],
+    });
+    void sendEmail({ to: previousEmail, subject: template.subject, html: template.html, text: template.text });
+  }
+
+  const welcome = buildNotificationEmail({
+    subject: 'Your Ayphr email is confirmed',
+    heading: 'Email confirmed',
+    intro: 'Your email address has been confirmed for your Ayphr account.',
+    lines: ['You can now use this address for account recovery.'],
+  });
+  void sendEmail({ to: email, subject: welcome.subject, html: welcome.html, text: welcome.text });
+
   return json({ user: toSelfUser(user) }, 200);
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 

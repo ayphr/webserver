@@ -1,4 +1,4 @@
-import type { AcceptPoliciesPayload, AuthMePayload, AuthResponsePayload, AuthSession, ChangePasswordRequest, EmailChangeRequest, EmailCodeSentPayload, EmailConfirmPayload, EmailConfirmRequest, PasswordForgotRequest, PasswordResetRequest, SessionDeviceType } from '@common';
+import type { AcceptPoliciesPayload, AuthMePayload, AuthResponsePayload, AuthSession, ChangePasswordRequest, DeviceVerificationRequiredPayload, EmailChangeRequest, EmailCodeSentPayload, EmailConfirmPayload, EmailConfirmRequest, PasswordForgotRequest, PasswordResetRequest, SessionDeviceType } from '@common';
 import type { RequestClient } from './client';
 import { addStoredAccount, removeStoredAccount } from '../accounts';
 
@@ -56,7 +56,29 @@ export function createAuthApi(client: RequestClient) {
       } satisfies AuthSession;
     },
     async login(input: { username: string; password: string }) {
-      const response = await client.requestJson<AuthResponsePayload>('/api/auth/login', {
+      const response = await client.requestJson<AuthResponsePayload | DeviceVerificationRequiredPayload>('/api/auth/login', {
+        method: 'POST',
+        auth: false,
+        body: { ...input, ...getClientSessionMeta() },
+      });
+
+      if ('requiresDeviceVerification' in response && response.requiresDeviceVerification) {
+        return { requiresDeviceVerification: true as const, expiresAt: response.expiresAt };
+      }
+
+      const success = response as AuthResponsePayload;
+      client.setAuthToken(success.token);
+      addStoredAccount(success.token, success.user, success.expiresAt);
+
+      return {
+        user: success.user,
+        token: success.token,
+        ...(success.suspension ? { suspension: success.suspension } : {}),
+        policyStatus: success.policyStatus,
+      } satisfies AuthSession;
+    },
+    async verifyDeviceLogin(input: { username: string; code: string }) {
+      const response = await client.requestJson<AuthResponsePayload>('/api/auth/login/verify', {
         method: 'POST',
         auth: false,
         body: { ...input, ...getClientSessionMeta() },
