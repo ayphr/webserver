@@ -10,6 +10,13 @@ import {
   handleRegister as handleAuthRegister,
 } from './routes/auth';
 import {
+  handleRequestEmailCode,
+  handleForgotPassword,
+  handleResetPassword,
+  handleEmailChangeRequest,
+  handleEmailConfirm,
+} from './routes/email';
+import {
   handleApiNotFoundRoute,
   handleNotFoundRoute,
   handleOptionsRoute,
@@ -108,6 +115,12 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/auth/policies/accept', handle: handleAcceptPolicies },
   { method: 'POST', path: '/api/auth/password', handle: handleChangePassword },
   { method: 'DELETE', path: '/api/auth/account', handle: handleDeleteAccount },
+
+  { method: 'POST', path: '/api/auth/email/code', handle: handleRequestEmailCode },
+  { method: 'POST', path: '/api/auth/password/forgot', handle: handleForgotPassword },
+  { method: 'POST', path: '/api/auth/password/reset', handle: handleResetPassword },
+  { method: 'POST', path: '/api/auth/email/change', handle: handleEmailChangeRequest },
+  { method: 'POST', path: '/api/auth/email/confirm', handle: handleEmailConfirm },
 
   { method: 'GET', path: '/api/users/me', handle: handleUsersMe },
   { method: 'GET', path: '/api/credits/me', handle: handleCreditsMe },

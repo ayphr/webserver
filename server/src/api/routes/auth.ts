@@ -23,10 +23,13 @@ import {
 } from '../../lib/db';
 import type { User } from '@common';
 import { getCreditPeriodStart, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
-import { toPublicUser } from '../../lib/user';
+import { toSelfUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
+import { normalizeEmail, getEmailValidationError } from '@common/utils/email';
+import { getUserByEmail } from '../../lib/db';
+import { verifyEmailCode } from '../../lib/email';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { authEventsTotal, userRegistrationsByCountry } from '../../lib/metrics';
@@ -37,6 +40,8 @@ import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
 type AuthPayload = JsonObject & {
   username?: string;
   password?: string;
+  email?: string;
+  code?: string;
   currentPassword?: string;
   newPassword?: string;
   country?: string;
@@ -52,6 +57,8 @@ function validateAuthPayload(value: unknown): AuthPayload {
     ...body,
     username: optionalString(body, 'username', { maxLength: 64 }),
     password: optionalString(body, 'password', { maxLength: 256, trim: false }),
+    email: optionalString(body, 'email', { maxLength: 254 }),
+    code: optionalString(body, 'code', { maxLength: 32 }),
     currentPassword: optionalString(body, 'currentPassword', { maxLength: 256, trim: false }),
     newPassword: optionalString(body, 'newPassword', { maxLength: 256, trim: false }),
     country: optionalString(body, 'country', { maxLength: 2 }),
@@ -102,6 +109,29 @@ async function handleRegister(request: Request) {
     return json({ error: passwordValidationErrors[0] }, 400);
   }
 
+  const email = body.email ? normalizeEmail(body.email) : '';
+  const emailError = getEmailValidationError(email);
+  if (emailError) {
+    authEventsTotal.inc({ event: 'register', result: 'invalid' });
+    return json({ error: emailError }, 400);
+  }
+  if (!body.code) {
+    authEventsTotal.inc({ event: 'register', result: 'invalid' });
+    return json({ error: 'email verification code is required' }, 400);
+  }
+
+  const verifyResult = await verifyEmailCode({ email, purpose: 'register', code: body.code });
+  if (verifyResult.status !== 'verified') {
+    authEventsTotal.inc({ event: 'register', result: 'invalid_code' });
+    return json({ error: 'invalid or expired email verification code' }, 400);
+  }
+
+  const existingEmail = await getUserByEmail(email);
+  if (existingEmail) {
+    authEventsTotal.inc({ event: 'register', result: 'conflict' });
+    return json({ error: 'email is already registered' }, 409);
+  }
+
   const policyVersions = await getPolicyVersions();
   if (!policyVersions) {
     authEventsTotal.inc({ event: 'register', result: 'error' });
@@ -122,6 +152,8 @@ async function handleRegister(request: Request) {
   const user: User = {
     uuid: crypto.randomUUID(),
     username,
+    email,
+    emailVerifiedAt: now,
     role: 'user',
     bio: DEFAULT_BIO,
     socialLinks: {},
@@ -146,8 +178,21 @@ async function handleRegister(request: Request) {
   try {
     await createUser(user);
   } catch (error) {
-    // The unique username index is the source of truth, closing the check-then-insert race.
-    if (isDuplicateKeyError(error) || (await getUserFromUsername(username))) {
+    // The unique username/email indexes are the source of truth, closing the
+    // check-then-insert race.
+    if (isDuplicateKeyError(error)) {
+      const [existingUsername, existingEmail] = await Promise.all([
+        getUserFromUsername(username),
+        getUserByEmail(email),
+      ]);
+      if (existingUsername) {
+        authEventsTotal.inc({ event: 'register', result: 'conflict' });
+        return json({ error: 'username already exists' }, 409);
+      }
+      if (existingEmail) {
+        authEventsTotal.inc({ event: 'register', result: 'conflict' });
+        return json({ error: 'email is already registered' }, 409);
+      }
       authEventsTotal.inc({ event: 'register', result: 'conflict' });
       return json({ error: 'username already exists' }, 409);
     }
@@ -166,7 +211,7 @@ async function handleRegister(request: Request) {
 
   const policyStatus = await getPolicyStatus(user);
 
-  return json({ user: toPublicUser(user), token, policyStatus, expiresAt: getExpiryDate(now) }, 201);
+  return json({ user: toSelfUser(user), token, policyStatus, expiresAt: getExpiryDate(now) }, 201);
 }
 
 async function handleLogin(request: Request) {
@@ -210,7 +255,7 @@ async function handleLogin(request: Request) {
   const policyStatus = await getPolicyStatus(user);
 
   return json({
-    user: toPublicUser(user),
+    user: toSelfUser(user),
     token,
     suspension: activeSuspension,
     policyStatus,
@@ -223,29 +268,29 @@ const handleMe = requireAuth(async (request, user) => {
   const policyStatus = await getPolicyStatus(user);
 
   return json({
-    user: toPublicUser(user),
+    user: toSelfUser(user),
     suspension: activeSuspension,
     policyStatus,
   });
-}, { allowSuspended: true, allowPolicyPending: true });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleLogout = requireAuth(async (request) => {
   await endCurrentSession(request);
   authEventsTotal.inc({ event: 'logout', result: 'success' });
   return new Response(null, { status: 204 });
-}, { allowSuspended: true, allowPolicyPending: true });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleLogoutAll = requireAuth(async (_request, user) => {
   await endAllSessions(user);
   authEventsTotal.inc({ event: 'logout_all', result: 'success' });
   return new Response(null, { status: 204 });
-}, { allowSuspended: true, allowPolicyPending: true });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleLogoutOthers = requireAuth(async (request, user) => {
   await endOtherSessions(user, request);
   authEventsTotal.inc({ event: 'logout_others', result: 'success' });
   return new Response(null, { status: 204 });
-}, { allowSuspended: true, allowPolicyPending: true });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleAcceptPolicies = requireAuth(async (_request, user) => {
   const policyVersions = await getPolicyVersions();
@@ -263,8 +308,8 @@ const handleAcceptPolicies = requireAuth(async (_request, user) => {
 
   const policyStatus = await getPolicyStatus(user);
 
-  return json({ user: toPublicUser(user), policyStatus });
-}, { allowSuspended: true, allowPolicyPending: true });
+  return json({ user: toSelfUser(user), policyStatus });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleChangePassword = requireAuth(async (request, user) => {
   const body = await readJsonBody<AuthPayload>(request);
@@ -301,7 +346,7 @@ const handleChangePassword = requireAuth(async (request, user) => {
   authEventsTotal.inc({ event: 'password_change', result: 'success' });
 
   return new Response(null, { status: 204 });
-}, { allowSuspended: true, allowPolicyPending: true });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleDeleteAccount = requireAuth(async (request, user) => {
   const body = await readJsonBody<AuthPayload>(request);
@@ -326,6 +371,6 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
   authEventsTotal.inc({ event: 'account_delete', result: 'success' });
 
   return new Response(null, { status: 204 });
-}, { allowSuspended: true, allowPolicyPending: true });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 export { handleRegister, handleLogin, handleMe, handleLogout, handleLogoutAll, handleLogoutOthers, handleAcceptPolicies, handleChangePassword, handleDeleteAccount };

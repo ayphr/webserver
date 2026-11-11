@@ -50,7 +50,13 @@ export type AuthGuardOptions = {
   allowSuspended?: boolean;
   /** Allow access even when the user has not accepted the latest policies. */
   allowPolicyPending?: boolean;
+  /** Allow access even when the user has not set up a verified email address. */
+  allowEmailMissing?: boolean;
 };
+
+export function hasVerifiedEmail(user: User): boolean {
+  return Boolean(user.email && user.emailVerifiedAt);
+}
 
 export type AuthErrorBody = {
   error: string;
@@ -253,6 +259,13 @@ export function requireAuth(handler: AuthenticatedHandler, options: AuthGuardOpt
           { status: 403 },
         );
       }
+    }
+
+    if (!options.allowEmailMissing && !hasVerifiedEmail(user)) {
+      return Response.json(
+        { error: 'Email setup required', emailSetupRequired: true },
+        { status: 403 },
+      );
     }
 
     return handler(request, user, params);

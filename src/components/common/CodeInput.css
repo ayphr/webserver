@@ -1,0 +1,29 @@
+.code-input {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+
+.code-input__box {
+  width: 2.5rem;
+  height: 3rem;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: var(--font-family-mono);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.code-input__box:focus {
+  outline: none;
+  border-color: var(--text-primary);
+}
+
+.code-input__box:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

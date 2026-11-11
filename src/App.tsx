@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { PolicyGate } from './components/policy';
+import { EmailGate } from './components/auth/EmailGate';
 import { ModalProvider, TooltipProvider, useTooltip } from './context';
 import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
 
@@ -61,8 +62,8 @@ function App() {
               <Route path="/policies/privacy" element={<PrivacyPage />} />
               <Route path="/policies/refunds" element={<RefundPage />} />
               <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
-              <Route path="/dashboard" element={<PolicyGate loadingFallback={<DashboardLoadingSkeleton />}><DashboardPage /></PolicyGate>} />
-              <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><ProfilePage /></PolicyGate>} />
+              <Route path="/dashboard" element={<PolicyGate loadingFallback={<DashboardLoadingSkeleton />}><EmailGate loadingFallback={<DashboardLoadingSkeleton />}><DashboardPage /></EmailGate></PolicyGate>} />
+              <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><EmailGate><ProfilePage /></EmailGate></PolicyGate>} />
               <Route path="/oauth/authorize" element={<AuthorizePage />} />
             </Routes>
           </Suspense>

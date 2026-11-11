@@ -19,6 +19,7 @@ import {
   CONNECTIONS_COLLECTION,
   DOMAIN_VERIFICATIONS_COLLECTION,
   LOCATIONS_COLLECTION,
+  EMAIL_CODES_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
@@ -55,6 +56,19 @@ export type DevicePairing = {
   fetched?: boolean;
 };
 
+export type EmailCodePurpose = 'register' | 'reset' | 'change';
+
+export type EmailCode = {
+  codeHash: string;
+  email: string;
+  purpose: EmailCodePurpose;
+  userUuid?: string;
+  createdAt: Date;
+  expiresAt: Date;
+  attempts: number;
+  used?: boolean;
+};
+
 export type DomainVerification = {
   id: string;
   userUuid: string;
@@ -85,6 +99,7 @@ export interface Collections {
   connections: Collection<Connection>;
   domainVerifications: Collection<DomainVerification>;
   locations: Collection<Location>;
+  emailCodes: Collection<EmailCode>;
 }
 
 export interface StoredAvatar {
@@ -201,7 +216,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     oauthTokens: db.collection<OAuthAccessToken>(OAUTH_TOKENS_COLLECTION),
     connections: db.collection<Connection>(CONNECTIONS_COLLECTION),
     domainVerifications: db.collection<DomainVerification>(DOMAIN_VERIFICATIONS_COLLECTION),
-    locations: db.collection<Location>(LOCATIONS_COLLECTION)
+    locations: db.collection<Location>(LOCATIONS_COLLECTION),
+    emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION)
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -222,6 +238,9 @@ export async function setupCollections(db: Db): Promise<Collections> {
     )],
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ code: 1 }, { unique: true })],
     [DEVICE_PAIRINGS_COLLECTION, () => cols.devicePairings.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
+    [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ codeHash: 1 }, { unique: true })],
+    [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
+    [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ email: 1, purpose: 1, userUuid: 1 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ ownerUuid: 1 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex(

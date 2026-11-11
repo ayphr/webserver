@@ -42,6 +42,8 @@ export type GameBests = {
 export type User = {
   uuid: string;
   username: string;
+  email?: string;
+  emailVerifiedAt?: Date;
   role: UserRole;
   avatar?: UserAvatar;
   bio?: string;
@@ -65,9 +67,11 @@ export type User = {
 
 export type PublicUser = Omit<
   User,
-  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar' | 'gameBests'
+  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar' | 'gameBests' | 'email' | 'emailVerifiedAt'
 > & {
   badges: BadgeId[];
   avatarUrl?: string;
   subscription: PublicSubscription | null;
 };
+
+export type SelfUser = PublicUser & Pick<User, 'email' | 'emailVerifiedAt'>;

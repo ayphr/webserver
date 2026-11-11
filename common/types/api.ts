@@ -13,7 +13,7 @@ import type {
   SubscriptionSource,
   SubscriptionTier,
 } from './subscription';
-import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, UserRole } from './user';
+import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, SelfUser, UserRole } from './user';
 
 export type PolicyStatus = {
   upToDate: boolean;
@@ -24,7 +24,7 @@ export type PolicyStatus = {
 };
 
 export type AuthSession = {
-  user: PublicUser;
+  user: SelfUser;
   token: string;
   suspension?: Punishment | null;
   policyStatus: PolicyStatus | null;
@@ -42,7 +42,7 @@ export type ApiErrorBody = {
 };
 
 export type AuthResponsePayload = {
-  user: PublicUser;
+  user: SelfUser;
   token: string;
   suspension?: Punishment | null;
   policyStatus: PolicyStatus | null;
@@ -50,25 +50,25 @@ export type AuthResponsePayload = {
 };
 
 export type AuthMePayload = {
-  user: PublicUser;
+  user: SelfUser;
   suspension: Punishment | null;
   policyStatus: PolicyStatus | null;
 };
 
 export type UserMePayload = {
-  user: PublicUser;
+  user: SelfUser;
   activeSuspension: Punishment | null;
   policyStatus: PolicyStatus | null;
   credits: CreditBalance;
 };
 
 export type AcceptPoliciesPayload = {
-  user: PublicUser;
+  user: SelfUser;
   policyStatus: PolicyStatus | null;
 };
 
 export type ProfileMePayload = {
-  user: PublicUser;
+  user: SelfUser;
 };
 
 export type ProfileCountriesPayload = {
@@ -76,7 +76,7 @@ export type ProfileCountriesPayload = {
 };
 
 export type PunishmentsMePayload = {
-  user: PublicUser;
+  user: SelfUser;
   activeSuspension: Punishment | null;
   punishments: Punishment[];
 };
@@ -207,6 +207,34 @@ export type StaffPasswordUpdatePayload = {
 export type ChangePasswordRequest = {
   currentPassword: string;
   newPassword: string;
+};
+
+export type EmailCodeSentPayload = {
+  expiresAt: Date;
+};
+
+export type PasswordForgotRequest = {
+  identifier: string;
+};
+
+export type PasswordResetRequest = {
+  identifier: string;
+  code: string;
+  newPassword: string;
+};
+
+export type EmailChangeRequest = {
+  email: string;
+  currentPassword: string;
+};
+
+export type EmailConfirmRequest = {
+  email: string;
+  code: string;
+};
+
+export type EmailConfirmPayload = {
+  user: SelfUser;
 };
 
 export type StaffSubscriptionAttachRequest = {

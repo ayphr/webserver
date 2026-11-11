@@ -49,6 +49,12 @@ export async function getUserFromUuid(uuid: string) {
 }
 
 
+export async function getUserByEmail(email: string) {
+  const users = await getCollection('users');
+  trackMongoOperation('findOne', USERS_COLLECTION);
+  return users.findOne({ email }, { projection: { _id: 0 } });
+}
+
 export async function getUserFromUsername(username: string) {
   const users = await getCollection('users');
   trackMongoOperation('findOne', USERS_COLLECTION);

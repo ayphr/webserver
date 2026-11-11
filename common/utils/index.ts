@@ -28,6 +28,12 @@ export {
   USERNAME_MAX_LENGTH,
   getUsernameValidationError,
 } from './username';
+export {
+  EMAIL_CODE_LENGTH,
+  EMAIL_MAX_LENGTH,
+  normalizeEmail,
+  getEmailValidationError,
+} from './email';
 export { POLICIES_VERSIONS_URL } from './policies';
 export {
   getFeaturesForPlan,

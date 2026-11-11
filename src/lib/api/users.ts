@@ -1,4 +1,4 @@
-import type { UserMePayload, PublicUser } from '@common';
+import type { UserMePayload, PublicUser, SelfUser } from '@common';
 import type { RequestClient } from './client';
 
 export function createUsersApi(client: RequestClient) {
@@ -48,7 +48,7 @@ export function createUsersApi(client: RequestClient) {
       };
     },
     async setDeveloperAccount(enabled: boolean) {
-      const response = await client.requestJson<{ user: PublicUser }>('/api/users/me/developer', {
+      const response = await client.requestJson<{ user: SelfUser }>('/api/users/me/developer', {
         method: 'PATCH',
         body: { enabled },
       });

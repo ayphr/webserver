@@ -1,7 +1,7 @@
 import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '@common';
-import { toPublicUser } from '../../lib/user';
+import { toPublicUser, toSelfUser } from '../../lib/user';
 import {
   BIO_MAX_LENGTH,
   BIO_MAX_SOURCE_LENGTH,
@@ -23,7 +23,7 @@ type ProfileEditPayload = {
 };
 
 const handleMe = requireAuth((_request, user) => {
-  return json({ user: toPublicUser(user) });
+  return json({ user: toSelfUser(user) });
 }, { allowSuspended: true });
 
 const handleCountries = requireAuth(() => {
@@ -53,7 +53,7 @@ const handleCountryUpdate = requireAuth(async (request, user) => {
 
   profileUpdatesTotal.inc({ field: 'country' });
 
-  return json({ user: toPublicUser(user) });
+  return json({ user: toSelfUser(user) });
 }, { allowSuspended: true });
 
 const handleProfileEdit = requireAuth(async (request, user, params) => {

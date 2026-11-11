@@ -1,14 +1,14 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconMail, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
-import type { Punishment, PublicUser, CreditBalance } from '@common';
+import type { Punishment, SelfUser, CreditBalance } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
-import { SessionsModal, ChangePasswordModal } from '../../components/settings';
+import { SessionsModal, ChangePasswordModal, ChangeEmailModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
 import { OverviewPanel } from '../../components/overview/OverviewPanel';
 import { DashboardContentSkeleton, DashboardLoadingSkeleton } from './DashboardLoadingSkeleton';
@@ -140,7 +140,7 @@ const DashboardPanel = ({ title, description, className = '', children }: Dashbo
 );
 
 export const DashboardPage = () => {
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [user, setUser] = useState<SelfUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -152,6 +152,7 @@ export const DashboardPage = () => {
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
   const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   const [compactLayout, setCompactLayout] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-compact') === '1',
@@ -310,6 +311,18 @@ export const DashboardPage = () => {
       id: 'account',
       title: 'Account',
       options: [
+        {
+          id: 'email',
+          optionType: 'button',
+          icon: <IconMail size={18} strokeWidth={1.75} />,
+          title: 'Email',
+          description: user?.email
+            ? `${user.email}${user.emailVerifiedAt ? ` — verified ${formatDisplayDate(user.emailVerifiedAt)}` : ''}`
+            : 'Add a verified email address to secure your account.',
+          label: user?.email ? 'Change email' : 'Set email',
+          variant: 'secondary',
+          action: () => setIsChangeEmailOpen(true),
+        },
         {
           id: 'logout',
           optionType: 'button',
@@ -684,6 +697,19 @@ export const DashboardPage = () => {
           onChanged={() => {
             setIsChangePasswordOpen(false);
             void navigate('/auth', { replace: true });
+          }}
+        />
+      )}
+      {isChangeEmailOpen && (
+        <ChangeEmailModal
+          isOpen={isChangeEmailOpen}
+          onClose={() => setIsChangeEmailOpen(false)}
+          onChanged={async (updatedUser) => {
+            setIsChangeEmailOpen(false);
+            setUser(updatedUser);
+            const token = api.getAuthToken();
+            if (token) updateStoredAccount(token, updatedUser);
+            api.users.invalidateMe();
           }}
         />
       )}

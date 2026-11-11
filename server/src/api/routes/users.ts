@@ -2,19 +2,19 @@ import { json } from '../../lib/http';
 import { getCachedActiveSuspension, requireAuth } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid, updateUser } from '../../lib/db';
 import { getPolicyStatus } from '../../lib/policies';
-import { toPublicUser } from '../../lib/user';
+import { toPublicUser, toSelfUser } from '../../lib/user';
 import { getCreditBalance } from '../../lib/credits';
 
 const handleMe = requireAuth(async (request, user) => {
   const activeSuspension = getCachedActiveSuspension(request) ?? await getActiveSuspensionForUserUuid(user.uuid);
   const policyStatus = await getPolicyStatus(user);
   return json({
-    user: toPublicUser(user),
+    user: toSelfUser(user),
     activeSuspension,
     policyStatus,
     credits: getCreditBalance(user),
   });
-}, { allowSuspended: true, allowPolicyPending: true });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleUserByUuid = requireAuth(async (_request, user, params) => {
   const targetUuid = params.uuid;
@@ -38,7 +38,7 @@ const handleDeveloperToggle = requireAuth(async (request, user) => {
   const enabled = body?.enabled === true;
   user.developerAccount = enabled;
   await updateUser(user);
-  return json({ user: toPublicUser(user) });
-}, { allowSuspended: true, allowPolicyPending: true });
+  return json({ user: toSelfUser(user) });
+}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 export { handleMe, handleUserByUuid, handleDeveloperToggle };

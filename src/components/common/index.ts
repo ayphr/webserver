@@ -19,3 +19,4 @@ export { Tooltip, type TooltipProps } from './Tooltip';
 export { ListInput, type ListInputProps } from './ListInput';
 export { ToggleDropdown, type ToggleDropdownProps } from './ToggleDropdown';
 export { Pagination, type PaginationProps } from './Pagination';
+export { CodeInput, type CodeInputProps } from './CodeInput';

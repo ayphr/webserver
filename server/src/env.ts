@@ -16,6 +16,7 @@ export const TRUST_PROXY = Bun.env.TRUST_PROXY === 'true';
 
 export const DATA_POINTS_COLLECTION = 'data_points';
 export const USERS_COLLECTION = 'users';
+export const EMAIL_CODES_COLLECTION = 'email_codes';
 export const PUNISHMENTS_COLLECTION = 'punishments';
 export const DEVICES_COLLECTION = 'devices';
 export const DEVICE_PAIRINGS_COLLECTION = 'device_pairings';
@@ -42,6 +43,12 @@ export const CORS_ALLOWED_ORIGINS = (Bun.env.CORS_ALLOWED_ORIGINS || 'https://ay
 
 export const STRIPE_SECRET_KEY = Bun.env.STRIPE_SECRET_KEY || '';
 export const STRIPE_WEBHOOK_SECRET = Bun.env.STRIPE_WEBHOOK_SECRET || '';
+
+export const RESEND_API_KEY = Bun.env.RESEND_API_KEY || '';
+export const RESEND_FROM_EMAIL = Bun.env.RESEND_FROM_EMAIL || 'Ayphr <noreply@ayphr.com>';
+
+export const EMAIL_CODE_TTL_MINUTES = envNumber('EMAIL_CODE_TTL_MINUTES', 10);
+export const EMAIL_CODE_TTL_MS = EMAIL_CODE_TTL_MINUTES * 60 * 1000;
 
 export const STRIPE_TRIAL_DAYS = envNumber('STRIPE_TRIAL_DAYS', 7);
 

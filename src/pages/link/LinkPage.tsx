@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconAlertCircle, IconDeviceDesktop } from '@tabler/icons-react';
 import { api } from '../../lib/api';
-import { Button, Card, CardHeader, CardBody, Select, UsernameDisplay } from '../../components/common';
+import { Button, Card, CardHeader, CardBody, Select, UsernameDisplay, CodeInput } from '../../components/common';
 import { getActiveToken, getStoredAccounts, isStoredAccountExpired, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { PAIRING_CODE_LENGTH, type Location } from '@common';
 import './LinkPage.css';
@@ -44,8 +44,12 @@ export const LinkPage = () => {
     const check = async () => {
       setIsCheckingAuth(true);
       try {
-        await api.auth.me();
+        const { user } = await api.auth.me();
         if (active) {
+          if (!user.email) {
+            navigate('/dashboard', { replace: true });
+            return;
+          }
           setIsAuthenticated(true);
           setIsCheckingAuth(false);
         }
@@ -92,61 +96,9 @@ export const LinkPage = () => {
     }
   };
 
-  const inputRefs = useRef<HTMLInputElement[]>([]);
   const eligibleAccounts = storedAccounts.filter((account) => !isStoredAccountExpired(account));
   const visibleAccounts = eligibleAccounts.filter((account) => account.token !== activeTokenState);
   const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : eligibleAccounts;
-
-  const setCodeAt = (index: number, char: string) => {
-    setCode((prev) => {
-      const chars = prev.split('');
-      while (chars.length < PAIRING_CODE_LENGTH) chars.push('');
-      chars[index] = char ? char.toUpperCase().slice(0, 1) : '';
-      return chars.join('').slice(0, PAIRING_CODE_LENGTH);
-    });
-  };
-
-  const applyPaste = (startIndex: number, text: string) => {
-    const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, PAIRING_CODE_LENGTH);
-    setCode((prev) => {
-      const chars = prev.split('');
-      while (chars.length < PAIRING_CODE_LENGTH) chars.push('');
-      for (let i = 0; i < cleaned.length; i++) {
-        const idx = startIndex + i;
-        if (idx < PAIRING_CODE_LENGTH) chars[idx] = cleaned[i];
-      }
-      return chars.join('').slice(0, PAIRING_CODE_LENGTH);
-    });
-    const nextFocus = Math.min(startIndex + cleaned.length, PAIRING_CODE_LENGTH - 1);
-    inputRefs.current[nextFocus]?.focus();
-  };
-
-  const handleChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (val.length > 1) {
-      applyPaste(index, val);
-      return;
-    }
-    setCodeAt(index, val);
-    if (val && index < PAIRING_CODE_LENGTH - 1) inputRefs.current[index + 1]?.focus();
-  };
-
-  const handlePaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    applyPaste(index, e.clipboardData.getData('text'));
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !(inputRefs.current[index]?.value) && index > 0) {
-      setCodeAt(index - 1, '');
-      inputRefs.current[index - 1]?.focus();
-      e.preventDefault();
-    } else if (e.key === 'ArrowLeft' && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    } else if (e.key === 'ArrowRight' && index < PAIRING_CODE_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
 
   if (isCheckingAuth) {
     return (
@@ -251,27 +203,16 @@ export const LinkPage = () => {
                     fullWidth
                   />
                 )}
-                <div className="link-page__code" role="group" aria-label="Device code">
-                  {Array.from({ length: PAIRING_CODE_LENGTH }).map((_, i) => (
-                    <input
-                      key={i}
-                      ref={(el) => {
-                        if (el) inputRefs.current[i] = el;
-                      }}
-                      className="link-page__code-input"
-                      type="text"
-                      inputMode="text"
-                      autoCapitalize="characters"
-                      autoComplete="one-time-code"
-                      maxLength={1}
-                      value={code[i] || ''}
-                      onChange={(e) => handleChange(i, e)}
-                      onPaste={(e) => handlePaste(i, e)}
-                      onKeyDown={(e) => handleKeyDown(i, e)}
-                      aria-label={`Character ${i + 1}`}
-                    />
-                  ))}
-                </div>
+                <CodeInput
+                  length={PAIRING_CODE_LENGTH}
+                  value={code}
+                  onChange={setCode}
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  transform={(c) => c.toUpperCase()}
+                  accept={(c) => /[A-Z0-9]/.test(c)}
+                  ariaLabel="Device code"
+                />
                 <Button variant="primary" fullWidth isLoading={isLoading} type="submit">
                   <IconDeviceDesktop size={16} strokeWidth={1.75} />
                   Link device

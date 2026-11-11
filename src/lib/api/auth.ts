@@ -1,4 +1,4 @@
-import type { AcceptPoliciesPayload, AuthMePayload, AuthResponsePayload, AuthSession, ChangePasswordRequest, SessionDeviceType } from '@common';
+import type { AcceptPoliciesPayload, AuthMePayload, AuthResponsePayload, AuthSession, ChangePasswordRequest, EmailChangeRequest, EmailCodeSentPayload, EmailConfirmPayload, EmailConfirmRequest, PasswordForgotRequest, PasswordResetRequest, SessionDeviceType } from '@common';
 import type { RequestClient } from './client';
 import { addStoredAccount, removeStoredAccount } from '../accounts';
 
@@ -38,7 +38,7 @@ function getClientSessionMeta() {
 
 export function createAuthApi(client: RequestClient) {
   return {
-    async register(input: { username: string; password: string; country?: string; acceptPolicies: boolean }) {
+    async register(input: { username: string; password: string; email: string; code: string; country?: string; acceptPolicies: boolean }) {
       const response = await client.requestJson<AuthResponsePayload>('/api/auth/register', {
         method: 'POST',
         auth: false,
@@ -71,6 +71,43 @@ export function createAuthApi(client: RequestClient) {
         ...(response.suspension ? { suspension: response.suspension } : {}),
         policyStatus: response.policyStatus,
       } satisfies AuthSession;
+    },
+    async requestEmailCode(input: { email: string }) {
+      const response = await client.requestJson<EmailCodeSentPayload>('/api/auth/email/code', {
+        method: 'POST',
+        auth: false,
+        body: input,
+      });
+      return response;
+    },
+    async forgotPassword(input: PasswordForgotRequest) {
+      const response = await client.requestJson<{ message: string }>('/api/auth/password/forgot', {
+        method: 'POST',
+        auth: false,
+        body: input,
+      });
+      return response.message;
+    },
+    async resetPassword(input: PasswordResetRequest) {
+      await client.requestJson<null>('/api/auth/password/reset', {
+        method: 'POST',
+        auth: false,
+        body: input,
+      });
+    },
+    async requestEmailChange(input: EmailChangeRequest) {
+      const response = await client.requestJson<EmailCodeSentPayload>('/api/auth/email/change', {
+        method: 'POST',
+        body: input,
+      });
+      return response;
+    },
+    async confirmEmailChange(input: EmailConfirmRequest) {
+      const response = await client.requestJson<EmailConfirmPayload>('/api/auth/email/confirm', {
+        method: 'POST',
+        body: input,
+      });
+      return response.user;
     },
     async me() {
       const response = await client.requestJson<AuthMePayload>('/api/auth/me');

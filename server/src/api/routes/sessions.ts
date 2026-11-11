@@ -4,7 +4,7 @@ import { deleteSession, getSessionById, getSessionsForUserUuid } from '../../lib
 import { hashToken } from '../../lib/tokens';
 import type { SessionInfo } from '@common';
 
-const guardOptions = { allowSuspended: true, allowPolicyPending: true };
+const guardOptions = { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true };
 
 const handleListMine = requireAuth(async (request, user) => {
   const token = getBearerToken(request);
