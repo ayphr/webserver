@@ -94,9 +94,6 @@ export const Sidebar: React.FC<Props> = ({
   const { showTooltip, hideTooltip } = useTooltip();
 
   const accountTooltip = `Account: ${username}`;
-  const creditsTooltip = credits
-    ? `${formatCredits(credits.available)} credits available${credits.onHold > 0 ? ` (${formatCredits(credits.onHold)} on hold)` : ''}`
-    : 'Credits';
 
   // The credits and account controls keep tooltips while collapsed.
   const tooltipHandlers = (content: string) => {
@@ -176,9 +173,7 @@ export const Sidebar: React.FC<Props> = ({
         type="button"
         className={`n-sidebar__credits ${activeTab === 'credits' ? 'active' : ''}`}
         onClick={() => onChange('credits')}
-        title={creditsTooltip}
         aria-label={credits ? `Credits: ${formatCredits(credits.available)} available` : 'Credits'}
-        {...tooltipHandlers(creditsTooltip)}
       >
         <span className="n-sidebar__creditsIcon"><IconCoin size={18} strokeWidth={1.5} /></span>
         <span className="n-sidebar__creditsAmount">{credits ? formatCredits(credits.available) : '—'}</span>
