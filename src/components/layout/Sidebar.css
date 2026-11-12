@@ -427,9 +427,22 @@
   }
   .n-sidebar__top,
   .n-sidebar__spacer,
-  .n-sidebar__credits,
-  .n-sidebar__bottom {
+  .n-sidebar__credits {
     display: none;
+  }
+  .n-sidebar__bottom {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    width: auto;
+    overflow-x: auto;
+  }
+  .n-sidebar__bottomTabs {
+    display: flex;
+    flex-direction: row;
+    gap: 0.25rem;
   }
   .n-sidebar__tabs {
     flex-direction: row;
