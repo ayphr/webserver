@@ -411,9 +411,10 @@ export const LandingPage = () => {
       .then((data) => {
         if (!active || !data) return;
         setStats([
-          { to: Number(data.users) || 0, suffix: '', label: 'Users' },
-          { to: Number(data.devices) || 0, suffix: '', label: 'Devices' },
-          ...STATS.slice(2),
+          STATS[0],
+          STATS[1],
+          { to: Number(data.dataPointsPerDay) || 0, suffix: '', label: 'Data points / day' },
+          { to: Number(data.medianUploadAgeMs) || 0, suffix: 'ms', label: 'Data upload latency' },
         ]);
       })
       .catch(() => undefined);

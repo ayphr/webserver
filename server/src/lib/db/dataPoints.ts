@@ -120,6 +120,25 @@ export async function countDevices(): Promise<number> {
   return devices.countDocuments({});
 }
 
+export async function countDataPointsSince(since: Date): Promise<number> {
+  const dataPoints = await getCollection('dataPoints');
+  trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
+  return dataPoints.countDocuments({ timestamp: { $gte: since } });
+}
+
+export async function getMedianUploadAgeMs(): Promise<number | null> {
+  const devices = await getCollection('devices');
+  trackMongoOperation('find', DEVICES_COLLECTION);
+  const docs = await devices.find({ lastUploadAt: { $exists: true } }, { projection: { lastUploadAt: 1 } }).toArray();
+  if (docs.length === 0) return null;
+  const ages = docs
+    .map((doc) => Date.now() - new Date((doc as { lastUploadAt: Date }).lastUploadAt).getTime())
+    .filter((age) => Number.isFinite(age) && age >= 0)
+    .sort((a, b) => a - b);
+  if (ages.length === 0) return null;
+  return ages[Math.floor(ages.length / 2)] ?? null;
+}
+
 /**
  * Enforces a plan's data retention and total data point cap for the given set
  * of device serials. Data points older than `retentionCutoff` are removed, and
