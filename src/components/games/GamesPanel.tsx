@@ -393,13 +393,33 @@ function MinesweeperGame() {
     if (cell.revealed) return;
     const nextFlagged = !cell.flagged;
     if (nextFlagged && flagCount >= MS_MINES) return;
-    setBoard((prev) => {
-      const b = cloneMsBoard(prev);
-      b[r][c].flagged = nextFlagged;
-      return b;
-    });
-    setFlagCount((n) => (nextFlagged ? n + 1 : Math.max(0, n - 1)));
+
+    const working = cloneMsBoard(board);
+    if (firstClick) {
+      placeMines(working, r, c);
+      setFirstClick(false);
+    }
+    working[r][c].flagged = nextFlagged;
+
+    const newFlagCount = nextFlagged ? flagCount + 1 : Math.max(0, flagCount - 1);
+
+    setBoard(working);
+    setFlagCount(newFlagCount);
     if (status === 'idle') setStatus('playing');
+
+    // End the game when all mines have been flagged.
+    const allMinesFlagged =
+      newFlagCount === MS_MINES && working.flat().every((cl) => !cl.mine || cl.flagged);
+    if (allMinesFlagged) {
+      setStatus('won');
+      const time = elapsed;
+      if (bestTime === null || time < bestTime) {
+        api.games
+          .updateBest('minesweeper', time)
+          .then((res) => setBestTime(res.bests.minesweeper?.value ?? time))
+          .catch(() => {});
+      }
+    }
   };
 
   const adjacentColor = (n: number) => {
