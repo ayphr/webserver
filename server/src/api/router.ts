@@ -22,11 +22,14 @@ import {
   handleNotFoundRoute,
   handleOptionsRoute,
   handleReadinessRoute,
+  handleStatsRoute,
   handleStatusRoute,
 } from './routes/util';
-import { handlePunishment, handleMe as handlePunishmentsMe } from './routes/punishments';
+import { handlePunishment, handleMe as handlePunishmentsMe, handleAppealSubmit, handleAppealGet } from './routes/punishments';
 import {
   handleStaffPunishmentLift,
+  handleStaffAppeals,
+  handleStaffAppealResolve,
   handleStaffPunishments,
   handleStaffPasswordUpdate,
   handleStaffRoleUpdate,
@@ -117,6 +120,7 @@ type RouteDefinition = {
 
 const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/status', handle: handleStatusRoute },
+  { method: 'GET', path: '/api/stats', handle: handleStatsRoute },
   { method: 'GET', path: '/api/ready', handle: handleReadinessRoute },
 
   { method: 'POST', path: '/api/auth/register', handle: handleAuthRegister },
@@ -187,6 +191,8 @@ const ROUTES: readonly RouteDefinition[] = [
 
   { method: 'GET', path: '/api/punishments/me', handle: handlePunishmentsMe },
   { method: 'GET', path: '/api/punishments/:id', handle: handlePunishment },
+  { method: 'GET', path: '/api/punishments/:id/appeal', handle: handleAppealGet },
+  { method: 'POST', path: '/api/punishments/:id/appeal', handle: handleAppealSubmit },
 
   { method: 'POST', path: '/api/devices/pair', handle: handleRequestPairing },
   { method: 'GET', path: '/api/devices/pair/:code', handle: handleFetchPairingToken },
@@ -244,6 +250,8 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/staff/punishments/:id/lift', handle: handleStaffPunishmentLift },
   { method: 'GET', path: '/api/staff/punishments', handle: handleStaffPunishments },
   { method: 'POST', path: '/api/staff/punishments', handle: handleStaffPunishments },
+  { method: 'GET', path: '/api/staff/appeals', handle: handleStaffAppeals },
+  { method: 'POST', path: '/api/staff/appeals/:id/resolve', handle: handleStaffAppealResolve },
   { method: 'POST', path: '/api/staff/subscriptions/:uuid', handle: handleStaffSubscriptionAttach },
   { method: 'GET', path: '/api/staff/subscriptions/:uuid', handle: handleStaffSubscriptionList },
   { method: 'DELETE', path: '/api/staff/subscriptions/:uuid/:id', handle: handleStaffSubscriptionDetach },

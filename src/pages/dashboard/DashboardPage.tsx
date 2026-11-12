@@ -4,7 +4,7 @@ import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, Icon
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
-import type { Punishment, SelfUser, CreditBalance } from '@common';
+import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { ProfileCard, Button } from '../../components/common';
 import { Sidebar } from '../../components/layout';
@@ -25,7 +25,7 @@ const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ de
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit']);
+const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
 
 function getRelativeTime(date: Date | string): string {
   const resolvedDate = toDate(date);
@@ -145,6 +145,12 @@ export const DashboardPage = () => {
   const [user, setUser] = useState<SelfUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
+  const [existingAppeal, setExistingAppeal] = useState<Appeal | null>(null);
+  const [appealText, setAppealText] = useState('');
+  const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+  const [appealError, setAppealError] = useState<string | null>(null);
+  const [staffAppeals, setStaffAppeals] = useState<Appeal[]>([]);
+  const [isAppealsLoading, setIsAppealsLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [activePage, setActivePage] = useState<string>(() => {
     const tab = searchParams.get('tab');
@@ -164,6 +170,7 @@ export const DashboardPage = () => {
   );
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -188,6 +195,31 @@ export const DashboardPage = () => {
     void load();
   }, []);
   useEffect(() => {
+    if (!activeSuspension) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setExistingAppeal(null);
+      return;
+    }
+    let active = true;
+    api.punishments.getAppeal(activeSuspension.id)
+      .then((appeal) => { if (active) setExistingAppeal(appeal); })
+      .catch(() => { if (active) setExistingAppeal(null); });
+    return () => { active = false; };
+  }, [activeSuspension]);
+
+  useEffect(() => {
+    if (activePage !== 'appeals' || user?.role !== 'staff') return;
+    let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsAppealsLoading(true);
+    api.staff.appeals.list()
+      .then((appeals) => { if (active) setStaffAppeals(appeals); })
+      .catch(() => { if (active) setStaffAppeals([]); })
+      .finally(() => { if (active) setIsAppealsLoading(false); });
+    return () => { active = false; };
+  }, [activePage, user]);
+
+  useEffect(() => {
     const inviteToken = searchParams.get('invite');
     if (!inviteToken || !user) return;
     let cancelled = false;
@@ -203,6 +235,7 @@ export const DashboardPage = () => {
         setActiveSuspension(userData.activeSuspension);
       } catch (err) {
         console.error('Failed to accept team invite:', err);
+        if (!cancelled) setInviteError(err instanceof Error ? err.message : 'Failed to accept team invite');
       } finally {
         if (!cancelled) {
           setSearchParams((prev) => {
@@ -247,6 +280,31 @@ export const DashboardPage = () => {
       console.error('Failed to lift suspension:', err);
     } finally {
       setIsLiftingPunishment(false);
+    }
+  };
+
+  const handleSubmitAppeal = async () => {
+    if (!activeSuspension || !appealText.trim()) return;
+    setIsSubmittingAppeal(true);
+    setAppealError(null);
+    try {
+      await api.punishments.submitAppeal(activeSuspension.id, appealText.trim());
+      const appeal = await api.punishments.getAppeal(activeSuspension.id);
+      setExistingAppeal(appeal);
+      setAppealText('');
+    } catch (err) {
+      setAppealError(err instanceof Error ? err.message : 'Failed to submit appeal');
+    } finally {
+      setIsSubmittingAppeal(false);
+    }
+  };
+
+  const handleResolveStaffAppeal = async (appealId: string, decision: 'lift' | 'deny') => {
+    try {
+      await api.staff.appeals.resolve(appealId, decision);
+      setStaffAppeals((prev) => prev.filter((a) => a.id !== appealId));
+    } catch (err) {
+      console.error('Failed to resolve appeal:', err);
     }
   };
 
@@ -494,6 +552,13 @@ export const DashboardPage = () => {
           options: [
             { value: 'overview', label: 'Overview' },
             { value: 'devices', label: 'Devices' },
+            { value: 'locations', label: 'Locations' },
+            { value: 'profile', label: 'Profile' },
+            { value: 'credits', label: 'Credits' },
+            { value: 'games', label: 'Games' },
+            { value: 'connections', label: 'Connections' },
+            { value: 'subscription', label: 'Subscription' },
+            { value: 'team', label: 'Team' },
             ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
             ...(isDeveloper ? [{ value: 'my-apps', label: 'My Apps' }] : []),
           ],
@@ -732,6 +797,51 @@ export const DashboardPage = () => {
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <GamesPanel />
                 </Suspense>
+              </DashboardPanel>
+            )}
+
+            {activePage === 'appeal' && isSuspended && (
+              <DashboardPanel title="Appeal suspension" description="You may submit one appeal per suspension" className="dashboard-panel--wide">
+                {inviteError && <p className="dashboard-page__error">{inviteError}</p>}
+                {existingAppeal ? (
+                  <p>Your appeal has been submitted. Status: {existingAppeal.status}.</p>
+                ) : (
+                  <div>
+                    <textarea
+                      value={appealText}
+                      onChange={(e) => setAppealText(e.target.value)}
+                      rows={6}
+                      style={{ width: '100%' }}
+                      placeholder="Explain why your suspension should be lifted..."
+                    />
+                    {appealError && <p className="dashboard-page__error">{appealError}</p>}
+                    <Button onClick={() => void handleSubmitAppeal()} isLoading={isSubmittingAppeal} disabled={isSubmittingAppeal || !appealText.trim()}>
+                      Submit appeal
+                    </Button>
+                  </div>
+                )}
+              </DashboardPanel>
+            )}
+
+            {activePage === 'appeals' && isStaff && (
+              <DashboardPanel title="Appeals" description="User appeals against suspensions" className="dashboard-panel--wide">
+                {isAppealsLoading ? (
+                  <p>Loading appeals…</p>
+                ) : staffAppeals.length === 0 ? (
+                  <p>No pending appeals.</p>
+                ) : (
+                  <ul>
+                    {staffAppeals.map((appeal) => (
+                      <li key={appeal.id} style={{ marginBottom: '1rem' }}>
+                        <strong>{appeal.userUsername}</strong>: {appeal.text}
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <Button variant="primary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'lift')}>Remove punishment</Button>
+                          <Button variant="secondary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'deny')}>Deny</Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </DashboardPanel>
             )}
           </>

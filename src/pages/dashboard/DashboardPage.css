@@ -215,3 +215,22 @@
     background-position: -200% 0;
   }
 }
+
+@media (max-width: 768px) {
+  .dashboard-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .dashboard-main {
+    padding: 1rem 0.75rem;
+    overflow: visible;
+  }
+  .dashboard-panel,
+  .dashboard-panel--wide,
+  .dashboard-panel--full,
+  .dashboard-panel--devices {
+    max-width: 100%;
+  }
+}

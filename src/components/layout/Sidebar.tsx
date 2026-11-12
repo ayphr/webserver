@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -20,6 +20,7 @@ const tabs: Tab[] = [
 
 const staffTabs: Tab[] = [
   { id: 'users', name: 'Users' },
+  { id: 'appeals', name: 'Appeals' },
 ];
 
 const developerTabs: Tab[] = [
@@ -38,6 +39,8 @@ const iconFor = (id: string) => {
       return <IconDeviceGamepad2 size={18} />;
     case 'users':
       return <IconUsers size={18} />;
+    case 'appeals':
+      return <IconMessage size={18} />;
     case 'my-apps':
       return <IconApps size={18} />;
     case 'team':
@@ -46,6 +49,8 @@ const iconFor = (id: string) => {
       return <IconClipboardList size={18} />;
     case 'jail':
       return <IconBan size={18} />;
+    case 'appeal':
+      return <IconMessage size={18} />;
     default:
       return <IconPlaceholder size={18} />;
   }
@@ -161,11 +166,11 @@ export const Sidebar: React.FC<Props> = ({
           <button
             className={`n-sidebar__tab active`}
             type="button"
-            onClick={() => onChange('overview')}
-            aria-label="Jail"
+            onClick={() => onChange('appeal')}
+            aria-label="Appeal"
           >
-            <span className="n-sidebar__icon">{iconFor('jail')}</span>
-            <span className="n-sidebar__label">Jail</span>
+            <span className="n-sidebar__icon">{iconFor('appeal')}</span>
+            <span className="n-sidebar__label">Appeal</span>
           </button>
         ) : (
           visibleTabs.map((t) => (

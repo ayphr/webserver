@@ -375,3 +375,29 @@
   text-transform: uppercase;
   color: var(--text-dim);
 }
+
+@media (max-width: 768px) {
+  .n-sidebar {
+    width: 100%;
+    min-width: 100%;
+    height: auto;
+    max-height: 40vh;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+  .n-sidebar__tabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .n-sidebar__tab {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .n-sidebar__label {
+    max-width: none;
+  }
+}

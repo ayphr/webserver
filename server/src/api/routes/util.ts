@@ -1,5 +1,5 @@
 import { CORS_ALLOWED_ORIGINS } from '../../env';
-import { getCols } from '../../lib/db';
+import { getCols, getUserCount, countDevices } from '../../lib/db';
 
 const DEFAULT_ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const DEFAULT_ALLOWED_HEADERS = 'Content-Type, Authorization';
@@ -60,6 +60,17 @@ export function handleOptionsRoute(request: Request) {
 
 export function handleStatusRoute(request: Request) {
   return addCorsHeaders(new Response('OK'), request);
+}
+
+export async function handleStatsRoute(request: Request) {
+  const [users, devices] = await Promise.allSettled([getUserCount(), countDevices()]);
+  return addCorsHeaders(
+    Response.json({
+      users: users.status === 'fulfilled' ? users.value : 0,
+      devices: devices.status === 'fulfilled' ? devices.value : 0,
+    }),
+    request,
+  );
 }
 
 export async function handleReadinessRoute(request: Request) {

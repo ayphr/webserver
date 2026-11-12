@@ -14,6 +14,7 @@ import type {
   StaffUsersPayload,
   StaffUsersQuery,
 } from '@common';
+import type { Appeal } from '@common';
 import type { RequestClient } from './client';
 
 export function createStaffApi(client: RequestClient) {
@@ -68,7 +69,19 @@ export function createStaffApi(client: RequestClient) {
         return response.punishment;
       },
     },
-    subscriptions: {
+    appeals: {
+    async list() {
+      const response = await client.requestJson<{ appeals: Appeal[] }>('/api/staff/appeals');
+      return response.appeals;
+    },
+    async resolve(appealId: string, decision: 'lift' | 'deny') {
+      await client.requestJson(`/api/staff/appeals/${encodeURIComponent(appealId)}/resolve`, {
+        method: 'POST',
+        body: { decision },
+      });
+    },
+  },
+  subscriptions: {
       async list(userUuid: string) {
         const response = await client.requestJson<StaffSubscriptionListPayload>(`/api/staff/subscriptions/${userUuid}`);
         return response.subscriptions;

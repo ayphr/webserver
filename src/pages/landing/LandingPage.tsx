@@ -17,6 +17,7 @@ import {
   IconStar,
 } from '@tabler/icons-react';
 import { Button, Card } from '../../components/common';
+import { API_BASE_URL } from '../../lib/api';
 import logoSvg from '../../assets/logo.svg';
 import './LandingPage.css';
 
@@ -390,6 +391,7 @@ export const LandingPage = () => {
   const [scrolled, setScrolled] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [marqueeReady, setMarqueeReady] = useState(false);
+  const [stats, setStats] = useState(STATS);
 
   useEffect(() => {
     const ready = () => setMarqueeReady(true);
@@ -400,6 +402,24 @@ export const LandingPage = () => {
     }
     const fallback = window.setTimeout(ready, 800);
     return () => window.clearTimeout(fallback);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`${API_BASE_URL}/api/stats`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        setStats([
+          { to: Number(data.users) || 0, suffix: '', label: 'Users' },
+          { to: Number(data.devices) || 0, suffix: '', label: 'Devices' },
+          ...STATS.slice(2),
+        ]);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -702,7 +722,7 @@ export const LandingPage = () => {
             </h2>
           </Reveal>
           <div className="landing-stats__grid">
-            {STATS.map((s, i) => (
+            {stats.map((s, i) => (
               <Reveal key={s.label} delay={i * 100}>
                 <div className="landing-stat">
                   <div className="landing-stat__value">

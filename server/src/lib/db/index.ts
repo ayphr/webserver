@@ -3,6 +3,7 @@ export * from './dataPoints';
 export * from './users';
 export * from './avatars';
 export * from './punishments';
+export * from './appeals';
 export * from './devices';
 export * from './locations';
 export * from './sessions';

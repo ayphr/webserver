@@ -1,6 +1,7 @@
 export * from './api';
 export * from './device';
 export * from './punishment';
+export * from './appeal';
 export * from './session';
 export * from './user';
 export * from './badges';

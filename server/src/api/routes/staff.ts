@@ -2,6 +2,7 @@ import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
 import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../lib/db';
+import { getAppeals, getAppealById, resolveAppeal } from '../../lib/db/appeals';
 import type { AttachedSubscription, Punishment, SubscriptionSource, SubscriptionTier, User, UserRole } from '@common';
 import { isSubscriptionTier, resolveSubscription } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';
@@ -225,6 +226,48 @@ const handleStaffPunishmentLift = requireRole('staff', async (_request, staffUse
   staffActionsTotal.inc({ action: 'punishment_lift' });
 
   return json({ punishment });
+}, { allowSuspended: true });
+
+const handleStaffAppeals = requireRole('staff', async () => {
+  const appeals = await getAppeals();
+  return json({ appeals });
+}, { allowSuspended: true });
+
+const handleStaffAppealResolve = requireRole('staff', async (request, staffUser, params) => {
+  const appealId = params.id;
+  if (!appealId) return json({ error: 'appeal id is required' }, 400);
+
+  const body = await readJsonBody(request);
+  const decision = body?.decision;
+  if (decision !== 'lift' && decision !== 'deny') {
+    return json({ error: 'decision must be "lift" or "deny"' }, 400);
+  }
+
+  const appeal = await getAppealById(appealId);
+  if (!appeal) return json({ error: 'appeal not found' }, 404);
+  if (appeal.status !== 'pending') return json({ error: 'appeal already resolved' }, 409);
+
+  if (decision === 'lift') {
+    const punishment = await getPunishmentById(appeal.punishmentId);
+    if (punishment && !punishment.liftedAt) {
+      punishment.liftedAt = new Date();
+      punishment.liftedByUuid = staffUser.uuid;
+      punishment.liftedByUsername = staffUser.username;
+      punishment.liftedReason = 'Appeal accepted';
+      await updatePunishment(punishment);
+      punishmentsTotal.inc({ type: punishment.type, action: 'lifted' });
+      staffActionsTotal.inc({ action: 'punishment_lift' });
+    }
+  }
+
+  const resolved = await resolveAppeal({
+    appealId,
+    resolution: decision === 'lift' ? 'lifted' : 'denied',
+    staffUuid: staffUser.uuid,
+    staffUsername: staffUser.username,
+  });
+
+  return json({ appeal: resolved });
 }, { allowSuspended: true });
 
 const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params) => {
@@ -460,6 +503,8 @@ export {
   handleStaffUsers,
   handleStaffPunishments,
   handleStaffPunishmentLift,
+  handleStaffAppeals,
+  handleStaffAppealResolve,
   handleStaffRoleUpdate,
   handleStaffPasswordUpdate,
   handleStaffSubscriptionAttach,

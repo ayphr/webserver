@@ -1,4 +1,5 @@
 import './Input.css';
+import { useId } from 'react';
 import type { InputHTMLAttributes } from 'react';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -14,16 +15,21 @@ export const Input = ({
   helperText,
   fullWidth = false,
   className = '',
+  id,
   ...props
 }: InputProps) => {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+
   return (
     <div className={`input-wrapper ${fullWidth ? 'input-wrapper--full-width' : ''}`}>
-      {label && <label className="input-label">{label}</label>}
+      {label && <label className="input-label" htmlFor={inputId}>{label}</label>}
       <input
+        id={inputId}
         className={`input ${error ? 'input--error' : ''} ${className}`}
         {...props}
       />
-      {error && <span className="input-error">{error}</span>}
+      {error && <span className="input-error" id={`${inputId}-error`}>{error}</span>}
       {helperText && !error && <span className="input-helper">{helperText}</span>}
     </div>
   );

@@ -191,7 +191,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
                   className="overview__device"
                   onClick={() => onDeviceNavigate(device.serial)}
                 >
-                  <span className={`overview__device-status ${online ? 'is-online' : 'is-offline'}`} />
+                  <span className={`overview__device-status ${online ? 'is-online' : 'is-offline'}`} aria-label={online ? 'Online' : 'Offline'} role="img" />
                   <span className="overview__device-main">
                     <span className="overview__device-name">{deviceLabel(device)}</span>
                     <span className="overview__device-meta">

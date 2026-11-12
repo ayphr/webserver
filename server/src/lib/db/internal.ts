@@ -2,7 +2,7 @@ import { Binary, Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection, type Team, type TeamAuditLog, type TeamInvite } from '@common';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection, type Team, type TeamAuditLog, type TeamInvite, type Appeal } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -103,6 +103,7 @@ export interface Collections {
   teams: Collection<Team>;
   teamAuditLogs: Collection<TeamAuditLog>;
   teamInvites: Collection<TeamInvite>;
+  appeals: Collection<Appeal>;
 }
 
 export interface StoredAvatar {
@@ -223,7 +224,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION),
     teams: db.collection<Team>('teams'),
     teamAuditLogs: db.collection<TeamAuditLog>('team_audit_logs'),
-    teamInvites: db.collection<TeamInvite>('team_invites')
+    teamInvites: db.collection<TeamInvite>('team_invites'),
+    appeals: db.collection<Appeal>('appeals'),
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
