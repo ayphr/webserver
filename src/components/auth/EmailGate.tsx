@@ -45,7 +45,7 @@ export const EmailGate = ({
         }
       } catch {
         if (!active) return;
-        await navigate('/auth', { replace: true });
+        await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
       }
     };
     void load();
@@ -117,7 +117,7 @@ export const EmailGate = ({
     } catch {
       // Ignore logout failures, the local session is cleared regardless.
     }
-    await navigate('/auth', { replace: true });
+    await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
   };
 
   if (state === 'loading') {

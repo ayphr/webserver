@@ -141,8 +141,9 @@ export function createRequestClient(config: ApiClientConfig = {}) {
         if (remaining.length > 0) {
           setActiveToken(remaining[0].token);
           writeStoredToken(storageKey, remaining[0].token);
+        } else {
+          onUnauthorized?.();
         }
-        onUnauthorized?.();
       }
 
       throw new ApiError(errorMessage, response.status, responseBody, response.url);

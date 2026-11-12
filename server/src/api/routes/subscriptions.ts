@@ -107,9 +107,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 }
 
 async function handleInvoiceEvent(invoice: Stripe.Invoice) {
-  const subscriptionRef = (invoice as Stripe.Invoice & {
+  const invoiceWithSubscription = invoice as Stripe.Invoice & {
     subscription?: string | Stripe.Subscription | null;
-  }).subscription;
+    parent?: { subscription_details?: { subscription?: string | Stripe.Subscription | null } } | null;
+  };
+  const subscriptionRef =
+    invoiceWithSubscription.subscription ??
+    invoiceWithSubscription.parent?.subscription_details?.subscription;
 
   const subscriptionId = typeof subscriptionRef === 'string'
     ? subscriptionRef

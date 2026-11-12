@@ -361,14 +361,14 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   );
 
   // Sync settings form fields when selected device changes
-  const [prevDeviceSerial, setPrevDeviceSerial] = useState<number | null>(null);
-  if (selectedDevice && selectedDevice.serial !== prevDeviceSerial) {
-    setPrevDeviceSerial(selectedDevice.serial);
+  useEffect(() => {
+    if (!selectedDevice) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSettingsName(selectedDevice.name?.trim() || '');
     setSettingsLocationId(selectedDevice.locationId || '');
     setSaveSuccess(false);
     setHasLoadedInitialData(false);
-  }
+  }, [selectedDevice]);
 
   // Load telemetry data points when a device is selected and tab is 'graphs'
   useEffect(() => {

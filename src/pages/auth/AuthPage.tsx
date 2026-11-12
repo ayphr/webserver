@@ -30,8 +30,8 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/dashboard';
   const inviteToken = searchParams.get('invite');
+  const redirectTo = searchParams.get('redirect') || (inviteToken ? `/dashboard?invite=${encodeURIComponent(inviteToken)}` : '/dashboard');
   const mode: AuthMode = initialMode ?? (location.pathname.includes('register') ? 'signup' : 'login');
 
   const [step, setStep] = useState<AuthStep>('form');
@@ -80,7 +80,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
   const handleChooseAccount = (token: string) => {
     setActiveToken(token);
-    navigate('/dashboard');
+    navigate(redirectTo);
   };
 
   const validateForm = (): boolean => {

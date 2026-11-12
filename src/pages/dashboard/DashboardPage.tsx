@@ -195,6 +195,7 @@ export const DashboardPage = () => {
       try {
         await api.teams.acceptInvite(inviteToken);
         if (cancelled) return;
+        api.users.invalidateMe();
         const userData = await api.users.me();
         if (cancelled) return;
         setUser(userData.user);
@@ -213,7 +214,7 @@ export const DashboardPage = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [searchParams, user]);
+  }, [searchParams, setSearchParams, user]);
 
   const isSuspended = activeSuspension !== null;
   const isStaff = user?.role === 'staff';

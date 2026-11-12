@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUserCache } from './internal';
+import { invalidateAuthEntries } from '../authCache';
 import type { Team, TeamAuditLog, TeamRole, User, AttachedSubscription, TeamInvite } from '@common';
 import { addAttachedSubscription, removeAttachedSubscription, getUserFromUuid, upsertPaidSubscription, removePaidSubscription } from './users';
 import { getActivePaidSubscription } from '@common';
@@ -75,6 +76,7 @@ export async function setUserTeamMembership(userUuid: string, teamId: string, ro
   trackMongoOperation('updateOne', 'users');
   await users.updateOne({ uuid: userUuid }, { $set: { teamId, teamRole: role } });
   await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
 }
 
 export async function clearUserTeamMembership(userUuid: string): Promise<void> {
@@ -82,6 +84,7 @@ export async function clearUserTeamMembership(userUuid: string): Promise<void> {
   trackMongoOperation('updateOne', 'users');
   await users.updateOne({ uuid: userUuid }, { $unset: { teamId: '', teamRole: '' } });
   await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
 }
 
 export async function getTeamScopeUuid(user: Pick<User, 'uuid' | 'teamId' | 'paidSubscriptions' | 'attachedSubscriptions'>): Promise<string> {

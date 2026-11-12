@@ -118,12 +118,15 @@ export function TeamPanel() {
       <section className="team-panel__section team-panel__section--plain">
         <h4 className="team-panel__section-title">Members</h4>
         <ul className="team-panel__list team-panel__list--plain">
-          {members.map((m) => (
+          {members.map((m) => {
+            const isPayingManager = team !== null && m.uuid === team.managerUuid;
+            return (
             <li key={m.uuid} className="team-panel__member-row">
               <div className="team-panel__member-info">
                 <span className="team-panel__member-name">{m.username}</span>
-                <span className="team-panel__member-role">{m.role}</span>
+                <span className="team-panel__member-role">{isPayingManager ? 'Team Manager' : m.role}</span>
               </div>
+              {!isPayingManager && (
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -134,8 +137,10 @@ export function TeamPanel() {
                 <IconEdit size={16} />
                 Edit
               </Button>
+              )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
 

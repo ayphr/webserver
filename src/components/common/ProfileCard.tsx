@@ -162,6 +162,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         socialLinks,
       });
       setUser(updated);
+      if (isSelfProfile) api.users.invalidateMe();
       setIsEditingProfile(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update profile';
@@ -197,6 +198,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       const token = dnsChallenge.token ?? dnsChallenge.challenge ?? dnsChallenge.txtValue;
       const result = await api.profile.verifyDomain({ type: 'website', domain, token });
       setUser(result.user ?? result);
+      if (isSelfProfile) api.users.invalidateMe();
       setDnsSuccess(true);
       setReloadToken((t) => t + 1);
     } catch (err) {
@@ -223,6 +225,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       const prepared = await prepareAvatarFile(file);
       const updated = await api.profile.uploadAvatar(prepared, userUuid);
       setUser(updated);
+      if (isSelfProfile) api.users.invalidateMe();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to upload avatar';
       setAvatarError(message);
@@ -240,6 +243,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     try {
       const updated = await api.profile.removeAvatar(userUuid);
       setUser(updated);
+      if (isSelfProfile) api.users.invalidateMe();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to remove avatar';
       setAvatarError(message);

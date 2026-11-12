@@ -45,7 +45,7 @@ export const PolicyGate = ({
         }
       } catch {
         if (!active) return;
-        await navigate('/auth', { replace: true });
+        await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
       }
     };
 
@@ -86,7 +86,7 @@ export const PolicyGate = ({
     } catch {
       // Ignore logout failures, the local session is cleared regardless.
     }
-    await navigate('/auth', { replace: true });
+    await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
   };
 
   const handleDelete = async () => {
@@ -95,7 +95,7 @@ export const PolicyGate = ({
 
     try {
       await api.auth.deleteAccount({ password: deletePassword });
-      await navigate('/auth', { replace: true });
+      await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete your account');
       setIsDeleting(false);

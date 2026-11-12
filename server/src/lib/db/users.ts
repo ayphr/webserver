@@ -286,16 +286,14 @@ export async function upsertPaidSubscription(userUuid: string, subscription: Pai
   trackMongoOperation('updateOne', USERS_COLLECTION);
   await users.updateOne(
     { uuid: userUuid },
-    { $pull: { paidSubscriptions: { stripeSubscriptionId: subscription.stripeSubscriptionId } } }
-  );
-
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne(
-    { uuid: userUuid },
-    { $push: { paidSubscriptions: normalizedSubscription } }
+    {
+      $pull: { paidSubscriptions: { stripeSubscriptionId: subscription.stripeSubscriptionId } },
+      $push: { paidSubscriptions: normalizedSubscription },
+    },
   );
 
   await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
 
   return normalizedSubscription;
 }
@@ -309,6 +307,7 @@ export async function removePaidSubscription(userUuid: string, stripeSubscriptio
     { $pull: { paidSubscriptions: { stripeSubscriptionId } } }
   );
   await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
 }
 
 
@@ -323,6 +322,7 @@ export async function addAttachedSubscription(userUuid: string, subscription: At
   );
 
   await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
 
   return normalizedSubscription;
 }
@@ -336,6 +336,7 @@ export async function removeAttachedSubscription(userUuid: string, subscriptionI
     { $pull: { attachedSubscriptions: { id: subscriptionId } } }
   );
   await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
 }
 
 
@@ -354,6 +355,7 @@ export async function updateAttachedSubscription(userUuid: string, subscription:
 
   if (result.matchedCount > 0) {
     await invalidateUserCache(userUuid);
+    await invalidateAuthEntries();
     return normalizedSubscription;
   }
 

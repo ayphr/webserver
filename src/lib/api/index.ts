@@ -44,7 +44,8 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     onUnauthorized: () => {
       if (globalThis.window === undefined) return;
       if (!globalThis.location.pathname.startsWith('/auth')) {
-        globalThis.location.assign('/auth/login');
+        const redirect = encodeURIComponent(globalThis.location.pathname + globalThis.location.search);
+        globalThis.location.assign(`/auth/login?redirect=${redirect}`);
       }
     },
     ...config,

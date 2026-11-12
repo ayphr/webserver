@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useMemo } from 'react';
 import twemoji from '@twemoji/api';
 
 interface EmojiTextProps {
@@ -18,6 +18,19 @@ const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (char) =
 
 const EMOJI_CACHE_MAX_ENTRIES = 200;
 const emojiCache = new Map<string, string>();
+
+const toText = (children: React.ReactNode): string => {
+  if (children === null || children === undefined || typeof children === 'boolean') {
+    return '';
+  }
+  if (typeof children === 'string' || typeof children === 'number') {
+    return String(children);
+  }
+  if (Array.isArray(children)) {
+    return children.map(toText).join('');
+  }
+  return '';
+};
 
 const createEmoji = (emoji: string): string => {
   const cached = emojiCache.get(emoji);
@@ -40,15 +53,8 @@ const createEmoji = (emoji: string): string => {
 };
 
 export const EmojiText: React.FC<EmojiTextProps> = ({ className, children }) => {
-  const spanRef = useRef<HTMLSpanElement>(null);
+  const text = toText(children);
+  const html = useMemo(() => createEmoji(text), [text]);
 
-  useEffect(() => {
-    if (spanRef.current) {
-      const emojiStr = typeof children === 'string' ? children : '';
-      const emojiHTML = createEmoji(emojiStr);
-      spanRef.current.innerHTML = emojiHTML;
-    }
-  }, [children]);
-
-  return <span ref={spanRef} className={className}></span>;
+  return <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 };

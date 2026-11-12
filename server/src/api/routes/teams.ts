@@ -147,8 +147,8 @@ const handleTeamMemberRoleUpdate = requireAuth(async (request, user: User, param
 
   const target = await getUserFromUuid(targetUuid);
   if (!target || target.teamId !== team.id) return json({ error: 'member not found' }, 404);
-  if (target.uuid === team.managerUuid && roleRaw !== 'manager') {
-    // allow? keep manager at least one manager; but allow demotion? Prevent removing last manager maybe.
+  if (target.uuid === team.managerUuid) {
+    return json({ error: 'cannot change the team manager role' }, 400);
   }
 
   await updateRole({ team, actor: user, target, role: roleRaw });
