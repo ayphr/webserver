@@ -707,7 +707,7 @@ export const DashboardPage = () => {
             )}
 
             {activePage === 'team' && isTeamMember && (
-              <DashboardPanel title="Team" description="Manage your team members" className="dashboard-panel--full">
+              <DashboardPanel title="Team" description="Manage your team members" className="dashboard-panel--wide">
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <TeamPanel />
                 </Suspense>
@@ -715,7 +715,7 @@ export const DashboardPage = () => {
             )}
 
             {activePage === 'team-audit' && isTeamManager && (
-              <DashboardPanel title="Team audit log" description="Recent team activity" className="dashboard-panel--full">
+              <DashboardPanel title="Team audit log" description="Recent team activity" className="dashboard-panel--wide">
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <TeamAuditPanel />
                 </Suspense>
