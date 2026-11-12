@@ -97,12 +97,12 @@ export const Sidebar: React.FC<Props> = ({
       ]
     : [];
 
-  const topTabs: Tab[] = [...tabs];
-  const sections: { title?: string; tabs: Tab[] }[] = [];
-  if (topTabs.length) sections.push({ tabs: topTabs });
-  if (teamTabs.length) sections.push({ title: 'Team', tabs: teamTabs });
-  if (isDeveloper && developerTabs.length) sections.push({ title: 'Developer', tabs: developerTabs });
-  if (isStaff && staffTabs.length) sections.push({ title: 'Staff', tabs: staffTabs });
+  const visibleTabs = [
+    ...tabs,
+    ...teamTabs,
+    ...(isDeveloper ? developerTabs : []),
+    ...(isStaff ? staffTabs : []),
+  ];
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [accountToLogout, setAccountToLogout] = useState<StoredAccount | null>(null);
@@ -168,22 +168,17 @@ export const Sidebar: React.FC<Props> = ({
             <span className="n-sidebar__label">Jail</span>
           </button>
         ) : (
-          sections.map((section, idx) => (
-            <div key={idx} className="n-sidebar__section">
-              {section.title && <div className="n-sidebar__section-title">{section.title}</div>}
-              {section.tabs.map((t) => (
-                <button
-                  key={t.id}
-                  className={`n-sidebar__tab ${activeTab === t.id ? 'active' : ''}`}
-                  onClick={() => onChange(t.id)}
-                  type="button"
-                  aria-label={t.name}
-                >
-                  <span className="n-sidebar__icon">{iconFor(t.id)}</span>
-                  <span className="n-sidebar__label">{t.name}</span>
-                </button>
-              ))}
-            </div>
+          visibleTabs.map((t) => (
+            <button
+              key={t.id}
+              className={`n-sidebar__tab ${activeTab === t.id ? 'active' : ''}`}
+              onClick={() => onChange(t.id)}
+              type="button"
+              aria-label={t.name}
+            >
+              <span className="n-sidebar__icon">{iconFor(t.id)}</span>
+              <span className="n-sidebar__label">{t.name}</span>
+            </button>
           ))
         )}
       </nav>
