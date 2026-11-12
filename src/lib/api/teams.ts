@@ -43,6 +43,10 @@ export function createTeamsApi(client: RequestClient) {
     async revokeInvite(id: string) {
       await client.requestJson(`/api/team/invites/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
+    async pendingInvites() {
+      const response = await client.requestJson<{ invites: import('@common').TeamInvite[] }>('/api/team/invites/pending');
+      return response.invites;
+    },
     async acceptInvite(token: string) {
       await client.requestJson('/api/team/invites/accept', { method: 'POST', body: { token } });
     },

@@ -354,3 +354,24 @@
 .n-sidebar--collapsed:not(:hover):not(.n-sidebar--menu-open) .username-display__flag {
   display: none;
 }
+
+.n-sidebar__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.n-sidebar__section + .n-sidebar__section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.n-sidebar__section-title {
+  padding: 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-md);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}

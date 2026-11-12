@@ -31,6 +31,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/dashboard';
+  const inviteToken = searchParams.get('invite');
   const mode: AuthMode = initialMode ?? (location.pathname.includes('register') ? 'signup' : 'login');
 
   const [step, setStep] = useState<AuthStep>('form');
@@ -167,6 +168,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
           email: formData.email!.trim(),
           code,
           acceptPolicies: acceptedPolicies,
+          ...(inviteToken ? { inviteToken } : {}),
         });
         navigate(redirectTo);
       } catch (error) {

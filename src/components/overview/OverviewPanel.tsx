@@ -6,7 +6,7 @@ import {
   IconDeviceDesktop,
   IconMapPin,
 } from '@tabler/icons-react';
-import { PLAN_NAMES, type CreditBalance, type DeviceSummary, type Location, type PublicUser } from '@common';
+import { PLAN_NAMES, type CreditBalance, type DeviceSummary, type Location, type PublicUser, type TeamInvite } from '@common';
 import { api } from '../../lib/api';
 import { formatCredits } from '../../lib/credits';
 import { toDate } from '../../lib/date';
@@ -29,6 +29,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,13 +37,15 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
 
     const load = async () => {
       try {
-        const [loadedDevices, loadedLocations] = await Promise.all([
+        const [loadedDevices, loadedLocations, loadedInvites] = await Promise.all([
           api.devices.listMine(),
           api.locations.listMine().catch(() => []),
+          api.teams.pendingInvites().catch(() => []),
         ]);
         if (!active) return;
         setDevices(loadedDevices);
         setLocations(loadedLocations);
+        setPendingInvites(loadedInvites);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Failed to load devices');
@@ -74,6 +77,15 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
   const planTier = credits?.plan ?? user.subscription?.tier ?? 'free';
   const planName = PLAN_NAMES[planTier];
 
+  const handleAcceptInvite = async (token: string) => {
+    try {
+      await api.teams.acceptInvite(token);
+      setPendingInvites((prev) => prev.filter((i) => i.token !== token));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to accept invite');
+    }
+  };
+
   return (
     <div className="overview">
       <div className="overview__greeting">
@@ -86,6 +98,23 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
         />
         <p>Welcome back. Here&apos;s a quick look at your account.</p>
       </div>
+
+      {pendingInvites.length > 0 && (
+        <div className="overview__invites">
+          <h3>Pending team invitations</h3>
+          {pendingInvites.map((invite) => (
+            <div key={invite.id} className="overview__invite">
+              <span>
+                Invited to join a team by {invite.invitedByUsername}
+                {invite.migrateData ? ' (will migrate your devices/locations)' : ''}
+              </span>
+              <button type="button" onClick={() => handleAcceptInvite(invite.token)}>
+                Accept
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="overview__stats">
         <button type="button" className="overview__stat" onClick={() => onNavigate('devices')}>

@@ -91,6 +91,7 @@ import {
   handleTeamInvitesList,
   handleTeamInviteRevoke,
   handleTeamInviteAccept,
+  handlePendingTeamInvites,
 } from './routes/teams';
 import { handleListMine as handleSessionsListMine, handleRevoke as handleSessionRevoke } from './routes/sessions';
 import {
@@ -178,6 +179,8 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'DELETE', path: '/api/teams/invites/:id', handle: handleTeamInviteRevoke },
   { method: 'POST', path: '/api/team/invites/accept', handle: handleTeamInviteAccept },
   { method: 'POST', path: '/api/teams/invites/accept', handle: handleTeamInviteAccept },
+  { method: 'GET', path: '/api/team/invites/pending', handle: handlePendingTeamInvites },
+  { method: 'GET', path: '/api/teams/invites/pending', handle: handlePendingTeamInvites },
 
   { method: 'GET', path: '/api/sessions', handle: handleSessionsListMine },
   { method: 'DELETE', path: '/api/sessions/:id', handle: handleSessionRevoke },

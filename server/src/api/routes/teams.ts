@@ -10,6 +10,7 @@ import {
   canManageTeam,
   createTeamInvite,
   getTeamInvites,
+  getPendingInvitesForEmail,
   revokeTeamInvite,
   getTeamInviteByToken,
   acceptTeamInvite,
@@ -109,12 +110,18 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
   try {
     const { sendEmail } = await import('../../lib/email');
     const { CLIENT_URL } = await import('../../env');
-    const link = `${CLIENT_URL}/team/invite/${invite.token}`;
+    const { buildTeamInviteEmail } = await import('../../lib/email/templates');
+    const link = `${CLIENT_URL}/auth/register?invite=${invite.token}`;
+    const emailContent = buildTeamInviteEmail({
+      inviterUsername: user.username,
+      inviteUrl: link,
+      migrateData,
+    });
     await sendEmail({
       to: inviteEmail,
-      subject: 'You have been invited to join an Ayphr team',
-      html: `<p>You have been invited to join a team on Ayphr by ${user.username}.</p>${migrateData ? '<p>Accepting will move your existing devices and locations into the team.</p>' : ''}<p><a href="${link}">Accept invitation</a></p>`,
-      text: `You have been invited to join a team on Ayphr by ${user.username}.${migrateData ? ' Accepting will move your existing devices and locations into the team.' : ''} Accept: ${link}`,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
     });
   } catch {
     // ignore
@@ -220,6 +227,14 @@ const handleTeamInviteAccept = requireAuth(async (request, user: User) => {
 });
 
 
+
+const handlePendingTeamInvites = requireAuth(async (_request, user: User) => {
+  if (!user.email) return json({ invites: [] });
+  const invites = await getPendingInvitesForEmail(user.email);
+  return json({ invites });
+});
+
+
 export {
   handleTeamMe,
   handleTeamMembersList,
@@ -230,4 +245,5 @@ export {
   handleTeamInvitesList,
   handleTeamInviteRevoke,
   handleTeamInviteAccept,
+  handlePendingTeamInvites,
 };

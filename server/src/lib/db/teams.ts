@@ -292,6 +292,16 @@ export async function createTeamInvite(params: {
   return invite;
 }
 
+
+export async function getPendingInvitesForEmail(email: string): Promise<TeamInvite[]> {
+  const invites = await getCollection('teamInvites');
+  trackMongoOperation('find', 'team_invites');
+  return invites
+    .find({ email: email.toLowerCase().trim(), acceptedAt: { $exists: false }, expiresAt: { $gt: new Date() } })
+    .sort({ createdAt: -1 })
+    .toArray();
+}
+
 export async function getTeamInvites(teamId: string): Promise<TeamInvite[]> {
   const invites = await getCollection('teamInvites');
   trackMongoOperation('find', 'team_invites');
