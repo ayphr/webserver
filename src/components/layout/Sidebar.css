@@ -413,7 +413,7 @@
     width: 100%;
     min-width: 100%;
     height: auto;
-    max-height: 4rem;
+    max-height: 3.25rem;
     flex-direction: row;
     align-items: center;
     overflow: hidden;
@@ -478,8 +478,7 @@
     margin-bottom: 0.1rem;
   }
   .n-sidebar__label {
-    max-width: 100%;
-    opacity: 1;
+    display: none;
   }
   .n-sidebar__label {
     max-width: none;
