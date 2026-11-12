@@ -469,9 +469,13 @@
     min-width: 0;
     flex-direction: column;
     gap: 0.15rem;
-    padding: 0.35rem 0.4rem;
-    font-size: 0.65rem;
+    padding: 0.4rem 0.35rem;
+    font-size: 0.62rem;
     text-align: center;
+    border-radius: 8px;
+  }
+  .n-sidebar__icon {
+    margin-bottom: 0.1rem;
   }
   .n-sidebar__label {
     max-width: 100%;
