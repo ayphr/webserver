@@ -219,14 +219,18 @@
 @media (max-width: 768px) {
   .dashboard-layout {
     flex-direction: column;
-    height: auto;
+    height: 100vh;
     min-height: 100vh;
-    overflow: visible;
+    overflow: hidden;
   }
   .dashboard-main {
-    padding: 0.75rem 0.75rem 6rem;
-    overflow: visible;
+    padding: 0.75rem 0.75rem 4.5rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     gap: 0.75rem;
+    flex: 1;
+    min-height: 0;
   }
   .dashboard-panel,
   .dashboard-panel--wide,
