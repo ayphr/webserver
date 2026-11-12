@@ -111,7 +111,10 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
     const { sendEmail } = await import('../../lib/email');
     const { CLIENT_URL } = await import('../../env');
     const { buildTeamInviteEmail } = await import('../../lib/email/templates');
-    const link = `${CLIENT_URL}/auth/register?invite=${invite.token}`;
+    const isExistingUser = Boolean(target);
+    const link = isExistingUser
+      ? `${CLIENT_URL}/dashboard?invite=${invite.token}`
+      : `${CLIENT_URL}/auth/register?invite=${invite.token}`;
     const emailContent = buildTeamInviteEmail({
       inviterUsername: user.username,
       inviteUrl: link,

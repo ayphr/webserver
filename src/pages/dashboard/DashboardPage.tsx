@@ -187,6 +187,33 @@ export const DashboardPage = () => {
 
     void load();
   }, []);
+  useEffect(() => {
+    const inviteToken = searchParams.get('invite');
+    if (!inviteToken || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await api.teams.acceptInvite(inviteToken);
+        if (cancelled) return;
+        const userData = await api.users.me();
+        if (cancelled) return;
+        setUser(userData.user);
+        setCredits(userData.credits);
+        setActiveSuspension(userData.activeSuspension);
+      } catch (err) {
+        console.error('Failed to accept team invite:', err);
+      } finally {
+        if (!cancelled) {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('invite');
+            return next;
+          }, { replace: true });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [searchParams, user]);
 
   const isSuspended = activeSuspension !== null;
   const isStaff = user?.role === 'staff';
