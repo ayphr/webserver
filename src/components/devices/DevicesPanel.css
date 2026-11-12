@@ -805,3 +805,21 @@
   font-size: 0.78rem;
   cursor: pointer;
 }
+
+@media (max-width: 640px) {
+  .devices__grid {
+    grid-template-columns: 1fr;
+  }
+  .devices__chart-container {
+    height: 220px;
+  }
+  .devices__graphs-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .devices__detail-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
