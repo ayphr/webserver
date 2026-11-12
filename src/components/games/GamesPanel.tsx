@@ -371,7 +371,7 @@ function MinesweeperGame() {
     floodReveal(working, r, c);
     setBoard(working);
 
-    const won = working.flat().every((cl) => cl.mine || cl.revealed);
+    const won = working.flat().every((cl) => (cl.mine && cl.flagged) || (!cl.mine && cl.revealed));
     if (won) {
       setStatus('won');
       const time = elapsed;
@@ -407,10 +407,10 @@ function MinesweeperGame() {
     setFlagCount(newFlagCount);
     if (status === 'idle') setStatus('playing');
 
-    // End the game when all mines have been flagged.
-    const allMinesFlagged =
-      newFlagCount === MS_MINES && working.flat().every((cl) => !cl.mine || cl.flagged);
-    if (allMinesFlagged) {
+    // End the game when all mines are flagged and all other squares are revealed.
+    const complete =
+      working.flat().every((cl) => (cl.mine && cl.flagged) || (!cl.mine && cl.revealed));
+    if (complete) {
       setStatus('won');
       const time = elapsed;
       if (bestTime === null || time < bestTime) {
