@@ -413,17 +413,21 @@
     width: 100%;
     min-width: 100%;
     height: auto;
-    max-height: 4.5rem;
+    max-height: 7rem;
     flex-direction: row;
     align-items: center;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     border-bottom: none;
     border-right: none;
     padding: 0.35rem 0.5rem;
     z-index: 50;
-    -webkit-overflow-scrolling: touch;
+  }
+  .n-sidebar--collapsed:hover,
+  .n-sidebar--collapsed.n-sidebar--menu-open {
+    --sidebar-width: var(--sidebar-width-collapsed);
+    width: 100%;
+    min-width: 100%;
   }
   .n-sidebar__top,
   .n-sidebar__spacer,
@@ -437,7 +441,8 @@
     gap: 0.25rem;
     margin: 0;
     width: auto;
-    overflow-x: auto;
+    overflow: hidden;
+    flex-wrap: wrap;
   }
   .n-sidebar__bottomTabs {
     display: flex;
@@ -446,19 +451,31 @@
   }
   .n-sidebar__tabs {
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0.25rem;
     margin-top: 0;
     width: 100%;
-    overflow-x: auto;
+    overflow: hidden;
+    justify-content: space-around;
+  }
+  .n-sidebar__bottomTabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: space-around;
   }
   .n-sidebar__tab {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+    min-width: 0;
     flex-direction: column;
     gap: 0.15rem;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.7rem;
+    padding: 0.35rem 0.4rem;
+    font-size: 0.65rem;
     text-align: center;
+  }
+  .n-sidebar__label {
+    max-width: 100%;
+    opacity: 1;
   }
   .n-sidebar__label {
     max-width: none;
