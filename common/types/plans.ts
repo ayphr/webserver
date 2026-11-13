@@ -166,8 +166,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
       'lite',
       'standard',
       'plus',
-      'turbo',
-      'ultra',
+      'turbo'
     ],
     dataShared: false,
     eventsAccess: 'priority',
