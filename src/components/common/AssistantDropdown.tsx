@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  IconBolt,
   IconRocket,
-  IconSparkles,
-  IconStar,
-  IconCpu,
+  IconCircle,
+  IconSparkle,
+  IconSparkle2,
+  IconSparkleHighlight,
 } from '@tabler/icons-react';
 import type { AssistantVariants } from '@common';
 import './AssistantDropdown.css';
@@ -28,11 +28,11 @@ const VARIANT_LABELS: Record<AssistantVariants, string> = {
   turbo: 'Turbo',
 };
 
-const VARIANT_ICONS: Record<AssistantVariants, typeof IconCpu> = {
-  nano: IconCpu,
-  lite: IconBolt,
-  standard: IconSparkles,
-  plus: IconStar,
+const VARIANT_ICONS: Record<AssistantVariants, typeof IconCircle> = {
+  nano: IconCircle,
+  lite: IconSparkle,
+  standard: IconSparkle2,
+  plus: IconSparkleHighlight,
   turbo: IconRocket,
 };
 
