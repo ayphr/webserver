@@ -10,6 +10,7 @@ import {
   Legend,
   Filler,
   Decimation,
+  type Chart,
   type ChartOptions,
   type ChartData,
 } from 'chart.js';
@@ -30,7 +31,6 @@ ChartJS.register(
   Filler,
 );
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const LineGraph = forwardRef<any, LineGraphProps>(function LineGraph({ data, config }, ref) {
+export const LineGraph = forwardRef<Chart<'line'> | undefined, LineGraphProps>(function LineGraph({ data, config }, ref) {
   return <Line ref={ref} options={config as ChartOptions<'line'>} data={data as ChartData<'line'>} />;
 });

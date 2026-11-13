@@ -26,6 +26,7 @@ import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
 import { LineGraph } from '../graphs';
+import type { LineGraphScale } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
 import type { DevicePeriod } from '../../lib/devicePeriod';
 import { DeviceQueryModal } from './DeviceQueryModal';
@@ -561,8 +562,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
 
 
   const combinedConfig = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const scales: Record<string, any> = {
+    const scales: Record<string, LineGraphScale> = {
       x: {
         type: 'linear',
         ...(graphWindow ? { min: graphWindow.initialMin, max: graphWindow.initialMax } : {}),

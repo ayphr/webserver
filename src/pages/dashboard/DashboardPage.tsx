@@ -180,6 +180,7 @@ export const DashboardPage = () => {
 
   useEffect(() => {
     if (appealsPage > appealsTotalPages) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAppealsPage(appealsTotalPages);
     }
   }, [appealsPage, appealsTotalPages]);
@@ -214,9 +215,14 @@ export const DashboardPage = () => {
     return () => { cancelled = true; };
   }, [searchParams, setSearchParams, user]);
 
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const isSuspended = activeSuspension !== null;
   const suspensionProgress = activeSuspension?.endsAt
-    ? Math.min(100, Math.max(0, ((Date.now() - toDate(activeSuspension.issuedAt).getTime()) / (toDate(activeSuspension.endsAt).getTime() - toDate(activeSuspension.issuedAt).getTime())) * 100))
+    ? Math.min(100, Math.max(0, ((now - toDate(activeSuspension.issuedAt).getTime()) / (toDate(activeSuspension.endsAt).getTime() - toDate(activeSuspension.issuedAt).getTime())) * 100))
     : null;
   const isStaff = user?.role === 'staff';
   const isDeveloper = user?.developerAccount === true;
@@ -380,7 +386,7 @@ export const DashboardPage = () => {
             }
             const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
             const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
-            if (nextAllowed && Date.now() < nextAllowed.getTime()) {
+            if (nextAllowed && now < nextAllowed.getTime()) {
               return `Current: ${user?.username}. You can change again on ${nextAllowed.toLocaleDateString('en-GB')}.`;
             }
             return `Current: ${user?.username}. You can change your username once every 29 days.`;
@@ -391,7 +397,7 @@ export const DashboardPage = () => {
             if (user?.role === 'staff') return false;
             const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
             const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
-            return Boolean(nextAllowed && Date.now() < nextAllowed.getTime());
+            return Boolean(nextAllowed && now < nextAllowed.getTime());
           })(),
           action: () => setIsChangeUsernameOpen(true),
         },
@@ -578,7 +584,7 @@ export const DashboardPage = () => {
         },
       ],
     },
-  ], [defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user]);
+  ], [defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user, now]);
 
   if (isLoading) {
     return <DashboardLoadingSkeleton activeTab={activePage} />;

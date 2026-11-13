@@ -1,5 +1,5 @@
 import { Children, useEffect, useRef, useState, isValidElement } from 'react';
-import type { ChangeEvent, ReactNode, SelectHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, SelectHTMLAttributes } from 'react';
 import './Select.css';
 
 export interface SelectOption {
@@ -92,10 +92,10 @@ export const Select = ({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        {...(props as any)}
+        {...(props as unknown as ButtonHTMLAttributes<HTMLButtonElement>)}
         onClick={(e) => {
           if (disabled) return;
-          (props as any)?.onClick?.(e);
+          (props as unknown as ButtonHTMLAttributes<HTMLButtonElement>)?.onClick?.(e);
           setOpen((v) => !v);
         }}
       >

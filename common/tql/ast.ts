@@ -1,7 +1,6 @@
 export interface TelemetryPoint {
   timestamp: number | string | Date;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export type RootClauseType = 'findAll' | 'findFirst' | 'findLast' | 'count' | 'exists' | 'select';
