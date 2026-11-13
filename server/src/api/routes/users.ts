@@ -67,7 +67,7 @@ const handleUsernameChange = requireAuth(async (request, user) => {
   }
 
   const lastChanged = user.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
-  if (lastChanged) {
+  if (user.role !== 'staff' && lastChanged) {
     const nextAllowed = new Date(lastChanged.getTime() + USERNAME_CHANGE_COOLDOWN_MS);
     if (Date.now() < nextAllowed.getTime()) {
       return json({ error: `You can change your username again on ${nextAllowed.toLocaleDateString('en-GB')}` }, 429);

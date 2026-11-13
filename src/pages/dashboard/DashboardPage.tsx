@@ -375,6 +375,9 @@ export const DashboardPage = () => {
           icon: <IconUser size={18} strokeWidth={1.75} />,
           title: 'Username',
           description: (() => {
+            if (user?.role === 'staff') {
+              return `Current: ${user?.username}. Staff can change their username at any time.`;
+            }
             const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
             const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
             if (nextAllowed && Date.now() < nextAllowed.getTime()) {
@@ -385,6 +388,7 @@ export const DashboardPage = () => {
           label: 'Change username',
           variant: 'secondary',
           disabled: (() => {
+            if (user?.role === 'staff') return false;
             const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
             const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
             return Boolean(nextAllowed && Date.now() < nextAllowed.getTime());
