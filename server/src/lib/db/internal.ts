@@ -251,6 +251,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ email: 1, purpose: 1, userUuid: 1 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ ownerUuid: 1 })],
+    ['teams', () => cols.teams.createIndex({ managerUuid: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex(
       { ownerUuid: 1, isDefault: 1 },
       { unique: true, partialFilterExpression: { isDefault: true } }

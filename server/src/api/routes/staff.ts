@@ -331,6 +331,7 @@ const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUse
   }
 
   targetUser.auth.passwordHash = await createPasswordHash(password);
+  targetUser.trustedDevices = [];
   await updateUser(targetUser);
 
   // Setting a password signs the user out of every device.

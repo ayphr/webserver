@@ -58,12 +58,31 @@ export const PolicyGate = ({
 
   // Poll the session so this device is signed out shortly after another
   // device revokes it. A 401 triggers the global unauthorized handler.
+  // Only poll while the tab is visible to avoid background work.
   useEffect(() => {
-    const interval = setInterval(() => {
-      void api.users.me().catch(() => undefined);
-    }, 20000);
-
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (interval) return;
+      interval = setInterval(() => {
+        void api.users.me().catch(() => undefined);
+      }, 20000);
+    };
+    const stop = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const handleAccept = async () => {

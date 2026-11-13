@@ -278,6 +278,13 @@ export async function recordStripeEvent(eventId: string, type: string) {
   return result.upsertedCount > 0;
 }
 
+export async function hasStripeEvent(eventId: string): Promise<boolean> {
+  const stripeEvents = await getCollection('stripeEvents');
+  trackMongoOperation('findOne', STRIPE_EVENTS_COLLECTION);
+  const existing = await stripeEvents.findOne({ id: eventId }, { projection: { _id: 1 } });
+  return existing !== null;
+}
+
 
 export async function upsertPaidSubscription(userUuid: string, subscription: PaidSubscription) {
   const users = await getCollection('users');

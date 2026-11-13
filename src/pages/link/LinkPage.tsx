@@ -12,6 +12,18 @@ export const LinkPage = () => {
   const navigate = useNavigate();
   const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [activeTokenState, setActiveTokenState] = useState<string | null>(() => getActiveToken());
+  useEffect(() => {
+    const refresh = () => {
+      setStoredAccounts(getStoredAccounts());
+      setActiveTokenState(getActiveToken());
+    };
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [code, setCode] = useState('');

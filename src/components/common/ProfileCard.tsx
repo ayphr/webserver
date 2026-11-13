@@ -108,6 +108,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [selectedSocialValue, setSelectedSocialValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const saveSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (saveSuccessTimeoutRef.current) clearTimeout(saveSuccessTimeoutRef.current);
+  }, []);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -165,7 +169,8 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       setUser(updated);
       if (isSelfProfile) api.users.invalidateMe();
       setSaveSuccess(true);
-      window.setTimeout(() => setSaveSuccess(false), 3000);
+      if (saveSuccessTimeoutRef.current) clearTimeout(saveSuccessTimeoutRef.current);
+      saveSuccessTimeoutRef.current = window.setTimeout(() => setSaveSuccess(false), 3000);
       setIsEditingProfile(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update profile';

@@ -27,6 +27,7 @@ import {
   getPaidSubscriptionsForUserUuid,
   getUserByStripeCustomerId,
   getUserUuidByStripeCustomerId,
+  hasStripeEvent,
   recordStripeEvent,
   removeAttachedSubscription,
   removePaidSubscription,
@@ -176,6 +177,11 @@ export async function handleStripeWebhook(request: Request) {
   }
 
   stripeWebhookEventsTotal.inc({ type: event.type });
+
+  // Idempotency: skip events we have already successfully processed.
+  if (await hasStripeEvent(event.id)) {
+    return Response.json({ received: true });
+  }
 
   try {
     await handleStripeEvent(event);

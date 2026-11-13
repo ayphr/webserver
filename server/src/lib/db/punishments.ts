@@ -34,7 +34,7 @@ export async function createPunishment(punishment: Punishment) {
 export async function getPunishmentById(id: string) {
   const punishments = await getCollection('punishments');
   trackMongoOperation('findOne', PUNISHMENTS_COLLECTION);
-  return punishments.findOne({ id } as Record<string, unknown>);
+  return punishments.findOne({ id } as Record<string, unknown>, { projection: { _id: 0 } });
 }
 
 
@@ -95,7 +95,8 @@ export async function getPunishmentsByType(type: Punishment['type']) {
 
 export async function updatePunishment(punishment: Punishment) {
   const punishments = await getCollection('punishments');
-  const normalizedPunishment = normalizeDateValues(punishment);
+  const normalizedPunishment = normalizeDateValues(punishment) as Record<string, unknown>;
+  delete normalizedPunishment._id;
   trackMongoOperation('updateOne', PUNISHMENTS_COLLECTION);
   await punishments.updateOne(
     { id: punishment.id } as Record<string, unknown>,

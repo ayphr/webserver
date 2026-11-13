@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUserCache } from './internal';
+import { isDuplicateKeyError } from '../http';
 import { invalidateAuthEntries } from '../authCache';
 import type { Team, TeamAuditLog, TeamRole, User, AttachedSubscription, TeamInvite } from '@common';
 import { addAttachedSubscription, removeAttachedSubscription, getUserFromUuid, upsertPaidSubscription, removePaidSubscription } from './users';
@@ -63,7 +64,15 @@ export async function ensureTeamForManager(managerUuid: string, tier?: string): 
 
   const teams = await getCollection('teams');
   trackMongoOperation('insertOne', TEAMS_COLLECTION);
-  await teams.insertOne(normalizeDateValues(team));
+  try {
+    await teams.insertOne(normalizeDateValues(team));
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      const existingAfterRace = await getTeamByManagerUuid(managerUuid);
+      if (existingAfterRace) return existingAfterRace;
+    }
+    throw error;
+  }
 
   // Mark manager as team member/manager.
   await setUserTeamMembership(managerUuid, team.id, 'manager');

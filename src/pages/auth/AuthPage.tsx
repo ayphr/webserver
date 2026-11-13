@@ -46,7 +46,16 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storedAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  useEffect(() => {
+    const refresh = () => setStoredAccounts(getStoredAccounts());
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   const eligibleAccounts = storedAccounts.filter((account) => !isStoredAccountExpired(account));
   const visibleAccounts = eligibleAccounts.filter((account) => account.token !== getActiveToken());
   const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : eligibleAccounts;

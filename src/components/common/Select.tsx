@@ -1,4 +1,4 @@
-import { Children, useEffect, useRef, useState, isValidElement } from 'react';
+import { Children, useId, useEffect, useRef, useState, isValidElement } from 'react';
 import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, SelectHTMLAttributes } from 'react';
 import './Select.css';
 
@@ -45,6 +45,7 @@ export const Select = ({
 }: SelectProps) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const selectId = useId();
 
   const resolvedOptions = options ?? parseOptionChildren(children);
 
@@ -85,9 +86,10 @@ export const Select = ({
       className={`select-wrapper ${fullWidth ? 'select-wrapper--full-width' : ''}`}
       ref={containerRef}
     >
-      {label && <label className="select-label">{label}</label>}
+      {label && <label className="select-label" htmlFor={selectId}>{label}</label>}
       <button
         type="button"
+        id={selectId}
         className={`select ${error ? 'select--error' : ''} ${className}`}
         disabled={disabled}
         aria-haspopup="listbox"

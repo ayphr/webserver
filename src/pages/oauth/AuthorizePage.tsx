@@ -44,11 +44,23 @@ export const AuthorizePage = () => {
     return () => window.clearTimeout(task);
   }, [clientId, redirectUri, navigate]);
 
+  const isSafeRedirect = (value: string): boolean => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   const handleApprove = async () => {
     setIsApproving(true);
     setError(null);
     try {
       const res = await api.oauth.authorize({ clientId, redirectUri, scope, state });
+      if (!isSafeRedirect(res.redirectUri)) {
+        throw new Error('Unsafe redirect URI returned by server');
+      }
       const url = new URL(res.redirectUri);
       url.searchParams.set('code', res.code);
       if (res.state || state) url.searchParams.set('state', res.state || state);
@@ -60,6 +72,10 @@ export const AuthorizePage = () => {
   };
 
   const handleDeny = () => {
+    if (!isSafeRedirect(redirectUri)) {
+      window.location.assign('/');
+      return;
+    }
     try {
       const url = new URL(redirectUri);
       url.searchParams.set('error', 'access_denied');

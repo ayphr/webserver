@@ -14,10 +14,13 @@ import {
   createUser,
   deleteAvatar,
   deleteDevicesForOwnerUuid,
+  deleteDomainVerificationsForUser,
   deletePunishmentsForUserUuid,
   deleteSessionsForUserUuid,
   deleteUser,
   getActiveSuspensionForUserUuid,
+  getCollection,
+  getDevicesForOwnerUuid,
   getUserFromUsername,
   updateUser,
 } from '../../lib/db';
@@ -335,6 +338,12 @@ async function handleVerifyLogin(request: Request) {
   const username = body.username.trim();
   const code = body.code.trim();
 
+  const userCheck = await loginVerifyLimiter.check(`user:${username}`);
+  if (!userCheck.allowed) {
+    authEventsTotal.inc({ event: 'login_verify', result: 'rate_limited' });
+    return tooManyRequests(userCheck.retryAfterMs);
+  }
+
   const user = username.includes('@')
     ? await getUserByEmail(normalizeEmail(username))
     : await getUserFromUsername(username);
@@ -483,12 +492,42 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
     return json({ error: 'invalid password' }, 401);
   }
 
+  // Cascade-delete all data owned by the account before removing the user.
+  const devices = await getDevicesForOwnerUuid(user.uuid);
+  const deviceSerials = devices.map((device) => device.serial);
+  const dataPoints = await getCollection('dataPoints');
+  if (deviceSerials.length > 0) {
+    await dataPoints.deleteMany({ deviceSerial: { $in: deviceSerials } });
+  }
+
   await Promise.all([
     deletePunishmentsForUserUuid(user.uuid),
     deleteDevicesForOwnerUuid(user.uuid),
     deleteSessionsForUserUuid(user.uuid),
     deleteAvatar(user.uuid),
+    deleteDomainVerificationsForUser(user.uuid),
   ]);
+
+  const locations = await getCollection('locations');
+  await locations.deleteMany({ ownerUuid: user.uuid });
+
+  const apps = await getCollection('apps');
+  await apps.deleteMany({ ownerId: user.uuid });
+
+  const connections = await getCollection('connections');
+  const userConnections = await connections.find({ userId: user.uuid } as Record<string, unknown>).toArray();
+  const connectionIds = userConnections.map((connection) => connection.id);
+  await connections.deleteMany({ userId: user.uuid } as Record<string, unknown>);
+  if (connectionIds.length > 0) {
+    const oauthTokens = await getCollection('oauthTokens');
+    await oauthTokens.deleteMany({ connectionId: { $in: connectionIds } } as Record<string, unknown>);
+  }
+
+  const oauthTokens = await getCollection('oauthTokens');
+  await oauthTokens.deleteMany({ userId: user.uuid } as Record<string, unknown>);
+  const oauthCodes = await getCollection('oauthCodes');
+  await oauthCodes.deleteMany({ userId: user.uuid } as Record<string, unknown>);
+
   await deleteUser(user.uuid);
   authEventsTotal.inc({ event: 'account_delete', result: 'success' });
 

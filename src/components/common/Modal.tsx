@@ -17,6 +17,8 @@ export interface ModalProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+let scrollLockCount = 0;
+
 export const Modal = ({
   isOpen,
   onClose,
@@ -31,14 +33,16 @@ export const Modal = ({
   size = 'md',
 }: ModalProps) => {
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!isOpen) return;
+
+    scrollLockCount += 1;
+    document.body.style.overflow = 'hidden';
 
     return () => {
-      document.body.style.overflow = '';
+      scrollLockCount = Math.max(0, scrollLockCount - 1);
+      if (scrollLockCount === 0) {
+        document.body.style.overflow = '';
+      }
     };
   }, [isOpen]);
 
@@ -56,11 +60,16 @@ export const Modal = ({
   };
 
   return (
-    <div className="modal-backdrop" onClick={handleBackdropClick}>
-      <div className={`modal modal--${size}`}>
+    <div className="modal-backdrop" onClick={handleBackdropClick} role="presentation">
+      <div
+        className={`modal modal--${size}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? 'modal-title' : undefined}
+      >
         {title && (
           <div className="modal__header">
-            <h2 className="modal__title">{title}</h2>
+            <h2 className="modal__title" id="modal-title">{title}</h2>
             <button className="modal__close" onClick={onClose} aria-label="Close modal">
               <IconX size={20} />
             </button>

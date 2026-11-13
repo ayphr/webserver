@@ -1,17 +1,19 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconMail, IconUser, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps, IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
 import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
-import type { SettingsSection } from '../../lib/settings';
+
 import { ProfileCard, Button, AssistantInput, Pagination } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
 import { OverviewPanel } from '../../components/overview/OverviewPanel';
 import { DashboardContentSkeleton, DashboardLoadingSkeleton } from './DashboardLoadingSkeleton';
+import { useDashboardClock } from './useDashboardClock';
+import { buildSettingsSections } from './dashboardSettings';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
@@ -215,11 +217,7 @@ export const DashboardPage = () => {
     return () => { cancelled = true; };
   }, [searchParams, setSearchParams, user]);
 
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const now = useDashboardClock();
   const isSuspended = activeSuspension !== null;
   const suspensionProgress = activeSuspension?.endsAt
     ? Math.min(100, Math.max(0, ((now - toDate(activeSuspension.issuedAt).getTime()) / (toDate(activeSuspension.endsAt).getTime() - toDate(activeSuspension.issuedAt).getTime())) * 100))
@@ -370,221 +368,36 @@ export const DashboardPage = () => {
     localStorage.setItem('ayphr-pref-sidebar-pinned', checked ? '1' : '0');
   };
 
-  const settingsSections = useMemo<SettingsSection[]>(() => [
-    {
-      id: 'account',
-      title: 'Account',
-      options: [
-        {
-          id: 'username',
-          optionType: 'button',
-          icon: <IconUser size={18} strokeWidth={1.75} />,
-          title: 'Username',
-          description: (() => {
-            if (user?.role === 'staff') {
-              return `Current: ${user?.username}. Staff can change their username at any time.`;
-            }
-            const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
-            const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
-            if (nextAllowed && now < nextAllowed.getTime()) {
-              return `Current: ${user?.username}. You can change again on ${nextAllowed.toLocaleDateString('en-GB')}.`;
-            }
-            return `Current: ${user?.username}. You can change your username once every 29 days.`;
-          })(),
-          label: 'Change username',
-          variant: 'secondary',
-          disabled: (() => {
-            if (user?.role === 'staff') return false;
-            const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
-            const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
-            return Boolean(nextAllowed && now < nextAllowed.getTime());
-          })(),
-          action: () => setIsChangeUsernameOpen(true),
+  const settingsSections = useMemo(
+    () =>
+      buildSettingsSections({
+        user,
+        credits,
+        defaultTab,
+        setDefaultTabPref,
+        compactLayout,
+        setCompactPref,
+        sidebarPinned,
+        setSidebarPinnedPref,
+        isStaff,
+        isDeveloper,
+        now,
+        navigate,
+        setIsSessionsOpen,
+        setIsChangePasswordOpen,
+        setIsChangeEmailOpen,
+        setIsChangeUsernameOpen,
+        onDeveloperToggle: async (checked) => {
+          try {
+            const updated = await api.users.setDeveloperAccount(checked);
+            setUser(updated);
+          } catch (err) {
+            console.error('Failed to update developer account:', err);
+          }
         },
-        {
-          id: 'email',
-          optionType: 'button',
-          icon: <IconMail size={18} strokeWidth={1.75} />,
-          title: 'Email',
-          description: user?.email
-            ? `${user.email}${user.emailVerifiedAt ? ` (verified ${formatDisplayDate(user.emailVerifiedAt)})` : ''}`
-            : 'Add a verified email address to secure your account.',
-          label: user?.email ? 'Change email' : 'Set email',
-          variant: 'secondary',
-          action: () => setIsChangeEmailOpen(true),
-        },
-        {
-          id: 'logout',
-          optionType: 'button',
-          icon: <IconLogout size={18} strokeWidth={1.75} />,
-          title: 'Log out',
-          description: 'Sign out of your account on this device.',
-          label: 'Log out',
-          variant: 'secondary',
-          action: async () => {
-            await api.auth.logout();
-            await navigate('/auth', { replace: true });
-          },
-        },
-        {
-          id: 'logout-other-sessions',
-          optionType: 'button',
-          icon: <IconLogout2 size={18} strokeWidth={1.75} />,
-          title: 'Sign out all other sessions',
-          description: 'Sign out of all other devices and active sessions, keeping this one.',
-          label: 'Sign out all other sessions',
-          variant: 'secondary',
-          confirm: {
-            title: 'Sign out all other sessions',
-            message: 'You will be signed out of all other devices and active sessions. This device will stay signed in.',
-            confirmText: 'Sign out others',
-          },
-          action: async () => {
-            await api.auth.logoutOthers();
-          },
-        },
-        {
-          id: 'logout-all',
-          optionType: 'button',
-          icon: <IconLogout2 size={18} strokeWidth={1.75} />,
-          title: 'Log out everywhere',
-          description: 'Sign out of all devices and active sessions.',
-          label: 'Log out everywhere',
-          variant: 'secondary',
-          confirm: {
-            title: 'Log out everywhere',
-            message: 'You will be signed out of all devices and active sessions, including this one.',
-            confirmText: 'Log out everywhere',
-          },
-          action: async () => {
-            await api.auth.logoutAll();
-            await navigate('/auth', { replace: true });
-          },
-        },
-      ],
-    },
-    {
-      id: 'security',
-      title: 'Security',
-      options: [
-        {
-          id: 'change-password',
-          optionType: 'button',
-          icon: <IconLock size={18} strokeWidth={1.75} />,
-          title: 'Change password',
-          description: 'Set a new password. All devices will be signed out.',
-          label: 'Change password',
-          variant: 'secondary',
-          action: () => setIsChangePasswordOpen(true),
-        },
-        {
-          id: 'sessions',
-          optionType: 'button',
-          icon: <IconShieldLock size={18} strokeWidth={1.75} />,
-          title: 'Active sessions',
-          description: 'See where your account is signed in, with approximate location and device.',
-          label: 'View sessions',
-          variant: 'secondary',
-          action: () => setIsSessionsOpen(true),
-        },
-      ],
-    },
-    {
-      id: 'danger',
-      title: 'Danger Zone',
-      options: [
-        {
-          id: 'delete-account',
-          optionType: 'button',
-          icon: <IconTrash size={18} strokeWidth={1.75} />,
-          title: 'Delete account',
-          description: 'Permanently delete your account and all associated data.',
-          label: 'Delete account',
-          variant: 'danger',
-          danger: true,
-          confirm: {
-            title: 'Delete Account',
-            message: 'This will permanently delete your account and all associated data. This action cannot be undone. Confirm your password to continue.',
-            confirmText: 'Delete account',
-            dangerous: true,
-            requirePassword: true,
-          },
-          action: async ({ password }) => {
-            await api.auth.deleteAccount({ password: password ?? '' });
-            await navigate('/auth', { replace: true });
-          },
-        },
-      ],
-    },
-    {
-      id: 'developer',
-      title: 'Developer',
-      options: [
-        {
-          id: 'developer-account',
-          optionType: 'checkbox',
-          icon: <IconApps size={18} strokeWidth={1.75} />,
-          title: 'Developer account',
-          description: 'Enable developer features like creating apps.',
-          checked: user?.developerAccount === true,
-          onChange: async (checked) => {
-            try {
-              const updated = await api.users.setDeveloperAccount(checked);
-              setUser(updated);
-            } catch (err) {
-              console.error('Failed to update developer account:', err);
-            }
-          },
-        },
-      ],
-    },
-    {
-      id: 'preferences',
-      title: 'Preferences',
-      options: [
-        {
-          id: 'default-tab',
-          optionType: 'select',
-          icon: <IconLayoutDashboard size={18} strokeWidth={1.75} />,
-          title: 'Default dashboard view',
-          description: 'Choose which tab opens when you visit the dashboard.',
-          value: defaultTab,
-          options: [
-            { value: 'overview', label: 'Overview' },
-            { value: 'devices', label: 'Devices' },
-            { value: 'locations', label: 'Locations' },
-            { value: 'profile', label: 'Profile' },
-            { value: 'credits', label: 'Credits' },
-            { value: 'games', label: 'Games' },
-            { value: 'connections', label: 'Connections' },
-            { value: 'subscription', label: 'Subscription' },
-            { value: 'team', label: 'Team' },
-            ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
-            ...(isDeveloper ? [{ value: 'my-apps', label: 'My Apps' }] : []),
-          ],
-          onChange: setDefaultTabPref,
-        },
-        {
-          id: 'compact-layout',
-          optionType: 'checkbox',
-          icon: <IconAdjustmentsHorizontal size={18} strokeWidth={1.75} />,
-          title: 'Compact layout',
-          description: 'Reduce padding and tighten the dashboard layout.',
-          checked: compactLayout,
-          onChange: setCompactPref,
-        },
-        {
-          id: 'sidebar-pinned',
-          optionType: 'checkbox',
-          icon: <IconLayoutSidebar size={18} strokeWidth={1.75} />,
-          title: 'Keep sidebar open',
-          description: 'Always show the full sidebar instead of collapsing it to icons.',
-          checked: sidebarPinned,
-          onChange: setSidebarPinnedPref,
-        },
-      ],
-    },
-  ], [defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user, now]);
+      }),
+    [credits, defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user, now],
+  );
 
   if (isLoading) {
     return <DashboardLoadingSkeleton activeTab={activePage} />;

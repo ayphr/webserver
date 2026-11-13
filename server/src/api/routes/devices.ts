@@ -63,6 +63,7 @@ const pairingRequestLimiter = createRateLimiter(15 * 60 * 1000, 20, 'pairing-req
 const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
 const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
 const deviceQueryLimiter = createRateLimiter(60 * 1000, 60, 'device-query');
+const deviceUploadLimiter = createRateLimiter(60 * 1000, 120, 'device-upload');
 const MAX_NAME_LENGTH = 64;
 const MAX_POINTS_PER_UPLOAD = 2_000;
 const MAX_QUERY_LENGTH = 10_000;
@@ -417,6 +418,9 @@ const handleGetBySerial = requireAuth(async (_request, user: User, params) => {
 });
 
 async function handleUpload(request: Request): Promise<Response> {
+  const ipCheck = await deviceUploadLimiter.check(`ip:${getClientIp(request)}`);
+  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+
   const endTimer = telemetryUploadDuration.startTimer();
 
   try {
@@ -509,7 +513,8 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
 
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const url = new URL(request.url);
   const period = url.searchParams.get('period') ?? '24h';
@@ -537,7 +542,8 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
 
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== user.uuid) return json({ error: 'forbidden' }, 403);
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const body = await readJsonBody<DeviceQueryRequest>(request);
   const query = typeof body?.query === 'string' ? body.query.trim() : '';
@@ -613,7 +619,7 @@ const handleDeleteDeviceDataPoints = requireAuth(async (request, user: User, par
   if (timestamps.length === 0) return json({ error: 'invalid timestamps' }, 400);
 
   const removed = await deleteDataPointsForDevice(serial, timestamps);
-  invalidateDeviceStatsForOwner(scopeUuid);
+  await invalidateDeviceStatsForOwner(scopeUuid);
   return json({ serial, removed }, 200);
 });
 

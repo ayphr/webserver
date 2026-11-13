@@ -1,3 +1,4 @@
+import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertCircle,
@@ -84,7 +85,7 @@ type GraphWindow = {
 
 function computeGraphWindow(points: DataPoint[]): GraphWindow | null {
   if (points.length === 0) return null;
-  const times = points.map((p) => toDate(p.timestamp).getTime());
+  const times = points.map((p) => toDate(p.timestamp).getTime()).sort((a, b) => a - b);
   const extentMin = times[0];
   const extentMax = times[times.length - 1];
 
@@ -307,7 +308,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isUnlinkOpen, setIsUnlinkOpen] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
-  const hasAppliedInitialDevice = useRef(false);
+  const appliedInitialDeviceRef = useRef<number | null>(null);
+  const saveSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (saveSuccessTimeoutRef.current) clearTimeout(saveSuccessTimeoutRef.current);
+  }, []);
 
   const loadAll = useCallback(async () => {
     setError(null);
@@ -321,15 +326,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
       setLocations(loadedLocations);
       if (userData) setUser(userData.user);
       if (
-        !hasAppliedInitialDevice.current &&
         initialDeviceSerial !== null &&
         initialDeviceSerial !== undefined &&
+        initialDeviceSerial !== appliedInitialDeviceRef.current &&
         loadedDevices.some((device) => device.serial === initialDeviceSerial)
       ) {
         setSelectedSerial(initialDeviceSerial);
         setDetailTab('graphs');
         setView('detail');
-        hasAppliedInitialDevice.current = true;
+        appliedInitialDeviceRef.current = initialDeviceSerial;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
@@ -450,7 +455,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
         current.map((d) => (d.serial === updated.serial ? { ...d, ...updated } : d)),
       );
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      if (saveSuccessTimeoutRef.current) clearTimeout(saveSuccessTimeoutRef.current);
+      saveSuccessTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update device settings');
     } finally {
@@ -742,7 +748,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null }: Props) => {
                   key={device.serial}
                   elevated
                   className="devices__card"
-                  onClick={() => handleSelectDevice(device)}
+                  onClick={() => handleSelectDevice(device)} role="button" tabIndex={0} onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectDevice(device); } }}
                 >
                   <div className="devices__card-header">
                     <div className="devices__card-title-group">

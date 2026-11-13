@@ -1,4 +1,5 @@
 import './Card.css';
+import type React from 'react';
 import type { ReactNode } from 'react';
 
 export interface CardProps {
@@ -6,13 +7,19 @@ export interface CardProps {
   className?: string;
   onClick?: () => void;
   elevated?: boolean;
+  role?: string;
+  tabIndex?: number;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
 }
 
-export const Card = ({ children, className = '', onClick, elevated = false }: CardProps) => {
+export const Card = ({ children, className = '', onClick, elevated = false, role, tabIndex, onKeyDown }: CardProps) => {
   return (
     <div
       className={`card ${elevated ? 'card--elevated' : ''} ${className}`}
       onClick={onClick}
+      role={role}
+      tabIndex={tabIndex}
+      onKeyDown={onKeyDown}
     >
       {children}
     </div>

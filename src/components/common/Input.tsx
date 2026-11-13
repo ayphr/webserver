@@ -27,6 +27,8 @@ export const Input = ({
       <input
         id={inputId}
         className={`input ${error ? 'input--error' : ''} ${className}`}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${inputId}-error` : undefined}
         {...props}
       />
       {error && <span className="input-error" id={`${inputId}-error`}>{error}</span>}
