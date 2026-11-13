@@ -29,6 +29,7 @@
   font-size: 0.95rem;
   cursor: pointer;
   transition: background-color 0.15s ease;
+  border-radius: 0.5rem;
 }
 
 .assistant-dropdown__toggle:hover:not(:disabled) {
