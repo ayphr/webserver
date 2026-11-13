@@ -335,3 +335,14 @@
   border-radius: var(--radius-md);
   margin: 0;
 }
+
+.profile-card__save-success {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.6rem 0.75rem;
+  margin: 0;
+  background: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
