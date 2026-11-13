@@ -14,12 +14,16 @@
 }
 
 .assistant-dropdown__toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.5rem;
   text-align: left;
-  width: 100%;
+  width: auto;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0.25rem 0.5rem;
 }
 
 .assistant-dropdown__value {

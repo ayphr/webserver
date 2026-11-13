@@ -88,7 +88,7 @@ export const AssistantDropdown = ({
       {label && <label className="assistant-dropdown__label">{label}</label>}
       <button
         type="button"
-        className="select assistant-dropdown__toggle"
+        className="assistant-dropdown__toggle"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
