@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IconArrowUp } from '@tabler/icons-react';
 import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariants } from '@common';
@@ -15,16 +15,25 @@ export const AssistantInput = ({
 }: AssistantInputProps) => {
   const [value, setValue] = useState('');
   const [variant, setVariant] = useState<AssistantVariants>('standard');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
 
   return (
     <div className={`assistant-input ${className}`}>
       <div className="assistant-input__box">
         <textarea
+          ref={textareaRef}
           className="assistant-input__textarea"
           placeholder={placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          rows={4}
+          rows={1}
         />
         <div className="assistant-input__footer">
           <AssistantDropdown value={variant} onChange={setVariant} />
@@ -32,6 +41,7 @@ export const AssistantInput = ({
             type="button"
             className="assistant-input__send"
             aria-label="Send"
+            // Intentionally does nothing for now.
           >
             <IconArrowUp size={18} strokeWidth={2} />
           </button>
