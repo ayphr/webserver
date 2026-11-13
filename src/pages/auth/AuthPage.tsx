@@ -87,7 +87,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     const newErrors: Partial<FormData> = {};
 
     if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
+      newErrors.username = mode === 'login' ? 'Email or username is required' : 'Username is required';
     } else if (mode === 'signup') {
       const usernameError = getUsernameValidationError(formData.username.trim());
       if (usernameError) newErrors.username = usernameError;
@@ -477,10 +477,10 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
             {step === 'form' && (
               <form onSubmit={handleSubmit} className="auth-form">
                 <Input
-                  label="Username"
+                  label={isSignup ? 'Username' : 'Email or username'}
                   name="username"
                   type="text"
-                  placeholder="Enter your username"
+                  placeholder={isSignup ? 'Enter your username' : 'Enter your email or username'}
                   value={formData.username}
                   onChange={handleInputChange}
                   error={errors.username}

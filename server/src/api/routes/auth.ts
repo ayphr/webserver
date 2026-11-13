@@ -254,13 +254,19 @@ async function handleLogin(request: Request) {
   const username = body.username.trim();
   const password = body.password.trim();
 
-  const userCheck = await loginLimiter.check(`user:${username.toLowerCase()}`);
+  const loginIdentifier = username;
+  const rateLimitKey = loginIdentifier.includes('@')
+    ? normalizeEmail(loginIdentifier)
+    : loginIdentifier.toLowerCase();
+  const userCheck = await loginLimiter.check(`user:${rateLimitKey}`);
   if (!userCheck.allowed) {
     authEventsTotal.inc({ event: 'login', result: 'rate_limited' });
     return tooManyRequests(userCheck.retryAfterMs);
   }
 
-  const user = await getUserFromUsername(username);
+  const user = loginIdentifier.includes('@')
+    ? await getUserByEmail(normalizeEmail(loginIdentifier))
+    : await getUserFromUsername(loginIdentifier);
   if (!user || !(await verifyPassword(password, user.auth.passwordHash))) {
     authEventsTotal.inc({ event: 'login', result: 'invalid_credentials' });
     return json({ error: 'invalid username or password' }, 401);
@@ -329,7 +335,9 @@ async function handleVerifyLogin(request: Request) {
   const username = body.username.trim();
   const code = body.code.trim();
 
-  const user = await getUserFromUsername(username);
+  const user = username.includes('@')
+    ? await getUserByEmail(normalizeEmail(username))
+    : await getUserFromUsername(username);
   if (!user || !user.email || !user.emailVerifiedAt) {
     authEventsTotal.inc({ event: 'login_verify', result: 'invalid' });
     return json({ error: 'invalid or expired code' }, 400);
