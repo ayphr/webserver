@@ -22,6 +22,16 @@
   padding: 0.5rem 0.75rem;
 }
 
+.assistant-input__box--multiline {
+  flex-direction: column;
+  align-items: stretch;
+  border-radius: 1.25rem;
+}
+
+.assistant-input__box--multiline .assistant-input__footer {
+  justify-content: flex-end;
+}
+
 .assistant-input__textarea {
   flex: 1 1 auto;
   width: 100%;

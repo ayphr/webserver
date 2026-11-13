@@ -15,18 +15,21 @@ export const AssistantInput = ({
 }: AssistantInputProps) => {
   const [value, setValue] = useState('');
   const [variant, setVariant] = useState<AssistantVariants>('standard');
+  const [multiline, setMultiline] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
+    const nextHeight = el.scrollHeight;
+    el.style.height = `${nextHeight}px`;
+    setMultiline(nextHeight > 40);
   }, [value]);
 
   return (
     <div className={`assistant-input ${className}`}>
-      <div className="assistant-input__box">
+      <div className={`assistant-input__box ${multiline ? 'assistant-input__box--multiline' : ''}`}>
         <textarea
           ref={textareaRef}
           className="assistant-input__textarea"
