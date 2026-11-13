@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconArrowUp } from '@tabler/icons-react';
 import { AssistantDropdown } from './AssistantDropdown';
-import type { AssistantVariants } from '@common';
+import type { AssistantVariant } from '@common';
 import './AssistantInput.css';
 
 export interface AssistantInputProps {
@@ -14,7 +14,7 @@ export const AssistantInput = ({
   className = '',
 }: AssistantInputProps) => {
   const [value, setValue] = useState('');
-  const [variant, setVariant] = useState<AssistantVariants>('standard');
+  const [variant, setVariant] = useState<AssistantVariant>('standard');
   const [multiline, setMultiline] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -49,7 +49,7 @@ export const AssistantInput = ({
             type="button"
             className="assistant-input__send"
             aria-label="Send"
-            // Intentionally does nothing for now.
+          // Intentionally does nothing for now.
           >
             <IconArrowUp size={18} strokeWidth={2} />
           </button>

@@ -21,16 +21,30 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [placement, setPlacement] = useState<TooltipPlacement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const TOOLTIP_DELAY = 400;
+
+  const clearShowTimer = useCallback(() => {
+    if (showTimerRef.current) {
+      clearTimeout(showTimerRef.current);
+      showTimerRef.current = null;
+    }
+  }, []);
 
   const hideTooltip = useCallback(() => {
+    clearShowTimer();
     setTooltip(null);
     setPlacement(null);
-  }, []);
+  }, [clearShowTimer]);
 
   const showTooltip = useCallback(({ content, anchor }: TooltipOptions) => {
-    setTooltip({ content, anchor });
-    setPlacement(null);
-  }, []);
+    clearShowTimer();
+    showTimerRef.current = setTimeout(() => {
+      setTooltip({ content, anchor });
+      setPlacement(null);
+    }, TOOLTIP_DELAY);
+  }, [clearShowTimer]);
 
   useLayoutEffect(() => {
     if (!tooltip || placement || !tooltipRef.current) return;
@@ -55,6 +69,10 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => {
       placement: placeAbove ? 'top' : 'bottom',
     });
   }, [tooltip, placement]);
+
+  useEffect(() => {
+    return () => clearShowTimer();
+  }, [clearShowTimer]);
 
   useEffect(() => {
     if (!tooltip) return;

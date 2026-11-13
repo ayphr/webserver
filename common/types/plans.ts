@@ -1,4 +1,4 @@
-import type { AssistantVariants } from './assistant';
+import type { AssistantVariant } from './assistant';
 import type { SubscriptionTier } from './subscription';
 
 export type UserAccessCount = number | 'team';
@@ -29,7 +29,7 @@ export type PlanFeatures = {
   queryComputeUnitLimit: number;
   queryCostCredits: number;
   boostedQueryCostCredits: number;
-  availableAssistantVariants: AssistantVariants[];
+  availableAssistantVariants: AssistantVariant[];
   dataShared: boolean;
   eventsAccess: EventsAccess;
   maxUsers: number;
