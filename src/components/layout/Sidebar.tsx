@@ -12,11 +12,11 @@ import type { BadgeId, CreditBalance } from '@common/types';
 type Tab = { id: string; name: string };
 
 const tabs: Tab[] = [
-  { id: 'assistant', name: 'Assistant' },
   { id: 'overview', name: 'Overview' },
   { id: 'devices', name: 'Devices' },
   { id: 'locations', name: 'Locations' },
   { id: 'games', name: 'Games' },
+  { id: 'assistant', name: 'Assistant' },
 ];
 
 const staffTabs: Tab[] = [
