@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconMail, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps, IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconMail, IconUser, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps, IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
@@ -8,7 +8,7 @@ import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
 import type { SettingsSection } from '../../lib/settings';
 import { ProfileCard, Button, AssistantInput, Pagination } from '../../components/common';
 import { Sidebar } from '../../components/layout';
-import { SessionsModal, ChangePasswordModal, ChangeEmailModal } from '../../components/settings';
+import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
 import { OverviewPanel } from '../../components/overview/OverviewPanel';
 import { DashboardContentSkeleton, DashboardLoadingSkeleton } from './DashboardLoadingSkeleton';
@@ -119,6 +119,7 @@ export const DashboardPage = () => {
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
+  const [isChangeUsernameOpen, setIsChangeUsernameOpen] = useState(false);
   const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   const [compactLayout, setCompactLayout] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-compact') === '1',
@@ -368,6 +369,28 @@ export const DashboardPage = () => {
       id: 'account',
       title: 'Account',
       options: [
+        {
+          id: 'username',
+          optionType: 'button',
+          icon: <IconUser size={18} strokeWidth={1.75} />,
+          title: 'Username',
+          description: (() => {
+            const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
+            const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
+            if (nextAllowed && Date.now() < nextAllowed.getTime()) {
+              return `Current: ${user?.username}. You can change again on ${nextAllowed.toLocaleDateString('en-GB')}.`;
+            }
+            return `Current: ${user?.username}. You can change your username once every 29 days.`;
+          })(),
+          label: 'Change username',
+          variant: 'secondary',
+          disabled: (() => {
+            const changedAt = user?.usernameChangedAt ? new Date(user.usernameChangedAt) : null;
+            const nextAllowed = changedAt ? new Date(changedAt.getTime() + 29 * 24 * 60 * 60 * 1000) : null;
+            return Boolean(nextAllowed && Date.now() < nextAllowed.getTime());
+          })(),
+          action: () => setIsChangeUsernameOpen(true),
+        },
         {
           id: 'email',
           optionType: 'button',
@@ -886,6 +909,19 @@ export const DashboardPage = () => {
           onClose={() => setIsChangeEmailOpen(false)}
           onChanged={async (updatedUser) => {
             setIsChangeEmailOpen(false);
+            setUser(updatedUser);
+            const token = api.getAuthToken();
+            if (token) updateStoredAccount(token, updatedUser);
+            api.users.invalidateMe();
+          }}
+        />
+      )}
+      {isChangeUsernameOpen && (
+        <ChangeUsernameModal
+          isOpen={isChangeUsernameOpen}
+          onClose={() => setIsChangeUsernameOpen(false)}
+          onChanged={async (updatedUser) => {
+            setIsChangeUsernameOpen(false);
             setUser(updatedUser);
             const token = api.getAuthToken();
             if (token) updateStoredAccount(token, updatedUser);

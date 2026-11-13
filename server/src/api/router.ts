@@ -73,7 +73,7 @@ import {
   handleRevokeToken,
 } from './routes/oauth';
 import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
-import { handleUserByUuid, handleMe as handleUsersMe, handleDeveloperToggle } from './routes/users';
+import { handleUserByUuid, handleMe as handleUsersMe, handleDeveloperToggle, handleUsernameChange } from './routes/users';
 import { handleCreditsMe } from './routes/credits';
 import { handleGetBests as handleGamesBestsGet, handleUpdateBest as handleGamesBestsUpdate } from './routes/games';
 import {
@@ -146,6 +146,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/games/bests', handle: handleGamesBestsUpdate },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
   { method: 'PATCH', path: '/api/users/me/developer', handle: handleDeveloperToggle },
+  { method: 'PATCH', path: '/api/users/me/username', handle: handleUsernameChange },
 
   { method: 'GET', path: '/api/avatars/:uuid', handle: handleAvatarGet },
 

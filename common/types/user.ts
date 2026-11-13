@@ -66,6 +66,7 @@ export type User = {
   teamRole?: 'member' | 'helper' | 'manager';
   credits?: UserCredits;
   trustedDevices?: string[];
+  usernameChangedAt?: Date;
 };
 
 export type PublicUser = Omit<

@@ -55,5 +55,13 @@ export function createUsersApi(client: RequestClient) {
       invalidateMe();
       return response.user;
     },
+    async changeUsername(username: string, currentPassword: string) {
+      const response = await client.requestJson<{ user: SelfUser }>('/api/users/me/username', {
+        method: 'PATCH',
+        body: { username, currentPassword },
+      });
+      invalidateMe();
+      return response.user;
+    },
   };
 }
