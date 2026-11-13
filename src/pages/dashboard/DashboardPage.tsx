@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconMail, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps, IconCheck, IconClock, IconX, IconSend } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconMail, IconLogout, IconLogout2, IconShieldLock, IconTrash, IconApps, IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
@@ -597,6 +597,7 @@ export const DashboardPage = () => {
                 onClick={() => setIsSuspensionDetailsOpen((open) => !open)}
               >
                 {isSuspensionDetailsOpen ? 'Hide details' : 'More info'}
+                {isSuspensionDetailsOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
               </button>
               {isSuspensionDetailsOpen && (
                 <div className="dashboard-page__suspension-card__meta">

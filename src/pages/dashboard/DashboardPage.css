@@ -126,10 +126,6 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding: 1.5rem;
-  background: var(--bg-elevated);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
 }
 
 .dashboard-page__suspension-card__header {
@@ -233,13 +229,16 @@
 
 .dashboard-page__suspension-card__toggle {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   background: none;
   border: none;
   color: var(--text-muted);
   font-size: 0.8rem;
   cursor: pointer;
   padding: 0;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .dashboard-page__suspension-card__toggle:hover {
