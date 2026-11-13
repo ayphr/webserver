@@ -199,6 +199,92 @@
   align-self: flex-start;
 }
 
+.dashboard-page__appeal-status {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dashboard-page__appeal-tracker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem 0;
+}
+
+.dashboard-page__appeal-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-page__appeal-step-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: hsl(0, 0%, 25%);
+  border: 2px solid hsl(0, 0%, 35%);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.dashboard-page__appeal-step--done .dashboard-page__appeal-step-dot {
+  background-color: hsl(0, 0%, 60%);
+  border-color: hsl(0, 0%, 60%);
+}
+
+.dashboard-page__appeal-step--active .dashboard-page__appeal-step-dot {
+  background-color: hsl(0, 0%, 80%);
+  border-color: hsl(0, 0%, 80%);
+  box-shadow: 0 0 0 4px hsla(0, 0%, 80%, 0.15);
+}
+
+.dashboard-page__appeal-step--pending .dashboard-page__appeal-step-dot {
+  background-color: hsl(0, 0%, 25%);
+  border-color: hsl(0, 0%, 35%);
+}
+
+.dashboard-page__appeal-step--success .dashboard-page__appeal-step-dot {
+  background-color: var(--accent-green-solid);
+  border-color: var(--accent-green-solid);
+}
+
+.dashboard-page__appeal-step--danger .dashboard-page__appeal-step-dot {
+  background-color: var(--status-error);
+  border-color: var(--status-error);
+}
+
+.dashboard-page__appeal-step-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dashboard-page__appeal-step--done .dashboard-page__appeal-step-label,
+.dashboard-page__appeal-step--active .dashboard-page__appeal-step-label,
+.dashboard-page__appeal-step--success .dashboard-page__appeal-step-label,
+.dashboard-page__appeal-step--danger .dashboard-page__appeal-step-label {
+  color: var(--text-primary);
+}
+
+.dashboard-page__appeal-step-line {
+  flex: 1;
+  height: 2px;
+  background-color: hsl(0, 0%, 25%);
+  min-width: 12px;
+}
+
+.dashboard-page__appeal-status-text {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  margin: 0;
+}
+
 .dashboard-skeleton {
   display: flex;
   flex-direction: column;

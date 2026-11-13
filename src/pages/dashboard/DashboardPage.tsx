@@ -806,7 +806,31 @@ export const DashboardPage = () => {
               <DashboardPanel title="Appeal suspension" description="You may submit one appeal per suspension" className="dashboard-panel--wide">
                 {inviteError && <p className="dashboard-page__error">{inviteError}</p>}
                 {existingAppeal ? (
-                  <p>Your appeal has been submitted. Status: {existingAppeal.status}.</p>
+                  <div className="dashboard-page__appeal-status">
+                    <div className="dashboard-page__appeal-tracker" data-status={existingAppeal.status}>
+                      <div className="dashboard-page__appeal-step dashboard-page__appeal-step--done">
+                        <span className="dashboard-page__appeal-step-dot" />
+                        <span className="dashboard-page__appeal-step-label">Submitted</span>
+                      </div>
+                      <div className="dashboard-page__appeal-step-line" />
+                      <div className={`dashboard-page__appeal-step ${existingAppeal.status === 'pending' ? 'dashboard-page__appeal-step--active' : 'dashboard-page__appeal-step--done'}`}>
+                        <span className="dashboard-page__appeal-step-dot" />
+                        <span className="dashboard-page__appeal-step-label">Under review</span>
+                      </div>
+                      <div className="dashboard-page__appeal-step-line" />
+                      <div className={`dashboard-page__appeal-step ${existingAppeal.status === 'pending' ? 'dashboard-page__appeal-step--pending' : existingAppeal.status === 'accepted' ? 'dashboard-page__appeal-step--success' : 'dashboard-page__appeal-step--danger'}`}>
+                        <span className="dashboard-page__appeal-step-dot" />
+                        <span className="dashboard-page__appeal-step-label">
+                          {existingAppeal.status === 'accepted' ? 'Accepted' : existingAppeal.status === 'denied' ? 'Denied' : 'Decision'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="dashboard-page__appeal-status-text">
+                      {existingAppeal.status === 'pending' && 'Your appeal is being reviewed by staff.'}
+                      {existingAppeal.status === 'accepted' && 'Your appeal was accepted and the suspension was lifted.'}
+                      {existingAppeal.status === 'denied' && 'Your appeal was denied.'}
+                    </p>
+                  </div>
                 ) : (
                   <div className="dashboard-page__appeal">
                     <textarea
