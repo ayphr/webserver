@@ -97,7 +97,7 @@
 }
 
 .dashboard-page__field select {
-  background-color: hsl(0, 0%, 10%);
+  background-color: var(--bg-base);
   border: 1px solid hsl(0, 0%, 16%);
   border-radius: var(--radius-md);
   padding: 0.55rem 1rem;
@@ -222,39 +222,48 @@
   min-width: 0;
 }
 
-.dashboard-page__appeal-step-dot {
-  width: 16px;
-  height: 16px;
+.dashboard-page__appeal-step-icon {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background-color: hsl(0, 0%, 25%);
-  border: 2px solid hsl(0, 0%, 35%);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-elevated);
+  border: 2px solid var(--border-subtle);
+  color: var(--text-muted);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.dashboard-page__appeal-step--done .dashboard-page__appeal-step-dot {
-  background-color: hsl(0, 0%, 60%);
-  border-color: hsl(0, 0%, 60%);
+.dashboard-page__appeal-step--done .dashboard-page__appeal-step-icon {
+  background-color: var(--text-muted);
+  border-color: var(--text-muted);
+  color: var(--bg-base);
 }
 
-.dashboard-page__appeal-step--active .dashboard-page__appeal-step-dot {
-  background-color: hsl(0, 0%, 80%);
-  border-color: hsl(0, 0%, 80%);
-  box-shadow: 0 0 0 4px hsla(0, 0%, 80%, 0.15);
+.dashboard-page__appeal-step--active .dashboard-page__appeal-step-icon {
+  background-color: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--bg-base);
+  box-shadow: 0 0 0 4px hsla(180, 67%, 99%, 0.15);
 }
 
-.dashboard-page__appeal-step--pending .dashboard-page__appeal-step-dot {
-  background-color: hsl(0, 0%, 25%);
-  border-color: hsl(0, 0%, 35%);
+.dashboard-page__appeal-step--pending .dashboard-page__appeal-step-icon {
+  background-color: var(--bg-input-off);
+  border-color: var(--border);
+  color: var(--text-muted);
 }
 
-.dashboard-page__appeal-step--success .dashboard-page__appeal-step-dot {
+.dashboard-page__appeal-step--success .dashboard-page__appeal-step-icon {
   background-color: var(--accent-green-solid);
   border-color: var(--accent-green-solid);
+  color: #fff;
 }
 
-.dashboard-page__appeal-step--danger .dashboard-page__appeal-step-dot {
+.dashboard-page__appeal-step--danger .dashboard-page__appeal-step-icon {
   background-color: var(--status-error);
   border-color: var(--status-error);
+  color: #fff;
 }
 
 .dashboard-page__appeal-step-label {
@@ -274,7 +283,7 @@
 .dashboard-page__appeal-step-line {
   flex: 1;
   height: 2px;
-  background-color: hsl(0, 0%, 25%);
+  background-color: var(--bg-input-off);
   min-width: 12px;
 }
 

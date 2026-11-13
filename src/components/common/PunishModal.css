@@ -45,9 +45,9 @@
 }
 
 .punish-modal__preset--active {
-  background-color: hsl(0, 0%, 28%);
+  background-color: var(--bg-input-off);
   color: var(--text-primary);
-  border-color: hsl(0, 0%, 40%);
+  border-color: var(--border);
 }
 
 .punish-modal__duration-wrapper {
