@@ -280,6 +280,48 @@
   align-self: flex-start;
 }
 
+.dashboard-page__appeals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dashboard-page__appeal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.dashboard-page__appeal-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dashboard-page__appeal-item__user {
+  font-weight: var(--font-weight-md);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.dashboard-page__appeal-item__text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.dashboard-page__appeal-item__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .dashboard-page__appeal-status {
   display: flex;
   flex-direction: column;

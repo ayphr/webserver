@@ -6,7 +6,7 @@ import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAcc
 import { toDate } from '../../lib/date';
 import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
 import type { SettingsSection } from '../../lib/settings';
-import { ProfileCard, Button, AssistantInput } from '../../components/common';
+import { ProfileCard, Button, AssistantInput, Pagination } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -104,6 +104,10 @@ export const DashboardPage = () => {
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
   const [appealError, setAppealError] = useState<string | null>(null);
   const [staffAppeals, setStaffAppeals] = useState<Appeal[]>([]);
+  const [appealsPage, setAppealsPage] = useState(1);
+  const APPEALS_PAGE_SIZE = 5;
+  const appealsTotalPages = Math.max(1, Math.ceil(staffAppeals.length / APPEALS_PAGE_SIZE));
+  const safeAppealsPage = Math.min(appealsPage, appealsTotalPages);
   const [isAppealsLoading, setIsAppealsLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [activePage, setActivePage] = useState<string>(() => {
@@ -172,6 +176,12 @@ export const DashboardPage = () => {
       .finally(() => { if (active) setIsAppealsLoading(false); });
     return () => { active = false; };
   }, [activePage, user]);
+
+  useEffect(() => {
+    if (appealsPage > appealsTotalPages) {
+      setAppealsPage(appealsTotalPages);
+    }
+  }, [appealsPage, appealsTotalPages]);
 
   useEffect(() => {
     const inviteToken = searchParams.get('invite');
@@ -834,17 +844,25 @@ export const DashboardPage = () => {
                 ) : staffAppeals.length === 0 ? (
                   <p>No pending appeals.</p>
                 ) : (
-                  <ul>
-                    {staffAppeals.map((appeal) => (
-                      <li key={appeal.id} style={{ marginBottom: '1rem' }}>
-                        <strong>{appeal.userUsername}</strong>: {appeal.text}
-                        <div style={{ marginTop: '0.5rem' }}>
-                          <Button variant="primary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'lift')}>Remove punishment</Button>
-                          <Button variant="secondary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'deny')}>Deny</Button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <div className="dashboard-page__appeals-list">
+                      {staffAppeals
+                        .slice((safeAppealsPage - 1) * APPEALS_PAGE_SIZE, safeAppealsPage * APPEALS_PAGE_SIZE)
+                        .map((appeal) => (
+                          <div key={appeal.id} className="dashboard-page__appeal-item">
+                            <div className="dashboard-page__appeal-item__header">
+                              <span className="dashboard-page__appeal-item__user">{appeal.userUsername}</span>
+                            </div>
+                            <p className="dashboard-page__appeal-item__text">{appeal.text}</p>
+                            <div className="dashboard-page__appeal-item__actions">
+                              <Button variant="primary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'lift')}>Remove punishment</Button>
+                              <Button variant="secondary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'deny')}>Deny</Button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    <Pagination page={safeAppealsPage} totalPages={appealsTotalPages} onPageChange={setAppealsPage} />
+                  </>
                 )}
               </DashboardPanel>
             )}
