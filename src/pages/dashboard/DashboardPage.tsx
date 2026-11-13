@@ -27,55 +27,8 @@ import './DashboardPage.css';
 
 const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
 
-function getRelativeTime(date: Date | string): string {
-  const resolvedDate = toDate(date);
-  const now = new Date();
-  const diffMs = now.getTime() - resolvedDate.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  const diffWeeks = Math.floor(diffDays / 7);
-  const diffMonths = Math.floor(diffDays / 30);
-  const diffYears = Math.floor(diffDays / 365);
-
-  if (diffYears > 0) return `${diffYears} year${diffYears > 1 ? 's' : ''} ago`;
-  if (diffMonths > 0) return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
-  if (diffWeeks > 0) return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
-  if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffMins > 0) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-  return 'just now';
-}
-
 function formatDisplayDate(date: Date | string): string {
   return toDate(date).toLocaleDateString('en-GB');
-}
-
-function getTimeRemaining(date: Date | string): string {
-  const resolvedDate = toDate(date);
-  const now = new Date();
-  const diffMs = resolvedDate.getTime() - now.getTime();
-
-  if (diffMs <= 0) {
-    return 'Expired';
-  }
-
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  const diffWeeks = Math.floor(diffDays / 7);
-  const diffMonths = Math.floor(diffDays / 30);
-  const diffYears = Math.floor(diffDays / 365);
-
-  if (diffYears > 0) return `in ${diffYears} year${diffYears > 1 ? 's' : ''}`;
-  if (diffMonths > 0) return `in ${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
-  if (diffWeeks > 0) return `in ${diffWeeks} week${diffWeeks > 1 ? 's' : ''}`;
-  if (diffDays > 0) return `in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
-  if (diffHours > 0) return `in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
-  if (diffMins > 0) return `in ${diffMins} minute${diffMins > 1 ? 's' : ''}`;
-  return 'in less than a minute';
 }
 
 function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | null; isPermanent: boolean }>) {
@@ -145,6 +98,7 @@ export const DashboardPage = () => {
   const [user, setUser] = useState<SelfUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
+  const [isSuspensionDetailsOpen, setIsSuspensionDetailsOpen] = useState(false);
   const [existingAppeal, setExistingAppeal] = useState<Appeal | null>(null);
   const [appealText, setAppealText] = useState('');
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
@@ -250,6 +204,9 @@ export const DashboardPage = () => {
   }, [searchParams, setSearchParams, user]);
 
   const isSuspended = activeSuspension !== null;
+  const suspensionProgress = activeSuspension?.endsAt
+    ? Math.min(100, Math.max(0, ((Date.now() - toDate(activeSuspension.issuedAt).getTime()) / (toDate(activeSuspension.endsAt).getTime() - toDate(activeSuspension.issuedAt).getTime())) * 100))
+    : null;
   const isStaff = user?.role === 'staff';
   const isDeveloper = user?.developerAccount === true;
   const isTeamMember = Boolean(user?.teamId) || (user?.subscription?.tier ?? '').startsWith('team-');
@@ -609,38 +566,56 @@ export const DashboardPage = () => {
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
-            <div className="dashboard-page__punishment-info">
-              <div className="dashboard-page__punishment-field">
-                <span className="dashboard-page__punishment-label">Reason:</span>
-                <span className="dashboard-page__punishment-value">{activeSuspension.reason}</span>
-              </div>
-              <div className="dashboard-page__punishment-field">
-                <span className="dashboard-page__punishment-label">Issued by:</span>
-                <span className="dashboard-page__punishment-value">{activeSuspension.issuedByUsername}</span>
-              </div>
-              <div className="dashboard-page__punishment-field">
-                <span className="dashboard-page__punishment-label">Issued:</span>
-                <span className="dashboard-page__punishment-value">{getRelativeTime(activeSuspension.issuedAt)} ({formatDisplayDate(activeSuspension.issuedAt)})</span>
-              </div>
-              <div className="dashboard-page__punishment-field">
-                <span className="dashboard-page__punishment-label">Ends:</span>
-                <span className="dashboard-page__punishment-value">
-                  {activeSuspension.endsAt ? (
-                    <>
-                      {getTimeRemaining(activeSuspension.endsAt)} ({formatDisplayDate(activeSuspension.endsAt)})
-                    </>
-                  ) : (
-                    'Permanent'
-                  )}
+            <div className="dashboard-page__suspension-card">
+              <div className="dashboard-page__suspension-card__header">
+                <span className="dashboard-page__suspension-card__countdown">
+                  <PunishmentCountdown
+                    endsAt={activeSuspension.endsAt}
+                    isPermanent={activeSuspension.endsAt === null}
+                  />
                 </span>
+                <span className="dashboard-page__suspension-card__countdown-label">remaining</span>
               </div>
-              <div className="dashboard-page__punishment-field">
-                <span className="dashboard-page__punishment-label">Time remaining:</span>
-                <PunishmentCountdown
-                  endsAt={activeSuspension.endsAt}
-                  isPermanent={activeSuspension.endsAt === null}
-                />
+              <div className="dashboard-page__suspension-card__reason">
+                <span className="dashboard-page__suspension-card__label">Reason</span>
+                <p className="dashboard-page__suspension-card__reason-text">{activeSuspension.reason}</p>
               </div>
+              {suspensionProgress !== null && (
+                <div className="dashboard-page__suspension-card__progress">
+                  <div className="dashboard-page__suspension-card__progress-bar">
+                    <div
+                      className="dashboard-page__suspension-card__progress-fill"
+                      style={{ width: `${suspensionProgress}%` }}
+                    />
+                  </div>
+                  <span className="dashboard-page__suspension-card__progress-label">{Math.round(suspensionProgress)}% elapsed</span>
+                </div>
+              )}
+              <button
+                type="button"
+                className="dashboard-page__suspension-card__toggle"
+                onClick={() => setIsSuspensionDetailsOpen((open) => !open)}
+              >
+                {isSuspensionDetailsOpen ? 'Hide details' : 'More info'}
+              </button>
+              {isSuspensionDetailsOpen && (
+                <div className="dashboard-page__suspension-card__meta">
+                  <div>
+                    <span className="dashboard-page__suspension-card__label">Issued by</span>
+                    <span className="dashboard-page__suspension-card__value">{activeSuspension.issuedByUsername}</span>
+                  </div>
+                  <div>
+                    <span className="dashboard-page__suspension-card__label">Issued</span>
+                    <span className="dashboard-page__suspension-card__value">{formatDisplayDate(activeSuspension.issuedAt)}</span>
+                  </div>
+                  <div>
+                    <span className="dashboard-page__suspension-card__label">Ends</span>
+                    <span className="dashboard-page__suspension-card__value">
+                      {activeSuspension.endsAt ? formatDisplayDate(activeSuspension.endsAt) : 'Permanent'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             {isStaff && (
               <Button

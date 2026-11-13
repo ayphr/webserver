@@ -122,36 +122,76 @@
   font-size: 0.9rem;
 }
 
-.dashboard-page__punishment-info {
+ .dashboard-page__suspension-card {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding: 2rem;
-  background: var(--bg-base);
+  padding: 1.5rem;
+  background: var(--bg-elevated);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
 }
 
-.dashboard-page__punishment-field {
+.dashboard-page__suspension-card__header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dashboard-page__suspension-card__countdown {
+  font-size: 2rem;
+  font-weight: var(--font-weight-hv);
+  color: var(--status-error);
+  line-height: 1;
+}
+
+.dashboard-page__suspension-card__countdown-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.dashboard-page__suspension-card__reason {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  align-items: flex-start;
+  gap: 0.35rem;
 }
 
-.dashboard-page__punishment-label {
+.dashboard-page__suspension-card__label {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   font-weight: var(--font-weight-md);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
 }
 
-.dashboard-page__punishment-value {
+.dashboard-page__suspension-card__reason-text {
+  margin: 0;
   color: var(--text-primary);
+  font-size: 1.1rem;
   font-weight: var(--font-weight-md);
-  word-break: break-word;
-  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.dashboard-page__suspension-card__meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.dashboard-page__suspension-card__meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dashboard-page__suspension-card__value {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-md);
 }
 
 .dashboard-page__countdown {
@@ -162,6 +202,48 @@
 
 .dashboard-page__lift-button {
   margin-top: 1.5rem;
+}
+
+.dashboard-page__suspension-card__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dashboard-page__suspension-card__progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-input-off);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.dashboard-page__suspension-card__progress-fill {
+  height: 100%;
+  background: var(--status-error);
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease;
+}
+
+.dashboard-page__suspension-card__progress-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.dashboard-page__suspension-card__toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.dashboard-page__suspension-card__toggle:hover {
+  color: var(--text-primary);
 }
 
 .dashboard-page__appeal {
