@@ -20,6 +20,7 @@
   border: 1px solid hsl(0, 0%, 16%);
   border-radius: 999px;
   padding: 0.5rem 0.75rem;
+  transition: border-radius 0.25s ease, padding 0.25s ease, flex-direction 0s;
 }
 
 .assistant-input__box--multiline {
@@ -46,6 +47,7 @@
   padding: 0.25rem 0.25rem;
   max-height: 40vh;
   overflow-y: auto;
+  transition: height 0.15s ease;
 }
 
 .assistant-input__textarea::placeholder {
