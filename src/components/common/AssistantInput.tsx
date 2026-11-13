@@ -21,9 +21,18 @@ export const AssistantInput = ({
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
+    const previousHeight = el.offsetHeight;
+    const previousTransition = el.style.transition;
+    el.style.transition = 'none';
+    el.style.height = 'auto';
     const nextHeight = el.scrollHeight;
-    el.style.height = `${nextHeight}px`;
-    setMultiline(nextHeight > 40);
+    el.style.height = `${previousHeight}px`;
+    void el.offsetHeight;
+    el.style.transition = previousTransition || 'height 0.2s ease';
+    requestAnimationFrame(() => {
+      el.style.height = `${nextHeight}px`;
+      setMultiline(nextHeight > 40);
+    });
   }, [value]);
 
   return (

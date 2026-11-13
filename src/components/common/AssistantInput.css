@@ -46,7 +46,12 @@
   padding: 0.25rem 0.25rem;
   max-height: 40vh;
   overflow-y: auto;
-  transition: height 0.15s ease;
+  scrollbar-width: none;
+  transition: height 0.2s ease;
+}
+
+.assistant-input__textarea::-webkit-scrollbar {
+  display: none;
 }
 
 .assistant-input__textarea::placeholder {
