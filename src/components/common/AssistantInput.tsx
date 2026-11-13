@@ -21,7 +21,6 @@ export const AssistantInput = ({
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
     const nextHeight = el.scrollHeight;
     el.style.height = `${nextHeight}px`;
     setMultiline(nextHeight > 40);
