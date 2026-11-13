@@ -12,6 +12,7 @@ import type { BadgeId, CreditBalance } from '@common/types';
 type Tab = { id: string; name: string };
 
 const tabs: Tab[] = [
+  { id: 'assistant', name: 'Assistant' },
   { id: 'overview', name: 'Overview' },
   { id: 'devices', name: 'Devices' },
   { id: 'locations', name: 'Locations' },
@@ -29,6 +30,8 @@ const developerTabs: Tab[] = [
 
 const iconFor = (id: string) => {
   switch (id) {
+    case 'assistant':
+      return <IconMessage size={18} />;
     case 'overview':
       return <IconGauge size={18} />;
     case 'devices':

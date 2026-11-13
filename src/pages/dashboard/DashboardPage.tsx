@@ -6,7 +6,7 @@ import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAcc
 import { toDate } from '../../lib/date';
 import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
 import type { SettingsSection } from '../../lib/settings';
-import { ProfileCard, Button } from '../../components/common';
+import { ProfileCard, Button, AssistantInput } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -25,7 +25,7 @@ const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ de
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
+const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
 
 function getRelativeTime(date: Date | string): string {
   const resolvedDate = toDate(date);
@@ -607,7 +607,7 @@ export const DashboardPage = () => {
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
       <main className="dashboard-main">
-        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' ? (
+        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
             <div className="dashboard-page__punishment-info">
               <div className="dashboard-page__punishment-field">
@@ -656,6 +656,8 @@ export const DashboardPage = () => {
           </DashboardPanel>
         ) : (
           <>
+            {activePage === 'assistant' && <AssistantInput />}
+
             {activePage === 'overview' && (
               <DashboardPanel
                 title="Overview"

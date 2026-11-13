@@ -2,6 +2,8 @@ export { Button, type ButtonProps } from './Button';
 export { Card, CardHeader, CardBody, CardFooter, type CardProps, type CardHeaderProps, type CardBodyProps, type CardFooterProps } from './Card';
 export { Input, type InputProps } from './Input';
 export { Select, type SelectProps, type SelectOption } from './Select';
+export { AssistantDropdown, type AssistantDropdownProps } from './AssistantDropdown';
+export { AssistantInput, type AssistantInputProps } from './AssistantInput';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Modal, type ModalProps } from './Modal';
 export { DnsChallengeModal, type DnsChallengeModalProps } from './DnsChallengeModal';
