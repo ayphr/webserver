@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { IconSend } from '@tabler/icons-react';
+import { IconArrowUp } from '@tabler/icons-react';
 import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariants } from '@common';
 import './AssistantInput.css';
@@ -32,9 +32,8 @@ export const AssistantInput = ({
             type="button"
             className="assistant-input__send"
             aria-label="Send"
-            // Intentionally does nothing for now.
           >
-            <IconSend size={18} strokeWidth={2} />
+            <IconArrowUp size={18} strokeWidth={2} />
           </button>
         </div>
       </div>

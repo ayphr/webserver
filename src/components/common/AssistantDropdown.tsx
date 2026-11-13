@@ -49,6 +49,7 @@ export const AssistantDropdown = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (value !== undefined) setInternal(value);
   }, [value]);
 
@@ -119,12 +120,6 @@ export const AssistantDropdown = ({
               >
                 <Icon size={16} className="assistant-dropdown__icon" />
                 <span className="assistant-dropdown__item-name">{VARIANT_LABELS[variant]}</span>
-                {variant === 'turbo' && (
-                  <span className="assistant-dropdown__badge">
-                    <IconRocket size={12} strokeWidth={2.5} />
-                    Up to 40x more usage
-                  </span>
-                )}
               </button>
             );
           })}
