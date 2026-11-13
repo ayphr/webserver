@@ -101,7 +101,7 @@ export const Sidebar: React.FC<Props> = ({
   const teamTabs: Tab[] = isTeamMember
     ? [
         { id: 'team', name: 'Team' },
-        ...(isTeamManager ? [{ id: 'team-audit', name: 'Team audit' }] : []),
+        ...(isTeamManager ? [{ id: 'team-audit', name: 'Team Audit' }] : []),
       ]
     : [];
 
