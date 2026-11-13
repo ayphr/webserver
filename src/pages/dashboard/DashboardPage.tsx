@@ -808,16 +808,16 @@ export const DashboardPage = () => {
                 {existingAppeal ? (
                   <p>Your appeal has been submitted. Status: {existingAppeal.status}.</p>
                 ) : (
-                  <div>
+                  <div className="dashboard-page__appeal">
                     <textarea
+                      className="dashboard-page__appeal-textarea"
                       value={appealText}
                       onChange={(e) => setAppealText(e.target.value)}
                       rows={6}
-                      style={{ width: '100%' }}
                       placeholder="Explain why your suspension should be lifted..."
                     />
                     {appealError && <p className="dashboard-page__error">{appealError}</p>}
-                    <Button onClick={() => void handleSubmitAppeal()} isLoading={isSubmittingAppeal} disabled={isSubmittingAppeal || !appealText.trim()}>
+                    <Button className="dashboard-page__appeal-submit" onClick={() => void handleSubmitAppeal()} isLoading={isSubmittingAppeal} disabled={isSubmittingAppeal || !appealText.trim()}>
                       Submit appeal
                     </Button>
                   </div>

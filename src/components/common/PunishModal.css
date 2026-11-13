@@ -22,6 +22,34 @@
   margin: 0;
 }
 
+.punish-modal__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.punish-modal__preset {
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.punish-modal__preset:hover {
+  border-color: var(--text-primary);
+}
+
+.punish-modal__preset--active {
+  background-color: hsl(0, 0%, 28%);
+  color: var(--text-primary);
+  border-color: hsl(0, 0%, 40%);
+}
+
 .punish-modal__duration-wrapper {
   display: flex;
   gap: 0.75rem;

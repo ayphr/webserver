@@ -166,15 +166,26 @@ export const Sidebar: React.FC<Props> = ({
 
       <nav className="n-sidebar__tabs" aria-label="Primary">
         {isSuspended ? (
-          <button
-            className={`n-sidebar__tab active`}
-            type="button"
-            onClick={() => onChange('appeal')}
-            aria-label="Appeal"
-          >
-            <span className="n-sidebar__icon">{iconFor('appeal')}</span>
-            <span className="n-sidebar__label">Appeal</span>
-          </button>
+          <>
+            <button
+              className={`n-sidebar__tab ${activeTab === 'appeal' ? '' : 'active'}`}
+              type="button"
+              onClick={() => onChange('overview')}
+              aria-label="Jail"
+            >
+              <span className="n-sidebar__icon">{iconFor('jail')}</span>
+              <span className="n-sidebar__label">Jail</span>
+            </button>
+            <button
+              className={`n-sidebar__tab ${activeTab === 'appeal' ? 'active' : ''}`}
+              type="button"
+              onClick={() => onChange('appeal')}
+              aria-label="Appeal"
+            >
+              <span className="n-sidebar__icon">{iconFor('appeal')}</span>
+              <span className="n-sidebar__label">Appeal</span>
+            </button>
+          </>
         ) : (
           visibleTabs.map((t) => (
             <button

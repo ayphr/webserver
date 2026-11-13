@@ -142,11 +142,31 @@ export const PunishModal: React.FC<PunishModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Suspend ${username}`} size="sm" showCancel={false}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Suspend ${username}`} size="md" showCancel={false}>
       <div className="punish-modal__body">
         <div className="punish-modal__section">
-          <label htmlFor="duration" className="punish-modal__label">Duration</label>
-          <p className="punish-modal__hint">Enter duration like: 1h, 1d, 1w, 1w2d3h, or permanent</p>
+          <label className="punish-modal__label">Duration</label>
+          <div className="punish-modal__presets">
+            {[
+              { label: '1 hour', value: '1h' },
+              { label: '1 day', value: '1d' },
+              { label: '3 days', value: '3d' },
+              { label: '1 week', value: '1w' },
+              { label: '2 weeks', value: '2w' },
+              { label: 'Permanent', value: 'permanent' },
+            ].map((preset) => (
+              <button
+                key={preset.value}
+                type="button"
+                className={`punish-modal__preset ${durationInput === preset.value ? 'punish-modal__preset--active' : ''}`}
+                onClick={() => setDurationInput(preset.value)}
+                disabled={isLoading}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <p className="punish-modal__hint">Or enter a custom duration (e.g. 1w2d3h, 30m) or "permanent"</p>
           <div className="punish-modal__duration-wrapper">
             <input
               id="duration"

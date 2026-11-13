@@ -164,6 +164,41 @@
   margin-top: 1.5rem;
 }
 
+.dashboard-page__appeal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dashboard-page__appeal-textarea {
+  width: 100%;
+  background-color: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.95rem;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+  line-height: 1.5;
+}
+
+.dashboard-page__appeal-textarea:focus {
+  border-color: var(--text-primary);
+  outline: none;
+}
+
+.dashboard-page__appeal-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.dashboard-page__appeal-submit {
+  margin-top: 0.5rem;
+  align-self: flex-start;
+}
+
 .dashboard-skeleton {
   display: flex;
   flex-direction: column;
