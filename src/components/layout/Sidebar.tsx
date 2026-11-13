@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2 } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -31,7 +31,7 @@ const developerTabs: Tab[] = [
 const iconFor = (id: string) => {
   switch (id) {
     case 'assistant':
-      return <IconMessage size={18} />;
+      return <IconSparkle2 size={18} />;
     case 'overview':
       return <IconGauge size={18} />;
     case 'devices':
