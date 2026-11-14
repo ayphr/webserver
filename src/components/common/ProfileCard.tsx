@@ -14,6 +14,7 @@ import type { ReactNode } from 'react';
 import { api } from '../../lib/api';
 import { BioEditor, BioText, Button, UsernameDisplay, Avatar, DnsChallengeModal } from './index';
 import { EmojiText } from './EmojiText';
+import { Tooltip } from './Tooltip';
 import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
 import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
@@ -377,17 +378,18 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               {renderedSocialLinks.length > 0 && (
                 <div className="profile-card__socials" aria-label="Social links">
                   {renderedSocialLinks.map(({ key, label, href }) => (
-                    <a
-                      key={key}
-                      className="profile-card__social-iconLink"
-                      href={href}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={label}
-                      title={label}
-                    >
-                      <span className="profile-card__social-icon">{SOCIAL_LINK_ICONS[key].icon}</span>
-                    </a>
+                    <Tooltip content={label}>
+                      <a
+                        key={key}
+                        className="profile-card__social-iconLink"
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={label}
+                      >
+                        <span className="profile-card__social-icon">{SOCIAL_LINK_ICONS[key].icon}</span>
+                      </a>
+                    </Tooltip>
                   ))}
                 </div>
               )}

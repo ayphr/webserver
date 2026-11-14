@@ -13,7 +13,7 @@ import type { DeviceSummary, Location, PublicUser } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
 import { isDeviceOnline as isOnline } from '../../lib/deviceActivity';
-import { Button, Card, ConfirmDialog, Input, Modal, Pagination } from '../common';
+import { Button, Card, ConfirmDialog, Input, Modal, Pagination, Tooltip } from '../common';
 import '../settings/SettingsPanel.css';
 import './LocationsPanel.css';
 
@@ -363,13 +363,14 @@ export const LocationsPanel = ({ onDeviceNavigate }: Props) => {
                         </span>
                         <span className="locations__device-serial">#{device.serial}</span>
                       </div>
-                      <span
-                        className={`locations__device-status ${isOnline(device) ? 'is-online' : 'is-offline'}`}
-                        title={isOnline(device) ? 'Online' : 'Offline'}
-                        aria-label={isOnline(device) ? 'Online' : 'Offline'}
-                      >
-                        {isOnline(device) ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
-                      </span>
+                      <Tooltip content={isOnline(device) ? 'Online' : 'Offline'}>
+                        <span
+                          className={`locations__device-status ${isOnline(device) ? 'is-online' : 'is-offline'}`}
+                          aria-label={isOnline(device) ? 'Online' : 'Offline'}
+                        >
+                          {isOnline(device) ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
+                        </span>
+                      </Tooltip>
                     </button>
                   </li>
                 ))}

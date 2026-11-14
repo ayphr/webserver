@@ -25,7 +25,7 @@ import { getPlanFeaturesForUser, type DataPoint, type DeviceSummary, type Locati
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
-import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
+import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown, Tooltip } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphScale } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
@@ -758,16 +758,17 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
                     <div className="devices__card-title-group">
                       <span className="devices__card-name">{deviceLabel(device)}</span>
                       {device.name?.trim() && (
-                        <span className="devices__serial-pill">#{device.serial}</span>
+                        <Tooltip content={`Device serial number: ${device.serial}`}><span className="devices__serial-pill">#{device.serial}</span></Tooltip>
                       )}
                     </div>
-                    <span
-                      className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
-                      title={online ? 'Online' : 'Offline'}
-                      aria-label={online ? 'Online' : 'Offline'}
-                    >
-                      {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
-                    </span>
+                    <Tooltip content={online ? 'Online' : 'Offline'}>
+                      <span
+                        className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
+                        aria-label={online ? 'Online' : 'Offline'}
+                      >
+                        {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
+                      </span>
+                    </Tooltip>
                   </div>
 
                   <div className="devices__card-telemetry">
@@ -824,21 +825,22 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
         </Button>
         <div className="devices__actions">
           {(detailTab === 'graphs' || detailTab === 'forecasts') && (
-            <button
-              type="button"
-              className="devices__fullscreen-btn"
-              onClick={() => setIsGraphFullscreen((current) => !current)}
-              disabled={!canFullscreenGraph}
-              title={isGraphFullscreen ? 'Exit fullscreen' : 'View graph fullscreen'}
-              aria-label={isGraphFullscreen ? 'Exit fullscreen' : 'View graph fullscreen'}
-              aria-pressed={isGraphFullscreen}
-            >
-              {isGraphFullscreen ? (
-                <IconMinimize size={18} strokeWidth={1.75} />
-              ) : (
-                <IconMaximize size={18} strokeWidth={1.75} />
-              )}
-            </button>
+            <Tooltip content={isGraphFullscreen ? 'Exit fullscreen' : 'View graph fullscreen'}>
+              <button
+                type="button"
+                className="devices__fullscreen-btn"
+                onClick={() => setIsGraphFullscreen((current) => !current)}
+                disabled={!canFullscreenGraph}
+                aria-label={isGraphFullscreen ? 'Exit fullscreen' : 'View graph fullscreen'}
+                aria-pressed={isGraphFullscreen}
+              >
+                {isGraphFullscreen ? (
+                  <IconMinimize size={18} strokeWidth={1.75} />
+                ) : (
+                  <IconMaximize size={18} strokeWidth={1.75} />
+                )}
+              </button>
+            </Tooltip>
           )}
           {detailTab !== 'forecasts' && detailTab !== 'settings' && (
             <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
@@ -865,15 +867,18 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
         <div className="devices__title-row">
           <div className="devices__title-group">
             <h3 className="devices__detail-title">{deviceLabel(selectedDevice)}</h3>
-            <span className="devices__serial-pill">#{selectedDevice.serial}</span>
+            <Tooltip content={`Device serial number: ${selectedDevice.serial}`}>
+              <span className="devices__serial-pill">#{selectedDevice.serial}</span>
+            </Tooltip>
           </div>
-          <span
-            className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
-            title={online ? 'Online' : 'Offline'}
-            aria-label={online ? 'Online' : 'Offline'}
-          >
-            {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
-          </span>
+          <Tooltip content={online ? 'Online' : 'Offline'}>
+            <span
+              className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
+              aria-label={online ? 'Online' : 'Offline'}
+            >
+              {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
+            </span>
+          </Tooltip>
         </div>
 
         <div className="devices__detail-data-row">
