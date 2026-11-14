@@ -227,15 +227,22 @@ function medianPower(points: SpectrumPoint[]): number {
 export class CusumDetector {
   private mean = 0;
   private variance = 0;
-  private initialized = false;
+  initialized = false;
   private sumPositive = 0;
   private sumNegative = 0;
+  private readonly alpha: number;
+  private readonly kappa: number;
+  private readonly threshold: number;
 
   constructor(
-    private readonly alpha = 0.02,
-    private readonly kappa = 0.5,
-    private readonly threshold = 5.0,
-  ) {}
+    alpha = 0.02,
+    kappa = 0.5,
+    threshold = 5.0,
+  ) {
+    this.alpha = alpha;
+    this.kappa = kappa;
+    this.threshold = threshold;
+  }
 
   update(delta: number): boolean {
     if (!this.initialized) {

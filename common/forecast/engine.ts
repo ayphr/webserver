@@ -9,7 +9,7 @@ import {
   saturationVapourPressure,
   vapourPressureDeficit,
   wetBulbTemperature,
-} from '@common';
+} from '../utils';
 import type {
   AlgorithmContext,
   ForecastAlgorithm,

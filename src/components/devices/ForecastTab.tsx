@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { IconAlertCircle, IconRefresh } from '@tabler/icons-react';
-import type { DataPoint, DeviceForecastLockedPayload, DeviceForecastPayload, ForecastSample } from '@common';
+import { IconAlertCircle } from '@tabler/icons-react';
+import type { DataPoint, DeviceForecastPayload, ForecastSample } from '@common';
+import { forecastFromHistory, forecastHorizons, FORECAST_STEP_SECONDS } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { Button } from '../common';
@@ -72,10 +73,10 @@ const METRICS = [
 
 export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props) {
   const [forecast, setForecast] = useState<DeviceForecastPayload | null>(null);
-  const [lockedPayload, setLockedPayload] = useState<DeviceForecastLockedPayload | null>(null);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [horizonMinutes, setHorizonMinutes] = useState(60);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -105,26 +106,52 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     setLoading(true);
     setError(null);
     setForecast(null);
-    setLockedPayload(null);
+    setProgress(0);
     try {
-      const fc = await api.devices.getForecast(serial, horizonMinutes * 60);
-      if ('locked' in fc && fc.locked) {
-        setLockedPayload(fc as DeviceForecastLockedPayload);
-      } else {
-        setForecast(fc as DeviceForecastPayload);
+      let pts = dataPoints;
+      if (pts.length === 0) {
+        const dp = await api.devices.getDataPoints(serial, { period: '24h' });
+        pts = dp.dataPoints ?? [];
+        setDataPoints(pts);
       }
+      const horizons = forecastHorizons(horizonMinutes * 60, FORECAST_STEP_SECONDS);
+      const result = await forecastFromHistory(pts, {
+        horizons,
+        onProgress: (p) => setProgress(Math.round(p * 100)),
+      });
+      if (!result) {
+        setError('Not enough telemetry history to produce a forecast.');
+        return;
+      }
+      const payload: DeviceForecastPayload = {
+        serial,
+        generatedAt: new Date(result.generatedAt),
+        anchorTimestamp: new Date(result.anchorTimestamp),
+        horizonSeconds: horizonMinutes * 60,
+        stepSeconds: FORECAST_STEP_SECONDS,
+        samples: result.horizons.map((h) => ({
+          timestamp: new Date(h.targetTimestamp),
+          temperature: h.point.temperature,
+          humidity: h.point.humidity,
+          airPressure: h.point.pressure,
+          temperatureStd: h.uncertainty.temperature,
+          humidityStd: h.uncertainty.humidity,
+          airPressureStd: h.uncertainty.pressure,
+        })),
+      };
+      setProgress(100);
+      setForecast(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to calculate forecast');
     } finally {
       setLoading(false);
     }
-  }, [serial, locked, horizonMinutes]);
+  }, [serial, locked, horizonMinutes, dataPoints]);
 
   // Reset calculated forecast when horizon changes so stale results aren't shown.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setForecast(null);
-    setLockedPayload(null);
   }, [horizonMinutes]);
 
   const combinedData = useMemo<LineGraphData>(() => {
@@ -251,7 +278,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     };
   }, []);
 
-  if (locked || lockedPayload) {
+  if (locked) {
     return (
       <div className="forecast-tab forecast-tab--locked">
         <p className="forecast-tab__locked-message">Forecasts are available for Plus &amp; Ultra plans.</p>
@@ -286,8 +313,10 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
 
       {loading ? (
         <div className="forecast-tab forecast-tab--loading">
-          <IconRefresh className="forecast-tab__spin" size={24} strokeWidth={2} />
-          <p>Calculating forecast...</p>
+          <div className="forecast-tab__progress">
+            <div className="forecast-tab__progress-bar" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="forecast-tab__progress-caption">Calculating forecast… {progress}%</p>
         </div>
       ) : error ? (
         <div className="forecast-tab forecast-tab--error">

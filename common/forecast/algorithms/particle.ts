@@ -33,13 +33,17 @@ class ParticleFilter1D {
   private weights: number[];
   private initialized = false;
   private readonly random: () => number;
+  private readonly count: number;
+  private readonly velocityDecay: number;
 
   constructor(
     seed: number,
-    private readonly count = 64,
-    private readonly velocityDecay = 0.95,
+    count = 64,
+    velocityDecay = 0.95,
   ) {
     this.random = createRandom(seed);
+    this.count = count;
+    this.velocityDecay = velocityDecay;
     this.particles = [];
     this.weights = new Array<number>(count).fill(1 / count);
   }

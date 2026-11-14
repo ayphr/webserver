@@ -7,10 +7,14 @@ export class RingBuffer<T> {
   private head = 0;
   private count = 0;
 
-  constructor(readonly capacity: number, create: () => T) {
+  private readonly capacityField: number;
+  get capacity(): number { return this.capacityField; }
+
+  constructor(capacity: number, create: () => T) {
     if (!Number.isInteger(capacity) || capacity <= 0) {
       throw new Error('RingBuffer capacity must be a positive integer');
     }
+    this.capacityField = capacity;
     this.buffer = Array.from({ length: capacity }, create);
   }
 

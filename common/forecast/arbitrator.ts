@@ -47,14 +47,22 @@ export class Arbitrator {
   private readonly capacities: number[];
   private readonly history: number[][] = [[], [], []];
   private readonly scales = SCALE_FLOOR.slice();
+  readonly algorithmIds: string[];
+  readonly horizons: number[];
+  private readonly eta: number;
+  private readonly share: number;
 
   constructor(
-    readonly algorithmIds: string[],
-    readonly horizons: number[],
-    private readonly eta = 1.0,
-    private readonly share = 0.02,
+    algorithmIds: string[],
+    horizons: number[],
+    eta = 1.0,
+    share = 0.02,
     dtFloor = 30,
   ) {
+    this.algorithmIds = algorithmIds;
+    this.horizons = horizons;
+    this.eta = eta;
+    this.share = share;
     const algorithmCount = algorithmIds.length;
     const uniform = 1 / algorithmCount;
     this.weights = [0, 1, 2].map(() =>

@@ -51,11 +51,18 @@ export class KinematicKalman implements ForecastAlgorithm {
   private readonly covariances: number[][][];
   private readonly initialized = [false, false, false];
 
+  readonly id: string;
+  private readonly order: 2 | 3;
+  private readonly processNoise: number;
+
   constructor(
-    readonly id: string,
-    private readonly order: 2 | 3,
-    private readonly processNoise: number,
+    id: string,
+    order: 2 | 3,
+    processNoise: number,
   ) {
+    this.id = id;
+    this.order = order;
+    this.processNoise = processNoise;
     this.states = [0, 1, 2].map(() => new Array<number>(order).fill(0));
     this.covariances = [0, 1, 2].map(() => identity(order));
   }
@@ -147,11 +154,19 @@ export class AlphaBetaGamma implements ForecastAlgorithm {
   private readonly acceleration = [0, 0, 0];
   private readonly initialized = [false, false, false];
 
+  private readonly alpha: number;
+  private readonly beta: number;
+  private readonly gamma: number;
+
   constructor(
-    private readonly alpha = 0.25,
-    private readonly beta = 0.03,
-    private readonly gamma = 0.001,
-  ) {}
+    alpha = 0.25,
+    beta = 0.03,
+    gamma = 0.001,
+  ) {
+    this.alpha = alpha;
+    this.beta = beta;
+    this.gamma = gamma;
+  }
 
   update(ctx: AlgorithmContext): void {
     const dt = Math.max(ctx.dt, 1e-3);

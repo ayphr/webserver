@@ -60,11 +60,16 @@ export class HarmonicOLS implements ForecastAlgorithm {
   readonly id = 'M15';
   private readonly models: (HarmonicModel | null)[] = [null, null, null];
   private tick = 0;
+  private readonly window: number;
+  private readonly refitEvery: number;
 
   constructor(
-    private readonly window = 256,
-    private readonly refitEvery = 4,
-  ) {}
+    window = 256,
+    refitEvery = 4,
+  ) {
+    this.window = window;
+    this.refitEvery = refitEvery;
+  }
 
   update(ctx: AlgorithmContext): void {
     this.tick += 1;
@@ -186,13 +191,22 @@ export class SingularSpectrumAnalysis implements ForecastAlgorithm {
   readonly id = 'M16';
   private readonly models: (HarmonicModel | null)[] = [null, null, null];
   private tick = 0;
+  private readonly window: number;
+  private readonly embedding: number;
+  private readonly components: number;
+  private readonly refitEvery: number;
 
   constructor(
-    private readonly window = 128,
-    private readonly embedding = 20,
-    private readonly components = 3,
-    private readonly refitEvery = 8,
-  ) {}
+    window = 128,
+    embedding = 20,
+    components = 3,
+    refitEvery = 8,
+  ) {
+    this.window = window;
+    this.embedding = embedding;
+    this.components = components;
+    this.refitEvery = refitEvery;
+  }
 
   update(ctx: AlgorithmContext): void {
     this.tick += 1;

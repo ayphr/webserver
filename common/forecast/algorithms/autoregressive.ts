@@ -65,12 +65,19 @@ export class LevinsonAR implements ForecastAlgorithm {
   private readonly history: number[][] = [[], [], []];
   private readonly coefficients: number[][] = [[], [], []];
   private tick = 0;
+  private readonly order: number;
+  private readonly window: number;
+  private readonly refitEvery: number;
 
   constructor(
-    private readonly order = 8,
-    private readonly window = 160,
-    private readonly refitEvery = 4,
-  ) {}
+    order = 8,
+    window = 160,
+    refitEvery = 4,
+  ) {
+    this.order = order;
+    this.window = window;
+    this.refitEvery = refitEvery;
+  }
 
   update(ctx: AlgorithmContext): void {
     for (let v = 0; v < 3; v += 1) {
@@ -130,14 +137,20 @@ export class RecursiveLeastSquaresAR implements ForecastAlgorithm {
   readonly id: string;
   private readonly states: RlsState[];
   private readonly size: number;
+  private readonly order: number;
+  private readonly forgetting: number;
+  private readonly initialCovariance: number;
 
   constructor(
     id: string,
-    private readonly order = 8,
-    private readonly forgetting = 0.99,
-    private readonly initialCovariance = 1e3,
+    order = 8,
+    forgetting = 0.99,
+    initialCovariance = 1e3,
   ) {
     this.id = id;
+    this.order = order;
+    this.forgetting = forgetting;
+    this.initialCovariance = initialCovariance;
     this.size = order + 1;
     this.states = [0, 1, 2].map(() => ({
       theta: new Array<number>(this.size).fill(0),

@@ -4,7 +4,7 @@ import {
   saturationVapourPressure,
   vapourPressureFromMixingRatio,
   wetBulbTemperature,
-} from '@common';
+} from '../utils';
 import type { ReconstructedForecast } from './types';
 
 const DRY_AIR_GAS_CONSTANT = 287.058;

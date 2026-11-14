@@ -1,4 +1,4 @@
-import { relativeHumidityFromMixingRatio } from '@common';
+import { relativeHumidityFromMixingRatio } from '../../utils';
 import type { AlgorithmContext, ForecastAlgorithm, ForecastTriple, StateFrame } from '../types';
 import { emptyTriple } from '../types';
 import { diagonal, inverse, linearSlope, matVec, mean, zeros } from '../math';
@@ -142,11 +142,16 @@ export class BarometricAdvective implements ForecastAlgorithm {
   private coefficients = new Array<number>(4).fill(0);
   private previous: StateFrame | null = null;
   private tick = 0;
+  private readonly ridge: number;
+  private readonly refitEvery: number;
 
   constructor(
-    private readonly ridge = 1e-3,
-    private readonly refitEvery = 8,
-  ) {}
+    ridge = 1e-3,
+    refitEvery = 8,
+  ) {
+    this.ridge = ridge;
+    this.refitEvery = refitEvery;
+  }
 
   update(ctx: AlgorithmContext): void {
     const frame = ctx.frame;

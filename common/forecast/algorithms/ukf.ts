@@ -18,11 +18,13 @@ export class UnscentedKalmanFilter {
   private readonly weightsMean: number[];
   private readonly weightsCovariance: number[];
   private readonly lambda: number;
+  private readonly dimension: number;
 
   constructor(
-    private readonly dimension: number,
+    dimension: number,
     options: UkfOptions = {},
   ) {
+    this.dimension = dimension;
     const alpha = options.alpha ?? 1e-3;
     const beta = options.beta ?? 2;
     const kappa = options.kappa ?? 0;

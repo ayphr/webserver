@@ -15,10 +15,16 @@ type Candidate = {
 export class AnalogKnn implements ForecastAlgorithm {
   readonly id = 'M20';
 
+  private readonly window: number;
+  private readonly neighbors: number;
+
   constructor(
-    private readonly window = 8,
-    private readonly neighbors = 6,
-  ) {}
+    window = 8,
+    neighbors = 6,
+  ) {
+    this.window = window;
+    this.neighbors = neighbors;
+  }
 
   update(): void {
     // Stateless: reads the shared medium history on demand.

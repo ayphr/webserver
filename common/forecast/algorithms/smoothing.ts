@@ -1,4 +1,4 @@
-import { clamp } from '@common';
+import { clamp } from '../../utils';
 import type { AlgorithmContext, ForecastAlgorithm, ForecastTriple } from '../types';
 import { emptyTriple } from '../types';
 import { linearSlope } from '../math';
@@ -29,8 +29,10 @@ export class ExponentialSmoother implements ForecastAlgorithm {
   private seasonLength = 0;
   private readonly initialized = [false, false, false];
   private ticks = 0;
+  private readonly options: ExponentialSmootherOptions;
 
-  constructor(private readonly options: ExponentialSmootherOptions) {
+  constructor(options: ExponentialSmootherOptions) {
+    this.options = options;
     this.id = options.id;
   }
 
@@ -115,8 +117,11 @@ export class ThetaMethod implements ForecastAlgorithm {
   private readonly level = [Number.NaN, Number.NaN, Number.NaN];
   private readonly slope = [0, 0, 0];
   private readonly initialized = [false, false, false];
+  private readonly alpha: number;
 
-  constructor(private readonly alpha = 0.5) {}
+  constructor(alpha = 0.5) {
+    this.alpha = alpha;
+  }
 
   update(ctx: AlgorithmContext): void {
     for (let v = 0; v < 3; v += 1) {
