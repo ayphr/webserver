@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
+  IconCheck,
   IconClock,
+  IconCpu,
   IconDatabase,
   IconDroplet,
   IconExternalLink,
@@ -15,27 +17,110 @@ import {
   IconRefresh,
   IconTerminal2,
   IconThermometer,
+  IconTrash,
   IconWifi,
   IconWifiOff,
 } from '@tabler/icons-react';
 import { getPlanFeaturesForUser, type DataPoint, type DeviceSummary, type Location, type PublicUser } from '@common';
 import { api } from '../../lib/api';
+import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
-import { Button, Card, Pagination } from '../common';
+import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown } from '../common';
+import { LineGraph } from '../graphs';
+import type { LineGraphScale } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
-import { DeviceGraphs, type GraphMode } from './DeviceGraphs';
-import { DeviceSettings } from './DeviceSettings';
-import { ForecastTab } from './ForecastTab';
 import type { DevicePeriod } from '../../lib/devicePeriod';
 import { DeviceQueryModal } from './DeviceQueryModal';
 import { DeviceExportModal } from './DeviceExportModal';
+import { ForecastTab } from './ForecastTab';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
 
 const PAGE_SIZE = 5;
 
+function formatChartLabel(value: Date | string, period: string): string {
+  const d = toDate(value);
+  const time = d.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  if (period === '1h' || period === '24h') {
+    return time;
+  }
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${time}`;
+}
+
+/** Break lines wherever consecutive samples are further apart than 10x the median
+ * sample interval, so real outages show up as gaps instead of straight lines. */
+function computeGapThreshold(points: DataPoint[]): number | undefined {
+  if (points.length < 3) return undefined;
+  const times = points
+    .map((p) => toDate(p.timestamp).getTime())
+    .sort((a, b) => a - b);
+  const deltas: number[] = [];
+  for (let i = 1; i < times.length; i += 1) {
+    const delta = times[i] - times[i - 1];
+    if (delta > 0) deltas.push(delta);
+  }
+  if (deltas.length === 0) return undefined;
+  deltas.sort((a, b) => a - b);
+  const median = deltas[Math.floor(deltas.length / 2)];
+  return median * 10;
+}
+
 function deviceLabel(device: DeviceSummary): string {
   return device.name?.trim() || `Device ${device.serial}`;
+}
+
+const GRAPH_INITIAL_WINDOW_MS = 10 * 60 * 1000;
+const GRAPH_INITIAL_MIN_SAMPLES = 5;
+const GRAPH_MAX_ZOOM_IN_MS = 30 * 1000;
+const GRAPH_ZOOM_OUT_PADDING = 0.02;
+const GRAPH_INITIAL_HEADROOM = 0.1;
+
+type GraphWindow = {
+  initialMin: number;
+  initialMax: number;
+  limitMin: number;
+  limitMax: number;
+};
+
+function computeGraphWindow(points: DataPoint[]): GraphWindow | null {
+  if (points.length === 0) return null;
+  const times = points.map((p) => toDate(p.timestamp).getTime()).sort((a, b) => a - b);
+  const extentMin = times[0];
+  const extentMax = times[times.length - 1];
+
+  if (extentMax <= extentMin) {
+    return {
+      initialMin: extentMax - GRAPH_INITIAL_WINDOW_MS / 2,
+      initialMax: extentMax + GRAPH_INITIAL_WINDOW_MS / 2,
+      limitMin: extentMax - GRAPH_INITIAL_WINDOW_MS,
+      limitMax: extentMax + GRAPH_INITIAL_WINDOW_MS,
+    };
+  }
+
+  let initialMin = extentMax - GRAPH_INITIAL_WINDOW_MS;
+  let firstVisible = times.findIndex((t) => t >= initialMin);
+  
+  if (firstVisible < 0) firstVisible = times.length - 1;
+
+  if (times.length - firstVisible < GRAPH_INITIAL_MIN_SAMPLES) {
+    initialMin = times[Math.max(0, times.length - GRAPH_INITIAL_MIN_SAMPLES)];
+  }
+  
+  initialMin = Math.min(initialMin, extentMax - GRAPH_MAX_ZOOM_IN_MS);
+  initialMin = Math.max(initialMin, extentMin);
+
+  const initialMax = extentMax + (extentMax - initialMin) * GRAPH_INITIAL_HEADROOM;
+  const padding = (extentMax - extentMin) * GRAPH_ZOOM_OUT_PADDING;
+  return {
+    initialMin,
+    initialMax,
+    limitMin: extentMin - padding,
+    limitMax: Math.max(extentMax + padding, initialMax),
+  };
 }
 
 function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
@@ -62,6 +147,7 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 }
 
 type Period = DevicePeriod;
+type GraphMode = 'combined' | 'separate' | 'summary';
 type DetailTab = 'graphs' | 'forecasts' | 'settings';
 type Props = {
   initialDeviceSerial?: number | null;
@@ -69,6 +155,95 @@ type Props = {
 };
 
 
+
+function resolveCssColor(value: string): string {
+  if (!value.startsWith('var(')) return value;
+  if (typeof document === 'undefined') return value;
+  const name = value.slice(4, -1).trim();
+  const resolved = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return resolved || value;
+}
+
+function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoomWindow: GraphWindow | null) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    parsing: false,
+    font: {
+      family: "'DM Sans', sans-serif",
+    },
+    animation: { duration: 250 },
+    transitions: {
+      zoom: { animation: { duration: 0 } },
+      active: { animation: { duration: 0 } },
+    },
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    plugins: {
+      decimation: {
+        enabled: true,
+        algorithm: 'lttb' as const,
+        samples: 300,
+        threshold: 350,
+      },
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(18, 18, 18, 0.96)',
+        titleColor: 'hsla(180, 67%, 99%, 1)',
+        bodyColor: 'hsl(180, 1%, 53%)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
+        padding: 10,
+        callbacks: {
+          title: (items: { parsed: { x: number } }[]) => {
+            const x = items[0]?.parsed?.x;
+            return typeof x === 'number' ? formatChartLabel(new Date(x), period) : '';
+          },
+        },
+      },
+      zoom: {
+        zoom: {
+          wheel: { enabled: true },
+          pinch: { enabled: true },
+          mode: 'x',
+        },
+        pan: {
+          enabled: true,
+          mode: 'x',
+        },
+        ...(zoomWindow
+          ? {
+              limits: {
+                x: { min: zoomWindow.limitMin, max: zoomWindow.limitMax, minRange: GRAPH_MAX_ZOOM_IN_MS },
+              },
+            }
+          : {}),
+      },
+    },
+    scales: {
+      x: {
+        type: 'linear' as const,
+        ...(zoomWindow ? { min: zoomWindow.initialMin, max: zoomWindow.initialMax } : {}),
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: {
+          color: 'hsl(180, 1%, 53%)',
+          maxTicksLimit: 8,
+          callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
+        },
+      },
+      y: {
+        type: 'linear' as const,
+        display: showAxes,
+        position: 'left' as const,
+        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
+      },
+    },
+  };
+}
 
 export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) => {
   const [view, setView] = useState<'list' | 'detail'>('list');
@@ -338,6 +513,189 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
     return 2;
   };
 
+  // Metrics summary statistics for the period
+  const seriesStats = useMemo(() => {
+    if (dataPoints.length === 0 || enabledDefs.length === 0) return [];
+    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    return enabledDefs.map((def) => {
+      const values = dataPoints.map((p) => def.getValue(p));
+      return {
+        def,
+        min: Math.min(...values),
+        max: Math.max(...values),
+        avg: avg(values),
+        count: dataPoints.length,
+      };
+    });
+  }, [dataPoints, enabledDefs]);
+
+  // Unit grouping for combined chart axes
+  const unitGroups = useMemo(() => Array.from(new Set(enabledDefs.map((d) => d.unit))), [enabledDefs]);
+
+  const unitToScaleId = useMemo(() => {
+    const map = new Map<string, string>();
+    unitGroups.forEach((unit, i) => {
+      map.set(unit, i === 0 ? 'y' : `y${i}`);
+    });
+    return map;
+  }, [unitGroups]);
+
+  // Combined chart config & data
+  const gapThreshold = useMemo(() => computeGapThreshold(dataPoints), [dataPoints]);
+  const graphWindow = useMemo(() => computeGraphWindow(dataPoints), [dataPoints]);
+
+  const combinedData = useMemo(() => {
+    const pointRadius = dataPoints.length > 80 ? 0 : 2;
+    return {
+      datasets: enabledDefs.map((def) => ({
+        label: def.label,
+        data: dataPoints.map((p) => ({
+          x: toDate(p.timestamp).getTime(),
+          y: def.getValue(p),
+        })),
+        parsing: false,
+        normalized: true,
+        spanGaps: gapThreshold,
+        borderColor: resolveCssColor(def.color),
+        backgroundColor: 'transparent',
+        yAxisID: unitToScaleId.get(def.unit) ?? 'y',
+        tension: 0.25,
+        fill: false,
+        borderWidth: 2,
+        borderDash: def.dash,
+        pointRadius,
+        pointHoverRadius: 4,
+      })),
+    };
+  }, [dataPoints, enabledDefs, unitToScaleId, gapThreshold]);
+
+
+
+  const combinedConfig = useMemo(() => {
+    const scales: Record<string, LineGraphScale> = {
+      x: {
+        type: 'linear',
+        ...(graphWindow ? { min: graphWindow.initialMin, max: graphWindow.initialMax } : {}),
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: {
+          color: 'hsl(180, 1%, 53%)',
+          maxTicksLimit: 8,
+          callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
+        },
+      },
+    };
+    unitGroups.forEach((unit, i) => {
+      const id = i === 0 ? 'y' : `y${i}`;
+      scales[id] = {
+        type: 'linear',
+        display: showAxes,
+        position: i === 0 ? 'left' : 'right',
+        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
+        grid: i === 0 ? { color: 'rgba(255, 255, 255, 0.08)' } : { drawOnChartArea: false },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
+      };
+    });
+    if (unitGroups.length === 0) {
+      scales.y = {
+        type: 'linear',
+        display: showAxes,
+        position: 'left',
+        title: { display: showAxes, text: '', color: 'hsl(180, 1%, 53%)' },
+        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        ticks: { color: 'hsl(180, 1%, 53%)' },
+      };
+    }
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: false,
+      font: { family: "'DM Sans', sans-serif" },
+      animation: { duration: 250 },
+      transitions: {
+        zoom: { animation: { duration: 0 } },
+        active: { animation: { duration: 0 } },
+      },
+      interaction: { mode: 'index' as const, intersect: false },
+      plugins: {
+        decimation: {
+          enabled: true,
+          algorithm: 'lttb' as const,
+          samples: 300,
+          threshold: 350,
+        },
+        legend: {
+          display: true,
+          position: 'top' as const,
+          labels: { color: 'hsla(180, 67%, 99%, 1)', boxWidth: 16, padding: 14 },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(18, 18, 18, 0.96)',
+          titleColor: 'hsla(180, 67%, 99%, 1)',
+          bodyColor: 'hsl(180, 1%, 53%)',
+          borderColor: 'rgba(255, 255, 255, 0.15)',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            title: (items: { parsed: { x: number } }[]) => {
+              const x = items[0]?.parsed?.x;
+              return typeof x === 'number' ? formatChartLabel(new Date(x), period) : '';
+            },
+          },
+        },
+        zoom: {
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x',
+          },
+          pan: {
+            enabled: true,
+            mode: 'x',
+          },
+          ...(graphWindow
+            ? {
+                limits: {
+                  x: { min: graphWindow.limitMin, max: graphWindow.limitMax, minRange: GRAPH_MAX_ZOOM_IN_MS },
+                },
+              }
+            : {}),
+        },
+      },
+      scales,
+    };
+  }, [unitGroups, showAxes, period, graphWindow]);
+
+  const separateCharts = useMemo(
+    () =>
+      enabledDefs.map((def) => ({
+        def,
+        data: {
+          datasets: [
+            {
+              label: def.label,
+              data: dataPoints.map((p) => ({
+                x: toDate(p.timestamp).getTime(),
+                y: def.getValue(p),
+              })),
+              parsing: false,
+              normalized: true,
+              spanGaps: gapThreshold,
+              borderColor: resolveCssColor(def.color),
+              backgroundColor: 'transparent',
+              tension: 0.25,
+              fill: false,
+              borderWidth: 2,
+              borderDash: def.dash,
+              pointRadius: dataPoints.length > 80 ? 0 : 2,
+              pointHoverRadius: 4,
+            },
+          ],
+        },
+        config: createMetricConfig(def.unit, showAxes, period, graphWindow),
+      })),
+    [dataPoints, period, enabledDefs, showAxes, gapThreshold, graphWindow],
+  );
+
   if (isLoading) {
     return <p className="devices__notice">Loading devices...</p>;
   }
@@ -561,23 +919,188 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
       <div className="devices__panel-body">
         {/* GRAPHS TAB */}
         {detailTab === 'graphs' && (
-          <DeviceGraphs
-            dataPoints={dataPoints}
-            enabledDefs={enabledDefs}
-            period={period}
-            onPeriodChange={setPeriod}
-            graphMode={graphMode}
-            onGraphModeChange={setGraphMode}
-            showAxes={showAxes}
-            onShowAxesChange={setShowAxes}
-            enabledLabels={enabledLabels}
-            seriesLabels={seriesLabels}
-            onSeriesChange={handleSeriesChange}
-            isFetchingData={isFetchingData}
-            hasLoadedInitialData={hasLoadedInitialData}
-            dataError={dataError}
-            precisionFor={precisionFor}
-          />
+          <div className="devices__graphs">
+            <div className="devices__graphs-controls" onContextMenu={(e) => e.preventDefault()}>
+              <div className="devices__period-selector" role="group" aria-label="Time period">
+                {(['1h', '24h', '7d', '30d', 'all'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`devices__control-btn ${period === p ? 'is-active' : ''}`}
+                    onClick={() => setPeriod(p)}
+                  >
+                    {p === '1h'
+                      ? 'Past 1h'
+                      : p === '24h'
+                        ? 'Past 24h'
+                        : p === '7d'
+                          ? 'Past 7d'
+                          : p === '30d'
+                            ? 'Past 30d'
+                            : 'All Time'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="devices__series-selector">
+                <ToggleDropdown
+                  buttonLabel="Series"
+                  options={seriesLabels}
+                  value={enabledLabels}
+                  onChange={handleSeriesChange}
+                  placeholder="Series"
+                />
+              </div>
+
+              <div className="devices__axes-toggle">
+                <Checkbox
+                  label="Y axes"
+                  checked={showAxes}
+                  onChange={(e) => setShowAxes(e.target.checked)}
+                />
+              </div>
+
+              <div className="devices__mode-selector" role="group" aria-label="Graph display mode">
+                <button
+                  type="button"
+                  className={`devices__control-btn ${graphMode === 'combined' ? 'is-active' : ''}`}
+                  onClick={() => setGraphMode('combined')}
+                >
+                  Combined Graph
+                </button>
+                <button
+                  type="button"
+                  className={`devices__control-btn ${graphMode === 'separate' ? 'is-active' : ''}`}
+                  onClick={() => setGraphMode('separate')}
+                >
+                  Separate Graphs
+                </button>
+                <button
+                  type="button"
+                  className={`devices__control-btn ${graphMode === 'summary' ? 'is-active' : ''}`}
+                  onClick={() => setGraphMode('summary')}
+                >
+                  Summary
+                </button>
+              </div>
+            </div>
+
+            {dataError && (
+              <div className="devices__error">
+                <IconAlertCircle size={16} strokeWidth={1.75} />
+                <span>{dataError}</span>
+              </div>
+            )}
+
+            {/* If initial load has not finished yet, show initial placeholder with stable height */}
+            {!hasLoadedInitialData && isFetchingData ? (
+              <div className="devices__chart-card devices__loading-box">
+                <IconRefresh className="devices__spin-icon" size={24} strokeWidth={2} />
+                <p>Loading telemetry history...</p>
+              </div>
+            ) : dataPoints.length === 0 || enabledDefs.length === 0 ? (
+              <div className="devices__empty">
+                <IconDatabase size={28} strokeWidth={1.5} />
+                <h3>{dataPoints.length === 0 ? 'No data points found' : 'No series selected'}</h3>
+                <p>
+                  {dataPoints.length === 0
+                    ? 'No telemetry recorded for this device during the selected time period.'
+                    : 'Select at least one series from the Series dropdown to display the graph.'}
+                </p>
+              </div>
+            ) : (
+              <div className={`devices__graphs-body ${isFetchingData ? 'is-updating' : ''} ${isGraphFullscreen ? 'is-fullscreen' : ''}`}>
+                {seriesStats.length > 0 && graphMode === 'summary' && (
+                  <div className="devices__metrics-summary">
+                    {seriesStats.map((s) => {
+                      const prec = precisionFor(s.def);
+                      return (
+                        <div className="devices__summary-col" key={s.def.id}>
+                          <div className="devices__summary-header">
+                            <span
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: '50%',
+                                background: s.def.color,
+                                display: 'inline-block',
+                              }}
+                            />
+                            <span>{s.def.shortLabel}</span>
+                          </div>
+                          <div className="devices__summary-metrics">
+                            <div>
+                              <span className="summary-lbl">Min</span>
+                              <span className="summary-val">
+                                {s.min.toFixed(prec)} {s.def.unit}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="summary-lbl">Max</span>
+                              <span className="summary-val">
+                                {s.max.toFixed(prec)} {s.def.unit}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="summary-lbl">Avg</span>
+                              <span className="summary-val">
+                                {s.avg.toFixed(prec)} {s.def.unit}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="devices__summary-col">
+                      <div className="devices__summary-header">
+                        <IconCpu size={16} strokeWidth={1.75} />
+                        <span>Telemetry Points</span>
+                      </div>
+                      <div className="devices__summary-metrics">
+                        <div>
+                          <span className="summary-lbl">Range count</span>
+                          <span className="summary-val">{seriesStats[0].count.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {graphMode === 'combined' ? (
+                  <div className="devices__chart-card">
+                    <div className="devices__chart-container" style={{ position: 'relative' }} onContextMenu={(e) => e.preventDefault()}>
+                      <LineGraph data={combinedData} config={combinedConfig} />
+
+                    </div>
+                  </div>
+                ) : graphMode === 'separate' ? (
+                  <div className="devices__separate-charts">
+                    {separateCharts.map(({ def, data, config }) => (
+                      <div className="devices__chart-card" key={def.id}>
+                        <div className="devices__chart-header">
+                          <span
+                            style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: '50%',
+                              background: def.color,
+                              display: 'inline-block',
+                            }}
+                          />
+                          <h4>{def.label}</h4>
+                        </div>
+                        <div className="devices__chart-container devices__chart-container--separate" onContextMenu={(e) => e.preventDefault()}>
+                          <LineGraph data={data} config={config} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+              </div>
+            )}
+          </div>
         )}
 
         {/* FORECASTS TAB */}
@@ -592,22 +1115,87 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
         )}
 
         {/* SETTINGS TAB */}
-        {detailTab === 'settings' && selectedDevice && (
-          <DeviceSettings
-            device={selectedDevice}
-            locations={locations}
-            settingsName={settingsName}
-            onSettingsNameChange={setSettingsName}
-            settingsLocationId={settingsLocationId}
-            onSettingsLocationIdChange={setSettingsLocationId}
-            isSavingSettings={isSavingSettings}
-            saveSuccess={saveSuccess}
-            onSave={handleSaveSettings}
-            isUnlinkOpen={isUnlinkOpen}
-            onUnlinkOpenChange={setIsUnlinkOpen}
-            isUnlinking={isUnlinking}
-            onUnlink={handleUnlink}
-          />
+        {detailTab === 'settings' && (
+          <div className="devices__settings">
+            <div className="devices__settings-section">
+              <h4 className="devices__settings-title">Device Details</h4>
+              <p className="devices__settings-desc">
+                Rename your device or reassign it to a different location.
+              </p>
+
+              <label className="devices__field">
+                <span className="devices__field-label">Device Name</span>
+                <Input
+                  value={settingsName}
+                  onChange={(e) => setSettingsName(e.target.value)}
+                  placeholder={`Device ${selectedDevice.serial}`}
+                />
+              </label>
+
+              {locations.length > 0 && (
+                <label className="devices__field">
+                  <span className="devices__field-label">Assigned Location</span>
+                  <select
+                    className="devices__select"
+                    value={settingsLocationId}
+                    onChange={(e) => setSettingsLocationId(e.target.value)}
+                  >
+                    <option value="">No location (Default)</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} {loc.isDefault ? '(Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <div className="devices__settings-save-row">
+                <Button
+                  variant="primary"
+                  onClick={() => void handleSaveSettings()}
+                  isLoading={isSavingSettings}
+                >
+                  Save Changes
+                </Button>
+                {saveSuccess && (
+                  <span className="devices__save-success">
+                    <IconCheck size={16} strokeWidth={2} />
+                    Saved successfully
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="devices__danger-zone">
+              <h4 className="devices__danger-title">Danger Zone</h4>
+              <p className="devices__danger-desc">
+                Unlinking removes this device from your account. The device will stop sending
+                telemetry to your dashboard until it is re-linked with a new pairing code.
+              </p>
+
+              <Button variant="danger" onClick={() => setIsUnlinkOpen(true)}>
+                <IconTrash size={16} strokeWidth={1.75} />
+                Unlink device
+              </Button>
+            </div>
+
+            <ConfirmDialog
+              isOpen={isUnlinkOpen}
+              title="Unlink Device"
+              confirmText={isUnlinking ? 'Unlinking...' : 'Unlink Device'}
+              cancelText="Cancel"
+              isDangerous
+              confirmDisabled={isUnlinking}
+              onConfirm={() => void handleUnlink()}
+              onCancel={() => setIsUnlinkOpen(false)}
+            >
+              <p>
+                Are you sure you want to unlink &quot;{deviceLabel(selectedDevice)}&quot; (serial #{selectedDevice.serial})?
+                All telemetry data recorded for this device will be cleared from your account.
+              </p>
+            </ConfirmDialog>
+          </div>
         )}
       </div>
 

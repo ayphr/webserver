@@ -7,7 +7,6 @@ import { Button } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphConfig, LineGraphData } from '../graphs/types';
 import { getSeriesDefinition } from '../../lib/series';
-import { resolveCssColor } from './graphUtils';
 import './ForecastTab.css';
 
 type Props = {
@@ -15,6 +14,14 @@ type Props = {
   locked: boolean;
   onNavigate?: (tab: string) => void;
 };
+
+function resolveCssColor(value: string): string {
+  if (!value.startsWith('var(')) return value;
+  if (typeof document === 'undefined') return value;
+  const name = value.slice(4, -1).trim();
+  const resolved = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return resolved || value;
+}
 
 function fade(color: string, alpha: number): string {
   const resolved = resolveCssColor(color).trim();
