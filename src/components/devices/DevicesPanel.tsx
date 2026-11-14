@@ -39,17 +39,23 @@ import './DevicesPanel.css';
 
 const PAGE_SIZE = 5;
 
-function formatChartLabel(value: Date | string, period: string): string {
+function formatChartLabel(value: Date | string, period: string, withYear = false): string {
   const d = toDate(value);
   const time = d.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   });
-  if (period === '1h' || period === '24h') {
+  const date = d.toLocaleDateString(
+    'en-GB',
+    withYear ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' },
+  );
+  // Short periods only show the time on the axis, but the tooltip always
+  // includes the full date (with year) so the exact point is unambiguous.
+  if ((period === '1h' || period === '24h') && !withYear) {
     return time;
   }
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${time}`;
+  return `${date} ${time}`;
 }
 
 /** Break lines wherever consecutive samples are further apart than 10x the median
@@ -200,7 +206,7 @@ function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoo
         callbacks: {
           title: (items: { parsed: { x: number } }[]) => {
             const x = items[0]?.parsed?.x;
-            return typeof x === 'number' ? formatChartLabel(new Date(x), period) : '';
+            return typeof x === 'number' ? formatChartLabel(new Date(x), period, true) : '';
           },
         },
       },
@@ -640,7 +646,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
           callbacks: {
             title: (items: { parsed: { x: number } }[]) => {
               const x = items[0]?.parsed?.x;
-              return typeof x === 'number' ? formatChartLabel(new Date(x), period) : '';
+              return typeof x === 'number' ? formatChartLabel(new Date(x), period, true) : '';
             },
           },
         },

@@ -316,7 +316,14 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
             title: (items: { parsed: { x: number | null } }[]) => {
               const x = items[0]?.parsed?.x;
               return typeof x === 'number'
-                ? new Date(x).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                ? new Date(x).toLocaleString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })
                 : '';
             },
             label: (item: { datasetIndex: number; dataIndex: number; parsed: { y: number | null } }) => {

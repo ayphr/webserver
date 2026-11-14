@@ -647,7 +647,7 @@ const handleUpdateDevice = requireAuth(async (request, user: User, params) => {
     const locId = typeof body.locationId === 'string' ? body.locationId.trim() : '';
     if (locId) {
       const location = await getLocationById(locId);
-      if (!location || location.ownerUuid !== scopeUuid) {
+      if (location?.ownerUuid !== scopeUuid) {
         return json({ error: 'invalid location' }, 400);
       }
       patch.locationId = location.id;
@@ -721,8 +721,6 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   for (const stat of existingStats.values()) {
     existingCount += stat.count;
   }
-  // The refill replaces this device's existing readings, so exclude them from
-  // the projected total before comparing against the shared plan cap.
   const replacedCount = existingStats.get(serial)?.count ?? 0;
   const projectedCount = count + existingCount - replacedCount;
 
