@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IconAlertCircle, IconRefresh } from '@tabler/icons-react';
 import type { DataPoint, DeviceForecastLockedPayload, DeviceForecastPayload, ForecastSample } from '@common';
 import { api } from '../../lib/api';
@@ -75,7 +75,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
   const [lockedPayload, setLockedPayload] = useState<DeviceForecastLockedPayload | null>(null);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [horizonMinutes, setHorizonMinutes] = useState(60);
-  const [loading, setLoading] = useState(!locked);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,35 +100,32 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     };
   }, [serial, locked]);
 
-  useEffect(() => {
+  const calculate = useCallback(async () => {
     if (locked) return;
-    let cancelled = false;
-    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setError(null);
     setForecast(null);
     setLockedPayload(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
-    const horizonSeconds = horizonMinutes * 60;
-    void (async () => {
-      try {
-        const fc = await api.devices.getForecast(serial, horizonSeconds);
-        if (cancelled) return;
-        if ('locked' in fc && fc.locked) {
-          setLockedPayload(fc as DeviceForecastLockedPayload);
-        } else {
-          setForecast(fc as DeviceForecastPayload);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load forecast');
-      } finally {
-        if (!cancelled) setLoading(false);
+    try {
+      const fc = await api.devices.getForecast(serial, horizonMinutes * 60);
+      if ('locked' in fc && fc.locked) {
+        setLockedPayload(fc as DeviceForecastLockedPayload);
+      } else {
+        setForecast(fc as DeviceForecastPayload);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to calculate forecast');
+    } finally {
+      setLoading(false);
+    }
   }, [serial, locked, horizonMinutes]);
+
+  // Reset calculated forecast when horizon changes so stale results aren't shown.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForecast(null);
+    setLockedPayload(null);
+  }, [horizonMinutes]);
 
   const combinedData = useMemo<LineGraphData>(() => {
     if (!forecast) return { datasets: [] };
@@ -265,32 +262,6 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     );
   }
 
-  if (loading) {
-    return (
-      <div className="forecast-tab forecast-tab--loading">
-        <IconRefresh className="forecast-tab__spin" size={24} strokeWidth={2} />
-        <p>Loading forecast...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="forecast-tab forecast-tab--error">
-        <IconAlertCircle size={16} strokeWidth={1.75} />
-        <span>{error}</span>
-      </div>
-    );
-  }
-
-  if (!forecast || forecast.samples.length === 0) {
-    return (
-      <div className="forecast-tab forecast-tab--empty">
-        <p>Not enough telemetry history to produce a forecast yet.</p>
-      </div>
-    );
-  }
-
   const horizonOptions = [30, 60, 120, 360, 720];
 
   return (
@@ -308,15 +279,37 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
             </button>
           ))}
         </div>
+        <Button variant="primary" onClick={() => void calculate()} isLoading={loading}>
+          Calculate forecast
+        </Button>
       </div>
-      <div className="forecast-tab__chart-card">
-        <div className={`forecast-tab__chart-container ${isFullscreen ? 'devices__chart-container' : ''}`}>
-          <LineGraph data={combinedData} config={combinedConfig} />
+
+      {loading ? (
+        <div className="forecast-tab forecast-tab--loading">
+          <IconRefresh className="forecast-tab__spin" size={24} strokeWidth={2} />
+          <p>Calculating forecast...</p>
         </div>
-      </div>
-      <p className="forecast-tab__caption">
-        Solid lines show recorded telemetry; dashed lines show the forecast up to {horizonMinutes >= 60 ? `${horizonMinutes / 60}h` : `${horizonMinutes}m`} ahead.
-      </p>
+      ) : error ? (
+        <div className="forecast-tab forecast-tab--error">
+          <IconAlertCircle size={16} strokeWidth={1.75} />
+          <span>{error}</span>
+        </div>
+      ) : !forecast || forecast.samples.length === 0 ? (
+        <div className="forecast-tab forecast-tab--empty">
+          <p>Select a horizon and click &quot;Calculate forecast&quot; to generate a prediction.</p>
+        </div>
+      ) : (
+        <>
+          <div className="forecast-tab__chart-card">
+            <div className={`forecast-tab__chart-container ${isFullscreen ? 'devices__chart-container' : ''}`}>
+              <LineGraph data={combinedData} config={combinedConfig} />
+            </div>
+          </div>
+          <p className="forecast-tab__caption">
+            Solid lines show recorded telemetry; dashed lines show the forecast up to {horizonMinutes >= 60 ? `${horizonMinutes / 60}h` : `${horizonMinutes}m`} ahead.
+          </p>
+        </>
+      )}
     </div>
   );
 }
