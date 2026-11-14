@@ -39,13 +39,15 @@ const PAGE_SIZE = 5;
 
 function formatChartLabel(value: Date | string, period: string): string {
   const d = toDate(value);
-  if (period === '1h') {
-    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const time = d.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  if (period === '1h' || period === '24h') {
+    return time;
   }
-  if (period === '24h') {
-    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  }
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${time}`;
 }
 
 /** Break lines wherever consecutive samples are further apart than 10x the median
