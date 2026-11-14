@@ -711,8 +711,22 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
 
   const intervalMs = Math.round(intervalSeconds * 1000);
   const count = Math.floor((endMs - startMs) / intervalMs) + 1;
-  if (count < 1 || count > 1_000_000) {
-    return json({ error: 'requested range produces too many points (max 1,000,000)' }, 400);
+
+  const features = getPlanFeaturesForUser(user);
+  const devices = await getDevicesForOwnerUuid(scopeUuid);
+  const existingStats = await getDataPointStats(devices.map((d) => d.serial), scopeUuid);
+
+  let existingCount = 0;
+  for (const stat of existingStats.values()) {
+    existingCount += stat.count;
+  }
+
+  if ((count + existingCount) > features.sharedMaxDataPointsPerUser) {
+    return json({ error: `requested range produces too many points for your plan (max ${features.sharedMaxDataPointsPerUser.toLocaleString()})` }, 400);
+  }
+
+  if (count < 1 || count > 10_000_000) {
+    return json({ error: 'requested range produces too many points (max 10,000,000)' }, 400);
   }
 
   // Replace existing data for this device.
