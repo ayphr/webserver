@@ -261,25 +261,44 @@ export async function getDataPointsForDevice(
     return { points: sampled, totalCount };
   }
 
-  const recentDocs = await dataPoints
-    .find(filter, {
-      projection: { _id: 0, timestamp: 1, temperature: 1, humidity: 1, airPressure: 1 },
-    })
-    .sort({ timestamp: -1 })
-    .limit(max)
+  // Very large histories: sample evenly across the entire range with
+  // `$bucketAuto` so periods like "All Time" span the full history instead of
+  // only the most recent slice. `$top` keeps the earliest reading per bucket.
+  trackMongoOperation('aggregate', DATA_POINTS_COLLECTION);
+  const buckets = await dataPoints
+    .aggregate<{ doc: DataPointDocument }>([
+      { $match: filter },
+      {
+        $bucketAuto: {
+          groupBy: '$timestamp',
+          buckets: max,
+          output: { doc: { $top: { output: '$$ROOT', sortBy: { timestamp: 1 } } } },
+        },
+      },
+    ])
     .toArray();
-  recentDocs.reverse();
-  return {
-    points: recentDocs.map((doc) => ({
+
+  const sampled = buckets
+    .map((bucket) => bucket.doc)
+    .filter((doc): doc is DataPointDocument => Boolean(doc))
+    .map((doc) => ({
       timestamp: doc.timestamp,
       temperature: doc.temperature,
       humidity: doc.humidity,
       airPressure: doc.airPressure,
-    })),
-    totalCount,
-  };
+    }))
+    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+  return { points: sampled, totalCount };
 }
 
+/** Removes every stored data point for a single device. */
+export async function deleteAllDataPointsForDevice(serial: number): Promise<number> {
+  const dataPoints = await getCollection('dataPoints');
+  trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);
+  const result = await dataPoints.deleteMany({ deviceSerial: serial });
+  return result.deletedCount ?? 0;
+}
 
 /**
  * Loads data points for server-side query execution. Unlike the graph endpoint

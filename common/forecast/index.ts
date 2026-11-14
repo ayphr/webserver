@@ -3,15 +3,30 @@ import { FORECAST_HORIZON_SECONDS, FORECAST_STEP_SECONDS } from '../types';
 import { ForecastEngine } from './engine';
 import type { ForecastOutput } from './types';
 
-/** Evenly spaced forecast horizons from one step out to the full horizon. */
+/**
+ * Horizons in seconds ahead of the anchor, sampled more densely near term and
+ * progressively less often as the horizon grows. The step starts at
+ * `stepSeconds` and grows geometrically so distant, less certain predictions
+ * cost fewer samples. The full horizon is always included.
+ */
 export function forecastHorizons(
   horizonSeconds = FORECAST_HORIZON_SECONDS,
   stepSeconds = FORECAST_STEP_SECONDS,
+  growth = 1.1,
 ): number[] {
   const horizons: number[] = [];
-  for (let horizon = stepSeconds; horizon <= horizonSeconds; horizon += stepSeconds) {
-    horizons.push(horizon);
+  if (!(horizonSeconds > 0) || !(stepSeconds > 0)) return horizons;
+
+  let horizon = 0;
+  let step = stepSeconds;
+  while (horizon + step < horizonSeconds) {
+    horizon += step;
+    horizons.push(Math.round(horizon));
+    step *= growth;
   }
+
+  const last = horizons[horizons.length - 1];
+  if (last !== horizonSeconds) horizons.push(Math.round(horizonSeconds));
   return horizons;
 }
 

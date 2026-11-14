@@ -33,7 +33,6 @@ describe('forecast engine', () => {
     const output = await forecastFromHistory(history);
     expect(output).not.toBeNull();
     expect(output!.horizons).toHaveLength(forecastHorizons().length);
-    expect(output!.horizons).toHaveLength(FORECAST_HORIZON_SECONDS / FORECAST_STEP_SECONDS);
     for (const horizon of output!.horizons) {
       expect(Number.isFinite(horizon.point.temperature)).toBe(true);
       expect(Number.isFinite(horizon.point.humidity)).toBe(true);
@@ -43,6 +42,18 @@ describe('forecast engine', () => {
       expect(horizon.uncertainty.temperature).toBeGreaterThanOrEqual(0);
       expect(horizon.targetTimestamp).toBe(output!.anchorTimestamp + horizon.horizonSeconds * 1000);
     }
+  });
+
+  it('samples horizons more densely near term than far term', () => {
+    const horizons = forecastHorizons();
+    expect(horizons[0]).toBe(FORECAST_STEP_SECONDS);
+    expect(horizons[horizons.length - 1]).toBe(FORECAST_HORIZON_SECONDS);
+    for (let i = 1; i < horizons.length; i += 1) {
+      expect(horizons[i]!).toBeGreaterThan(horizons[i - 1]!);
+    }
+    // Variable stepping keeps the sample count far below the uniform 5-minute grid.
+    expect(horizons.length).toBeGreaterThan(10);
+    expect(horizons.length).toBeLessThan(FORECAST_HORIZON_SECONDS / FORECAST_STEP_SECONDS);
   });
 
   it('keeps a constant series near its value', async () => {

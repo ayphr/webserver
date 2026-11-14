@@ -2,7 +2,7 @@ import { relativeHumidityFromMixingRatio } from '../../utils';
 import type { AlgorithmContext, ForecastAlgorithm, ForecastTriple, StateFrame } from '../types';
 import { emptyTriple } from '../types';
 import { diagonal, inverse, linearSlope, matVec, mean, zeros } from '../math';
-import { frameValue, recentVariance, series, seriesTimes, setTriple } from './helpers';
+import { frameValue, rateHorizon, recentVariance, series, seriesTimes, setTriple } from './helpers';
 import { UnscentedKalmanFilter } from './ukf';
 
 const VARIABLES = 3;
@@ -117,9 +117,10 @@ export class PsychrometricUkf implements ForecastAlgorithm {
     const state = this.filter.getMean();
     return horizons.map((h) => {
       const triple = emptyTriple();
-      setTriple(triple, 0, state[0]! + state[3]! * h);
-      setTriple(triple, 1, state[1]! + state[4]! * h);
-      setTriple(triple, 2, state[2]! + state[5]! * h);
+      const horizon = rateHorizon(h);
+      setTriple(triple, 0, state[0]! + state[3]! * horizon);
+      setTriple(triple, 1, state[1]! + state[4]! * horizon);
+      setTriple(triple, 2, state[2]! + state[5]! * horizon);
       return triple;
     });
   }
@@ -189,8 +190,8 @@ export class BarometricAdvective implements ForecastAlgorithm {
 
     return horizons.map((h) => {
       const triple = emptyTriple();
-      setTriple(triple, 0, frame.temperature + temperatureSlope * h);
-      setTriple(triple, 1, frame.mixingRatio + mixingRatioSlope * h);
+      setTriple(triple, 0, frame.temperature + temperatureSlope * rateHorizon(h));
+      setTriple(triple, 1, frame.mixingRatio + mixingRatioSlope * rateHorizon(h));
       setTriple(triple, 2, frame.pressure + pressureStep * steps(h));
       return triple;
     });

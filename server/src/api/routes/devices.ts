@@ -14,6 +14,7 @@ import {
   getDataPointStats,
   getDataPointsForDevice,
   getDataPointsForQuery,
+  deleteAllDataPointsForDevice,
   deleteDataPointsForDevice,
   getDeviceBySerial,
   getDeviceByTokenHash,
@@ -705,8 +706,8 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   if (endMs <= startMs) {
     return json({ error: 'end must be after start' }, 400);
   }
-  if (!Number.isFinite(intervalSeconds) || intervalSeconds < 60) {
-    return json({ error: 'interval must be at least 60 seconds' }, 400);
+  if (!Number.isFinite(intervalSeconds) || intervalSeconds < 1) {
+    return json({ error: 'interval must be at least 1 second' }, 400);
   }
 
   const intervalMs = Math.round(intervalSeconds * 1000);
@@ -720,8 +721,12 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   for (const stat of existingStats.values()) {
     existingCount += stat.count;
   }
+  // The refill replaces this device's existing readings, so exclude them from
+  // the projected total before comparing against the shared plan cap.
+  const replacedCount = existingStats.get(serial)?.count ?? 0;
+  const projectedCount = count + existingCount - replacedCount;
 
-  if ((count + existingCount) > features.sharedMaxDataPointsPerUser) {
+  if (projectedCount > features.sharedMaxDataPointsPerUser) {
     return json({ error: `requested range produces too many points for your plan (max ${features.sharedMaxDataPointsPerUser.toLocaleString()})` }, 400);
   }
 
@@ -730,10 +735,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   }
 
   // Replace existing data for this device.
-  await deleteDataPointsForDevice(serial, await (async () => {
-    const { points } = await getDataPointsForQuery(serial, { maxPoints: 100_000 });
-    return points.map((p) => p.timestamp);
-  })());
+  await deleteAllDataPointsForDevice(serial);
 
   const points: DataPoint[] = [];
 

@@ -1,7 +1,7 @@
 import type { AlgorithmContext, ForecastAlgorithm, ForecastTriple } from '../types';
 import { emptyTriple } from '../types';
 import { matVec, solveLeastSquares, zeros } from '../math';
-import { frameValue, series, seriesTimes, setTriple } from './helpers';
+import { frameValue, rateHorizon, series, seriesTimes, setTriple } from './helpers';
 
 type HarmonicModel = {
   /** Evaluation origin (last fitted timestamp). */
@@ -36,9 +36,12 @@ function fitTrendHarmonics(values: number[], times: number[], periods: number[])
   return { origin, timeScale, periods, coefficients };
 }
 
-function evaluateHarmonic(model: HarmonicModel, time: number): number {
+function evaluateHarmonic(model: HarmonicModel, time: number, horizonSeconds: number): number {
+  // The linear trend is only trustworthy over roughly the fitted window, so its
+  // contribution saturates instead of growing linearly with the horizon.
+  const dampedDelta = rateHorizon(horizonSeconds, model.timeScale) / model.timeScale;
+  let value = model.coefficients[0]! + model.coefficients[1]! * dampedDelta;
   const delta = (time - model.origin) / model.timeScale;
-  let value = model.coefficients[0]! + model.coefficients[1]! * delta;
   for (let k = 0; k < model.periods.length; k += 1) {
     const omega = (2 * Math.PI * model.timeScale) / Math.max(model.periods[k]!, 1e-6);
     value += model.coefficients[2 + 2 * k]! * Math.sin(omega * delta);
@@ -93,7 +96,7 @@ export class HarmonicOLS implements ForecastAlgorithm {
       for (let v = 0; v < 3; v += 1) {
         const model = this.models[v];
         if (!model) continue;
-        setTriple(triple, v, evaluateHarmonic(model, now + h));
+        setTriple(triple, v, evaluateHarmonic(model, now + h, h));
       }
       return triple;
     });
@@ -232,7 +235,7 @@ export class SingularSpectrumAnalysis implements ForecastAlgorithm {
       for (let v = 0; v < 3; v += 1) {
         const model = this.models[v];
         if (!model) continue;
-        setTriple(triple, v, evaluateHarmonic(model, ctx.now + h));
+        setTriple(triple, v, evaluateHarmonic(model, ctx.now + h, h));
       }
       return triple;
     });

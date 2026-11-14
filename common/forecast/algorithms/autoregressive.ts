@@ -106,8 +106,17 @@ export class LevinsonAR implements ForecastAlgorithm {
       for (let v = 0; v < 3; v += 1) {
         const coefficients = this.coefficients[v]!;
         if (coefficients.length === 0) continue;
-        const intercept = mean(this.history[v]!);
-        setTriple(triple, v, forecastAR(coefficients, this.history[v]!, steps, intercept));
+        const series = this.history[v]!;
+        const mu = mean(series);
+        // The Levinson-Durbin coefficients model the mean-removed series, so the
+        // intercept must be mu * (1 - sum(phi)); using mu directly adds a
+        // constant offset every step and makes the forecast ramp linearly.
+        const sum = coefficients.reduce((acc, c) => acc + c, 0);
+        // Shrink marginally explosive fits so long-horizon extrapolation stays stable.
+        const stable = sum > 0.999 ? coefficients.map((c) => (c * 0.999) / sum) : coefficients;
+        const stableSum = stable.reduce((acc, c) => acc + c, 0);
+        const intercept = mu * (1 - stableSum);
+        setTriple(triple, v, forecastAR(stable, series, steps, intercept));
       }
       return triple;
     });
@@ -223,9 +232,16 @@ export class RecursiveLeastSquaresAR implements ForecastAlgorithm {
       for (let v = 0; v < 3; v += 1) {
         const state = this.states[v]!;
         if (!state.initialized) continue;
+        const series = state.history;
         const coefficients = state.theta.slice(0, this.order);
-        const intercept = state.theta[this.order] ?? 0;
-        setTriple(triple, v, forecastAR(coefficients, state.history, steps, intercept));
+        const sum = coefficients.reduce((acc, c) => acc + c, 0);
+        // Shrink marginally explosive fits and anchor the recursion to the
+        // recent mean, mirroring the Levinson model, so iterating it cannot
+        // diverge or drift to a nonsensical equilibrium.
+        const stable = sum > 0.999 ? coefficients.map((c) => (c * 0.999) / sum) : coefficients;
+        const stableSum = stable.reduce((acc, c) => acc + c, 0);
+        const intercept = mean(series) * (1 - stableSum);
+        setTriple(triple, v, forecastAR(stable, series, steps, intercept));
       }
       return triple;
     });

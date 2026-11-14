@@ -27,6 +27,9 @@ function gaussian(random: () => number): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
+/** Velocity contribution saturates after this many seconds of horizon. */
+const VELOCITY_SATURATION_SECONDS = 600;
+
 /** Bootstrap particle filter for a 1-D constant-velocity state. */
 class ParticleFilter1D {
   private particles: Particle[];
@@ -52,7 +55,7 @@ class ParticleFilter1D {
     const spread = Math.max(Math.sqrt(Math.max(scale, 1e-8)), 1e-4);
     this.particles = Array.from({ length: this.count }, () => ({
       value: measurement + spread * gaussian(this.random),
-      velocity: (spread / 60) * gaussian(this.random),
+      velocity: (spread / 600) * gaussian(this.random),
     }));
     this.weights = new Array<number>(this.count).fill(1 / this.count);
     this.initialized = true;
@@ -64,14 +67,17 @@ class ParticleFilter1D {
       return;
     }
 
+    const safeDt = Math.max(dt, 1e-3);
     const processStd = Math.sqrt(Math.max(processScale, 1e-10));
+    // Velocity is a per-second rate, so its process noise scales with 1/dt.
+    const velocityStd = (processStd * 0.1) / safeDt;
     const sigma = Math.max(measurementSigma, 1e-6);
     let weightSum = 0;
 
     for (let i = 0; i < this.particles.length; i += 1) {
       const particle = this.particles[i]!;
-      particle.velocity = this.velocityDecay * particle.velocity + processStd * 0.1 * gaussian(this.random);
-      particle.value += particle.velocity * dt + processStd * Math.sqrt(dt) * gaussian(this.random);
+      particle.velocity = this.velocityDecay * particle.velocity + velocityStd * gaussian(this.random);
+      particle.value += particle.velocity * safeDt + processStd * Math.sqrt(safeDt) * gaussian(this.random);
       const residual = (measurement - particle.value) / sigma;
       const likelihood = Math.exp(-0.5 * residual * residual);
       this.weights[i] = (this.weights[i]! * likelihood) + 1e-300;
@@ -115,10 +121,14 @@ class ParticleFilter1D {
 
   forecast(horizonSeconds: number): number {
     if (!this.initialized) return Number.NaN;
+    // Extrapolating velocity linearly over a multi-hour horizon amplifies noise,
+    // so its contribution saturates: short-term momentum is preserved, long-range
+    // drift flattens out.
+    const effectiveHorizon = VELOCITY_SATURATION_SECONDS * (1 - Math.exp(-horizonSeconds / VELOCITY_SATURATION_SECONDS));
     let value = 0;
     for (let i = 0; i < this.particles.length; i += 1) {
       const particle = this.particles[i]!;
-      value += this.weights[i]! * (particle.value + particle.velocity * horizonSeconds);
+      value += this.weights[i]! * (particle.value + particle.velocity * effectiveHorizon);
     }
     return value;
   }

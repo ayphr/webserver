@@ -10,10 +10,22 @@
   align-items: flex-start;
   padding: 12px;
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: hsl(180, 1%, 78%);
   font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.data-fill__warning strong {
+  color: hsla(180, 67%, 99%, 1);
+  font-weight: 600;
+}
+
+.data-fill__warning-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: hsl(180, 1%, 62%);
 }
 
 .data-fill__field {
@@ -25,6 +37,11 @@
 .data-fill__label {
   font-size: 0.85rem;
   color: hsl(180, 1%, 70%);
+}
+
+.data-fill__hint {
+  font-size: 0.8rem;
+  color: hsl(180, 1%, 55%);
 }
 
 .data-fill__input {

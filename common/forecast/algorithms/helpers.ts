@@ -39,6 +39,17 @@ export function dampedTrendSum(phi: number, steps: number): number {
   return (phi * (1 - phi ** steps)) / (1 - phi);
 }
 
+/**
+ * Effective horizon, in seconds, over which a linear rate term is integrated.
+ * A measured rate is only trustworthy close to the anchor, so integrating it
+ * over a multi-hour horizon would let small estimation errors grow without
+ * bound. The integrated horizon therefore saturates at `timeScale` seconds.
+ */
+export function rateHorizon(horizonSeconds: number, timeScale = 3600): number {
+  const horizon = Math.max(horizonSeconds, 0);
+  return timeScale * (1 - Math.exp(-horizon / timeScale));
+}
+
 export function series(
   buffer: RingBuffer<StateFrame>,
   selector: (frame: StateFrame) => number,

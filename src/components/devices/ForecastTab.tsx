@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IconAlertCircle } from '@tabler/icons-react';
+import type { ScriptableLineSegmentContext } from 'chart.js';
 import type { DataPoint, DeviceForecastPayload, ForecastSample } from '@common';
 import { forecastFromHistory, forecastHorizons, FORECAST_STEP_SECONDS } from '@common';
 import { api } from '../../lib/api';
@@ -16,6 +17,9 @@ type Props = {
   onNavigate?: (tab: string) => void;
   isFullscreen?: boolean;
 };
+
+const FORECAST_MAX_ZOOM_IN_MS = 60 * 1000;
+const FORECAST_ZOOM_OUT_PADDING = 0.02;
 
 function resolveCssColor(value: string): string {
   if (!value.startsWith('var(')) return value;
@@ -70,6 +74,38 @@ const METRICS = [
     forecast: (s: ForecastSample) => s.airPressure,
   },
 ];
+
+type AxisWindow = {
+  initialMin: number;
+  initialMax: number;
+  limitMin: number;
+  limitMax: number;
+};
+
+function computeAxisWindow(points: { x: number }[]): AxisWindow | null {
+  if (points.length === 0) return null;
+  let min = points[0]!.x;
+  let max = points[0]!.x;
+  for (const point of points) {
+    if (point.x < min) min = point.x;
+    if (point.x > max) max = point.x;
+  }
+  if (max <= min) {
+    return {
+      initialMin: max - FORECAST_MAX_ZOOM_IN_MS / 2,
+      initialMax: max + FORECAST_MAX_ZOOM_IN_MS / 2,
+      limitMin: max - FORECAST_MAX_ZOOM_IN_MS,
+      limitMax: max + FORECAST_MAX_ZOOM_IN_MS,
+    };
+  }
+  const padding = (max - min) * FORECAST_ZOOM_OUT_PADDING;
+  return {
+    initialMin: min - padding,
+    initialMax: max + padding,
+    limitMin: min - padding,
+    limitMax: max + padding,
+  };
+}
 
 export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props) {
   const [forecast, setForecast] = useState<DeviceForecastPayload | null>(null);
@@ -154,16 +190,33 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     setForecast(null);
   }, [horizonMinutes]);
 
+  // Forecast samples within the selected horizon.
+  const forecastSamples = useMemo(() => {
+    if (!forecast) return [];
+    const anchorMs = toDate(forecast.anchorTimestamp).getTime();
+    const horizonMs = horizonMinutes * 60 * 1000;
+    return forecast.samples.filter((sample) => toDate(sample.timestamp).getTime() <= anchorMs + horizonMs);
+  }, [forecast, horizonMinutes]);
+
   const combinedData = useMemo<LineGraphData>(() => {
-    if (!forecast) return { datasets: [] };
+    if (!forecast || forecastSamples.length === 0) return { datasets: [] };
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
+    const boundary = dataPoints.length;
     const datasets: LineGraphData['datasets'] = [];
 
     for (const m of METRICS) {
       const color = resolveCssColor(m.def.color);
+      // One dataset per metric so `index` tooltips stay aligned across the
+      // recorded and forecast regions; `segment` styles the forecast portion.
+      const data = [
+        ...dataPoints.map((p) => ({ x: toDate(p.timestamp).getTime(), y: m.actual(p) })),
+        ...forecastSamples.map((s) => ({ x: toDate(s.timestamp).getTime(), y: m.forecast(s) })),
+      ];
+      const isForecast = (ctx: ScriptableLineSegmentContext) => ctx.p0DataIndex >= boundary - 1;
+
       datasets.push({
-        label: `${m.def.shortLabel} (actual)`,
-        data: dataPoints.map((p) => ({ x: toDate(p.timestamp).getTime(), y: m.actual(p) })),
+        label: m.shortLabel,
+        data,
         parsing: false,
         normalized: true,
         borderColor: color,
@@ -172,42 +225,33 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
         tension: 0.25,
         fill: false,
         borderWidth: 2,
-        borderDash: [],
         pointRadius,
         pointHoverRadius: 4,
-      });
-    }
-
-    const anchorMs = toDate(forecast.anchorTimestamp).getTime();
-    const horizonMs = horizonMinutes * 60 * 1000;
-    const forecastSamples = forecast.samples.filter((sample) => toDate(sample.timestamp).getTime() <= anchorMs + horizonMs);
-
-    for (const m of METRICS) {
-      const color = resolveCssColor(m.def.color);
-      datasets.push({
-        label: `${m.def.shortLabel} (forecast)`,
-        data: forecastSamples.map((s) => ({ x: toDate(s.timestamp).getTime(), y: m.forecast(s) })),
-        parsing: false,
-        normalized: true,
-        borderColor: fade(color, 0.5),
-        backgroundColor: 'transparent',
-        yAxisID: m.axis,
-        tension: 0.25,
-        fill: false,
-        borderWidth: 2,
-        borderDash: [6, 4],
-        pointRadius: 0,
-        pointHoverRadius: 3,
+        segment: {
+          borderColor: (ctx: ScriptableLineSegmentContext) => (isForecast(ctx) ? fade(color, 0.55) : color),
+          borderDash: (ctx: ScriptableLineSegmentContext) => (isForecast(ctx) ? [6, 4] : undefined),
+        },
       });
     }
 
     return { datasets } as LineGraphData;
-  }, [dataPoints, forecast, horizonMinutes]);
+  }, [dataPoints, forecast, forecastSamples]);
+
+  const axisWindow = useMemo(() => {
+    if (dataPoints.length === 0) return null;
+    const points = [
+      ...dataPoints.map((p) => ({ x: toDate(p.timestamp).getTime() })),
+      ...forecastSamples.map((s) => ({ x: toDate(s.timestamp).getTime() })),
+    ];
+    return computeAxisWindow(points);
+  }, [dataPoints, forecastSamples]);
 
   const combinedConfig: LineGraphConfig = useMemo(() => {
+    const boundary = dataPoints.length;
     const scales: Record<string, unknown> = {
       x: {
         type: 'linear',
+        ...(axisWindow ? { min: axisWindow.initialMin, max: axisWindow.initialMax } : {}),
         grid: { color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
           color: 'hsl(180, 1%, 53%)',
@@ -250,6 +294,10 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
       parsing: false,
       font: { family: "'DM Sans', sans-serif" },
       animation: { duration: 250 },
+      transitions: {
+        zoom: { animation: { duration: 0 } },
+        active: { animation: { duration: 0 } },
+      },
       interaction: { mode: 'index' as const, intersect: false },
       plugins: {
         legend: {
@@ -271,12 +319,38 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
                 ? new Date(x).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                 : '';
             },
+            label: (item: { datasetIndex: number; dataIndex: number; parsed: { y: number | null } }) => {
+              const metric = METRICS[item.datasetIndex];
+              if (!metric) return '';
+              const value = item.parsed.y;
+              if (value === null || !Number.isFinite(value)) return '';
+              const region = item.dataIndex >= boundary ? 'forecast' : 'recorded';
+              return `${metric.shortLabel} (${region}): ${value.toFixed(1)} ${metric.unit}`;
+            },
           },
+        },
+        zoom: {
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x',
+          },
+          pan: {
+            enabled: true,
+            mode: 'x',
+          },
+          ...(axisWindow
+            ? {
+                limits: {
+                  x: { min: axisWindow.limitMin, max: axisWindow.limitMax, minRange: FORECAST_MAX_ZOOM_IN_MS },
+                },
+              }
+            : {}),
         },
       },
       scales: scales as LineGraphConfig['scales'],
     };
-  }, []);
+  }, [axisWindow, dataPoints.length]);
 
   if (locked) {
     return (
@@ -336,6 +410,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
           </div>
           <p className="forecast-tab__caption">
             Solid lines show recorded telemetry; dashed lines show the forecast up to {horizonMinutes >= 60 ? `${horizonMinutes / 60}h` : `${horizonMinutes}m`} ahead.
+            Scroll to zoom and drag to pan.
           </p>
         </>
       )}

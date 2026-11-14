@@ -9,7 +9,7 @@ import {
 } from '../math';
 import type { AlgorithmContext, ForecastAlgorithm, ForecastTriple } from '../types';
 import { emptyTriple } from '../types';
-import { frameValue, recentVariance, setTriple } from './helpers';
+import { frameValue, rateHorizon, recentVariance, setTriple } from './helpers';
 
 function buildTransition(dt: number, order: number): number[][] {
   const f = identity(order);
@@ -119,12 +119,17 @@ export class KinematicKalman implements ForecastAlgorithm {
   predict(horizons: number[]): ForecastTriple[] {
     return horizons.map((h) => {
       const triple = emptyTriple();
+      const velocityHorizon = rateHorizon(h);
+      // Acceleration is the least trustworthy state, so it is damped harder.
+      const accelerationHorizon = this.order === 3 ? rateHorizon(h, 900) : 0;
       for (let v = 0; v < 3; v += 1) {
         if (!this.initialized[v]) continue;
         const state = this.states[v]!;
-        let acceleration = this.order === 3 ? state[2]! : 0;
-        if (this.order === 3 && h > 900) acceleration *= Math.exp(-(h - 900) / 3600);
-        const value = state[0]! + state[1]! * h + 0.5 * acceleration * h * h;
+        const acceleration = this.order === 3 ? state[2]! : 0;
+        const value =
+          state[0]! +
+          state[1]! * velocityHorizon +
+          0.5 * acceleration * accelerationHorizon * accelerationHorizon;
         setTriple(triple, v, value);
       }
       return triple;
@@ -196,10 +201,14 @@ export class AlphaBetaGamma implements ForecastAlgorithm {
   predict(horizons: number[]): ForecastTriple[] {
     return horizons.map((h) => {
       const triple = emptyTriple();
+      const velocityHorizon = rateHorizon(h);
+      const accelerationHorizon = rateHorizon(h, 900);
       for (let v = 0; v < 3; v += 1) {
         if (!this.initialized[v]) continue;
         const value =
-          this.position[v]! + this.velocity[v]! * h + 0.5 * this.acceleration[v]! * h * h;
+          this.position[v]! +
+          this.velocity[v]! * velocityHorizon +
+          0.5 * this.acceleration[v]! * accelerationHorizon * accelerationHorizon;
         setTriple(triple, v, value);
       }
       return triple;

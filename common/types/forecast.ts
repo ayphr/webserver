@@ -7,11 +7,8 @@
 /** Total time horizon covered by a device forecast, in seconds. */
 export const FORECAST_HORIZON_SECONDS = 12 * 60 * 60;
 
-/** Spacing between returned forecast samples, in seconds. */
+/** Base spacing between forecast samples near the anchor, in seconds. */
 export const FORECAST_STEP_SECONDS = 5 * 60;
-
-/** Number of forecast samples returned across the horizon. */
-export const FORECAST_SAMPLE_COUNT = Math.floor(FORECAST_HORIZON_SECONDS / FORECAST_STEP_SECONDS);
 
 /** A single point of a device forecast, including ensemble uncertainty. */
 export type ForecastSample = {

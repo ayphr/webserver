@@ -28,6 +28,7 @@ export {
   USERNAME_MAX_LENGTH,
   getUsernameValidationError,
 } from './username';
+export { parseDuration, formatDuration, type DurationUnit } from './duration';
 export {
   EMAIL_CODE_LENGTH,
   EMAIL_MAX_LENGTH,

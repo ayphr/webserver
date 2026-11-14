@@ -2,7 +2,7 @@ import { clamp } from '../../utils';
 import type { AlgorithmContext, ForecastAlgorithm, ForecastTriple } from '../types';
 import { emptyTriple } from '../types';
 import { linearSlope } from '../math';
-import { dampedTrendSum, frameValue, horizonSteps, series, seriesTimes, setTriple } from './helpers';
+import { dampedTrendSum, frameValue, horizonSteps, rateHorizon, series, seriesTimes, setTriple } from './helpers';
 
 export type ExponentialSmootherOptions = {
   id: string;
@@ -82,13 +82,17 @@ export class ExponentialSmoother implements ForecastAlgorithm {
 
   predict(horizons: number[], ctx: AlgorithmContext): ForecastTriple[] {
     const phi = this.options.phi ?? 1;
+    const meanDt = Math.max(ctx.meanDt, 1e-3);
     return horizons.map((h) => {
-      const steps = horizonSteps(h, ctx.meanDt);
+      const steps = horizonSteps(h, meanDt);
+      // Cap the number of trend steps so an undamped (phi = 1) linear trend
+      // cannot run away over a multi-hour horizon.
+      const trendSteps = Math.min(steps, Math.max(1, Math.round(rateHorizon(h) / meanDt)));
       const triple = emptyTriple();
       for (let v = 0; v < 3; v += 1) {
         if (!this.initialized[v]) continue;
         const trendContribution =
-          this.options.beta !== undefined ? this.trend[v]! * dampedTrendSum(phi, steps) : 0;
+          this.options.beta !== undefined ? this.trend[v]! * dampedTrendSum(phi, trendSteps) : 0;
         const season =
           this.seasonLength > 0
             ? (this.seasonal[v]![(this.ticks + steps) % this.seasonLength] ?? 0)
@@ -146,7 +150,7 @@ export class ThetaMethod implements ForecastAlgorithm {
       const triple = emptyTriple();
       for (let v = 0; v < 3; v += 1) {
         if (!this.initialized[v]) continue;
-        setTriple(triple, v, this.level[v]! + 0.5 * this.slope[v]! * h);
+        setTriple(triple, v, this.level[v]! + 0.5 * this.slope[v]! * rateHorizon(h));
       }
       return triple;
     });

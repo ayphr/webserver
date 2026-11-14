@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { Button, Modal } from '../common';
 import { api } from '../../lib/api';
+import { formatDuration, parseDuration } from '@common';
 import './DataFillModal.css';
 
 export interface DataFillModalProps {
@@ -23,7 +24,7 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
 
   const [start, setStart] = useState(toLocalInput(oneHourAgo));
   const [end, setEnd] = useState(toLocalInput(now));
-  const [intervalMinutes, setIntervalMinutes] = useState(5);
+  const [intervalInput, setIntervalInput] = useState('5m');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,16 +35,17 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
     setIsSubmitting(false);
   }, [isOpen]);
 
+  const intervalSeconds = useMemo(() => parseDuration(intervalInput, 'm'), [intervalInput]);
+
   const preview = useMemo(() => {
     const startDate = new Date(start);
     const endDate = new Date(end);
-    const intervalSeconds = Math.max(1, intervalMinutes) * 60;
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
     if (endDate <= startDate) return null;
-    if (intervalSeconds < 60) return null;
+    if (intervalSeconds === undefined || intervalSeconds < 1) return null;
     const count = Math.floor((endDate.getTime() - startDate.getTime()) / (intervalSeconds * 1000)) + 1;
     return { count, intervalSeconds };
-  }, [start, end, intervalMinutes]);
+  }, [start, end, intervalSeconds]);
 
   const handleFill = async () => {
     if (!preview) return;
@@ -70,7 +72,7 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
     <Modal isOpen={isOpen} onClose={onClose} title="Fill mock data" size="md" showCancel={false}>
       <div className="data-fill">
         <div className="data-fill__warning">
-          <IconAlertTriangle size={18} strokeWidth={1.75} />
+          <IconAlertTriangle className="data-fill__warning-icon" size={18} strokeWidth={1.75} />
           <span>
             This will <strong>replace all existing telemetry</strong> for &quot;{deviceName}&quot; with
             generated mock data across the selected time range. This action cannot be undone.
@@ -98,14 +100,21 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
         </label>
 
         <label className="data-fill__field">
-          <span className="data-fill__label">Interval (minutes)</span>
+          <span className="data-fill__label">Interval</span>
           <input
-            type="number"
-            min={1}
+            type="text"
             className="data-fill__input"
-            value={intervalMinutes}
-            onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+            value={intervalInput}
+            onChange={(e) => setIntervalInput(e.target.value)}
+            placeholder="e.g. 5m, 30s, 1h"
+            spellCheck={false}
+            autoComplete="off"
           />
+          <span className="data-fill__hint">
+            {intervalSeconds === undefined || intervalSeconds < 1
+              ? 'Enter a duration of at least 1 second (e.g. 5m, 30s, 1h).'
+              : `One reading every ${formatDuration(intervalSeconds)}.`}
+          </span>
         </label>
 
         <div className="data-fill__summary">
@@ -115,7 +124,7 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
               <span className="data-fill__value">{preview.count.toLocaleString()}</span>
             </>
           ) : (
-            <span className="data-fill__error-text">Enter a valid range and interval (≥ 1 minute).</span>
+            <span className="data-fill__error-text">Enter a valid range and interval.</span>
           )}
         </div>
 
