@@ -1,5 +1,7 @@
 import type {
   DeviceDataPointsPayload,
+  DeviceForecastLockedPayload,
+  DeviceForecastPayload,
   DeviceLinkPayload,
   DeviceListPayload,
   DevicePairingRequestPayload,
@@ -30,6 +32,9 @@ export function createDevicesApi(client: RequestClient) {
       const query = params.toString();
       const path = `/api/devices/${serial}/data${query ? `?${query}` : ''}`;
       return client.requestJson<DeviceDataPointsPayload>(path);
+    },
+    async getForecast(serial: number) {
+      return client.requestJson<DeviceForecastPayload | DeviceForecastLockedPayload>(`/api/devices/${serial}/forecast`);
     },
     async deleteDataPoints(serial: number, timestamps: (Date | string)[]) {
       return client.requestJson<{ serial: number; removed: number }>(`/api/devices/${serial}/data`, {

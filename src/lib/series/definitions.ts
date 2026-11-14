@@ -1,5 +1,5 @@
 import type { DataPoint } from '@common';
-import * as P from './psychrometrics';
+import * as P from '@common';
 
 export type SeriesId =
   | 'temperature'

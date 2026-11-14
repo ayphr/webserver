@@ -50,11 +50,16 @@ import {
   PAIRING_CODE_LENGTH,
   compileQuery,
   type DataPoint,
+  type DeviceForecastLockedPayload,
+  type DeviceForecastPayload,
   type DeviceQueryRequest,
   type DeviceSummary,
   type User,
+  FORECAST_HORIZON_SECONDS,
+  FORECAST_STEP_SECONDS,
   getPlanFeaturesForUser,
 } from '@common';
+import { forecastFromHistory } from '../../lib/forecast';
 import { redisFixedWindow } from '../../lib/redis';
 
 const MAX_SERIAL = 0xFFFFFFFF;
@@ -684,7 +689,58 @@ const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
   return json({ unlinked: true, serial });
 });
 
+const handleDeviceForecast = requireAuth(async (_request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  const features = getPlanFeaturesForUser(user);
+  if (!features.forecasts) {
+    const locked: DeviceForecastLockedPayload = {
+      serial,
+      locked: true,
+      requiredPlans: ['Plus', 'Ultra'],
+    };
+    return json(locked);
+  }
+
+  const { points } = await getDataPointsForQuery(serial, { maxPoints: 2048 });
+
+  const result = forecastFromHistory(points);
+
+  const anchorMs =
+    points.length > 0 ? points[points.length - 1]!.timestamp.getTime() : Date.now();
+  const generatedAt = result?.generatedAt ?? Date.now();
+  const anchorTimestamp = result?.anchorTimestamp ?? anchorMs;
+
+  const samples = (result?.horizons ?? []).map((horizon) => ({
+    timestamp: new Date(horizon.targetTimestamp),
+    temperature: horizon.point.temperature,
+    humidity: horizon.point.humidity,
+    airPressure: horizon.point.pressure,
+    temperatureStd: horizon.uncertainty.temperature,
+    humidityStd: horizon.uncertainty.humidity,
+    airPressureStd: horizon.uncertainty.pressure,
+  }));
+
+  const payload: DeviceForecastPayload = {
+    serial,
+    generatedAt: new Date(generatedAt),
+    anchorTimestamp: new Date(anchorTimestamp),
+    horizonSeconds: FORECAST_HORIZON_SECONDS,
+    stepSeconds: FORECAST_STEP_SECONDS,
+    samples,
+  };
+
+  return json(payload);
+});
+
 export {
+  handleDeviceForecast,
   handleFetchPairingToken,
   handleLink,
   handleListMine,

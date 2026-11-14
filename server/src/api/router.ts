@@ -43,6 +43,7 @@ import {
 import {
   handleFetchPairingToken,
   handleGetBySerial,
+  handleDeviceForecast,
   handleDeviceGetData,
   handleDeviceQuery,
   handleDeviceDeleteDataPoints,
@@ -213,6 +214,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/devices', handle: handleListMine },
   { method: 'GET', path: '/api/devices/mine', handle: handleListMine },
   { method: 'GET', path: '/api/devices/:serial/data', handle: handleDeviceGetData },
+  { method: 'GET', path: '/api/devices/:serial/forecast', handle: handleDeviceForecast },
   { method: 'POST', path: '/api/devices/:serial/query', handle: handleDeviceQuery },
   { method: 'DELETE', path: '/api/devices/:serial/data', handle: handleDeviceDeleteDataPoints },
   { method: 'GET', path: '/api/devices/:serial', handle: handleGetBySerial },

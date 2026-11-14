@@ -537,7 +537,7 @@ export const DashboardPage = () => {
                 className="dashboard-panel--devices"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <DevicesPanel initialDeviceSerial={deviceToOpen} />
+                  <DevicesPanel initialDeviceSerial={deviceToOpen} onNavigate={changeTab} />
                 </Suspense>
               </DashboardPanel>
             )}

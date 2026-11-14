@@ -1,0 +1,67 @@
+.forecast-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.forecast-tab--locked {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 16px;
+}
+
+.forecast-tab__locked-message {
+  margin: 0;
+  color: hsl(180, 1%, 70%);
+  font-size: 1rem;
+}
+
+.forecast-tab--loading,
+.forecast-tab--empty,
+.forecast-tab--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: hsl(180, 1%, 70%);
+}
+
+.forecast-tab__spin {
+  animation: forecast-spin 1s linear infinite;
+}
+
+@keyframes forecast-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.forecast-tab__chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  width: 100%;
+}
+
+.forecast-tab__chart-container {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  min-height: 400px;
+  padding-top: 0.75rem;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.forecast-tab__caption {
+  margin: 0;
+  font-size: 0.85rem;
+  color: hsl(180, 1%, 53%);
+  text-align: center;
+}

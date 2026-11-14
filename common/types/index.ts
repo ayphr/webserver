@@ -13,3 +13,4 @@ export * from './plans';
 export * from './credits';
 export * from './team';
 export * from './notification';
+export * from './forecast';

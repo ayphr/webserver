@@ -33,6 +33,8 @@ export type PlanFeatures = {
   dataShared: boolean;
   eventsAccess: EventsAccess;
   maxUsers: number;
+  /** Whether the plan can access device telemetry forecasting. */
+  forecasts: boolean;
 };
 
 export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
@@ -52,6 +54,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     dataShared: true,
     eventsAccess: 'limited',
     maxUsers: 1,
+    forecasts: false,
   },
   lite: {
     sharedMaxDataPointsPerUser: 10_000_000,
@@ -69,6 +72,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     dataShared: true,
     eventsAccess: 'limited',
     maxUsers: 1,
+    forecasts: false,
   },
   plus: {
     sharedMaxDataPointsPerUser: 20_000_000,
@@ -86,6 +90,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     dataShared: true,
     eventsAccess: 'standard',
     maxUsers: 1,
+    forecasts: true,
   },
   ultra: {
     sharedMaxDataPointsPerUser: 150_000_000,
@@ -109,6 +114,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     dataShared: false,
     eventsAccess: 'standard',
     maxUsers: 1,
+    forecasts: true,
   },
   'team-lite': {
     sharedMaxDataPointsPerUser: 25_000_000,
@@ -126,6 +132,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     dataShared: true,
     eventsAccess: 'limited',
     maxUsers: 5,
+    forecasts: false,
   },
   'team-plus': {
     sharedMaxDataPointsPerUser: 50_000_000,
@@ -148,6 +155,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     dataShared: false,
     eventsAccess: 'standard',
     maxUsers: 15,
+    forecasts: true,
   },
   'team-ultra': {
     sharedMaxDataPointsPerUser: 150_000_000,
@@ -171,5 +179,6 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     dataShared: false,
     eventsAccess: 'priority',
     maxUsers: 50,
+    forecasts: true,
   },
 };

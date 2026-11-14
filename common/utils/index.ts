@@ -36,6 +36,25 @@ export {
 } from './email';
 export { POLICIES_VERSIONS_URL } from './policies';
 export {
+  clamp,
+  toKelvin,
+  saturationVapourPressure,
+  actualVapourPressure,
+  vapourPressureDeficit,
+  dewPointTemperature,
+  wetBulbTemperature,
+  mixingRatio,
+  vapourPressureFromMixingRatio,
+  relativeHumidityFromMixingRatio,
+  humidityRatio,
+  absoluteHumidity,
+  moistAirDensity,
+  enthalpy,
+  apparentTemperature,
+  dewPointDeficit,
+  psychrometrics,
+} from './psychrometrics';
+export {
   getFeaturesForPlan,
   getPlanDataRetentionDays,
   getPlanFeatures,
