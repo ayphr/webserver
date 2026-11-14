@@ -684,7 +684,65 @@ const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
   return json({ unlinked: true, serial });
 });
 
+
+const handleDeviceDataFill = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  const body = await readJsonBody(request);
+  const startMs = typeof body?.start === 'string' ? Date.parse(body.start) : Number.NaN;
+  const endMs = typeof body?.end === 'string' ? Date.parse(body.end) : Number.NaN;
+  const intervalSeconds = typeof body?.intervalSeconds === 'number' ? body.intervalSeconds : Number(body?.intervalSeconds);
+
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return json({ error: 'invalid start or end time' }, 400);
+  }
+  if (endMs <= startMs) {
+    return json({ error: 'end must be after start' }, 400);
+  }
+  if (!Number.isFinite(intervalSeconds) || intervalSeconds < 60) {
+    return json({ error: 'interval must be at least 60 seconds' }, 400);
+  }
+
+  const intervalMs = Math.round(intervalSeconds * 1000);
+  const count = Math.floor((endMs - startMs) / intervalMs) + 1;
+  if (count < 1 || count > 100_000) {
+    return json({ error: 'requested range produces too many points (max 100000)' }, 400);
+  }
+
+  // Replace existing data for this device.
+  await deleteDataPointsForDevice(serial, await (async () => {
+    const { points } = await getDataPointsForQuery(serial, { maxPoints: 100_000 });
+    return points.map((p) => p.timestamp);
+  })());
+
+  const points: DataPoint[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const t = startMs + i * intervalMs;
+    const temp = 20 + Math.sin(i / 12) * 3 + (Math.random() - 0.5) * 0.4;
+    const humidity = 55 + Math.cos(i / 9) * 8 + (Math.random() - 0.5) * 1;
+    const pressure = 1013 + Math.sin(i / 20) * 2 + (Math.random() - 0.5) * 0.5;
+    points.push({
+      timestamp: new Date(t),
+      temperature: Math.round(temp * 10) / 10,
+      humidity: Math.round(humidity * 10) / 10,
+      airPressure: Math.round(pressure * 10) / 10,
+    });
+  }
+
+  await upsertDataPoints(serial, points);
+  await invalidateDeviceStatsForOwner(scopeUuid);
+
+  return json({ serial, count: points.length });
+});
+
 export {
+  handleDeviceDataFill,
   handleFetchPairingToken,
   handleLink,
   handleListMine,

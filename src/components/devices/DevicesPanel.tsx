@@ -32,6 +32,7 @@ import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinitio
 import type { DevicePeriod } from '../../lib/devicePeriod';
 import { DeviceQueryModal } from './DeviceQueryModal';
 import { DeviceExportModal } from './DeviceExportModal';
+import { DataFillModal } from './DataFillModal';
 import { ForecastTab } from './ForecastTab';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
@@ -254,6 +255,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
   const [detailTab, setDetailTab] = useState<DetailTab>('graphs');
   const [isQueryOpen, setIsQueryOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isDataFillOpen, setIsDataFillOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -843,10 +845,16 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
             </Tooltip>
           )}
           {detailTab !== 'forecasts' && detailTab !== 'settings' && (
-            <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
-              <IconTerminal2 size={16} strokeWidth={1.75} />
-              New query
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
+                <IconTerminal2 size={16} strokeWidth={1.75} />
+                New query
+              </Button>
+              <Button variant="secondary" onClick={() => setIsDataFillOpen(true)}>
+                <IconDatabase size={16} strokeWidth={1.75} />
+                Data fill
+              </Button>
+            </>
           )}
           <Button
             variant="secondary"
@@ -1227,6 +1235,25 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
         dataPoints={dataPoints}
         series={enabledDefs}
       />
+
+      {selectedDevice && (
+        <DataFillModal
+          isOpen={isDataFillOpen}
+          onClose={() => setIsDataFillOpen(false)}
+          serial={selectedDevice.serial}
+          deviceName={deviceLabel(selectedDevice)}
+          onFilled={() => {
+            void (async () => {
+              try {
+                const res = await api.devices.getDataPoints(selectedDevice.serial, { period });
+                setDataPoints(res.dataPoints);
+              } catch {
+                // ignore
+              }
+            })();
+          }}
+        />
+      )}
     </div>
   );
 };

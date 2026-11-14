@@ -1,0 +1,67 @@
+.data-fill {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.data-fill__warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  font-size: 0.9rem;
+}
+
+.data-fill__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.data-fill__label {
+  font-size: 0.85rem;
+  color: hsl(180, 1%, 70%);
+}
+
+.data-fill__input {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 0.95rem;
+}
+
+.data-fill__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.data-fill__value {
+  font-weight: 600;
+}
+
+.data-fill__error-text {
+  color: #f87171;
+  font-size: 0.9rem;
+}
+
+.data-fill__error {
+  color: #f87171;
+  font-size: 0.9rem;
+}
+
+.data-fill__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}

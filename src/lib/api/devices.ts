@@ -40,6 +40,12 @@ export function createDevicesApi(client: RequestClient) {
       const path = `/api/devices/${serial}/forecast${query ? `?${query}` : ''}`;
       return client.requestJson<DeviceForecastPayload | DeviceForecastLockedPayload>(path);
     },
+    async dataFill(serial: number, input: { start: string; end: string; intervalSeconds: number }) {
+      return client.requestJson<{ serial: number; count: number }>(`/api/devices/${serial}/data/fill`, {
+        method: 'POST',
+        body: input,
+      });
+    },
     async deleteDataPoints(serial: number, timestamps: (Date | string)[]) {
       return client.requestJson<{ serial: number; removed: number }>(`/api/devices/${serial}/data`, {
         method: 'DELETE',

@@ -41,6 +41,7 @@ import {
   handleUsersSummary,
 } from './routes/staff';
 import {
+  handleDeviceDataFill,
   handleFetchPairingToken,
   handleGetBySerial,
   handleDeviceGetData,
@@ -213,6 +214,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/devices', handle: handleListMine },
   { method: 'GET', path: '/api/devices/mine', handle: handleListMine },
   { method: 'GET', path: '/api/devices/:serial/data', handle: handleDeviceGetData },
+  { method: 'POST', path: '/api/devices/:serial/data/fill', handle: handleDeviceDataFill },
   { method: 'POST', path: '/api/devices/:serial/query', handle: handleDeviceQuery },
   { method: 'DELETE', path: '/api/devices/:serial/data', handle: handleDeviceDeleteDataPoints },
   { method: 'GET', path: '/api/devices/:serial', handle: handleGetBySerial },
