@@ -85,36 +85,50 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
       return;
     }
     let cancelled = false;
+    setDataPoints([]);
+    void (async () => {
+      try {
+        const dp = await api.devices.getDataPoints(serial, { period: '24h' });
+        if (cancelled) return;
+        setDataPoints(dp.dataPoints ?? []);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load telemetry');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [serial, locked]);
+
+  useEffect(() => {
+    if (locked) return;
+    let cancelled = false;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setError(null);
     setForecast(null);
     setLockedPayload(null);
-    setDataPoints([]);
-
+    /* eslint-enable react-hooks/set-state-in-effect */
+    const horizonSeconds = horizonMinutes * 60;
     void (async () => {
       try {
-        const [fc, dp] = await Promise.all([
-          api.devices.getForecast(serial),
-          api.devices.getDataPoints(serial, { period: '24h' }),
-        ]);
+        const fc = await api.devices.getForecast(serial, horizonSeconds);
         if (cancelled) return;
         if ('locked' in fc && fc.locked) {
           setLockedPayload(fc as DeviceForecastLockedPayload);
         } else {
           setForecast(fc as DeviceForecastPayload);
         }
-        setDataPoints(dp.dataPoints ?? []);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load forecast');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
-  }, [serial, locked]);
+  }, [serial, locked, horizonMinutes]);
 
   const combinedData = useMemo<LineGraphData>(() => {
     if (!forecast) return { datasets: [] };
@@ -277,7 +291,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     );
   }
 
-  const horizonOptions = [15, 30, 45, 60];
+  const horizonOptions = [30, 60, 120, 360, 720];
 
   return (
     <div className={`forecast-tab ${isFullscreen ? 'is-fullscreen' : ''}`}>
@@ -290,7 +304,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
               className={`devices__control-btn ${horizonMinutes === minutes ? 'is-active' : ''}`}
               onClick={() => setHorizonMinutes(minutes)}
             >
-              {minutes < 60 ? `${minutes}m` : '1h'}
+              {minutes < 60 ? `${minutes}m` : minutes === 60 ? '1h' : minutes === 120 ? '2h' : minutes === 360 ? '6h' : '12h'}
             </button>
           ))}
         </div>
@@ -301,7 +315,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
         </div>
       </div>
       <p className="forecast-tab__caption">
-        Solid lines show recorded telemetry; dashed lines show the forecast up to {horizonMinutes} minutes ahead.
+        Solid lines show recorded telemetry; dashed lines show the forecast up to {horizonMinutes >= 60 ? `${horizonMinutes / 60}h` : `${horizonMinutes}m`} ahead.
       </p>
     </div>
   );

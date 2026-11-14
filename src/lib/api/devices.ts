@@ -33,8 +33,12 @@ export function createDevicesApi(client: RequestClient) {
       const path = `/api/devices/${serial}/data${query ? `?${query}` : ''}`;
       return client.requestJson<DeviceDataPointsPayload>(path);
     },
-    async getForecast(serial: number) {
-      return client.requestJson<DeviceForecastPayload | DeviceForecastLockedPayload>(`/api/devices/${serial}/forecast`);
+    async getForecast(serial: number, horizonSeconds?: number) {
+      const params = new URLSearchParams();
+      if (horizonSeconds) params.set('horizon', String(horizonSeconds));
+      const query = params.toString();
+      const path = `/api/devices/${serial}/forecast${query ? `?${query}` : ''}`;
+      return client.requestJson<DeviceForecastPayload | DeviceForecastLockedPayload>(path);
     },
     async deleteDataPoints(serial: number, timestamps: (Date | string)[]) {
       return client.requestJson<{ serial: number; removed: number }>(`/api/devices/${serial}/data`, {

@@ -59,7 +59,7 @@ import {
   FORECAST_STEP_SECONDS,
   getPlanFeaturesForUser,
 } from '@common';
-import { forecastFromHistory } from '../../lib/forecast';
+import { forecastFromHistory, forecastHorizons } from '../../lib/forecast';
 import { redisFixedWindow } from '../../lib/redis';
 
 const MAX_SERIAL = 0xFFFFFFFF;
@@ -689,7 +689,10 @@ const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
   return json({ unlinked: true, serial });
 });
 
-const handleDeviceForecast = requireAuth(async (_request, user: User, params) => {
+const FORECAST_CACHE_MAX = 256;
+const forecastCache = new Map<string, { payload: DeviceForecastPayload; expiresAt: number }>();
+
+const handleDeviceForecast = requireAuth(async (request, user: User, params) => {
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
 
@@ -708,12 +711,26 @@ const handleDeviceForecast = requireAuth(async (_request, user: User, params) =>
     return json(locked);
   }
 
+  const url = new URL(request.url);
+  const requestedHorizon = Number(url.searchParams.get('horizon'));
+  const horizonSeconds = Number.isFinite(requestedHorizon) && requestedHorizon > 0
+    ? Math.min(FORECAST_HORIZON_SECONDS, Math.max(FORECAST_STEP_SECONDS, Math.round(requestedHorizon / FORECAST_STEP_SECONDS) * FORECAST_STEP_SECONDS))
+    : FORECAST_HORIZON_SECONDS;
+  const horizons = forecastHorizons(horizonSeconds, FORECAST_STEP_SECONDS);
+
   const { points } = await getDataPointsForQuery(serial, { maxPoints: 2048 });
 
-  const result = forecastFromHistory(points);
+  const lastTs = points.length > 0 ? points[points.length - 1]!.timestamp.getTime() : 0;
+  const cacheKey = `${serial}:${horizonSeconds}:${points.length}:${lastTs}`;
+  const now = Date.now();
+  const cached = forecastCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return json(cached.payload);
+  }
 
-  const anchorMs =
-    points.length > 0 ? points[points.length - 1]!.timestamp.getTime() : Date.now();
+  const result = forecastFromHistory(points, { horizons });
+
+  const anchorMs = points.length > 0 ? points[points.length - 1]!.timestamp.getTime() : Date.now();
   const generatedAt = result?.generatedAt ?? Date.now();
   const anchorTimestamp = result?.anchorTimestamp ?? anchorMs;
 
@@ -731,10 +748,16 @@ const handleDeviceForecast = requireAuth(async (_request, user: User, params) =>
     serial,
     generatedAt: new Date(generatedAt),
     anchorTimestamp: new Date(anchorTimestamp),
-    horizonSeconds: FORECAST_HORIZON_SECONDS,
+    horizonSeconds,
     stepSeconds: FORECAST_STEP_SECONDS,
     samples,
   };
+
+  forecastCache.set(cacheKey, { payload, expiresAt: now + 5 * 60 * 1000 });
+  if (forecastCache.size > FORECAST_CACHE_MAX) {
+    const oldestKey = forecastCache.keys().next().value;
+    if (oldestKey !== undefined) forecastCache.delete(oldestKey);
+  }
 
   return json(payload);
 });

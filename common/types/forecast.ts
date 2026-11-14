@@ -5,7 +5,7 @@
  */
 
 /** Total time horizon covered by a device forecast, in seconds. */
-export const FORECAST_HORIZON_SECONDS = 60 * 60;
+export const FORECAST_HORIZON_SECONDS = 12 * 60 * 60;
 
 /** Spacing between returned forecast samples, in seconds. */
 export const FORECAST_STEP_SECONDS = 5 * 60;
