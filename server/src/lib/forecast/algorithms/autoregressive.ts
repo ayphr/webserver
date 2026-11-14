@@ -4,18 +4,19 @@ import { mean } from '../math';
 import { frameValue, horizonSteps, setTriple } from './helpers';
 
 /** Extrapolates `steps` samples from an AR(p) model using `history` (oldest first). */
-function forecastAR(coefficients: number[], history: number[], steps: number): number {
+function forecastAR(coefficients: number[], history: number[], steps: number, intercept = 0): number {
   const p = coefficients.length;
-  if (p === 0 || history.length === 0) return history[history.length - 1] ?? Number.NaN;
+  if (history.length === 0) return history[history.length - 1] ?? Number.NaN;
 
   const fallback = mean(history);
-  const window = history.slice(-p);
-  while (window.length < p) window.unshift(fallback);
+  const window = history.slice(-Math.max(p, 1));
+  while (window.length < Math.max(p, 1)) window.unshift(fallback);
   const buffer = window.slice();
 
   for (let s = 0; s < steps; s += 1) {
-    let next = 0;
+    let next = intercept;
     for (let j = 0; j < p; j += 1) next += coefficients[j]! * buffer[buffer.length - 1 - j]!;
+    if (!Number.isFinite(next) || Math.abs(next) > 1e4) return buffer[buffer.length - 1] ?? Number.NaN;
     buffer.push(next);
   }
   return buffer[buffer.length - 1]!;
@@ -98,7 +99,8 @@ export class LevinsonAR implements ForecastAlgorithm {
       for (let v = 0; v < 3; v += 1) {
         const coefficients = this.coefficients[v]!;
         if (coefficients.length === 0) continue;
-        setTriple(triple, v, forecastAR(coefficients, this.history[v]!, steps));
+        const intercept = mean(this.history[v]!);
+        setTriple(triple, v, forecastAR(coefficients, this.history[v]!, steps, intercept));
       }
       return triple;
     });
@@ -171,9 +173,21 @@ export class RecursiveLeastSquaresAR implements ForecastAlgorithm {
       for (let i = 0; i < this.size; i += 1) state.theta[i] = state.theta[i]! + gain[i]! * residual;
 
       // P <- (P - gain * phi^T * P) / lambda.
-      state.covariance = covariance.map((row, i) =>
+      const newCovariance = covariance.map((row, i) =>
         row.map((entry, j) => (entry - gain[i]! * pPhi[j]!) / this.forgetting),
       );
+
+      const blewUp =
+        newCovariance.some((row) => row.some((entry) => !Number.isFinite(entry) || Math.abs(entry) > 1e6)) ||
+        state.theta.some((entry) => !Number.isFinite(entry) || Math.abs(entry) > 1e6);
+      if (blewUp) {
+        state.theta = new Array<number>(this.size).fill(0);
+        state.covariance = Array.from({ length: this.size }, (_, i) =>
+          Array.from({ length: this.size }, (_, j) => (i === j ? this.initialCovariance : 0)),
+        );
+      } else {
+        state.covariance = newCovariance;
+      }
     }
 
     history.push(value);
@@ -197,7 +211,8 @@ export class RecursiveLeastSquaresAR implements ForecastAlgorithm {
         const state = this.states[v]!;
         if (!state.initialized) continue;
         const coefficients = state.theta.slice(0, this.order);
-        setTriple(triple, v, forecastAR(coefficients, state.history, steps));
+        const intercept = state.theta[this.order] ?? 0;
+        setTriple(triple, v, forecastAR(coefficients, state.history, steps, intercept));
       }
       return triple;
     });

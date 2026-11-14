@@ -798,7 +798,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
   const online = isDeviceOnline(selectedDevice);
   const latest = selectedDevice.latestDataPoint;
   const canFullscreenGraph =
-    detailTab === 'graphs' && dataPoints.length > 0 && enabledDefs.length > 0 && graphMode !== 'summary';
+    detailTab === 'forecasts' ||
+    (detailTab === 'graphs' && dataPoints.length > 0 && enabledDefs.length > 0 && graphMode !== 'summary');
 
   return (
     <div className="devices">
@@ -822,7 +823,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
           Back to devices
         </Button>
         <div className="devices__actions">
-          {detailTab === 'graphs' && (
+          {(detailTab === 'graphs' || detailTab === 'forecasts') && (
             <button
               type="button"
               className="devices__fullscreen-btn"
@@ -839,10 +840,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
               )}
             </button>
           )}
-          <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
-            <IconTerminal2 size={16} strokeWidth={1.75} />
-            New query
-          </Button>
+          {detailTab !== 'forecasts' && detailTab !== 'settings' && (
+            <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
+              <IconTerminal2 size={16} strokeWidth={1.75} />
+              New query
+            </Button>
+          )}
           <Button
             variant="secondary"
             onClick={() => setIsExportOpen(true)}
@@ -1105,12 +1108,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
 
         {/* FORECASTS TAB */}
         {detailTab === 'forecasts' && selectedDevice && (
-          <div className="devices__forecasts">
-            <ForecastTab
-              serial={selectedDevice.serial}
-              locked={!(planFeatures?.forecasts ?? false)}
-              onNavigate={onNavigate}
-            />
+          <div className={`devices__graphs-body ${isGraphFullscreen ? 'is-fullscreen' : ''}`}>
+            <div className="devices__forecasts">
+              <ForecastTab
+                serial={selectedDevice.serial}
+                locked={!(planFeatures?.forecasts ?? false)}
+                onNavigate={onNavigate}
+                isFullscreen={isGraphFullscreen}
+              />
+            </div>
           </div>
         )}
 

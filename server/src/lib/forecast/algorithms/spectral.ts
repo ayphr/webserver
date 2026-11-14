@@ -6,6 +6,8 @@ import { frameValue, series, seriesTimes, setTriple } from './helpers';
 type HarmonicModel = {
   /** Evaluation origin (last fitted timestamp). */
   origin: number;
+  /** Characteristic time scale used to normalise the linear trend. */
+  timeScale: number;
   periods: number[];
   coefficients: number[];
 };
@@ -16,26 +18,29 @@ function fitTrendHarmonics(values: number[], times: number[], periods: number[])
   if (n < 4) return null;
 
   const origin = times[n - 1]!;
+  const duration = Math.max(1, times[n - 1]! - times[0]!);
+  const timeScale = duration;
   const design = times.map((time) => {
-    const delta = time - origin;
+    const delta = (time - origin) / timeScale;
     const row = [1, delta];
     for (const period of periods) {
-      const omega = (2 * Math.PI) / Math.max(period, 1e-6);
+      const omega = (2 * Math.PI * timeScale) / Math.max(period, 1e-6);
       row.push(Math.sin(omega * delta), Math.cos(omega * delta));
     }
     return row;
   });
 
-  const coefficients = solveLeastSquares(design, values, 1e-3);
+  const coefficients = solveLeastSquares(design, values, 1e-2);
   if (coefficients.some((coefficient) => !Number.isFinite(coefficient))) return null;
-  return { origin, periods, coefficients };
+  if (coefficients.some((coefficient) => Math.abs(coefficient) > 1e6)) return null;
+  return { origin, timeScale, periods, coefficients };
 }
 
 function evaluateHarmonic(model: HarmonicModel, time: number): number {
-  const delta = time - model.origin;
+  const delta = (time - model.origin) / model.timeScale;
   let value = model.coefficients[0]! + model.coefficients[1]! * delta;
   for (let k = 0; k < model.periods.length; k += 1) {
-    const omega = (2 * Math.PI) / Math.max(model.periods[k]!, 1e-6);
+    const omega = (2 * Math.PI * model.timeScale) / Math.max(model.periods[k]!, 1e-6);
     value += model.coefficients[2 + 2 * k]! * Math.sin(omega * delta);
     value += model.coefficients[3 + 2 * k]! * Math.cos(omega * delta);
   }

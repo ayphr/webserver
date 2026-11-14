@@ -229,6 +229,23 @@ export class ForecastEngine {
     }
 
     const predictions = this.algorithms.map((algorithm) => algorithm.predict(this.horizons, ctx));
+
+    // Sanitise implausible extrapolations so a single unstable expert cannot
+    // corrupt the ensemble blend or the deferred scoring ledger.
+    for (const perAlgorithm of predictions) {
+      for (const triple of perAlgorithm) {
+        if (!Number.isFinite(triple.temperature) || triple.temperature < -200 || triple.temperature > 200) {
+          triple.temperature = Number.NaN;
+        }
+        if (!Number.isFinite(triple.mixingRatio) || triple.mixingRatio < 0 || triple.mixingRatio > 1) {
+          triple.mixingRatio = Number.NaN;
+        }
+        if (!Number.isFinite(triple.pressure) || triple.pressure < 1 || triple.pressure > 2000) {
+          triple.pressure = Number.NaN;
+        }
+      }
+    }
+
     this.arbitrator.pushPredictions(seconds, predictions);
 
     this.lastPredictions = predictions;

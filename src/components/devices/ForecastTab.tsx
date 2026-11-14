@@ -13,6 +13,7 @@ type Props = {
   serial: number;
   locked: boolean;
   onNavigate?: (tab: string) => void;
+  isFullscreen?: boolean;
 };
 
 function resolveCssColor(value: string): string {
@@ -69,10 +70,11 @@ const METRICS = [
   },
 ];
 
-export function ForecastTab({ serial, locked, onNavigate }: Props) {
+export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props) {
   const [forecast, setForecast] = useState<DeviceForecastPayload | null>(null);
   const [lockedPayload, setLockedPayload] = useState<DeviceForecastLockedPayload | null>(null);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+  const [horizonMinutes, setHorizonMinutes] = useState(60);
   const [loading, setLoading] = useState(!locked);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,7 +103,7 @@ export function ForecastTab({ serial, locked, onNavigate }: Props) {
         } else {
           setForecast(fc as DeviceForecastPayload);
         }
-        setDataPoints(dp.dataPoints);
+        setDataPoints(dp.dataPoints ?? []);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load forecast');
       } finally {
@@ -138,11 +140,15 @@ export function ForecastTab({ serial, locked, onNavigate }: Props) {
       });
     }
 
+    const anchorMs = toDate(forecast.anchorTimestamp).getTime();
+    const horizonMs = horizonMinutes * 60 * 1000;
+    const forecastSamples = forecast.samples.filter((sample) => toDate(sample.timestamp).getTime() <= anchorMs + horizonMs);
+
     for (const m of METRICS) {
       const color = resolveCssColor(m.def.color);
       datasets.push({
         label: `${m.def.shortLabel} (forecast)`,
-        data: forecast.samples.map((s) => ({ x: toDate(s.timestamp).getTime(), y: m.forecast(s) })),
+        data: forecastSamples.map((s) => ({ x: toDate(s.timestamp).getTime(), y: m.forecast(s) })),
         parsing: false,
         normalized: true,
         borderColor: fade(color, 0.5),
@@ -158,7 +164,7 @@ export function ForecastTab({ serial, locked, onNavigate }: Props) {
     }
 
     return { datasets } as LineGraphData;
-  }, [dataPoints, forecast]);
+  }, [dataPoints, forecast, horizonMinutes]);
 
   const combinedConfig: LineGraphConfig = useMemo(() => {
     const scales: Record<string, unknown> = {
@@ -271,15 +277,31 @@ export function ForecastTab({ serial, locked, onNavigate }: Props) {
     );
   }
 
+  const horizonOptions = [15, 30, 45, 60];
+
   return (
-    <div className="forecast-tab">
+    <div className={`forecast-tab ${isFullscreen ? 'is-fullscreen' : ''}`}>
+      <div className="devices__graphs-controls" onContextMenu={(e) => e.preventDefault()}>
+        <div className="devices__period-selector" role="group" aria-label="Forecast horizon">
+          {horizonOptions.map((minutes) => (
+            <button
+              key={minutes}
+              type="button"
+              className={`devices__control-btn ${horizonMinutes === minutes ? 'is-active' : ''}`}
+              onClick={() => setHorizonMinutes(minutes)}
+            >
+              {minutes < 60 ? `${minutes}m` : '1h'}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="forecast-tab__chart-card">
-        <div className="forecast-tab__chart-container">
+        <div className={`forecast-tab__chart-container ${isFullscreen ? 'devices__chart-container' : ''}`}>
           <LineGraph data={combinedData} config={combinedConfig} />
         </div>
       </div>
       <p className="forecast-tab__caption">
-        Solid lines show recorded telemetry; dashed lines show the next hour forecast.
+        Solid lines show recorded telemetry; dashed lines show the forecast up to {horizonMinutes} minutes ahead.
       </p>
     </div>
   );
