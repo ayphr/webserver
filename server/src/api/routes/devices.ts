@@ -711,8 +711,8 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
 
   const intervalMs = Math.round(intervalSeconds * 1000);
   const count = Math.floor((endMs - startMs) / intervalMs) + 1;
-  if (count < 1 || count > 100_000) {
-    return json({ error: 'requested range produces too many points (max 100000)' }, 400);
+  if (count < 1 || count > 1_000_000) {
+    return json({ error: 'requested range produces too many points (max 1,000,000)' }, 400);
   }
 
   // Replace existing data for this device.
