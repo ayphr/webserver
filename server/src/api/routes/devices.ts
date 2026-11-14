@@ -722,15 +722,54 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   })());
 
   const points: DataPoint[] = [];
+
+  // Scale random-walk step size by interval so 1-min and 1-hr data drift at the same physical rate
+  const dtHours = intervalSeconds / 3600;
+  const walkScale = Math.sqrt(dtHours);
+
+  // Stateful weather baselines (slowly drifting fronts)
+  let tempBaseline = 19 + (Math.random() - 0.5) * 4;
+  let humidityBaseline = 58 + (Math.random() - 0.5) * 10;
+  let pressure = 1013 + (Math.random() - 0.5) * 12;
+  let pressureVelocity = 0;
+
+  // Sensor micro-noise state (autocorrelated so readings don't jump wildly sample-to-sample)
+  let tempNoise = 0;
+  let humidityNoise = 0;
+
   for (let i = 0; i < count; i += 1) {
     const t = startMs + i * intervalMs;
-    const temp = 20 + Math.sin(i / 12) * 3 + (Math.random() - 0.5) * 0.4;
-    const humidity = 55 + Math.cos(i / 9) * 8 + (Math.random() - 0.5) * 1;
-    const pressure = 1013 + Math.sin(i / 20) * 2 + (Math.random() - 0.5) * 0.5;
+    const date = new Date(t);
+
+    // 1. True Diurnal (24-hour) Cycle: coolest around 5:00 AM, warmest around 3:00 PM (15:00)
+    const hourOfDay = date.getUTCHours() + date.getUTCMinutes() / 60;
+    const diurnalPhase = ((hourOfDay - 15) / 24) * 2 * Math.PI;
+    // Asymmetric warmth curve (sun heats faster than night cools)
+    const diurnalTemp = 3.8 * Math.cos(diurnalPhase) + 0.7 * Math.cos(2 * diurnalPhase);
+
+    // 2. Multi-day weather front drift (mean-reverting random walk)
+    tempBaseline += ((19 - tempBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 0.5 * walkScale;
+    humidityBaseline += ((58 - humidityBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 1.8 * walkScale;
+
+    // 3. Smooth barometric pressure momentum (weather systems move slowly over days)
+    pressureVelocity = pressureVelocity * 0.96 + ((1013 - pressure) * 0.002 * dtHours) + (Math.random() - 0.5) * 0.25 * walkScale;
+    pressure = Math.max(980, Math.min(1042, pressure + pressureVelocity));
+
+    // 4. Autocorrelated sensor noise
+    tempNoise = tempNoise * 0.7 + (Math.random() - 0.5) * 0.18;
+    humidityNoise = humidityNoise * 0.7 + (Math.random() - 0.5) * 0.6;
+
+    // 5. Physical coupling:
+    // - Relative humidity drops as air warms (~2.2% per °C)
+    // - Low pressure systems bring higher humidity and slightly cooler daytime highs
+    const pressureAnomaly = pressure - 1013;
+    const rawTemp = tempBaseline + diurnalTemp + (pressureAnomaly * 0.08) + tempNoise;
+    const rawHumidity = humidityBaseline - (diurnalTemp * 2.2) - (pressureAnomaly * 0.45) + humidityNoise;
+
     points.push({
-      timestamp: new Date(t),
-      temperature: Math.round(temp * 10) / 10,
-      humidity: Math.round(humidity * 10) / 10,
+      timestamp: date,
+      temperature: Math.round(rawTemp * 10) / 10,
+      humidity: Math.round(Math.max(15, Math.min(99, rawHumidity)) * 10) / 10,
       airPressure: Math.round(pressure * 10) / 10,
     });
   }
