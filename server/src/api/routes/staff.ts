@@ -8,6 +8,7 @@ import { isSubscriptionTier, resolveSubscription } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { toPublicUser } from '../../lib/user';
 import { punishmentsTotal, staffActionsTotal } from '../../lib/metrics';
+import { notifyUser } from '../../lib/notifications';
 
 const MAX_REASON_LENGTH = 500;
 const MAX_DURATION_MINUTES = 5 * 365 * 24 * 60;
@@ -191,6 +192,16 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
     punishmentsTotal.inc({ type: 'suspension', action: 'created' });
     staffActionsTotal.inc({ action: 'punishment_create' });
 
+    await notifyUser({
+      userUuid: targetUser.uuid,
+      type: 'punishment',
+      title: 'Your account was suspended',
+      message: punishment.endsAt
+        ? `${reason} · Ends ${punishment.endsAt.toUTCString()}`
+        : `${reason} · This suspension is permanent.`,
+      link: '/dashboard?tab=appeal',
+    });
+
     return json({ punishment }, 201);
   }
 
@@ -224,6 +235,14 @@ const handleStaffPunishmentLift = requireRole('staff', async (_request, staffUse
 
   punishmentsTotal.inc({ type: punishment.type, action: 'lifted' });
   staffActionsTotal.inc({ action: 'punishment_lift' });
+
+  await notifyUser({
+    userUuid: punishment.userUuid,
+    type: 'punishment',
+    title: 'Your suspension was lifted',
+    message: 'Your account suspension has been lifted.',
+    link: '/dashboard?tab=overview',
+  });
 
   return json({ punishment });
 }, { allowSuspended: true });
@@ -267,6 +286,16 @@ const handleStaffAppealResolve = requireRole('staff', async (request, staffUser,
     staffUsername: staffUser.username,
   });
 
+  await notifyUser({
+    userUuid: appeal.userUuid,
+    type: 'appeal',
+    title: decision === 'lift' ? 'Your appeal was accepted' : 'Your appeal was denied',
+    message: decision === 'lift'
+      ? 'Your appeal was accepted and your suspension has been lifted.'
+      : 'Your appeal was reviewed and denied.',
+    link: decision === 'lift' ? '/dashboard?tab=overview' : '/dashboard?tab=appeal',
+  });
+
   return json({ appeal: resolved });
 }, { allowSuspended: true });
 
@@ -303,6 +332,14 @@ const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params
   }
 
   staffActionsTotal.inc({ action: 'role_update' });
+
+  await notifyUser({
+    userUuid: targetUser.uuid,
+    type: 'system',
+    title: 'Your account role was updated',
+    message: `Your account role is now ${body.role}.`,
+  });
+
   return json({ user: toPublicUser(updatedUser) });
 });
 
@@ -338,6 +375,14 @@ const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUse
   await deleteSessionsForUserUuid(targetUser.uuid);
 
   staffActionsTotal.inc({ action: 'password_reset' });
+
+  await notifyUser({
+    userUuid: targetUser.uuid,
+    type: 'security',
+    title: 'Your password was reset by staff',
+    message: 'A staff member set a new password for your account and signed out all devices.',
+    link: '/dashboard?tab=account-settings',
+  });
 
   return json({ user: toPublicUser(targetUser) });
 });
@@ -393,6 +438,14 @@ const handleStaffSubscriptionAttach = requireRole('staff', async (request, staff
 
   staffActionsTotal.inc({ action: 'subscription_attach' });
 
+  await notifyUser({
+    userUuid: targetUuid,
+    type: 'subscription',
+    title: 'A subscription was added to your account',
+    message: `A ${tier} subscription was added to your account${expiresAt ? ` until ${expiresAt.toUTCString()}` : ''}.`,
+    link: '/dashboard?tab=subscription',
+  });
+
   return json({
     user: toPublicUser({
       ...targetUser,
@@ -422,6 +475,14 @@ const handleStaffSubscriptionDetach = requireRole('staff', async (_request, _sta
   await removeAttachedSubscription(targetUuid, subscriptionId);
 
   staffActionsTotal.inc({ action: 'subscription_detach' });
+
+  await notifyUser({
+    userUuid: targetUuid,
+    type: 'subscription',
+    title: 'A subscription was removed from your account',
+    message: 'A subscription attached to your account was removed.',
+    link: '/dashboard?tab=subscription',
+  });
 
   return json({
     user: toPublicUser({

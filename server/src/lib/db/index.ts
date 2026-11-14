@@ -12,3 +12,4 @@ export * from './oauth';
 export * from './connections';
 export * from './domainVerifications';
 export * from './emailCodes';
+export * from './notifications';

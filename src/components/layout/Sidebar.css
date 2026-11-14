@@ -223,6 +223,18 @@
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  position: relative;
+}
+
+.n-sidebar__unreadDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-success);
+  box-shadow: 0 0 0 2px var(--bg-surface);
 }
 
 .n-sidebar__menuLabel {

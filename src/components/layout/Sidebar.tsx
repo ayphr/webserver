@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2 } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -76,6 +76,7 @@ type Props = {
   activeToken?: string | null;
   onSwitchAccount?: (token: string) => void;
   onLogoutAccount?: (token: string) => void;
+  unreadNotifications?: number;
   pinned?: boolean;
 };
 
@@ -96,6 +97,7 @@ export const Sidebar: React.FC<Props> = ({
   activeToken = null,
   onSwitchAccount,
   onLogoutAccount,
+  unreadNotifications = 0,
   pinned = false,
 }) => {
   const teamTabs: Tab[] = isTeamMember
@@ -118,6 +120,9 @@ export const Sidebar: React.FC<Props> = ({
   const { showTooltip, hideTooltip } = useTooltip();
 
   const accountTooltip = `Account: ${username}`;
+  const notificationsLabel = unreadNotifications > 0
+    ? `Notifications (${unreadNotifications} unread)`
+    : 'Notifications';
 
   // The credits and account controls keep tooltips while collapsed.
   const tooltipHandlers = (content: string) => {
@@ -252,6 +257,18 @@ export const Sidebar: React.FC<Props> = ({
           >
             <span className="n-sidebar__menuIcon"><IconCreditCard size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Subscription</span>
+          </button>
+          <button
+            className={`n-sidebar__menuItem ${activeTab === 'notifications' ? 'active' : ''}`}
+            type="button"
+            onClick={() => onChange('notifications')}
+            aria-label={notificationsLabel}
+          >
+            <span className="n-sidebar__menuIcon">
+              <IconBell size={16} strokeWidth={1.5} />
+              {unreadNotifications > 0 && <span className="n-sidebar__unreadDot" aria-hidden="true" />}
+            </span>
+            <span className="n-sidebar__menuLabel">{notificationsLabel}</span>
           </button>
         </nav>
 

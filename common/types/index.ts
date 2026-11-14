@@ -12,3 +12,4 @@ export * from './location';
 export * from './plans';
 export * from './credits';
 export * from './team';
+export * from './notification';

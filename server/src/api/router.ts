@@ -98,6 +98,12 @@ import {
 } from './routes/teams';
 import { handleListMine as handleSessionsListMine, handleRevoke as handleSessionRevoke } from './routes/sessions';
 import {
+  handleList as handleNotificationsList,
+  handleUnreadCount as handleNotificationsUnreadCount,
+  handleMarkRead as handleNotificationMarkRead,
+  handleMarkAllRead as handleNotificationsMarkAllRead,
+} from './routes/notifications';
+import {
   handleCountries,
   handleCountryUpdate,
   handleMe as handleProfileMe,
@@ -189,6 +195,11 @@ const ROUTES: readonly RouteDefinition[] = [
 
   { method: 'GET', path: '/api/sessions', handle: handleSessionsListMine },
   { method: 'DELETE', path: '/api/sessions/:id', handle: handleSessionRevoke },
+
+  { method: 'GET', path: '/api/notifications', handle: handleNotificationsList },
+  { method: 'GET', path: '/api/notifications/unread-count', handle: handleNotificationsUnreadCount },
+  { method: 'POST', path: '/api/notifications/read-all', handle: handleNotificationsMarkAllRead },
+  { method: 'POST', path: '/api/notifications/:id/read', handle: handleNotificationMarkRead },
 
   { method: 'GET', path: '/api/punishments/me', handle: handlePunishmentsMe },
   { method: 'GET', path: '/api/punishments/:id', handle: handlePunishment },

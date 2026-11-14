@@ -23,6 +23,7 @@ import {
 } from '../../lib/db/users';
 import type { TeamRole, User } from '@common';
 import { isTeamRole } from '@common';
+import { notifyUser } from '../../lib/notifications';
 
 const handleTeamMe = requireAuth(async (_request, user: User) => {
   let team = await getTeamForUser(user);
@@ -128,6 +129,16 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
     });
   } catch {
     // ignore
+  }
+
+  if (target) {
+    await notifyUser({
+      userUuid: target.uuid,
+      type: 'team_invite',
+      title: `${user.username} invited you to join their team`,
+      message: 'Open this notification to review and accept the invitation.',
+      link: `/dashboard?invite=${encodeURIComponent(invite.token)}`,
+    });
   }
 
   return json({ invite }, 201);

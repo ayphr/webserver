@@ -20,6 +20,7 @@ const LocationsPanel = lazy(() => import('../../components/locations').then((m) 
 const MyAppsPanel = lazy(() => import('../../components/developer/MyAppsPanel').then((m) => ({ default: m.MyAppsPanel })));
 const ConnectionsPanel = lazy(() => import('../../components/connections/ConnectionsPanel').then((m) => ({ default: m.ConnectionsPanel })));
 const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
+const NotificationsPanel = lazy(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
 const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
 const TeamPanel = lazy(() => import('../../components/team/TeamPanel').then((m) => ({ default: m.TeamPanel })));
 const TeamAuditPanel = lazy(() => import('../../components/team/TeamAuditPanel').then((m) => ({ default: m.TeamAuditPanel })));
@@ -27,7 +28,7 @@ const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ de
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
+const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'notifications', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
 
 function formatDisplayDate(date: Date | string): string {
   return toDate(date).toLocaleDateString('en-GB');
@@ -130,6 +131,7 @@ export const DashboardPage = () => {
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -155,6 +157,29 @@ export const DashboardPage = () => {
 
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+    const loadUnread = async () => {
+      try {
+        const count = await api.notifications.unreadCount();
+        if (!cancelled) setUnreadNotifications(count);
+      } catch {
+        // Best effort; the sidebar count is not critical.
+      }
+    };
+
+    void loadUnread();
+    const interval = setInterval(() => void loadUnread(), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uuid]);
+
   useEffect(() => {
     if (!activeSuspension) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -418,9 +443,9 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main className="dashboard-main">
-        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' ? (
+        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
             <div className="dashboard-page__suspension-card">
               <div className="dashboard-page__suspension-card__header">
@@ -562,6 +587,21 @@ export const DashboardPage = () => {
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <SubscriptionPanel />
+                </Suspense>
+              </DashboardPanel>
+            )}
+
+            {activePage === 'notifications' && (
+              <DashboardPanel
+                title="Notifications"
+                description="Updates about your account, team, and security"
+                className="dashboard-panel--wide"
+              >
+                <Suspense fallback={<DashboardContentSkeleton />}>
+                  <NotificationsPanel
+                    onNavigate={changeTab}
+                    onUnreadChange={setUnreadNotifications}
+                  />
                 </Suspense>
               </DashboardPanel>
             )}

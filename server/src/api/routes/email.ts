@@ -14,6 +14,7 @@ import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { authEventsTotal } from '../../lib/metrics';
 import { verifyEmailCode, sendEmailCode, buildNotificationEmail, sendEmail } from '../../lib/email';
+import { notifyUser } from '../../lib/notifications';
 
 type EmailPayload = JsonObject & {
   email?: string;
@@ -174,6 +175,14 @@ async function handleResetPassword(request: Request) {
 
   authEventsTotal.inc({ event: 'password_reset', result: 'success' });
 
+  await notifyUser({
+    userUuid: user.uuid,
+    type: 'security',
+    title: 'Your password was reset',
+    message: 'The password for your account was reset and all devices were signed out.',
+    link: '/dashboard?tab=account-settings',
+  });
+
   if (user.email) {
     const template = buildNotificationEmail({
       subject: 'Your Ayphr password was reset',
@@ -271,6 +280,14 @@ const handleEmailConfirm = requireAuth(async (request, user) => {
   await updateUser(user);
 
   authEventsTotal.inc({ event: 'email_confirm', result: 'success' });
+
+  await notifyUser({
+    userUuid: user.uuid,
+    type: 'security',
+    title: 'Your email address was changed',
+    message: `Your account email address is now ${email}.`,
+    link: '/dashboard?tab=account-settings',
+  });
 
   if (previousEmail) {
     const template = buildNotificationEmail({

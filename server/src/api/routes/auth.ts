@@ -18,6 +18,7 @@ import {
   deletePunishmentsForUserUuid,
   deleteSessionsForUserUuid,
   deleteUser,
+  deleteNotificationsForUserUuid,
   getActiveSuspensionForUserUuid,
   getCollection,
   getDevicesForOwnerUuid,
@@ -33,6 +34,7 @@ import { getUsernameValidationError } from '@common/utils/username';
 import { normalizeEmail, getEmailValidationError } from '@common/utils/email';
 import { getUserByEmail } from '../../lib/db';
 import { verifyEmailCode, sendEmailCode, buildNotificationEmail, sendEmail } from '../../lib/email';
+import { notifyLogin, notifyUser } from '../../lib/notifications';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
@@ -279,7 +281,8 @@ async function handleLogin(request: Request) {
 
   const fingerprint = deviceFingerprint(request);
   const trusted = user.trustedDevices ?? [];
-  const isNewDevice = Boolean(fingerprint) && trusted.length > 0 && !trusted.includes(fingerprint!) && Boolean(user.email && user.emailVerifiedAt);
+  const fingerprintTrusted = Boolean(fingerprint) && trusted.includes(fingerprint!);
+  const isNewDevice = Boolean(fingerprint) && trusted.length > 0 && !fingerprintTrusted && Boolean(user.email && user.emailVerifiedAt);
 
   if (isNewDevice) {
     const result = await sendEmailCode({ email: user.email!, purpose: 'login', userUuid: user.uuid });
@@ -305,6 +308,8 @@ async function handleLogin(request: Request) {
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
   authEventsTotal.inc({ event: 'login', result: 'success' });
+
+  await notifyLogin(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType }, { sendEmail: !fingerprintTrusted });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -360,6 +365,7 @@ async function handleVerifyLogin(request: Request) {
 
   const fingerprint = deviceFingerprint(request);
   const trusted = user.trustedDevices ?? [];
+  const fingerprintTrusted = Boolean(fingerprint) && trusted.includes(fingerprint!);
   if (fingerprint && !trusted.includes(fingerprint)) {
     user.trustedDevices = [...trusted, fingerprint];
     await updateUser(user);
@@ -371,6 +377,8 @@ async function handleVerifyLogin(request: Request) {
   const token = await startSession(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType });
 
   authEventsTotal.inc({ event: 'login_verify', result: 'success' });
+
+  await notifyLogin(user, request, { timezone: body.timezone, locale: body.locale, deviceType: body.deviceType }, { sendEmail: !fingerprintTrusted });
 
   const policyStatus = await getPolicyStatus(user);
 
@@ -466,6 +474,14 @@ const handleChangePassword = requireAuth(async (request, user) => {
   await endAllSessions(user);
   authEventsTotal.inc({ event: 'password_change', result: 'success' });
 
+  await notifyUser({
+    userUuid: user.uuid,
+    type: 'security',
+    title: 'Your password was changed',
+    message: 'The password for your account was changed and all devices were signed out.',
+    link: '/dashboard?tab=account-settings',
+  });
+
   if (user.email) {
     const template = buildNotificationEmail({
       subject: 'Your Ayphr password was changed',
@@ -506,6 +522,7 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
     deleteSessionsForUserUuid(user.uuid),
     deleteAvatar(user.uuid),
     deleteDomainVerificationsForUser(user.uuid),
+    deleteNotificationsForUserUuid(user.uuid),
   ]);
 
   const locations = await getCollection('locations');

@@ -6,6 +6,7 @@ import type { Team, TeamAuditLog, TeamRole, User, AttachedSubscription, TeamInvi
 import { addAttachedSubscription, removeAttachedSubscription, getUserFromUuid, upsertPaidSubscription, removePaidSubscription } from './users';
 import { getActivePaidSubscription } from '@common';
 import { updateSubscriptionQuantity, cancelStripeSubscription } from '../stripe';
+import { notifyUser } from '../notifications';
 
 const TEAMS_COLLECTION = 'teams';
 const TEAM_AUDIT_LOGS_COLLECTION = 'team_audit_logs';
@@ -232,6 +233,14 @@ export async function removeTeamMember(params: {
     targetUuid: target.uuid,
     targetUsername: target.username,
   });
+
+  await notifyUser({
+    userUuid: target.uuid,
+    type: 'team',
+    title: 'You were removed from a team',
+    message: `${actor.username} removed you from their team.`,
+    link: '/dashboard?tab=overview',
+  });
 }
 
 export async function updateTeamMemberRole(params: {
@@ -251,6 +260,14 @@ export async function updateTeamMemberRole(params: {
     targetUuid: target.uuid,
     targetUsername: target.username,
     details: { role },
+  });
+
+  await notifyUser({
+    userUuid: target.uuid,
+    type: 'team',
+    title: 'Your team role was updated',
+    message: `${actor.username} changed your team role to ${role}.`,
+    link: '/dashboard?tab=team',
   });
 }
 
@@ -406,6 +423,16 @@ export async function acceptTeamInvite(params: {
     targetUsername: user.username,
     details: { email: invite.email, role: invite.role },
   });
+
+  if (team.managerUuid !== user.uuid) {
+    await notifyUser({
+      userUuid: team.managerUuid,
+      type: 'team',
+      title: `${user.username} joined your team`,
+      message: `${user.username} accepted your invitation and joined the team.`,
+      link: '/dashboard?tab=team',
+    });
+  }
 }
 
 export async function getTeamSeatLimit(team: Team, manager: User): Promise<number> {

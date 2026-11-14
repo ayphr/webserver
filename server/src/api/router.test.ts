@@ -47,4 +47,14 @@ describe('router', () => {
     expect(deleteMatch?.template).toBe('/api/devices/:serial');
     expect(deleteMatch?.params.serial).toBe('42');
   });
+
+  test('matches notification routes before the parameterized route', () => {
+    expect(matchRoute('GET', '/api/notifications')?.template).toBe('/api/notifications');
+    expect(matchRoute('GET', '/api/notifications/unread-count')?.template).toBe('/api/notifications/unread-count');
+    expect(matchRoute('POST', '/api/notifications/read-all')?.template).toBe('/api/notifications/read-all');
+
+    const readMatch = matchRoute('POST', '/api/notifications/abc/read');
+    expect(readMatch?.template).toBe('/api/notifications/:id/read');
+    expect(readMatch?.params.id).toBe('abc');
+  });
 });

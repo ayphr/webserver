@@ -2,7 +2,7 @@ import { Binary, Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection, type Team, type TeamAuditLog, type TeamInvite, type Appeal } from '@common';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -20,6 +20,7 @@ import {
   DOMAIN_VERIFICATIONS_COLLECTION,
   LOCATIONS_COLLECTION,
   EMAIL_CODES_COLLECTION,
+  NOTIFICATIONS_COLLECTION,
   MONGO_URI,
   MONGO_DB_NAME,
   MONGO_MAX_POOL_SIZE
@@ -104,6 +105,7 @@ export interface Collections {
   teamAuditLogs: Collection<TeamAuditLog>;
   teamInvites: Collection<TeamInvite>;
   appeals: Collection<Appeal>;
+  notifications: Collection<UserNotification>;
 }
 
 export interface StoredAvatar {
@@ -226,6 +228,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     teamAuditLogs: db.collection<TeamAuditLog>('team_audit_logs'),
     teamInvites: db.collection<TeamInvite>('team_invites'),
     appeals: db.collection<Appeal>('appeals'),
+    notifications: db.collection<UserNotification>(NOTIFICATIONS_COLLECTION),
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -258,6 +261,10 @@ export async function setupCollections(db: Db): Promise<Collections> {
     )],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 })],
+    [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ id: 1 }, { unique: true })],
+    [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, createdAt: -1 })],
+    [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, read: 1 })],
+    [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 })],
   ];
 
   await Promise.all(
