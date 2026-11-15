@@ -1,7 +1,6 @@
-import { IconAdjustmentsHorizontal, IconApps, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconTrash, IconUser } from '@tabler/icons-react';
+import { IconApps, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconTrash, IconUser } from '@tabler/icons-react';
 import type { SettingsSection } from '../../lib/settings';
-import type { SelfUser } from '@common';
-import type { CreditBalance } from '@common';
+import type { SelfUser , CreditBalance } from '@common';
 import type { NavigateFunction } from 'react-router-dom';
 
 export interface SettingsSectionsParams {
