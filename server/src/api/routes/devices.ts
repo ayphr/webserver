@@ -53,6 +53,7 @@ import {
   PAIRING_CODE_LENGTH,
   compileQuery,
   estimateQueryComputeUnits,
+  MAX_QUERY_POINTS,
   type DataPoint,
   type DeviceQueryRequest,
   type DeviceSummary,
@@ -71,7 +72,6 @@ const deviceUploadLimiter = createRateLimiter(60 * 1000, 120, 'device-upload');
 const MAX_NAME_LENGTH = 64;
 const MAX_POINTS_PER_UPLOAD = 2_000;
 const MAX_QUERY_LENGTH = 10_000;
-const MAX_QUERY_POINTS = 50_000;
 const DATA_POINT_PRUNE_COOLDOWN_MS = 5 * 60 * 1000;
 const DATA_POINT_PRUNE_KEY_PREFIX = 'ayphr:telemetry:prune:';
 const localDataPointPruneByOwner = new Map<string, number>();

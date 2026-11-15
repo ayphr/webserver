@@ -111,6 +111,8 @@ export type DeviceQueryRequest = {
   to?: string;
 };
 
+export const MAX_QUERY_POINTS = 50_000;
+
 export type DeviceQueryPayload = {
   serial: number;
   query: string;

@@ -12,7 +12,7 @@ import {
   IconPlayerPlay,
   IconTable,
 } from '@tabler/icons-react';
-import { estimateQueryComputeUnits, validateQuery, type CreditBalance, type DeviceQueryPayload } from '@common';
+import { estimateQueryComputeUnits, validateQuery, MAX_QUERY_POINTS, type CreditBalance, type DeviceQueryPayload } from '@common';
 import { api } from '../../lib/api';
 import { formatCredits } from '../../lib/credits';
 import { DEVICE_PERIODS, devicePeriodLabel, type DevicePeriod } from '../../lib/devicePeriod';
@@ -134,14 +134,16 @@ export const DeviceQueryModal = ({
     return validateQuery(trimmedQuery);
   }, [trimmedQuery]);
 
+  const effectivePointCount = pointCount === null ? undefined : Math.min(pointCount, MAX_QUERY_POINTS);
+
   const computeEstimate = useMemo(() => {
     if (!validation.valid) return null;
     try {
-      return estimateQueryComputeUnits(trimmedQuery, pointCount ?? undefined);
+      return estimateQueryComputeUnits(trimmedQuery, effectivePointCount);
     } catch {
       return null;
     }
-  }, [trimmedQuery, validation.valid, pointCount]);
+  }, [trimmedQuery, validation.valid, effectivePointCount]);
 
   const creditCost = Math.max(0.1, (computeEstimate?.units ?? 0) * queryCostCredits);
 
@@ -357,7 +359,7 @@ export const DeviceQueryModal = ({
                 <span>{result.dataPointCount.toLocaleString()} points scanned</span>
                 {result.truncated && (
                   <span className="device-query__truncated">
-                    Only the most recent 50,000 points were queried
+                    Only the most recent {MAX_QUERY_POINTS.toLocaleString()} points were queried
                   </span>
                 )}
               </div>
