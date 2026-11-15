@@ -455,10 +455,6 @@ const historyOptions = [
               <LineGraph data={combinedData} config={combinedConfig} />
             </div>
           </div>
-          <p className="forecast-tab__caption">
-            Solid lines show recorded telemetry; dashed lines show the forecast up to {horizonMinutes >= 60 ? `${horizonMinutes / 60}h` : `${horizonMinutes}m`} ahead.
-            Scroll to zoom and drag to pan.
-          </p>
         </>
       )}
     </div>
