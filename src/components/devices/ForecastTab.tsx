@@ -110,8 +110,8 @@ function computeAxisWindow(points: { x: number }[]): AxisWindow | null {
 export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props) {
   const [forecast, setForecast] = useState<DeviceForecastPayload | null>(null);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
-  const [horizonMinutes, setHorizonMinutes] = useState(60);
-  const [historyPeriod, setHistoryPeriod] = useState('24h');
+  const [horizonMinutes, setHorizonMinutes] = useState(360);
+  const [historyPeriod, setHistoryPeriod] = useState('7d');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
