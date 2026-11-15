@@ -66,7 +66,6 @@ export function getPlanFeatures(plan: PlanTier | PlanUser, seatsOverride?: numbe
         ...base,
         sharedMaxDataPointsPerUser: base.sharedMaxDataPointsPerUser * seatsOverride,
         sharedQueryBoostLimitMonthlyPerUser: base.sharedQueryBoostLimitMonthlyPerUser * seatsOverride,
-        sharedMonthlyCreditsPerUser: base.sharedMonthlyCreditsPerUser * seatsOverride,
       };
     }
     return base;
@@ -91,7 +90,6 @@ export function getPlanFeaturesForUser(user: PlanUser, seatsOverride?: number): 
     ...base,
     sharedMaxDataPointsPerUser: base.sharedMaxDataPointsPerUser * seats,
     sharedQueryBoostLimitMonthlyPerUser: base.sharedQueryBoostLimitMonthlyPerUser * seats,
-    sharedMonthlyCreditsPerUser: base.sharedMonthlyCreditsPerUser * seats,
   };
 }
 
