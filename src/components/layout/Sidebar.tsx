@@ -50,7 +50,7 @@ const iconFor = (id: string) => {
       return <IconUsersGroup size={18} />;
     case 'team-audit':
       return <IconClipboardList size={18} />;
-    case 'jail':
+    case 'suspension':
       return <IconBan size={18} />;
     case 'appeal':
       return <IconMessage size={18} />;
@@ -176,10 +176,10 @@ export const Sidebar: React.FC<Props> = ({
               className={`n-sidebar__tab ${activeTab === 'appeal' ? '' : 'active'}`}
               type="button"
               onClick={() => onChange('overview')}
-              aria-label="Jail"
+              aria-label="Suspension"
             >
-              <span className="n-sidebar__icon">{iconFor('jail')}</span>
-              <span className="n-sidebar__label">Jail</span>
+              <span className="n-sidebar__icon">{iconFor('suspension')}</span>
+              <span className="n-sidebar__label">Suspension</span>
             </button>
             <button
               className={`n-sidebar__tab ${activeTab === 'appeal' ? 'active' : ''}`}

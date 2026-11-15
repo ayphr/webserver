@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
@@ -682,7 +682,7 @@ export const DashboardPage = () => {
                       <div className="dashboard-page__appeal-step-line" />
                       <div className={`dashboard-page__appeal-step ${existingAppeal.status === 'pending' ? 'dashboard-page__appeal-step--pending' : existingAppeal.status === 'accepted' ? 'dashboard-page__appeal-step--success' : 'dashboard-page__appeal-step--danger'}`}>
                         <span className="dashboard-page__appeal-step-icon">
-                          {existingAppeal.status === 'accepted' ? <IconCheck size={14} /> : existingAppeal.status === 'denied' ? <IconX size={14} /> : <IconClock size={14} />}
+                            {existingAppeal.status === 'accepted' ? <IconCheck size={14} /> : existingAppeal.status === 'denied' ? <IconX size={14} /> : <IconGavel size={14} />}
                         </span>
                         <span className="dashboard-page__appeal-step-label">
                           {existingAppeal.status === 'accepted' ? 'Accepted' : existingAppeal.status === 'denied' ? 'Denied' : 'Decision'}
