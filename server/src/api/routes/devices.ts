@@ -720,6 +720,11 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   const count = Math.floor((endMs - startMs) / intervalMs) + 1;
 
   const features = getPlanFeaturesForUser(user);
+
+  if (count < 1 || count > features.dataFillMaxPoints) {
+    return json({ error: `requested range produces too many points (max ${features.dataFillMaxPoints.toLocaleString()})` }, 400);
+  }
+
   const devices = await getDevicesForOwnerUuid(scopeUuid);
   const existingStats = await getDataPointStats(devices.map((d) => d.serial), scopeUuid);
 
@@ -734,14 +739,8 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
     return json({ error: `requested range produces too many points for your plan (max ${features.sharedMaxDataPointsPerUser.toLocaleString()})` }, 400);
   }
 
-  if (count < 1 || count > 10_000_000) {
-    return json({ error: 'requested range produces too many points (max 10,000,000)' }, 400);
-  }
-
   // Replace existing data for this device.
   await deleteAllDataPointsForDevice(serial);
-
-  const points: DataPoint[] = [];
 
   // Scale random-walk step size by interval so 1-min and 1-hr data drift at the same physical rate
   const dtHours = intervalSeconds / 3600;
@@ -757,47 +756,57 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   let tempNoise = 0;
   let humidityNoise = 0;
 
-  for (let i = 0; i < count; i += 1) {
-    const t = startMs + i * intervalMs;
-    const date = new Date(t);
+  // Generate and persist in batches so peak memory stays bounded even for the
+  // largest allowed ranges (up to 10M points).
+  const BATCH_SIZE = 5_000;
+  let generated = 0;
+  for (let batchStart = 0; batchStart < count; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, count);
+    const points: DataPoint[] = [];
+    for (let i = batchStart; i < batchEnd; i += 1) {
+      const t = startMs + i * intervalMs;
+      const date = new Date(t);
 
-    // 1. True Diurnal (24-hour) Cycle: coolest around 5:00 AM, warmest around 3:00 PM (15:00)
-    const hourOfDay = date.getUTCHours() + date.getUTCMinutes() / 60;
-    const diurnalPhase = ((hourOfDay - 15) / 24) * 2 * Math.PI;
-    // Asymmetric warmth curve (sun heats faster than night cools)
-    const diurnalTemp = 3.8 * Math.cos(diurnalPhase) + 0.7 * Math.cos(2 * diurnalPhase);
+      // 1. True Diurnal (24-hour) Cycle: coolest around 5:00 AM, warmest around 3:00 PM (15:00)
+      const hourOfDay = date.getUTCHours() + date.getUTCMinutes() / 60;
+      const diurnalPhase = ((hourOfDay - 15) / 24) * 2 * Math.PI;
+      // Asymmetric warmth curve (sun heats faster than night cools)
+      const diurnalTemp = 3.8 * Math.cos(diurnalPhase) + 0.7 * Math.cos(2 * diurnalPhase);
 
-    // 2. Multi-day weather front drift (mean-reverting random walk)
-    tempBaseline += ((19 - tempBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 0.5 * walkScale;
-    humidityBaseline += ((58 - humidityBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 1.8 * walkScale;
+      // 2. Multi-day weather front drift (mean-reverting random walk)
+      tempBaseline += ((19 - tempBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 0.5 * walkScale;
+      humidityBaseline += ((58 - humidityBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 1.8 * walkScale;
 
-    // 3. Smooth barometric pressure momentum (weather systems move slowly over days)
-    pressureVelocity = pressureVelocity * 0.96 + ((1013 - pressure) * 0.002 * dtHours) + (Math.random() - 0.5) * 0.25 * walkScale;
-    pressure = Math.max(980, Math.min(1042, pressure + pressureVelocity));
+      // 3. Smooth barometric pressure momentum (weather systems move slowly over days)
+      pressureVelocity = pressureVelocity * 0.96 + ((1013 - pressure) * 0.002 * dtHours) + (Math.random() - 0.5) * 0.25 * walkScale;
+      pressure = Math.max(980, Math.min(1042, pressure + pressureVelocity));
 
-    // 4. Autocorrelated sensor noise
-    tempNoise = tempNoise * 0.7 + (Math.random() - 0.5) * 0.18;
-    humidityNoise = humidityNoise * 0.7 + (Math.random() - 0.5) * 0.6;
+      // 4. Autocorrelated sensor noise
+      tempNoise = tempNoise * 0.7 + (Math.random() - 0.5) * 0.18;
+      humidityNoise = humidityNoise * 0.7 + (Math.random() - 0.5) * 0.6;
 
-    // 5. Physical coupling:
-    // - Relative humidity drops as air warms (~2.2% per °C)
-    // - Low pressure systems bring higher humidity and slightly cooler daytime highs
-    const pressureAnomaly = pressure - 1013;
-    const rawTemp = tempBaseline + diurnalTemp + (pressureAnomaly * 0.08) + tempNoise;
-    const rawHumidity = humidityBaseline - (diurnalTemp * 2.2) - (pressureAnomaly * 0.45) + humidityNoise;
+      // 5. Physical coupling:
+      // - Relative humidity drops as air warms (~2.2% per °C)
+      // - Low pressure systems bring higher humidity and slightly cooler daytime highs
+      const pressureAnomaly = pressure - 1013;
+      const rawTemp = tempBaseline + diurnalTemp + (pressureAnomaly * 0.08) + tempNoise;
+      const rawHumidity = humidityBaseline - (diurnalTemp * 2.2) - (pressureAnomaly * 0.45) + humidityNoise;
 
-    points.push({
-      timestamp: date,
-      temperature: Math.round(rawTemp * 10) / 10,
-      humidity: Math.round(Math.max(15, Math.min(99, rawHumidity)) * 10) / 10,
-      airPressure: Math.round(pressure * 10) / 10,
-    });
+      points.push({
+        timestamp: date,
+        temperature: Math.round(rawTemp * 10) / 10,
+        humidity: Math.round(Math.max(15, Math.min(99, rawHumidity)) * 10) / 10,
+        airPressure: Math.round(pressure * 10) / 10,
+      });
+    }
+
+    await upsertDataPoints(serial, points);
+    generated += points.length;
   }
 
-  await upsertDataPoints(serial, points);
   await invalidateDeviceStatsForOwner(scopeUuid);
 
-  return json({ serial, count: points.length });
+  return json({ serial, count: generated });
 });
 
 export {

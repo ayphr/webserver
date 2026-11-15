@@ -1,5 +1,12 @@
 export function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status });
+  const serialized = JSON.stringify(body);
+  return new Response(serialized, {
+    status,
+    headers: {
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(serialized)),
+    },
+  });
 }
 
 export async function readJsonBody<T = Record<string, unknown>>(

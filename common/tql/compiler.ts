@@ -16,7 +16,7 @@ export type QueryResult<T extends TelemetryPoint = TelemetryPoint> =
 export type QueryExecutor<T extends TelemetryPoint> = (dataset: T[]) => QueryResult<T>;
 
 function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && !Number.isNaN(value);
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 /**

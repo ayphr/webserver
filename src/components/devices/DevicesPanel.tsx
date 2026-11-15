@@ -907,7 +907,17 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
             </span>
             <span>
               <IconDatabase size={14} strokeWidth={1.75} />
-              {selectedDevice.dataPointCount.toLocaleString()} data points
+              <span
+                style={
+                  planFeatures && selectedDevice.dataPointCount > planFeatures.sharedMaxDataPointsPerUser
+                    ? { color: 'red' }
+                    : undefined
+                }
+              >
+                {selectedDevice.dataPointCount.toLocaleString()}
+                {planFeatures ? ` / ${planFeatures.sharedMaxDataPointsPerUser.toLocaleString()}` : ''}
+              </span>{' '}
+              data points
             </span>
             <span>
               <IconClock size={14} strokeWidth={1.75} />
@@ -1252,6 +1262,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
           onClose={() => setIsDataFillOpen(false)}
           serial={selectedDevice.serial}
           deviceName={deviceLabel(selectedDevice)}
+          maxPoints={planFeatures?.dataFillMaxPoints ?? 1000}
           onFilled={() => {
             void (async () => {
               try {

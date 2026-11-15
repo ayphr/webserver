@@ -11,6 +11,7 @@ export interface DataFillModalProps {
   serial: number;
   deviceName: string;
   onFilled: () => void;
+  maxPoints?: number;
 }
 
 function toLocalInput(date: Date): string {
@@ -18,7 +19,7 @@ function toLocalInput(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }: DataFillModalProps) => {
+export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, maxPoints = 1000 }: DataFillModalProps) => {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -47,8 +48,10 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
     return { count, intervalSeconds };
   }, [start, end, intervalSeconds]);
 
+  const exceedsLimit = Boolean(preview && preview.count > maxPoints);
+
   const handleFill = async () => {
-    if (!preview) return;
+    if (!preview || exceedsLimit) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -121,7 +124,17 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
           {preview ? (
             <>
               <span className="data-fill__label">Points to generate</span>
-              <span className="data-fill__value">{preview.count.toLocaleString()}</span>
+              <span
+                className="data-fill__value"
+                style={exceedsLimit ? { color: 'red' } : undefined}
+              >
+                {preview.count.toLocaleString()} / {maxPoints.toLocaleString()}
+              </span>
+              {exceedsLimit && (
+                <span className="data-fill__error-text">
+                  Exceeds your plan limit of {maxPoints.toLocaleString()} points.
+                </span>
+              )}
             </>
           ) : (
             <span className="data-fill__error-text">Enter a valid range and interval.</span>
@@ -134,7 +147,7 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled }:
           <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => void handleFill()} isLoading={isSubmitting} disabled={!preview}>
+          <Button variant="primary" onClick={() => void handleFill()} isLoading={isSubmitting} disabled={!preview || exceedsLimit}>
             Fill data
           </Button>
         </div>

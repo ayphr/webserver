@@ -33,8 +33,8 @@ export async function upsertDataPoints(deviceSerial: number, points: DataPoint[]
   }));
 
   trackMongoOperation('bulkWrite', DATA_POINTS_COLLECTION);
-  await dataPoints.bulkWrite(operations);
-  return points.length;
+  const result = await dataPoints.bulkWrite(operations);
+  return (result.upsertedCount ?? 0) + (result.modifiedCount ?? 0);
 }
 
 
