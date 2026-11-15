@@ -1,6 +1,7 @@
 import type { ForecastTriple, StateFrame } from './types';
 import { emptyTriple } from './types';
 import { robustScale } from './signal';
+import { quantile } from './math';
 import { frameValue } from './algorithms/helpers';
 
 type PendingRound = {
@@ -20,6 +21,15 @@ const HUBER_DELTA = 1.5;
 const MISSING_LOSS = 1;
 /** Minimum robust scale per variable so normalisation never divides by ~zero. */
 const SCALE_FLOOR = [0.02, 1e-5, 0.02];
+/** Weight of the newest round in the adaptive per-horizon error scale. */
+const ERROR_SCALE_ADAPT = 0.15;
+/**
+ * Quantile of the cross-expert absolute residuals used as the error scale. A
+ * low quantile tracks the accuracy of the *good* experts rather than the median
+ * (which the pathological experts inflate), so the loss measures how much worse
+ * an expert is than a realistic best, not than the average of a broken field.
+ */
+const ERROR_SCALE_QUANTILE = 0.25;
 
 function tripleValue(triple: ForecastTriple, index: number): number {
   if (index === 0) return triple.temperature;
@@ -61,6 +71,14 @@ export class Arbitrator {
   private readonly capacities: number[];
   private readonly history: number[][] = [[], [], []];
   private readonly scales = SCALE_FLOOR.slice();
+  /**
+   * Adaptive error scale per variable and horizon. Forecast error grows with
+   * lead time, so normalising a residual by the per-step observation noise makes
+   * every long-horizon loss saturate at ~1 and the update stops discriminating.
+   * Tracking the typical absolute error at each horizon keeps the loss
+   * proportional to how much worse an expert really is.
+   */
+  private readonly errorScales: number[][];
   readonly algorithmIds: string[];
   readonly horizons: number[];
   private readonly eta: number;
@@ -69,8 +87,8 @@ export class Arbitrator {
   constructor(
     algorithmIds: string[],
     horizons: number[],
-    eta = 1.0,
-    share = 0.02,
+    eta = 0.5,
+    share = 0.003,
     dtFloor = 30,
   ) {
     this.algorithmIds = algorithmIds;
@@ -82,6 +100,7 @@ export class Arbitrator {
     this.weights = [0, 1, 2].map(() =>
       horizons.map(() => new Array<number>(algorithmCount).fill(uniform)),
     );
+    this.errorScales = [0, 1, 2].map((v) => horizons.map(() => SCALE_FLOOR[v]!));
     this.queues = horizons.map(() => []);
     this.capacities = horizons.map((horizon) => Math.ceil(horizon / dtFloor) + 4);
   }
@@ -99,14 +118,32 @@ export class Arbitrator {
     for (let v = 0; v < 3; v += 1) {
       const actual = frameValue(frame, v);
       if (!Number.isFinite(actual)) continue;
-      const scale = this.scales[v]!;
       const weights = this.weights[v]![horizonIndex]!;
-      let total = 0;
+      const residual = new Array<number>(weights.length);
 
       for (let a = 0; a < weights.length; a += 1) {
         const prediction = round.predictions[a];
         const value = prediction ? tripleValue(prediction, v) : Number.NaN;
-        const loss = Number.isFinite(value) ? normalisedLoss((value - actual) / scale) : MISSING_LOSS;
+        residual[a] = Number.isFinite(value) ? value - actual : Number.NaN;
+      }
+
+      // Scale each round by the robust typical error across experts, bounded
+      // below by the sensor noise, so the loss reflects relative accuracy
+      // rather than saturating for every expert at long horizons.
+      const magnitudes: number[] = [];
+      for (const r of residual) {
+        if (Number.isFinite(r)) magnitudes.push(Math.abs(r));
+      }
+      const floor = this.scales[v]!;
+      const target = magnitudes.length > 0 ? Math.max(quantile(magnitudes, ERROR_SCALE_QUANTILE), floor) : floor;
+      const previous = this.errorScales[v]![horizonIndex]!;
+      const scale = previous + ERROR_SCALE_ADAPT * (target - previous);
+      this.errorScales[v]![horizonIndex] = scale;
+
+      let total = 0;
+      for (let a = 0; a < weights.length; a += 1) {
+        const r = residual[a]!;
+        const loss = Number.isFinite(r) ? normalisedLoss(r / scale) : MISSING_LOSS;
         weights[a] = weights[a]! * Math.exp(-this.eta * loss) + 1e-12;
         total += weights[a]!;
       }

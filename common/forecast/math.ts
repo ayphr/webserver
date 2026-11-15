@@ -158,11 +158,21 @@ export function variance(values: number[]): number {
   return sum / (values.length - 1);
 }
 
-export function median(values: number[]): number {
+/** Linearly interpolated quantile of `values`; `p` is clamped to [0, 1]. */
+export function quantile(values: number[], p: number): number {
   if (values.length === 0) return 0;
   const sorted = values.slice().sort((a, b) => a - b);
-  const mid = sorted.length >> 1;
-  return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
+  const last = sorted.length - 1;
+  const position = Math.min(Math.max(p, 0), 1) * last;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower]!;
+  const weight = position - lower;
+  return sorted[lower]! * (1 - weight) + sorted[upper]! * weight;
+}
+
+export function median(values: number[]): number {
+  return quantile(values, 0.5);
 }
 
 /** Ordinary least-squares slope of `values` against `times`. */

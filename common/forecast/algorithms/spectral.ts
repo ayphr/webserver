@@ -1,6 +1,6 @@
 import type { AlgorithmContext, ForecastAlgorithm, ForecastTriple } from '../types';
 import { emptyTriple } from '../types';
-import { matVec, solveLeastSquares, zeros } from '../math';
+import { matVec, mean, solveLeastSquares, zeros } from '../math';
 import { frameValue, rateHorizon, series, seriesTimes, setTriple } from './helpers';
 
 type HarmonicModel = {
@@ -30,9 +30,16 @@ function fitTrendHarmonics(values: number[], times: number[], periods: number[])
     return row;
   });
 
-  const coefficients = solveLeastSquares(design, values, 1e-2);
+  // Fit the fluctuations about the mean so the intercept stays O(1). Fitting a
+  // large level (e.g. pressure ~1013) makes the normal equations ill-conditioned
+  // and the harmonic coefficients are lost to rounding error, which extrapolates
+  // wildly. The level is added back to the intercept afterwards.
+  const level = mean(values);
+  const centered = values.map((value) => value - level);
+  const coefficients = solveLeastSquares(design, centered, 1e-2);
   if (coefficients.some((coefficient) => !Number.isFinite(coefficient))) return null;
   if (coefficients.some((coefficient) => Math.abs(coefficient) > 1e6)) return null;
+  coefficients[0] = coefficients[0]! + level;
   return { origin, timeScale, periods, coefficients };
 }
 
@@ -221,9 +228,16 @@ export class SingularSpectrumAnalysis implements ForecastAlgorithm {
 
     for (let v = 0; v < 3; v += 1) {
       const values = series(ctx.medium, (frame) => frameValue(frame, v), this.window);
-      const { covariance } = hankelCovariance(values, this.embedding);
+      // SSA must see mean-centred data: a large DC level otherwise dwarfs the
+      // fluctuations in the covariance, so the trailing components are pure
+      // numerical noise and the reconstruction is meaningless.
+      const level = mean(values);
+      const centered = values.map((value) => value - level);
+      const { covariance } = hankelCovariance(centered, this.embedding);
       const vectors = leadingEigenvectors(covariance, this.components);
-      const reconstructed = reconstruct(values, this.embedding, vectors);
+      const reconstructed = reconstruct(centered, this.embedding, vectors).map(
+        (value) => value + level,
+      );
       const model = fitTrendHarmonics(reconstructed, times, periods);
       if (model) this.models[v] = model;
     }

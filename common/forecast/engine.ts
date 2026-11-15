@@ -34,6 +34,14 @@ const CONFIDENCE_Z = 1.96;
 const DERIVATIVE_FLOOR = [1e-3, 1e-7, 1e-3];
 const PRESSURE_MIN = 1;
 const PRESSURE_MAX = 2000;
+/**
+ * Physical envelopes around the current observation used to reject implausible
+ * expert extrapolations. They are far wider than any real change over the
+ * supported horizon, so they only discard genuinely broken predictions.
+ */
+const TEMPERATURE_MARGIN = 60;
+const PRESSURE_MARGIN = 150;
+const MIXING_RATIO_MARGIN = 0.05;
 
 export type ForecastEngineOptions = {
   /** Horizons in seconds ahead of the anchor to predict. */
@@ -41,6 +49,10 @@ export type ForecastEngineOptions = {
   shortCapacity?: number;
   mediumCapacity?: number;
   longCapacity?: number;
+  /** Multiplicative-weights learning rate for the arbitrator. */
+  arbitratorEta?: number;
+  /** Fixed-share mixing rate for the arbitrator. */
+  arbitratorShare?: number;
 };
 
 function buildSmoothed(
@@ -87,6 +99,8 @@ export class ForecastEngine {
     this.arbitrator = new Arbitrator(
       this.algorithms.map((algorithm) => algorithm.id),
       this.horizons,
+      options.arbitratorEta,
+      options.arbitratorShare,
     );
   }
 
@@ -231,16 +245,28 @@ export class ForecastEngine {
     const predictions = this.algorithms.map((algorithm) => algorithm.predict(this.horizons, ctx));
 
     // Sanitise implausible extrapolations so a single unstable expert cannot
-    // corrupt the ensemble blend or the deferred scoring ledger.
+    // corrupt the ensemble blend or the deferred scoring ledger. Each bound is a
+    // physical envelope around the current observation, which catches broken
+    // experts whose output still falls inside a wide absolute range.
     for (const perAlgorithm of predictions) {
       for (const triple of perAlgorithm) {
-        if (!Number.isFinite(triple.temperature) || triple.temperature < -200 || triple.temperature > 200) {
+        if (
+          !Number.isFinite(triple.temperature) ||
+          Math.abs(triple.temperature - temperature) > TEMPERATURE_MARGIN
+        ) {
           triple.temperature = Number.NaN;
         }
-        if (!Number.isFinite(triple.mixingRatio) || triple.mixingRatio < 0 || triple.mixingRatio > 1) {
+        if (
+          !Number.isFinite(triple.mixingRatio) ||
+          triple.mixingRatio < 0 ||
+          triple.mixingRatio > mixingRatioValue + MIXING_RATIO_MARGIN
+        ) {
           triple.mixingRatio = Number.NaN;
         }
-        if (!Number.isFinite(triple.pressure) || triple.pressure < 1 || triple.pressure > 2000) {
+        if (
+          !Number.isFinite(triple.pressure) ||
+          Math.abs(triple.pressure - pressure) > PRESSURE_MARGIN
+        ) {
           triple.pressure = Number.NaN;
         }
       }
