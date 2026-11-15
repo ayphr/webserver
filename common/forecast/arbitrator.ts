@@ -16,7 +16,8 @@ export type Blend = {
 };
 
 const HUBER_DELTA = 1.5;
-const MISSING_LOSS = 25;
+/** Loss assigned to an expert that produced no finite prediction (the maximum). */
+const MISSING_LOSS = 1;
 /** Minimum robust scale per variable so normalisation never divides by ~zero. */
 const SCALE_FLOOR = [0.02, 1e-5, 0.02];
 
@@ -31,6 +32,19 @@ function huber(residual: number): number {
   return magnitude <= HUBER_DELTA
     ? 0.5 * residual * residual
     : HUBER_DELTA * (magnitude - 0.5 * HUBER_DELTA);
+}
+
+/**
+ * Bounds the Huber loss to [0, 1). The multiplicative-weights update needs a
+ * bounded loss: an unbounded one lets a single round with a large normalised
+ * residual drive every rival weight to ~0, so the blend latches onto whichever
+ * expert happened to win the most recent round and oscillates between adjacent
+ * horizons. Saturating at 1 keeps every round's influence proportional to how
+ * much worse an expert actually was.
+ */
+function normalisedLoss(residual: number): number {
+  const h = huber(residual);
+  return h / (1 + h);
 }
 
 /**
@@ -92,7 +106,7 @@ export class Arbitrator {
       for (let a = 0; a < weights.length; a += 1) {
         const prediction = round.predictions[a];
         const value = prediction ? tripleValue(prediction, v) : Number.NaN;
-        const loss = Number.isFinite(value) ? huber((value - actual) / scale) : MISSING_LOSS;
+        const loss = Number.isFinite(value) ? normalisedLoss((value - actual) / scale) : MISSING_LOSS;
         weights[a] = weights[a]! * Math.exp(-this.eta * loss) + 1e-12;
         total += weights[a]!;
       }
@@ -142,6 +156,30 @@ export class Arbitrator {
     }
   }
 
+  /**
+   * Trust in an expert should vary smoothly with the forecast horizon, but each
+   * horizon learns its weights independently and the longest horizons see the
+   * fewest scoring rounds. Averaging each weight vector with its immediate
+   * horizon neighbours (the horizons are geometrically spaced, so neighbours are
+   * adjacent in log-time) removes single-horizon glitches where an under-trained
+   * horizon latches onto a different expert than the horizons around it.
+   */
+  private smoothedWeights(v: number, horizonIndex: number): number[] {
+    const row = this.weights[v]!;
+    const current = row[horizonIndex]!;
+    const prev = horizonIndex > 0 ? row[horizonIndex - 1]! : null;
+    const next = horizonIndex < row.length - 1 ? row[horizonIndex + 1]! : null;
+    const norm = 2 + (prev ? 1 : 0) + (next ? 1 : 0);
+    const smoothed = new Array<number>(current.length);
+    for (let a = 0; a < current.length; a += 1) {
+      let sum = 2 * current[a]!;
+      if (prev) sum += prev[a]!;
+      if (next) sum += next[a]!;
+      smoothed[a] = sum / norm;
+    }
+    return smoothed;
+  }
+
   /** Weighted ensemble mean and predictive variance for one horizon. */
   blend(horizonIndex: number, predictions: ForecastTriple[][]): Blend {
     const horizon = this.horizons[horizonIndex]!;
@@ -149,7 +187,7 @@ export class Arbitrator {
     const variance = [0, 0, 0];
 
     for (let v = 0; v < 3; v += 1) {
-      const weights = this.weights[v]![horizonIndex]!;
+      const weights = this.smoothedWeights(v, horizonIndex);
       let weightedSum = 0;
       let weightTotal = 0;
       for (let a = 0; a < weights.length; a += 1) {
@@ -181,9 +219,12 @@ export class Arbitrator {
 
   /** Algorithm ids ranked by mean weight across variables for a horizon. */
   topAlgorithms(horizonIndex: number, count: number): string[] {
+    // Rank against the same horizon-smoothed weights `blend` uses so the
+    // reported experts match the ones actually driving the forecast.
+    const smoothed = [0, 1, 2].map((v) => this.smoothedWeights(v, horizonIndex));
     const scores = this.algorithmIds.map((_, a) => {
       let sum = 0;
-      for (let v = 0; v < 3; v += 1) sum += this.weights[v]![horizonIndex]![a]!;
+      for (let v = 0; v < 3; v += 1) sum += smoothed[v]![a]!;
       return { id: this.algorithmIds[a]!, score: sum };
     });
     scores.sort((a, b) => b.score - a.score);
