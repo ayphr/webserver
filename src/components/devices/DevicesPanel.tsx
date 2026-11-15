@@ -81,7 +81,6 @@ function deviceLabel(device: DeviceSummary): string {
 }
 
 const GRAPH_INITIAL_WINDOW_MS = 10 * 60 * 1000;
-const GRAPH_INITIAL_MIN_SAMPLES = 5;
 const GRAPH_MAX_ZOOM_IN_MS = 30 * 1000;
 const GRAPH_ZOOM_OUT_PADDING = 0.02;
 const GRAPH_INITIAL_HEADROOM = 0.1;
@@ -93,7 +92,7 @@ type GraphWindow = {
   limitMax: number;
 };
 
-function computeGraphWindow(points: DataPoint[]): GraphWindow | null {
+function computeGraphWindow(points: DataPoint[], period: Period = '24h'): GraphWindow | null {
   if (points.length === 0) return null;
   const times = points.map((p) => toDate(p.timestamp).getTime()).sort((a, b) => a - b);
   const extentMin = times[0];
@@ -108,20 +107,25 @@ function computeGraphWindow(points: DataPoint[]): GraphWindow | null {
     };
   }
 
-  let initialMin = extentMax - GRAPH_INITIAL_WINDOW_MS;
-  let firstVisible = times.findIndex((t) => t >= initialMin);
-  
-  if (firstVisible < 0) firstVisible = times.length - 1;
-
-  if (times.length - firstVisible < GRAPH_INITIAL_MIN_SAMPLES) {
-    initialMin = times[Math.max(0, times.length - GRAPH_INITIAL_MIN_SAMPLES)];
-  }
-  
-  initialMin = Math.min(initialMin, extentMax - GRAPH_MAX_ZOOM_IN_MS);
-  initialMin = Math.max(initialMin, extentMin);
-
-  const initialMax = extentMax + (extentMax - initialMin) * GRAPH_INITIAL_HEADROOM;
   const padding = (extentMax - extentMin) * GRAPH_ZOOM_OUT_PADDING;
+
+  // 'all' time: start zoomed to the most recent 30 days, but allow panning/
+  // zooming out to the entire available range.
+  let initialMin: number;
+  let initialMax: number;
+  if (period === 'all') {
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    initialMin = Math.max(extentMin, extentMax - thirtyDays);
+    initialMax = extentMax + (extentMax - initialMin) * GRAPH_INITIAL_HEADROOM;
+  } else {
+    // Fixed periods: show the whole selected range.
+    initialMin = extentMin;
+    initialMax = extentMax + (extentMax - extentMin) * GRAPH_INITIAL_HEADROOM;
+  }
+
+  initialMin = Math.max(initialMin, extentMin);
+  initialMin = Math.min(initialMin, extentMax - GRAPH_MAX_ZOOM_IN_MS);
+
   return {
     initialMin,
     initialMax,
@@ -550,7 +554,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
 
   // Combined chart config & data
   const gapThreshold = useMemo(() => computeGapThreshold(dataPoints), [dataPoints]);
-  const graphWindow = useMemo(() => computeGraphWindow(dataPoints), [dataPoints]);
+  const graphWindow = useMemo(() => computeGraphWindow(dataPoints, period), [dataPoints, period]);
 
   const combinedData = useMemo(() => {
     const pointRadius = dataPoints.length > 80 ? 0 : 2;
@@ -1092,7 +1096,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
                 {graphMode === 'combined' ? (
                   <div className="devices__chart-card">
                     <div className="devices__chart-container" style={{ position: 'relative' }} onContextMenu={(e) => e.preventDefault()}>
-                      <LineGraph data={combinedData} config={combinedConfig} />
+                      <LineGraph key={period} data={combinedData} config={combinedConfig} />
 
                     </div>
                   </div>
