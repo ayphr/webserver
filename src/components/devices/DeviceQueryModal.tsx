@@ -53,10 +53,10 @@ function displayCell(value: unknown): string {
     try {
       return JSON.stringify(value);
     } catch {
-      return String(value);
+      return '—';
     }
   }
-  return String(value);
+  return '—';
 }
 
 function joinColumns(rows: ExportRow[]): string[] {
@@ -108,6 +108,7 @@ export const DeviceQueryModal = ({
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsCountLoading(true);
     api.devices
       .getDataPoints(serial, { period, countOnly: true })
@@ -249,6 +250,10 @@ export const DeviceQueryModal = ({
                 </button>
               ))}
             </div>
+
+            <span className="device-query__period-note">
+              Queries are limited to the most recent {MAX_QUERY_POINTS.toLocaleString()} points.
+            </span>
 
             <a
               className="device-query__docs-link"

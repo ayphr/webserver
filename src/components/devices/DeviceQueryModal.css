@@ -20,6 +20,12 @@
   gap: 0.5rem 0.75rem;
 }
 
+.device-query__period-note {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .device-query__docs-link {
   display: inline-flex;
   align-items: center;
