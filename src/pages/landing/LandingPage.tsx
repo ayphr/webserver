@@ -11,10 +11,8 @@ import {
   IconGlobe,
   IconMinus,
   IconPlus,
-  IconQuote,
   IconRocket,
   IconShieldCheck,
-  IconStar,
 } from '@tabler/icons-react';
 import { Button, Card } from '../../components/common';
 import logoSvg from '../../assets/logo.svg';
@@ -153,24 +151,6 @@ const PRICING = [
       'Data access for 5 other users',
     ],
     highlight: false,
-  },
-];
-
-const TESTIMONIALS = [
-  {
-    quote: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-    name: 'Lorem Ipsum',
-    role: 'Lorem Ipsum',
-  },
-  {
-    quote: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-    name: 'Lorem Ipsum',
-    role: 'Lorem Ipsum',
-  },
-  {
-    quote: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-    name: 'Lorem Ipsum',
-    role: 'Lorem Ipsum',
   },
 ];
 
@@ -688,46 +668,6 @@ export const LandingPage = () => {
                     <span>Get started</span>
                     <IconArrowRight size={16} aria-hidden="true" />
                   </Button>
-                </Card>
-              </Reveal>
-            ))}
-          </div>
-        </section>
-
-        {/* Testimonials */}
-        <section className="landing-testimonials" aria-labelledby="testimonials-title">
-          <Reveal>
-            <div className="landing-testimonials__header">
-              <span className="landing-section__eyebrow">Testimonials</span>
-              <h2 id="testimonials-title" className="landing-testimonials__heading">
-                What people say
-              </h2>
-            </div>
-          </Reveal>
-
-          <div className="landing-testimonials__grid">
-            {TESTIMONIALS.map((t, i) => (
-              <Reveal key={t.name} delay={i * 100}>
-                <Card className="landing-testimonial-card">
-                  <IconQuote size={28} className="landing-testimonial-card__quote" aria-hidden="true" />
-                  <p className="landing-testimonial-card__text">{t.quote}</p>
-                  <div className="landing-testimonial-card__author">
-                    <div className="landing-testimonial-card__avatar">
-                      {t.name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
-                    </div>
-                    <div>
-                      <div className="landing-testimonial-card__name">{t.name}</div>
-                      <div className="landing-testimonial-card__role">{t.role}</div>
-                    </div>
-                  </div>
-                  <div className="landing-testimonial-card__stars" aria-hidden="true">
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <IconStar key={j} size={14} />
-                    ))}
-                  </div>
                 </Card>
               </Reveal>
             ))}
