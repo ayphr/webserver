@@ -921,7 +921,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
                 }
               >
                 {selectedDevice.dataPointCount.toLocaleString()}
-                {planFeatures ? ` / ${planFeatures.sharedMaxDataPointsPerUser.toLocaleString()}` : ''}
               </span>{' '}
               data points
             </span>
