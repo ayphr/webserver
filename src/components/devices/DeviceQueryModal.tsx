@@ -261,7 +261,7 @@ export const DeviceQueryModal = ({
               target="_blank"
               rel="noopener noreferrer"
             >
-              TQL docs
+              Docs
               <IconExternalLink size={13} strokeWidth={1.75} />
             </a>
           </div>
@@ -274,7 +274,7 @@ export const DeviceQueryModal = ({
               disabled={!canRun}
             >
               <IconPlayerPlay size={16} strokeWidth={2} />
-              Run query
+              Run
               <span className="device-query__keybind" aria-hidden="true">
                 <kbd>{IS_MAC ? '⌘' : 'Ctrl'}</kbd>
                 <kbd>↵</kbd>
