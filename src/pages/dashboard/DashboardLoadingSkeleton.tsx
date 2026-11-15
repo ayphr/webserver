@@ -32,7 +32,7 @@ export const DashboardContentSkeleton = () => (
 
 export const DashboardLoadingSkeleton = ({ activeTab = 'overview' }: DashboardLoadingSkeletonProps) => (
   <div
-    className={`dashboard-layout${localStorage.getItem('ayphr-pref-compact') === '1' ? ' dashboard-layout--compact' : ''}`}
+    className={`dashboard-layout`}
   >
     <Sidebar
       activeTab={activeTab}

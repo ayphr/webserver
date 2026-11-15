@@ -124,9 +124,6 @@ export const DashboardPage = () => {
   const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
   const [isChangeUsernameOpen, setIsChangeUsernameOpen] = useState(false);
   const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
-  const [compactLayout, setCompactLayout] = useState<boolean>(
-    () => localStorage.getItem('ayphr-pref-compact') === '1',
-  );
   const [sidebarPinned, setSidebarPinned] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
@@ -383,11 +380,6 @@ export const DashboardPage = () => {
     localStorage.setItem('ayphr-pref-default-tab', value);
   };
 
-  const setCompactPref = (checked: boolean) => {
-    setCompactLayout(checked);
-    localStorage.setItem('ayphr-pref-compact', checked ? '1' : '0');
-  };
-
   const setSidebarPinnedPref = (checked: boolean) => {
     setSidebarPinned(checked);
     localStorage.setItem('ayphr-pref-sidebar-pinned', checked ? '1' : '0');
@@ -400,8 +392,6 @@ export const DashboardPage = () => {
         credits,
         defaultTab,
         setDefaultTabPref,
-        compactLayout,
-        setCompactPref,
         sidebarPinned,
         setSidebarPinnedPref,
         isStaff,
@@ -421,7 +411,7 @@ export const DashboardPage = () => {
           }
         },
       }),
-    [credits, defaultTab, compactLayout, sidebarPinned, navigate, isStaff, isDeveloper, user, now],
+    [credits, defaultTab, sidebarPinned, navigate, isStaff, isDeveloper, user, now],
   );
 
   if (isLoading) {
@@ -430,7 +420,7 @@ export const DashboardPage = () => {
 
   if (!user) {
     return (
-      <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
+      <div className={`dashboard-layout`}>
         <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main">
           <DashboardPanel title="Dashboard">
@@ -442,7 +432,7 @@ export const DashboardPage = () => {
   }
 
   return (
-    <div className={`dashboard-layout ${compactLayout ? 'dashboard-layout--compact' : ''}`}>
+    <div className={`dashboard-layout`}>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (

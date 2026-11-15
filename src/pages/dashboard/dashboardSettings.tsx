@@ -9,8 +9,6 @@ export interface SettingsSectionsParams {
   credits: CreditBalance | null;
   defaultTab: string;
   setDefaultTabPref: (value: string) => void;
-  compactLayout: boolean;
-  setCompactPref: (checked: boolean) => void;
   sidebarPinned: boolean;
   setSidebarPinnedPref: (checked: boolean) => void;
   isStaff: boolean;
@@ -29,8 +27,6 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
     user,
     defaultTab,
     setDefaultTabPref,
-    compactLayout,
-    setCompactPref,
     sidebarPinned,
     setSidebarPinnedPref,
     isStaff,
@@ -236,15 +232,6 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
             ...(isDeveloper ? [{ value: 'my-apps', label: 'My Apps' }] : []),
           ],
           onChange: setDefaultTabPref,
-        },
-        {
-          id: 'compact-layout',
-          optionType: 'checkbox',
-          icon: <IconAdjustmentsHorizontal size={18} strokeWidth={1.75} />,
-          title: 'Compact layout',
-          description: 'Reduce padding and tighten the dashboard layout.',
-          checked: compactLayout,
-          onChange: setCompactPref,
         },
         {
           id: 'sidebar-pinned',

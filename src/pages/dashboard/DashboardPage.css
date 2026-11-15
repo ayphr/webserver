@@ -9,17 +9,6 @@
   background: var(--bg-base);
 }
 
-.dashboard-layout--compact .dashboard-main {
-  padding: 1rem 0.5rem;
-}
-
-.dashboard-layout--compact .n-sidebar {
-  --sidebar-width-expanded: 260px;
-  --sidebar-width-collapsed: 72px;
-  flex-shrink: 0;
-  padding: 1rem;
-}
-
 .dashboard-main {
   flex: 1;
   min-height: 0;
