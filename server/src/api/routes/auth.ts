@@ -24,23 +24,20 @@ import {
   getDevicesForOwnerUuid,
   getUserFromUsername,
   updateUser,
-} from '../../lib/db';
-import type { User } from '@common';
-import { getCreditPeriodStart, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
+ getUserByEmail } from '../../lib/db';
+import { type User, getCreditPeriodStart, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
 import { toSelfUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { normalizeEmail, getEmailValidationError } from '@common/utils/email';
-import { getUserByEmail } from '../../lib/db';
 import { verifyEmailCode, sendEmailCode, buildNotificationEmail, sendEmail } from '../../lib/email';
 import { notifyLogin, notifyUser } from '../../lib/notifications';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
-import { authEventsTotal, userRegistrationsByCountry } from '../../lib/metrics';
+import { authEventsTotal, userRegistrationsByCountry , setTotalUsers } from '../../lib/metrics';
 import { getUserCount } from '../../lib/db/users';
-import { setTotalUsers } from '../../lib/metrics';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
 import { getTeamInviteByToken, acceptTeamInvite } from '../../lib/db/teams';
 
@@ -352,7 +349,7 @@ async function handleVerifyLogin(request: Request) {
   const user = username.includes('@')
     ? await getUserByEmail(normalizeEmail(username))
     : await getUserFromUsername(username);
-  if (!user || !user.email || !user.emailVerifiedAt) {
+  if (!user?.email || !user.emailVerifiedAt) {
     authEventsTotal.inc({ event: 'login_verify', result: 'invalid' });
     return json({ error: 'invalid or expired code' }, 400);
   }
