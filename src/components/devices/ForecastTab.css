@@ -59,10 +59,12 @@
   overflow: hidden;
 }
 
-.forecast-tab__control-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.forecast-tab .devices__graphs-controls {
+  justify-content: flex-start;
+}
+
+.forecast-tab__calculate {
+  margin-left: auto;
 }
 
 .forecast-tab__control-label {

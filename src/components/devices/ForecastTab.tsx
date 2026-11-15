@@ -378,11 +378,11 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
   }
 
   const horizonOptions = [
-  { value: 30, label: '30m' },
   { value: 60, label: '1h' },
-  { value: 120, label: '2h' },
+  { value: 180, label: '3h' },
   { value: 360, label: '6h' },
   { value: 720, label: '12h' },
+  { value: 1440, label: '24h' },
 ];
 
 const historyOptions = [
@@ -425,9 +425,11 @@ const historyOptions = [
             ))}
           </div>
         </div>
-        <Button variant="primary" onClick={() => void calculate()} isLoading={loading}>
-          Calculate forecast
-        </Button>
+        <div className="forecast-tab__calculate">
+          <Button variant="primary" onClick={() => void calculate()} isLoading={loading}>
+            Calculate forecast
+          </Button>
+        </div>
       </div>
 
       {loading ? (
