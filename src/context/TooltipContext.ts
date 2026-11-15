@@ -11,6 +11,7 @@ export interface TooltipAnchor {
 export interface TooltipOptions {
   content: ReactNode;
   anchor: TooltipAnchor;
+  anchorElement?: HTMLElement | null;
 }
 
 export interface TooltipContextType {

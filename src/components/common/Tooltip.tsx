@@ -11,11 +11,11 @@ export const Tooltip = ({ content, children }: TooltipProps) => {
   const { showTooltip, hideTooltip } = useTooltip();
 
   const handleMouseEnter = (event: MouseEvent<HTMLElement>) => {
-    showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect() });
+    showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect(), anchorElement: event.currentTarget });
   };
 
   const handleFocus = (event: FocusEvent<HTMLElement>) => {
-    showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect() });
+    showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect(), anchorElement: event.currentTarget });
   };
 
   return (

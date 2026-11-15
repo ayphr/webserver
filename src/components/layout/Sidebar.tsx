@@ -130,12 +130,12 @@ export const Sidebar: React.FC<Props> = ({
 
     return {
       onMouseEnter: (event: React.MouseEvent<HTMLElement>) => {
-        showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect() });
+        showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect(), anchorElement: event.currentTarget });
+      },
+      onFocus: (event: React.FocusEvent<HTMLElement>) => {
+        showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect(), anchorElement: event.currentTarget });
       },
       onMouseLeave: hideTooltip,
-      onFocus: (event: React.FocusEvent<HTMLElement>) => {
-        showTooltip({ content, anchor: event.currentTarget.getBoundingClientRect() });
-      },
       onBlur: hideTooltip,
     };
   };

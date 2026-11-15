@@ -8,6 +8,7 @@ import {
 } from '@tabler/icons-react';
 import { ASSISTANT_DATA, ASSISTANT_VARIANTS, type AssistantVariant } from '@common';
 import { Tooltip } from './Tooltip';
+import { useTooltip } from '../../context';
 import './AssistantDropdown.css';
 
 export interface AssistantDropdownProps {
@@ -38,6 +39,8 @@ export const AssistantDropdown = ({
   const [internal, setInternal] = useState<AssistantVariant>(value ?? defaultVariant ?? 'standard');
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevOpenRef = useRef(false);
+  const { hideTooltip } = useTooltip();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -49,20 +52,31 @@ export const AssistantDropdown = ({
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
+        hideTooltip();
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  }, [open, hideTooltip]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        hideTooltip();
+      }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open]);
+  }, [open, hideTooltip]);
+
+  useEffect(() => {
+    if (prevOpenRef.current && !open) {
+      hideTooltip();
+    }
+    prevOpenRef.current = open;
+  }, [open, hideTooltip]);
 
   const current = internal;
   const CurrentIcon = VARIANT_ICONS[current];
@@ -72,6 +86,7 @@ export const AssistantDropdown = ({
     setInternal(variant);
     onChange?.(variant);
     setOpen(false);
+    hideTooltip();
   };
 
   return (
@@ -85,6 +100,7 @@ export const AssistantDropdown = ({
         aria-expanded={open}
         onClick={() => {
           if (disabled) return;
+          if (open) hideTooltip();
           setOpen((v) => !v);
         }}
       >

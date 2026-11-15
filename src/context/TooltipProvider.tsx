@@ -9,6 +9,7 @@ const VIEWPORT_MARGIN = 8;
 interface TooltipState {
   content: ReactNode;
   anchor: TooltipOptions['anchor'];
+  anchorElement?: HTMLElement | null;
 }
 
 interface TooltipPlacement {
@@ -38,10 +39,10 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => {
     setPlacement(null);
   }, [clearShowTimer]);
 
-  const showTooltip = useCallback(({ content, anchor }: TooltipOptions) => {
+  const showTooltip = useCallback(({ content, anchor, anchorElement }: TooltipOptions) => {
     clearShowTimer();
     showTimerRef.current = setTimeout(() => {
-      setTooltip({ content, anchor });
+      setTooltip({ content, anchor, anchorElement });
       setPlacement(null);
     }, TOOLTIP_DELAY);
   }, [clearShowTimer]);
@@ -80,9 +81,33 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => {
     const handle = () => hideTooltip();
     window.addEventListener('scroll', handle, true);
     window.addEventListener('resize', handle);
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') hideTooltip();
+    };
+    window.addEventListener('keydown', handleKey);
+
+    let observer: MutationObserver | null = null;
+    if (tooltip.anchorElement) {
+      const anchor = tooltip.anchorElement;
+      if (!anchor.isConnected) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        hideTooltip();
+      } else {
+        observer = new MutationObserver(() => {
+          if (!anchor.isConnected) {
+            hideTooltip();
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
+    }
+
     return () => {
       window.removeEventListener('scroll', handle, true);
       window.removeEventListener('resize', handle);
+      window.removeEventListener('keydown', handleKey);
+      observer?.disconnect();
     };
   }, [tooltip, hideTooltip]);
 
