@@ -79,6 +79,7 @@ export interface DeviceQueryModalProps {
   defaultPeriod: DevicePeriod;
   credits?: CreditBalance | null;
   queryCostCredits?: number;
+  queryComputeUnitLimit?: number;
   onCreditsChange?: (credits: CreditBalance) => void;
 }
 
@@ -90,6 +91,7 @@ export const DeviceQueryModal = ({
   defaultPeriod,
   credits = null,
   queryCostCredits = 0.5,
+  queryComputeUnitLimit,
   onCreditsChange,
 }: DeviceQueryModalProps) => {
   const [query, setQuery] = useState(DEFAULT_QUERY);
@@ -133,7 +135,12 @@ export const DeviceQueryModal = ({
     }
   }, [trimmedQuery, validation.valid, pointCount]);
 
-  const creditCost = Math.max(0.1, queryCostCredits);
+  const creditCost = Math.max(0.1, (computeEstimate?.units ?? 0) * queryCostCredits);
+
+  const exceedsComputeLimit = useMemo(() => {
+    if (!queryComputeUnitLimit || !computeEstimate) return false;
+    return computeEstimate.units > queryComputeUnitLimit;
+  }, [queryComputeUnitLimit, computeEstimate]);
 
   const hasEnoughCredits = useMemo(() => {
     if (!credits) return true;
@@ -147,8 +154,11 @@ export const DeviceQueryModal = ({
     creditCost > 0 && credits && credits.available < creditCost
       ? 'You do not have enough credits to run this query.'
       : null;
-  const currentError = error ?? validationError ?? insufficientCreditsMessage;
-  const canRun = validation.valid && !isRunning && hasEnoughCredits;
+  const computeLimitMessage = exceedsComputeLimit
+    ? `This query exceeds your plan's compute unit limit of ${queryComputeUnitLimit}.`
+    : null;
+  const currentError = error ?? validationError ?? computeLimitMessage ?? insufficientCreditsMessage;
+  const canRun = validation.valid && !isRunning && hasEnoughCredits && !exceedsComputeLimit;
 
   const rows = useMemo(() => (result ? resultRows(result.result) : []), [result]);
   const columns = useMemo(() => joinColumns(rows.slice(0, MAX_PREVIEW_ROWS)), [rows]);

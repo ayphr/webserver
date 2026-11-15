@@ -51,6 +51,7 @@ import { PAIRING_CODE_TTL_MS } from '../../env';
 import {
   PAIRING_CODE_LENGTH,
   compileQuery,
+  estimateQueryComputeUnits,
   type DataPoint,
   type DeviceQueryRequest,
   type DeviceSummary,
@@ -573,7 +574,19 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const { since, until } = resolveTimeRange(period, fromParam, toParam);
 
   const features = getPlanFeaturesForUser(user);
-  const creditCost = Math.max(0.1, features.queryCostCredits);
+
+  const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
+    since,
+    until,
+    maxPoints: MAX_QUERY_POINTS,
+  });
+
+  const estimate = estimateQueryComputeUnits(query, points.length);
+  const computeUnits = estimate.units;
+  if (computeUnits > features.queryComputeUnitLimit) {
+    return json({ error: `query exceeds your plan's compute unit limit of ${features.queryComputeUnitLimit}` }, 400);
+  }
+  const creditCost = Math.max(0.1, computeUnits * features.queryCostCredits);
 
   if (creditCost > 0) {
     const balance = getCreditBalance(user);
@@ -581,12 +594,6 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
       return json({ error: 'insufficient credits' }, 402);
     }
   }
-
-  const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
-    since,
-    until,
-    maxPoints: MAX_QUERY_POINTS,
-  });
 
   const startedAt = performance.now();
   let result: unknown;

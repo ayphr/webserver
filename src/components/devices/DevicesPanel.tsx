@@ -1253,6 +1253,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         defaultPeriod={period}
         credits={credits}
         queryCostCredits={planFeatures?.queryCostCredits ?? 0.5}
+        queryComputeUnitLimit={planFeatures?.queryComputeUnitLimit}
         onCreditsChange={(next) => {
           setCredits(next);
           onCreditsChange?.(next);
