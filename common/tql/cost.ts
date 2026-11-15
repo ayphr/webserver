@@ -170,19 +170,30 @@ export function estimatePipelineStepUnits(step: PipelineStepAST): number {
  * Produces a static compute-unit estimate plus a per-part breakdown for a
  * parsed query.
  */
-export function estimateComputeUnits(ast: QueryAST): ComputeEstimate {
+/**
+ * Estimates the cost of a query. When `dataPointCount` is provided, the estimate
+ * scales with the amount of data the query will actually process (per 1,000
+ * points); otherwise a 1,000-point baseline is assumed so that callers without
+ * a known dataset size get a representative estimate.
+ */
+export function estimateComputeUnits(ast: QueryAST, dataPointCount?: number): ComputeEstimate {
+  const points = typeof dataPointCount === 'number' && Number.isFinite(dataPointCount) && dataPointCount > 0
+    ? dataPointCount
+    : 1000;
+  const scale = points / 1000;
+
   const parts: ComputeCostPart[] = [
-    { label: 'Scan dataset', units: SCAN_BASELINE },
-    { label: 'Root action', units: ROOT_ACTION_UNITS[ast.action] },
+    { label: 'Scan dataset', units: SCAN_BASELINE * scale },
+    { label: 'Root action', units: ROOT_ACTION_UNITS[ast.action] * scale },
   ];
 
-  const filterUnits = ast.filter ? estimatePredicateUnits(ast.filter) : 0;
+  const filterUnits = ast.filter ? estimatePredicateUnits(ast.filter) * scale : 0;
   if (filterUnits > 0) {
     parts.push({ label: 'Filter conditions', units: filterUnits });
   }
 
   for (const step of ast.pipeline) {
-    parts.push({ label: PIPELINE_LABELS[step.type], units: estimatePipelineStepUnits(step) });
+    parts.push({ label: PIPELINE_LABELS[step.type], units: estimatePipelineStepUnits(step) * scale });
   }
 
   const rounded = parts.map((part) => ({ ...part, units: roundUnits(part.units) }));

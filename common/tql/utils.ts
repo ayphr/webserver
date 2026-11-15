@@ -38,6 +38,6 @@ export function validateQuery(queryString: string): { valid: boolean; error?: st
  * be parsed; callers that need a soft failure should check `validateQuery`
  * first.
  */
-export function estimateQueryComputeUnits(queryString: string): ComputeEstimate {
-  return estimateComputeUnits(parseQuery(queryString));
+export function estimateQueryComputeUnits(queryString: string, dataPointCount?: number): ComputeEstimate {
+  return estimateComputeUnits(parseQuery(queryString), dataPointCount);
 }
