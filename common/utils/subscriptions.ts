@@ -58,6 +58,7 @@ export function resolveSubscription(
       source: 'paid',
       expiresAt: subscription.currentPeriodEnd ?? null,
       paidSubscription: subscription,
+      seats: subscription.quantity ?? 1,
     });
   }
 
@@ -68,6 +69,7 @@ export function resolveSubscription(
       source: 'attached',
       expiresAt: subscription.expiresAt ?? null,
       attachedSubscription: subscription,
+      seats: subscription.seats,
     });
   }
 

@@ -186,6 +186,23 @@ export async function pruneDataPointsForSerials(
   return removed;
 }
 
+export async function countDataPointsForDevice(
+  serial: number,
+  options?: { since?: Date; until?: Date },
+): Promise<number> {
+  const dataPoints = await getCollection('dataPoints');
+  const filter: Record<string, unknown> = { deviceSerial: serial };
+  if (options?.since || options?.until) {
+    const tsFilter: Record<string, unknown> = {};
+    if (options.since) tsFilter.$gte = options.since;
+    if (options.until) tsFilter.$lte = options.until;
+    filter.timestamp = tsFilter;
+  }
+
+  trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
+  return dataPoints.countDocuments(filter);
+}
+
 export async function getDataPointsForDevice(
   serial: number,
   options?: { since?: Date; until?: Date; maxPoints?: number },

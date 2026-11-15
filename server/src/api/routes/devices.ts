@@ -11,6 +11,7 @@ import {
   getLocationById,
   markDevicePairingFetched,
   markDevicePairingLinked,
+  countDataPointsForDevice,
   getDataPointStats,
   getDataPointsForDevice,
   getDataPointsForQuery,
@@ -31,7 +32,7 @@ import {
   upsertDataPoints,
   type DeviceDocument,
 } from '../../lib/db';
-import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole } from '../../lib/db/teams';
+import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSeatLimit } from '../../lib/db/teams';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
@@ -185,7 +186,10 @@ async function pruneOwnerDataPoints(
     const ownerDevices = devices ?? await getDevicesForOwnerUuid(ownerUuid);
     if (!owner) return false;
 
-    const features = getPlanFeaturesForUser(owner);
+    const team = await getTeamForUser(owner);
+    const manager = team ? await getUserFromUuid(team.managerUuid) : null;
+    const seats = team && manager ? await getTeamSeatLimit(team, manager) : undefined;
+    const features = getPlanFeaturesForUser(owner, seats);
     const cutoff = new Date(now - features.dataRetentionDays * 86_400_000);
     const removed = await pruneDataPointsForSerials(
       ownerDevices.map((device) => device.serial),
@@ -529,8 +533,19 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
   const period = url.searchParams.get('period') ?? '24h';
   const fromParam = url.searchParams.get('from');
   const toParam = url.searchParams.get('to');
+  const countOnly = url.searchParams.get('countOnly') === 'true' || url.searchParams.get('countOnly') === '1';
 
   const { since, until } = resolveTimeRange(period, fromParam, toParam);
+
+  if (countOnly) {
+    const totalCount = await countDataPointsForDevice(serial, { since, until });
+    return json({
+      serial,
+      period,
+      dataPoints: [],
+      totalCount,
+    });
+  }
 
   const { points, totalCount } = await getDataPointsForDevice(serial, { since, until, maxPoints: 1200 });
 
@@ -573,7 +588,10 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const toParam = typeof body?.to === 'string' ? body.to : null;
   const { since, until } = resolveTimeRange(period, fromParam, toParam);
 
-  const features = getPlanFeaturesForUser(user);
+  const team = await getTeamForUser(user);
+  const manager = team ? await getUserFromUuid(team.managerUuid) : null;
+  const seats = team && manager ? await getTeamSeatLimit(team, manager) : undefined;
+  const features = getPlanFeaturesForUser(user, seats);
 
   const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
     since,
@@ -741,7 +759,10 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   const intervalMs = Math.round(intervalSeconds * 1000);
   const count = Math.floor((endMs - startMs) / intervalMs) + 1;
 
-  const features = getPlanFeaturesForUser(user);
+  const team = await getTeamForUser(user);
+  const manager = team ? await getUserFromUuid(team.managerUuid) : null;
+  const seats = team && manager ? await getTeamSeatLimit(team, manager) : undefined;
+  const features = getPlanFeaturesForUser(user, seats);
 
   if (count < 1 || count > features.dataFillMaxPoints) {
     return json({ error: `requested range produces too many points (max ${features.dataFillMaxPoints.toLocaleString()})` }, 400);

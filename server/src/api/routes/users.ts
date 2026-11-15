@@ -1,6 +1,7 @@
 import { json } from '../../lib/http';
 import { getCachedActiveSuspension, requireAuth, verifyPassword } from '../auth';
 import { getActiveSuspensionForUserUuid, getUserFromUuid, getUserFromUsername, updateUser } from '../../lib/db';
+import { getTeamForUser, getTeamById, getTeamSeatLimit } from '../../lib/db/teams';
 import { getPolicyStatus } from '../../lib/policies';
 import { toPublicUser, toSelfUser } from '../../lib/user';
 import { getCreditBalance } from '../../lib/credits';
@@ -9,8 +10,25 @@ import { getUsernameValidationError } from '@common/utils/username';
 const handleMe = requireAuth(async (request, user) => {
   const activeSuspension = getCachedActiveSuspension(request) ?? await getActiveSuspensionForUserUuid(user.uuid);
   const policyStatus = await getPolicyStatus(user);
+
+  let teamSeats: number | undefined;
+  if (user.teamId) {
+    const team = await getTeamById(user.teamId);
+    if (team) {
+      const manager = await getUserFromUuid(team.managerUuid);
+      if (manager) {
+        teamSeats = await getTeamSeatLimit(team, manager);
+      }
+    }
+  } else {
+    const team = await getTeamForUser(user);
+    if (team) {
+      teamSeats = await getTeamSeatLimit(team, user);
+    }
+  }
+
   return json({
-    user: toSelfUser(user),
+    user: toSelfUser(user, teamSeats),
     activeSuspension,
     policyStatus,
     credits: getCreditBalance(user),

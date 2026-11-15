@@ -177,6 +177,7 @@ export async function addTeamMember(params: {
   if (existingSub) {
     subscriptionId = existingSub.id;
   } else {
+    const seats = manager.paidSubscriptions?.find((s) => s.tier === team.tier)?.quantity ?? 1;
     const subscription: AttachedSubscription = {
       id: randomUUID(),
       tier: team.tier,
@@ -185,6 +186,7 @@ export async function addTeamMember(params: {
       addedByUuid: manager.uuid,
       addedByUsername: manager.username,
       reason: 'team membership',
+      seats,
     };
     await addAttachedSubscription(target.uuid, subscription);
     subscriptionId = subscription.id;
@@ -390,6 +392,7 @@ export async function acceptTeamInvite(params: {
   // Attach subscription + membership.
   const existingSub = (user.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === team.tier);
   if (!existingSub) {
+    const seats = manager.paidSubscriptions?.find((s) => s.tier === team.tier)?.quantity ?? 1;
     const subscription: AttachedSubscription = {
       id: randomUUID(),
       tier: team.tier,
@@ -398,6 +401,7 @@ export async function acceptTeamInvite(params: {
       addedByUuid: manager.uuid,
       addedByUsername: manager.username,
       reason: 'team membership',
+      seats,
     };
     await addAttachedSubscription(user.uuid, subscription);
   }

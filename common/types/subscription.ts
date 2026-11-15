@@ -78,6 +78,7 @@ export type AttachedSubscription = {
   addedByUuid: string;
   addedByUsername?: string;
   reason?: string;
+  seats?: number;
 };
 
 export type SubscriptionSource = 'paid' | 'attached';
@@ -88,12 +89,14 @@ export type ResolvedSubscription = {
   expiresAt: Date | null;
   paidSubscription?: PaidSubscription;
   attachedSubscription?: AttachedSubscription;
+  seats?: number;
 };
 
 export type PublicSubscription = {
   tier: SubscriptionTier;
   source: SubscriptionSource;
   expiresAt: Date | null;
+  seats?: number;
 };
 
 export type BillingInterval = 'month' | 'year';

@@ -24,11 +24,12 @@ export function createDevicesApi(client: RequestClient) {
       const response = await client.requestJson<DevicePayload>(`/api/devices/${serial}`);
       return response.device;
     },
-    async getDataPoints(serial: number, options?: { period?: string; from?: string; to?: string }) {
+    async getDataPoints(serial: number, options?: { period?: string; from?: string; to?: string; countOnly?: boolean }) {
       const params = new URLSearchParams();
       if (options?.period) params.set('period', options.period);
       if (options?.from) params.set('from', options.from);
       if (options?.to) params.set('to', options.to);
+      if (options?.countOnly) params.set('countOnly', 'true');
       const query = params.toString();
       const path = `/api/devices/${serial}/data${query ? `?${query}` : ''}`;
       return client.requestJson<DeviceDataPointsPayload>(path);

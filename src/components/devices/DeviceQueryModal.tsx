@@ -6,6 +6,7 @@ import {
   IconAlertCircle,
   IconBolt,
   IconBraces,
+  IconCoin,
   IconDownload,
   IconExternalLink,
   IconPlayerPlay,
@@ -97,6 +98,7 @@ export const DeviceQueryModal = ({
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [period, setPeriod] = useState<DevicePeriod>(defaultPeriod);
   const [isRunning, setIsRunning] = useState(false);
+  const [isCountLoading, setIsCountLoading] = useState(true);
   const [result, setResult] = useState<DeviceQueryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'json'>('table');
@@ -106,13 +108,19 @@ export const DeviceQueryModal = ({
 
   useEffect(() => {
     let cancelled = false;
+    setIsCountLoading(true);
     api.devices
-      .getDataPoints(serial, { period })
+      .getDataPoints(serial, { period, countOnly: true })
       .then((res) => {
-        if (!cancelled) setPointCount(res.totalCount);
+        if (!cancelled) {
+          setPointCount(res.totalCount);
+          setIsCountLoading(false);
+        }
       })
       .catch(() => {
-        // keep the last known count to avoid flickering
+        if (!cancelled) {
+          setIsCountLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -157,8 +165,15 @@ export const DeviceQueryModal = ({
   const computeLimitMessage = exceedsComputeLimit
     ? `This query exceeds your plan's compute unit limit of ${queryComputeUnitLimit}.`
     : null;
-  const currentError = error ?? validationError ?? computeLimitMessage ?? insufficientCreditsMessage;
-  const canRun = validation.valid && !isRunning && hasEnoughCredits && !exceedsComputeLimit;
+  const errors = useMemo(() => {
+    const list: string[] = [];
+    if (error) list.push(error);
+    if (validationError && !list.includes(validationError)) list.push(validationError);
+    if (computeLimitMessage && !list.includes(computeLimitMessage)) list.push(computeLimitMessage);
+    if (insufficientCreditsMessage && !list.includes(insufficientCreditsMessage)) list.push(insufficientCreditsMessage);
+    return list;
+  }, [error, validationError, computeLimitMessage, insufficientCreditsMessage]);
+  const canRun = validation.valid && !isRunning && !isCountLoading && hasEnoughCredits && !exceedsComputeLimit;
 
   const rows = useMemo(() => (result ? resultRows(result.result) : []), [result]);
   const columns = useMemo(() => joinColumns(rows.slice(0, MAX_PREVIEW_ROWS)), [rows]);
@@ -169,6 +184,7 @@ export const DeviceQueryModal = ({
   );
 
   const handleRun = async () => {
+    if (isCountLoading) return;
     const trimmed = query.trim();
     if (!trimmed) {
       setError('Enter a TQL query before running it.');
@@ -244,23 +260,6 @@ export const DeviceQueryModal = ({
           </div>
 
           <div className="device-query__run-group">
-            {creditCost > 0 && (
-              <Tooltip content="Credits this query will cost.">
-                <span className="device-query__credits">
-                  {formatCredits(creditCost)} credits
-                </span>
-              </Tooltip>
-            )}
-
-            {computeEstimate && (
-              <Tooltip content="Relative compute cost of this query. Higher means more work.">
-                <span className="device-query__compute">
-                  <IconBolt size={13} strokeWidth={2} />
-                  {computeEstimate.units} CU
-                </span>
-              </Tooltip>
-            )}
-
             <Button
               variant="primary"
               onClick={() => void handleRun()}
@@ -274,6 +273,32 @@ export const DeviceQueryModal = ({
                 <kbd>↵</kbd>
               </span>
             </Button>
+
+            <div className="device-query__cost-row">
+              {isCountLoading ? (
+                <span className="device-query__spinner" role="status" aria-label="Calculating cost..." />
+              ) : (
+                <>
+                  {computeEstimate && creditCost > 0 && (
+                    <Tooltip content="Credits this query will cost.">
+                      <span className="device-query__badge">
+                        <IconCoin size={13} strokeWidth={2} />
+                        {formatCredits(creditCost)} credits
+                      </span>
+                    </Tooltip>
+                  )}
+
+                  {computeEstimate && (
+                    <Tooltip content="Relative compute cost of this query. Higher means more work.">
+                      <span className="device-query__badge">
+                        <IconBolt size={13} strokeWidth={2} />
+                        {computeEstimate.units} CU
+                      </span>
+                    </Tooltip>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -306,10 +331,16 @@ export const DeviceQueryModal = ({
           />
         </div>
 
-        {currentError && (
+        {errors.length > 0 && (
           <div className="device-query__error" role="alert">
             <IconAlertCircle size={17} strokeWidth={1.75} />
-            <span>{currentError}</span>
+            <div className="device-query__error-list">
+              {errors.map((msg, idx) => (
+                <div key={idx} className="device-query__error-item">
+                  {msg}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
