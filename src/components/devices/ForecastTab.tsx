@@ -111,6 +111,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
   const [forecast, setForecast] = useState<DeviceForecastPayload | null>(null);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [horizonMinutes, setHorizonMinutes] = useState(60);
+  const [historyPeriod, setHistoryPeriod] = useState('24h');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +126,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     setDataPoints([]);
     void (async () => {
       try {
-        const dp = await api.devices.getDataPoints(serial, { period: '24h' });
+        const dp = await api.devices.getDataPoints(serial, { period: historyPeriod });
         if (cancelled) return;
         setDataPoints(dp.dataPoints ?? []);
       } catch (err) {
@@ -135,7 +136,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     return () => {
       cancelled = true;
     };
-  }, [serial, locked]);
+  }, [serial, locked, historyPeriod]);
 
   const calculate = useCallback(async () => {
     if (locked) return;
@@ -146,7 +147,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     try {
       let pts = dataPoints;
       if (pts.length === 0) {
-        const dp = await api.devices.getDataPoints(serial, { period: '24h' });
+        const dp = await api.devices.getDataPoints(serial, { period: historyPeriod });
         pts = dp.dataPoints ?? [];
         setDataPoints(pts);
       }
@@ -182,13 +183,19 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     } finally {
       setLoading(false);
     }
-  }, [serial, locked, horizonMinutes, dataPoints]);
+  }, [serial, locked, horizonMinutes, dataPoints, historyPeriod]);
 
   // Reset calculated forecast when horizon changes so stale results aren't shown.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setForecast(null);
   }, [horizonMinutes]);
+
+  // Reset calculated forecast when the history window changes.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForecast(null);
+  }, [historyPeriod]);
 
   // Forecast samples within the selected horizon.
   const forecastSamples = useMemo(() => {
@@ -370,22 +377,53 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     );
   }
 
-  const horizonOptions = [30, 60, 120, 360, 720];
+  const horizonOptions = [
+  { value: 30, label: '30m' },
+  { value: 60, label: '1h' },
+  { value: 120, label: '2h' },
+  { value: 360, label: '6h' },
+  { value: 720, label: '12h' },
+];
+
+const historyOptions = [
+  { value: '24h', label: '24h' },
+  { value: '2d', label: '2d' },
+  { value: '7d', label: '7d' },
+  { value: '2w', label: '2w' },
+];
 
   return (
     <div className={`forecast-tab ${isFullscreen ? 'is-fullscreen' : ''}`}>
       <div className="devices__graphs-controls" onContextMenu={(e) => e.preventDefault()}>
-        <div className="devices__period-selector" role="group" aria-label="Forecast horizon">
-          {horizonOptions.map((minutes) => (
-            <button
-              key={minutes}
-              type="button"
-              className={`devices__control-btn ${horizonMinutes === minutes ? 'is-active' : ''}`}
-              onClick={() => setHorizonMinutes(minutes)}
-            >
-              {minutes < 60 ? `${minutes}m` : minutes === 60 ? '1h' : minutes === 120 ? '2h' : minutes === 360 ? '6h' : '12h'}
-            </button>
-          ))}
+        <div className="forecast-tab__control-group">
+          <span className="forecast-tab__control-label">Forecast horizon</span>
+          <div className="devices__period-selector" role="group" aria-label="Forecast horizon">
+            {horizonOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`devices__control-btn ${horizonMinutes === option.value ? 'is-active' : ''}`}
+                onClick={() => setHorizonMinutes(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="forecast-tab__control-group">
+          <span className="forecast-tab__control-label">History used</span>
+          <div className="devices__period-selector" role="group" aria-label="History used for forecast">
+            {historyOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`devices__control-btn ${historyPeriod === option.value ? 'is-active' : ''}`}
+                onClick={() => setHistoryPeriod(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
         <Button variant="primary" onClick={() => void calculate()} isLoading={loading}>
           Calculate forecast

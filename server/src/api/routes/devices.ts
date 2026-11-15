@@ -485,8 +485,14 @@ function resolveTimeRange(period: string, fromParam?: string | null, toParam?: s
       case '24h':
         since = new Date(now - 24 * 60 * 60 * 1000);
         break;
+      case '2d':
+        since = new Date(now - 2 * 24 * 60 * 60 * 1000);
+        break;
       case '7d':
         since = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '2w':
+        since = new Date(now - 14 * 24 * 60 * 60 * 1000);
         break;
       case '30d':
         since = new Date(now - 30 * 24 * 60 * 60 * 1000);

@@ -59,11 +59,17 @@
   overflow: hidden;
 }
 
-.forecast-tab__caption {
-  margin: 0;
-  font-size: 0.85rem;
+.forecast-tab__control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.forecast-tab__control-label {
+  font-size: 0.75rem;
   color: hsl(180, 1%, 53%);
-  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .forecast-tab__progress {
   width: 100%;
