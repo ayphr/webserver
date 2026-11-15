@@ -17,7 +17,6 @@ import {
   IconStar,
 } from '@tabler/icons-react';
 import { Button, Card } from '../../components/common';
-import { API_BASE_URL } from '../../lib/api';
 import logoSvg from '../../assets/logo.svg';
 import './LandingPage.css';
 
@@ -57,50 +56,6 @@ const Reveal = ({
     >
       {children}
     </div>
-  );
-};
-
-const Counter = ({ to, suffix = '' }: { to: number; suffix?: string }) => {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [value, setValue] = useState(0);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !started.current) {
-          started.current = true;
-          const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          if (reduce) {
-            setValue(to);
-            obs.disconnect();
-            return;
-          }
-          const duration = 1600;
-          const start = performance.now();
-          const tick = (now: number) => {
-            const t = Math.min(1, (now - start) / duration);
-            const eased = 1 - Math.pow(1 - t, 3);
-            setValue(Math.round(to * eased));
-            if (t < 1) requestAnimationFrame(tick);
-          };
-          requestAnimationFrame(tick);
-          obs.disconnect();
-        }
-      },
-      { threshold: 0.4 },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [to]);
-
-  return (
-    <span ref={ref}>
-      {value.toLocaleString()}
-      {suffix}
-    </span>
   );
 };
 
@@ -153,13 +108,6 @@ const STEPS = [
     title: 'See readings arrive',
     desc: 'Charts and history show up immediately.',
   },
-];
-
-const STATS = [
-  { to: 99.9, suffix: '%', label: 'Uptime SLA' },
-  { to: 50, suffix: 'ms', label: 'Median ingest latency' },
-  { to: 10, suffix: 'M+', label: 'Data points / day' },
-  { to: 24, suffix: '/7', label: 'Monitoring' },
 ];
 
 const PRICING = [
@@ -391,7 +339,6 @@ export const LandingPage = () => {
   const [scrolled, setScrolled] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [marqueeReady, setMarqueeReady] = useState(false);
-  const [stats, setStats] = useState(STATS);
 
   useEffect(() => {
     const ready = () => setMarqueeReady(true);
@@ -402,25 +349,6 @@ export const LandingPage = () => {
     }
     const fallback = window.setTimeout(ready, 800);
     return () => window.clearTimeout(fallback);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    fetch(`${API_BASE_URL}/api/stats`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (!active || !data) return;
-        setStats([
-          STATS[0],
-          STATS[1],
-          { to: Number(data.dataPointsPerDay) || 0, suffix: '', label: 'Data points / day' },
-          { to: Number(data.medianUploadAgeMs) || 0, suffix: 'ms', label: 'Data upload latency' },
-        ]);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -713,27 +641,6 @@ export const LandingPage = () => {
               </div>
             </div>
           </Reveal>
-        </section>
-
-        {/* Stats */}
-        <section className="landing-stats" aria-labelledby="stats-title">
-          <Reveal>
-            <h2 id="stats-title" className="landing-stats__heading">
-              By the numbers
-            </h2>
-          </Reveal>
-          <div className="landing-stats__grid">
-            {stats.map((s, i) => (
-              <Reveal key={s.label} delay={i * 100}>
-                <div className="landing-stat">
-                  <div className="landing-stat__value">
-                    <Counter to={s.to} suffix={s.suffix} />
-                  </div>
-                  <div className="landing-stat__label">{s.label}</div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
         </section>
 
         {/* Pricing */}

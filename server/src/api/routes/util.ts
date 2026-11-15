@@ -1,5 +1,5 @@
 import { CORS_ALLOWED_ORIGINS } from '../../env';
-import { getCols, getUserCount, countDevices, countDataPointsSince, getMedianUploadAgeMs } from '../../lib/db';
+import { getCols } from '../../lib/db';
 
 const DEFAULT_ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const DEFAULT_ALLOWED_HEADERS = 'Content-Type, Authorization';
@@ -60,25 +60,6 @@ export function handleOptionsRoute(request: Request) {
 
 export function handleStatusRoute(request: Request) {
   return addCorsHeaders(new Response('OK'), request);
-}
-
-export async function handleStatsRoute(request: Request) {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [users, devices, dataPointsPerDay, medianUploadAgeMs] = await Promise.allSettled([
-    getUserCount(),
-    countDevices(),
-    countDataPointsSince(since),
-    getMedianUploadAgeMs(),
-  ]);
-  return addCorsHeaders(
-    Response.json({
-      users: users.status === 'fulfilled' ? users.value : 0,
-      devices: devices.status === 'fulfilled' ? devices.value : 0,
-      dataPointsPerDay: dataPointsPerDay.status === 'fulfilled' ? dataPointsPerDay.value : 0,
-      medianUploadAgeMs: medianUploadAgeMs.status === 'fulfilled' ? medianUploadAgeMs.value : null,
-    }),
-    request,
-  );
 }
 
 export async function handleReadinessRoute(request: Request) {
