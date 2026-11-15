@@ -64,8 +64,9 @@ export function getPlanFeatures(plan: PlanTier | PlanUser, seatsOverride?: numbe
     if (plan.startsWith('team-') && typeof seatsOverride === 'number' && seatsOverride > 1) {
       return {
         ...base,
-        dataFillMaxPoints: base.dataFillMaxPoints * seatsOverride,
         sharedMaxDataPointsPerUser: base.sharedMaxDataPointsPerUser * seatsOverride,
+        sharedQueryBoostLimitMonthlyPerUser: base.sharedQueryBoostLimitMonthlyPerUser * seatsOverride,
+        sharedMonthlyCreditsPerUser: base.sharedMonthlyCreditsPerUser * seatsOverride,
       };
     }
     return base;
@@ -88,8 +89,9 @@ export function getPlanFeaturesForUser(user: PlanUser, seatsOverride?: number): 
   const seats = Math.max(1, seatsOverride ?? getPlanSeats(user));
   return {
     ...base,
-    dataFillMaxPoints: base.dataFillMaxPoints * seats,
     sharedMaxDataPointsPerUser: base.sharedMaxDataPointsPerUser * seats,
+    sharedQueryBoostLimitMonthlyPerUser: base.sharedQueryBoostLimitMonthlyPerUser * seats,
+    sharedMonthlyCreditsPerUser: base.sharedMonthlyCreditsPerUser * seats,
   };
 }
 

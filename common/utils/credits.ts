@@ -1,5 +1,5 @@
 import type { CreditBalance, PlanTier, UserCredits } from '../types';
-import { PLAN_FEATURES } from '../types/plans';
+import { getPlanFeatures } from './plans';
 
 /** Timezone used for monthly credit reset boundaries. */
 export const CREDIT_TIMEZONE = 'Australia/Sydney';
@@ -99,7 +99,7 @@ export function resolveCreditBalance(
   credits: UserCredits | null | undefined,
   now: Date = new Date(),
 ): CreditBalance {
-  const features = PLAN_FEATURES[plan];
+  const features = getPlanFeatures(plan);
   const storedPeriodStart = credits?.periodStart ? new Date(credits.periodStart) : null;
   const periodIsCurrent = storedPeriodStart !== null
     && !Number.isNaN(storedPeriodStart.getTime())
