@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, tooltips } from '@codemirror/view';
@@ -98,8 +98,26 @@ export const DeviceQueryModal = ({
   const [result, setResult] = useState<DeviceQueryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'json'>('table');
+  const [pointCount, setPointCount] = useState<number | null>(null);
 
   const trimmedQuery = query.trim();
+
+  useEffect(() => {
+    let cancelled = false;
+    setPointCount(null);
+    api.devices
+      .getDataPoints(serial, { period })
+      .then((res) => {
+        if (!cancelled) setPointCount(res.totalCount);
+      })
+      .catch(() => {
+        if (!cancelled) setPointCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serial, period]);
+
   const validation = useMemo(() => {
     if (!trimmedQuery) {
       return { valid: false, error: 'Enter a TQL query before running it.' };
@@ -110,11 +128,11 @@ export const DeviceQueryModal = ({
   const computeEstimate = useMemo(() => {
     if (!validation.valid) return null;
     try {
-      return estimateQueryComputeUnits(trimmedQuery);
+      return estimateQueryComputeUnits(trimmedQuery, pointCount ?? undefined);
     } catch {
       return null;
     }
-  }, [trimmedQuery, validation.valid]);
+  }, [trimmedQuery, validation.valid, pointCount]);
 
   const creditCost = Math.max(0.1, queryCostCredits);
 
