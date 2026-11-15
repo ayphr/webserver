@@ -56,7 +56,7 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, m
 
   const creditCost = useMemo(() => {
     if (!preview) return null;
-    return (preview.count / 1000) * creditCostPerThousandPoints;
+    return Math.max(0.1, (preview.count / 1000) * creditCostPerThousandPoints);
   }, [preview, creditCostPerThousandPoints]);
 
   const hasEnoughCredits = useMemo(() => {
@@ -163,10 +163,9 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, m
                 </span>
               )}
               {creditCost !== null && (
-                <div className="data-fill__credit-cost">
-                  <span className="data-fill__label">Credit cost</span>
-                  <span className="data-fill__value">{formatCredits(creditCost)} credits</span>
-                </div>
+                <span className="data-fill__credit-cost">
+                  Credit cost: {formatCredits(creditCost)} credits
+                </span>
               )}
               {creditCost !== null && !hasEnoughCredits && (
                 <span className="data-fill__error-text">

@@ -573,7 +573,7 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const { since, until } = resolveTimeRange(period, fromParam, toParam);
 
   const features = getPlanFeaturesForUser(user);
-  const creditCost = features.queryCostCredits;
+  const creditCost = Math.max(0.1, features.queryCostCredits);
 
   if (creditCost > 0) {
     const balance = getCreditBalance(user);
@@ -754,7 +754,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
     return json({ error: `requested range produces too many points for your plan (max ${features.sharedMaxDataPointsPerUser.toLocaleString()})` }, 400);
   }
 
-  const creditCost = (count / 1000) * features.dataFillCreditCostPerThousandPoints;
+  const creditCost = Math.max(0.1, (count / 1000) * features.dataFillCreditCostPerThousandPoints);
   if (creditCost > 0) {
     const balance = getCreditBalance(user);
     if (balance.available < creditCost) {

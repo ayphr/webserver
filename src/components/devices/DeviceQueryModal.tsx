@@ -116,7 +116,7 @@ export const DeviceQueryModal = ({
     }
   }, [trimmedQuery, validation.valid]);
 
-  const creditCost = queryCostCredits;
+  const creditCost = Math.max(0.1, queryCostCredits);
 
   const hasEnoughCredits = useMemo(() => {
     if (!credits) return true;
