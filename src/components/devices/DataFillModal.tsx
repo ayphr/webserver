@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { Button, Modal } from '../common';
 import { api } from '../../lib/api';
-import { formatDuration, parseDuration } from '@common';
+import { formatDuration, parseDuration, type CreditBalance } from '@common';
+import { formatCredits } from '../../lib/credits';
 import './DataFillModal.css';
 
 export interface DataFillModalProps {
@@ -12,6 +13,9 @@ export interface DataFillModalProps {
   deviceName: string;
   onFilled: () => void;
   maxPoints?: number;
+  credits?: CreditBalance | null;
+  creditCostPerThousandPoints?: number;
+  onCreditsChange?: (credits: CreditBalance) => void;
 }
 
 function toLocalInput(date: Date): string {
@@ -19,7 +23,7 @@ function toLocalInput(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, maxPoints = 1000 }: DataFillModalProps) => {
+export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, maxPoints = 1000, credits = null, creditCostPerThousandPoints = 1, onCreditsChange }: DataFillModalProps) => {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -50,8 +54,23 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, m
 
   const exceedsLimit = Boolean(preview && preview.count > maxPoints);
 
+  const creditCost = useMemo(() => {
+    if (!preview) return null;
+    return (preview.count / 1000) * creditCostPerThousandPoints;
+  }, [preview, creditCostPerThousandPoints]);
+
+  const hasEnoughCredits = useMemo(() => {
+    if (creditCost === null) return true;
+    if (!credits) return true;
+    return credits.available >= creditCost;
+  }, [creditCost, credits]);
+
   const handleFill = async () => {
     if (!preview || exceedsLimit) return;
+    if (creditCost !== null && credits && credits.available < creditCost) {
+      setError('You do not have enough credits to fill this data.');
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
@@ -62,6 +81,14 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, m
         end: endDate.toISOString(),
         intervalSeconds: preview.intervalSeconds,
       });
+      if (onCreditsChange) {
+        try {
+          const fresh = await api.credits.me();
+          onCreditsChange(fresh);
+        } catch {
+          // ignore
+        }
+      }
       onFilled();
       onClose();
     } catch (err) {
@@ -135,6 +162,17 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, m
                   Exceeds your plan limit of {maxPoints.toLocaleString()} points.
                 </span>
               )}
+              {creditCost !== null && (
+                <div className="data-fill__credit-cost">
+                  <span className="data-fill__label">Credit cost</span>
+                  <span className="data-fill__value">{formatCredits(creditCost)} credits</span>
+                </div>
+              )}
+              {creditCost !== null && !hasEnoughCredits && (
+                <span className="data-fill__error-text">
+                  You do not have enough credits to fill this data.
+                </span>
+              )}
             </>
           ) : (
             <span className="data-fill__error-text">Enter a valid range and interval.</span>
@@ -147,7 +185,7 @@ export const DataFillModal = ({ isOpen, onClose, serial, deviceName, onFilled, m
           <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => void handleFill()} isLoading={isSubmitting} disabled={!preview || exceedsLimit}>
+          <Button variant="primary" onClick={() => void handleFill()} isLoading={isSubmitting} disabled={!preview || exceedsLimit || !hasEnoughCredits}>
             Fill data
           </Button>
         </div>

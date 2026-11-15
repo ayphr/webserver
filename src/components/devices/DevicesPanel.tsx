@@ -21,7 +21,7 @@ import {
   IconWifi,
   IconWifiOff,
 } from '@tabler/icons-react';
-import { getPlanFeaturesForUser, type DataPoint, type DeviceSummary, type Location, type PublicUser } from '@common';
+import { getPlanFeaturesForUser, type CreditBalance, type DataPoint, type DeviceSummary, type Location, type PublicUser } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
@@ -163,6 +163,8 @@ type DetailTab = 'graphs' | 'forecasts' | 'settings';
 type Props = {
   initialDeviceSerial?: number | null;
   onNavigate?: (tab: string) => void;
+  credits?: CreditBalance | null;
+  onCreditsChange?: (credits: CreditBalance) => void;
 };
 
 
@@ -256,7 +258,7 @@ function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoo
   };
 }
 
-export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) => {
+export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: initialCredits = null, onCreditsChange }: Props) => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -270,7 +272,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<PublicUser | null>(null);
-
+  const [credits, setCredits] = useState<CreditBalance | null>(initialCredits);
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;
   const maxDevices = planFeatures?.maxDevices ?? null;
   const atDeviceLimit = maxDevices !== null && devices.length >= maxDevices;
@@ -340,7 +342,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
       ]);
       setDevices(loadedDevices);
       setLocations(loadedLocations);
-      if (userData) setUser(userData.user);
+      if (userData) {
+        setUser(userData.user);
+        setCredits(userData.credits);
+        if (userData.credits && onCreditsChange) onCreditsChange(userData.credits);
+      }
       if (
         initialDeviceSerial !== null &&
         initialDeviceSerial !== undefined &&
@@ -355,7 +361,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
     }
-  }, [initialDeviceSerial]);
+  }, [initialDeviceSerial, onCreditsChange]);
 
   useEffect(() => {
     void (async () => {
@@ -1245,6 +1251,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
         serial={selectedDevice.serial}
         deviceName={deviceLabel(selectedDevice)}
         defaultPeriod={period}
+        credits={credits}
+        queryCostCredits={planFeatures?.queryCostCredits ?? 0.5}
+        onCreditsChange={(next) => {
+          setCredits(next);
+          onCreditsChange?.(next);
+        }}
       />
 
       <DeviceExportModal
@@ -1263,6 +1275,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
           serial={selectedDevice.serial}
           deviceName={deviceLabel(selectedDevice)}
           maxPoints={planFeatures?.dataFillMaxPoints ?? 1000}
+          credits={credits}
+          creditCostPerThousandPoints={planFeatures?.dataFillCreditCostPerThousandPoints ?? 1}
+          onCreditsChange={(next) => {
+            setCredits(next);
+            onCreditsChange?.(next);
+          }}
           onFilled={() => {
             void (async () => {
               try {

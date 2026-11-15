@@ -11,8 +11,9 @@ import {
   IconPlayerPlay,
   IconTable,
 } from '@tabler/icons-react';
-import { estimateQueryComputeUnits, validateQuery, type DeviceQueryPayload } from '@common';
+import { estimateQueryComputeUnits, validateQuery, type CreditBalance, type DeviceQueryPayload } from '@common';
 import { api } from '../../lib/api';
+import { formatCredits } from '../../lib/credits';
 import { DEVICE_PERIODS, devicePeriodLabel, type DevicePeriod } from '../../lib/devicePeriod';
 import { downloadRows, slugifyFilename, type ExportRow } from '../../lib/export';
 import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/tqlEditor';
@@ -76,6 +77,9 @@ export interface DeviceQueryModalProps {
   serial: number;
   deviceName: string;
   defaultPeriod: DevicePeriod;
+  credits?: CreditBalance | null;
+  queryCostCredits?: number;
+  onCreditsChange?: (credits: CreditBalance) => void;
 }
 
 export const DeviceQueryModal = ({
@@ -84,6 +88,9 @@ export const DeviceQueryModal = ({
   serial,
   deviceName,
   defaultPeriod,
+  credits = null,
+  queryCostCredits = 0.5,
+  onCreditsChange,
 }: DeviceQueryModalProps) => {
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [period, setPeriod] = useState<DevicePeriod>(defaultPeriod);
@@ -109,11 +116,22 @@ export const DeviceQueryModal = ({
     }
   }, [trimmedQuery, validation.valid]);
 
+  const creditCost = queryCostCredits;
+
+  const hasEnoughCredits = useMemo(() => {
+    if (!credits) return true;
+    return credits.available >= creditCost;
+  }, [creditCost, credits]);
+
   const validationError = validation.valid
     ? null
     : validation.error ?? 'This TQL query is invalid.';
-  const currentError = error ?? validationError;
-  const canRun = validation.valid && !isRunning;
+  const insufficientCreditsMessage =
+    creditCost > 0 && credits && credits.available < creditCost
+      ? 'You do not have enough credits to run this query.'
+      : null;
+  const currentError = error ?? validationError ?? insufficientCreditsMessage;
+  const canRun = validation.valid && !isRunning && hasEnoughCredits;
 
   const rows = useMemo(() => (result ? resultRows(result.result) : []), [result]);
   const columns = useMemo(() => joinColumns(rows.slice(0, MAX_PREVIEW_ROWS)), [rows]);
@@ -130,6 +148,10 @@ export const DeviceQueryModal = ({
       return;
     }
     if (!validation.valid) return;
+    if (creditCost > 0 && credits && credits.available < creditCost) {
+      setError('You do not have enough credits to run this query.');
+      return;
+    }
 
     setIsRunning(true);
     setError(null);
@@ -138,6 +160,14 @@ export const DeviceQueryModal = ({
     try {
       const response = await api.devices.query(serial, { query: trimmed, period });
       setResult(response);
+      if (onCreditsChange) {
+        try {
+          const fresh = await api.credits.me();
+          onCreditsChange(fresh);
+        } catch {
+          // ignore
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run query');
     } finally {
@@ -187,6 +217,14 @@ export const DeviceQueryModal = ({
           </div>
 
           <div className="device-query__run-group">
+            {creditCost > 0 && (
+              <Tooltip content="Credits this query will cost.">
+                <span className="device-query__credits">
+                  {formatCredits(creditCost)} credits
+                </span>
+              </Tooltip>
+            )}
+
             {computeEstimate && (
               <Tooltip content="Relative compute cost of this query. Higher means more work.">
                 <span className="device-query__compute">

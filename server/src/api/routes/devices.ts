@@ -46,6 +46,7 @@ import {
   telemetryUploadDuration,
   telemetryUploadErrorsTotal,
 } from '../../lib/metrics';
+import { consumeCredits, getCreditBalance } from '../../lib/credits';
 import { PAIRING_CODE_TTL_MS } from '../../env';
 import {
   PAIRING_CODE_LENGTH,
@@ -571,6 +572,16 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const toParam = typeof body?.to === 'string' ? body.to : null;
   const { since, until } = resolveTimeRange(period, fromParam, toParam);
 
+  const features = getPlanFeaturesForUser(user);
+  const creditCost = features.queryCostCredits;
+
+  if (creditCost > 0) {
+    const balance = getCreditBalance(user);
+    if (balance.available < creditCost) {
+      return json({ error: 'insufficient credits' }, 402);
+    }
+  }
+
   const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
     since,
     until,
@@ -583,6 +594,10 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
     result = executor(points as unknown as Parameters<typeof executor>[0]);
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'query failed' }, 400);
+  }
+
+  if (creditCost > 0) {
+    await consumeCredits(user.uuid, creditCost);
   }
 
   return json({
@@ -739,6 +754,14 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
     return json({ error: `requested range produces too many points for your plan (max ${features.sharedMaxDataPointsPerUser.toLocaleString()})` }, 400);
   }
 
+  const creditCost = (count / 1000) * features.dataFillCreditCostPerThousandPoints;
+  if (creditCost > 0) {
+    const balance = getCreditBalance(user);
+    if (balance.available < creditCost) {
+      return json({ error: 'insufficient credits' }, 402);
+    }
+  }
+
   // Replace existing data for this device.
   await deleteAllDataPointsForDevice(serial);
 
@@ -805,6 +828,10 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   }
 
   await invalidateDeviceStatsForOwner(scopeUuid);
+
+  if (creditCost > 0) {
+    await consumeCredits(user.uuid, creditCost);
+  }
 
   return json({ serial, count: generated });
 });

@@ -15,7 +15,7 @@ export function forecastHorizons(
   growth = 1.1,
 ): number[] {
   const horizons: number[] = [];
-  if (!(horizonSeconds > 0) || !(stepSeconds > 0)) return horizons;
+  if (horizonSeconds <= 0 || stepSeconds <= 0) return horizons;
 
   let horizon = 0;
   let step = stepSeconds;
