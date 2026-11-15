@@ -98,6 +98,7 @@ export function resolveCreditBalance(
   plan: PlanTier,
   credits: UserCredits | null | undefined,
   now: Date = new Date(),
+  teamCreditsUsage?: number | null | undefined,
 ): CreditBalance {
   const features = getPlanFeatures(plan);
   const storedPeriodStart = credits?.periodStart ? new Date(credits.periodStart) : null;
@@ -106,9 +107,11 @@ export function resolveCreditBalance(
     && isSameZonedMonth(storedPeriodStart, now);
 
   const monthlyAllowance = toNonNegative(features.sharedMonthlyCreditsPerUser);
-  const monthlyUsed = periodIsCurrent
-    ? Math.min(toNonNegative(credits?.monthlyUsed), monthlyAllowance)
-    : 0;
+  const monthlyUsed = teamCreditsUsage !== undefined && teamCreditsUsage !== null
+    ? Math.min(toNonNegative(teamCreditsUsage), monthlyAllowance)
+    : periodIsCurrent
+      ? Math.min(toNonNegative(credits?.monthlyUsed), monthlyAllowance)
+      : 0;
   const monthlyRemaining = Math.max(0, monthlyAllowance - monthlyUsed);
 
   const additional = toNonNegative(credits?.additional);

@@ -125,7 +125,6 @@ export function canManageTeam(user: Pick<User, 'uuid' | 'teamId' | 'teamRole' | 
   return isTeamManager(user, team);
 }
 
-
 export async function syncTeamSubscriptionQuantity(team: Team, manager: User): Promise<void> {
   const paid = getActivePaidSubscription(manager);
   if (!paid || paid.tier !== team.tier || !paid.stripeSubscriptionId) return;
