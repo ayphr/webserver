@@ -811,7 +811,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate }: Props) 
     (detailTab === 'graphs' && dataPoints.length > 0 && enabledDefs.length > 0 && graphMode !== 'summary');
 
   return (
-    <div className="devices">
+    <div className="devices devices--detail">
       {error && (
         <div className="devices__error">
           <IconAlertCircle size={16} strokeWidth={1.75} />

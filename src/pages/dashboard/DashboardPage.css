@@ -54,8 +54,7 @@
   max-width: 1140px;
 }
 
-.dashboard-panel--devices:has(.devices--wide),
-.dashboard-panel--devices:has(.devices__graphs) {
+.dashboard-panel--devices:has(.devices--detail) {
   max-width: 1140px;
 }
 
