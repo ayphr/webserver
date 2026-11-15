@@ -254,16 +254,6 @@ export const DeviceQueryModal = ({
             <span className="device-query__period-note">
               *Most recent {MAX_QUERY_POINTS.toLocaleString()} points max
             </span>
-
-            <a
-              className="device-query__docs-link"
-              href="https://docs.ayphr.com/tql/overview/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Docs
-              <IconExternalLink size={13} strokeWidth={1.75} />
-            </a>
           </div>
 
           <div className="device-query__run-group">
@@ -282,6 +272,16 @@ export const DeviceQueryModal = ({
             </Button>
 
             <div className="device-query__cost-row">
+              <a
+                className="device-query__docs-link"
+                href="https://docs.ayphr.com/tql/overview/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Docs
+                <IconExternalLink size={13} strokeWidth={1.75} />
+              </a>
+              
               {isCountLoading ? (
                 <span className="device-query__spinner" role="status" aria-label="Calculating cost..." />
               ) : (
