@@ -104,14 +104,13 @@ export const DeviceQueryModal = ({
 
   useEffect(() => {
     let cancelled = false;
-    setPointCount(null);
     api.devices
       .getDataPoints(serial, { period })
       .then((res) => {
         if (!cancelled) setPointCount(res.totalCount);
       })
       .catch(() => {
-        if (!cancelled) setPointCount(null);
+        // keep the last known count to avoid flickering
       });
     return () => {
       cancelled = true;
