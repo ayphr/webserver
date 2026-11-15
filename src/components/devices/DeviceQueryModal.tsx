@@ -252,7 +252,7 @@ export const DeviceQueryModal = ({
             </div>
 
             <span className="device-query__period-note">
-              Queries are limited to the most recent {MAX_QUERY_POINTS.toLocaleString()} points.
+              *Most recent {MAX_QUERY_POINTS.toLocaleString()} points max
             </span>
 
             <a
