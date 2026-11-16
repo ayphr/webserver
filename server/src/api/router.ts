@@ -54,6 +54,14 @@ import {
   handleUpload,
 } from './routes/devices';
 import { handleLocationsListMine, handleLocationCreate, handleLocationGet, handleLocationUpdate, handleLocationDelete } from './routes/locations';
+import {
+  handleIntegrationsListMine,
+  handleIntegrationCreate,
+  handleIntegrationGet,
+  handleIntegrationUpdate,
+  handleIntegrationDelete,
+  handleIntegrationTest,
+} from './routes/integrations';
 import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
 import { handleUserByUuid, handleMe as handleUsersMe, handleUsernameChange } from './routes/users';
 import { handleCreditsMe } from './routes/credits';
@@ -210,6 +218,13 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/locations/:id', handle: handleLocationGet },
   { method: 'PATCH', path: '/api/locations/:id', handle: handleLocationUpdate },
   { method: 'DELETE', path: '/api/locations/:id', handle: handleLocationDelete },
+
+  { method: 'GET', path: '/api/integrations', handle: handleIntegrationsListMine },
+  { method: 'POST', path: '/api/integrations', handle: handleIntegrationCreate },
+  { method: 'GET', path: '/api/integrations/:id', handle: handleIntegrationGet },
+  { method: 'PATCH', path: '/api/integrations/:id', handle: handleIntegrationUpdate },
+  { method: 'DELETE', path: '/api/integrations/:id', handle: handleIntegrationDelete },
+  { method: 'POST', path: '/api/integrations/:id/test', handle: handleIntegrationTest },
 
   { method: 'GET', path: '/api/profile/me', handle: handleProfileMe },
   { method: 'GET', path: '/api/profile/countries', handle: handleCountries },

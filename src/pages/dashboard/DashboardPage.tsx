@@ -21,11 +21,12 @@ const SubscriptionPanel = lazy(() => import('../../components/subscriptions/Subs
 const NotificationsPanel = lazy(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
 const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
 const TeamPanel = lazy(() => import('../../components/team/TeamPanel').then((m) => ({ default: m.TeamPanel })));
+const IntegrationsPanel = lazy(() => import('../../components/integrations').then((m) => ({ default: m.IntegrationsPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
+const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
 
 function formatDisplayDate(date: Date | string): string {
   return toDate(date).toLocaleDateString('en-GB');
@@ -612,6 +613,14 @@ export const DashboardPage = () => {
               <DashboardPanel title="Team" description="Manage your team members" className="dashboard-panel--wide">
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <TeamPanel isManager={isTeamManager} userUuid={user?.uuid} />
+                </Suspense>
+              </DashboardPanel>
+            )}
+
+            {activePage === 'integrations' && isTeamMember && (
+              <DashboardPanel title="Integrations" description="Webhooks shared with your team" className="dashboard-panel--wide">
+                <Suspense fallback={<DashboardContentSkeleton />}>
+                  <IntegrationsPanel isManager={isTeamManager} />
                 </Suspense>
               </DashboardPanel>
             )}

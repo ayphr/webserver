@@ -6,6 +6,7 @@ export * from './punishments';
 export * from './appeals';
 export * from './devices';
 export * from './locations';
+export * from './integrations';
 export * from './sessions';
 export * from './domainVerifications';
 export * from './emailCodes';

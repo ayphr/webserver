@@ -25,6 +25,7 @@ export const STRIPE_EVENTS_COLLECTION = 'stripe_events';
 export const AVATARS_COLLECTION = 'avatars';
 export const DOMAIN_VERIFICATIONS_COLLECTION = 'domain_verifications';
 export const LOCATIONS_COLLECTION = 'locations';
+export const INTEGRATIONS_COLLECTION = 'integrations';
 export const NOTIFICATIONS_COLLECTION = 'notifications';
 
 export const API_PORT = envNumber('API_PORT', 7233);

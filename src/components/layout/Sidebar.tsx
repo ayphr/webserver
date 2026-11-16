@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -44,6 +44,8 @@ const iconFor = (id: string) => {
       return <IconUsersGroup size={18} />;
     case 'team-audit':
       return <IconClipboardList size={18} />;
+    case 'integrations':
+      return <IconPlugConnected size={18} />;
     case 'suspension':
       return <IconBan size={18} />;
     case 'appeal':
@@ -94,6 +96,7 @@ export const Sidebar: React.FC<Props> = ({
   const teamTabs: Tab[] = isTeamMember
     ? [
         { id: 'team', name: 'Team' },
+        { id: 'integrations', name: 'Integrations' },
       ]
     : [];
 
