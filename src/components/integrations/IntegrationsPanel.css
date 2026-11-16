@@ -27,10 +27,10 @@
 }
 
 .integrations-panel__card {
-  border: 1px solid var(--border, #ddd);
-  border-radius: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
-  background: var(--surface, #fff);
+  background: var(--bg-surface);
 }
 
 .integrations-panel__card-header {
