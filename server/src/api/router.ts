@@ -55,6 +55,11 @@ import {
 } from './routes/devices';
 import { handleLocationsListMine, handleLocationCreate, handleLocationGet, handleLocationUpdate, handleLocationDelete } from './routes/locations';
 import {
+  handleAlertsList,
+  handleAlertCreate,
+  handleAlertUpdate,
+  handleAlertDelete,
+} from './routes/alerts';import {
   handleIntegrationsListMine,
   handleIntegrationCreate,
   handleIntegrationGet,
@@ -206,6 +211,10 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/devices/:serial/data', handle: handleDeviceGetData },
   { method: 'POST', path: '/api/devices/:serial/data/fill', handle: handleDeviceDataFill },
   { method: 'POST', path: '/api/devices/:serial/query', handle: handleDeviceQuery },
+  { method: 'GET', path: '/api/devices/:serial/alerts', handle: handleAlertsList },
+  { method: 'POST', path: '/api/devices/:serial/alerts', handle: handleAlertCreate },
+  { method: 'PATCH', path: '/api/devices/:serial/alerts/:id', handle: handleAlertUpdate },
+  { method: 'DELETE', path: '/api/devices/:serial/alerts/:id', handle: handleAlertDelete },
   { method: 'DELETE', path: '/api/devices/:serial/data', handle: handleDeviceDeleteDataPoints },
   { method: 'GET', path: '/api/devices/:serial', handle: handleGetBySerial },
   { method: 'PATCH', path: '/api/devices/:serial', handle: handleDeviceUpdate },

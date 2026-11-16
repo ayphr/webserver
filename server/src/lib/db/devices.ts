@@ -12,6 +12,7 @@ import {
   DATA_POINTS_COLLECTION,
 } from './internal';
 import type { DeviceDocument, DevicePairing } from './internal';
+import { deleteAlertsForSerial, deleteAlertsForTeamId } from './alerts';
 
 import type {
   Device
@@ -28,6 +29,7 @@ export async function deleteDevicesForTeamId(teamId: string) {
 
   trackMongoOperation('deleteMany', DEVICES_COLLECTION);
   await devices.deleteMany({ teamId });
+  await deleteAlertsForTeamId(teamId);
 
   await cacheDel(
     DEVICE_CACHE,
@@ -232,6 +234,7 @@ export async function unlinkDevice(serial: number, teamId: string): Promise<bool
     const dataPoints = await getCollection('dataPoints');
     trackMongoOperation('deleteMany', DATA_POINTS_COLLECTION);
     await dataPoints.deleteMany({ deviceSerial: serial });
+    await deleteAlertsForSerial(serial, teamId);
 
     await cacheDel(
       DEVICE_CACHE,

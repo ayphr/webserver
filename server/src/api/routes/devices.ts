@@ -61,6 +61,7 @@ import {
   getPlanFeaturesForUser,
 } from '@common';
 import { redisFixedWindow } from '../../lib/redis';
+import { evaluateAlertsForDevice } from '../../lib/alerts';
 
 const MAX_SERIAL = 0xFFFFFFFF;
 
@@ -469,6 +470,12 @@ async function handleUpload(request: Request): Promise<Response> {
     telemetryRecordsPersistedTotal.inc(accepted);
     telemetryUploadBatchSize.observe(points.length);
     observeTelemetryValues(points);
+
+    if (points.length > 0) {
+      void evaluateAlertsForDevice(device, points).catch((error) => {
+        console.error('Failed to evaluate device alerts:', error);
+      });
+    }
 
     return json({ device: toPublicDevice(device), accepted }, 200);
   } catch (error) {

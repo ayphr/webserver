@@ -34,6 +34,7 @@ import { DeviceQueryModal } from './DeviceQueryModal';
 import { DeviceExportModal } from './DeviceExportModal';
 import { DataFillModal } from './DataFillModal';
 import { ForecastTab } from './ForecastTab';
+import { AlertsTab } from './AlertsTab';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
 
@@ -159,7 +160,7 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 
 type Period = DevicePeriod;
 type GraphMode = 'combined' | 'separate' | 'summary';
-type DetailTab = 'graphs' | 'forecasts' | 'settings';
+type DetailTab = 'graphs' | 'forecasts' | 'alerts' | 'settings';
 type Props = {
   initialDeviceSerial?: number | null;
   onNavigate?: (tab: string) => void;
@@ -437,6 +438,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
     if (!selectedDevice?.locationId) return null;
     return locations.find((l) => l.id === selectedDevice.locationId) ?? null;
   }, [locations, selectedDevice]);
+
+  const canManageAlerts = user ? !user.teamId || user.teamRole === 'manager' : false;
+  const canOpenIntegrations = Boolean(
+    user && (user.teamId || (user.subscription?.tier ?? '').startsWith('team-')),
+  );
 
   const deviceTotalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
   const currentDevicePage = Math.min(devicePage, deviceTotalPages);
@@ -924,7 +930,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
               </button>
             </Tooltip>
           )}
-          {detailTab !== 'forecasts' && detailTab !== 'settings' && (
+          {detailTab !== 'forecasts' && detailTab !== 'settings' && detailTab !== 'alerts' && (
             <>
               <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
                 <IconTerminal2 size={16} strokeWidth={1.75} />
@@ -936,14 +942,16 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
               </Button>
             </>
           )}
-          <Button
-            variant="secondary"
-            onClick={() => setIsExportOpen(true)}
-            disabled={dataPoints.length === 0}
-          >
-            <IconFileDownload size={16} strokeWidth={1.75} />
-            Export
-          </Button>
+          {detailTab !== 'alerts' && (
+            <Button
+              variant="secondary"
+              onClick={() => setIsExportOpen(true)}
+              disabled={dataPoints.length === 0}
+            >
+              <IconFileDownload size={16} strokeWidth={1.75} />
+              Export
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
             <IconRefresh size={16} strokeWidth={1.75} />
             Refresh
@@ -1003,7 +1011,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
       </div>
 
       <div className="settings__tabs" role="tablist" aria-label="Device sections">
-        {(['graphs', 'forecasts', 'settings'] as const).map((tab) => (
+        {(['graphs', 'forecasts', 'alerts', 'settings'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -1016,7 +1024,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
               ? 'Telemetry & Graphs'
               : tab === 'forecasts'
                 ? 'Forecasts'
-                : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                : tab === 'alerts'
+                  ? 'Alerts'
+                  : 'Settings'}
           </button>
         ))}
       </div>
@@ -1232,6 +1242,16 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
               />
             </div>
           </div>
+        )}
+
+        {/* ALERTS TAB */}
+        {detailTab === 'alerts' && selectedDevice && (
+          <AlertsTab
+            serial={selectedDevice.serial}
+            deviceName={deviceLabel(selectedDevice)}
+            canManage={canManageAlerts}
+            onNavigate={canOpenIntegrations ? onNavigate : undefined}
+          />
         )}
 
         {/* SETTINGS TAB */}

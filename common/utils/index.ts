@@ -26,6 +26,7 @@ export {
   getUsernameValidationError,
 } from './username';
 export { parseDuration, formatDuration, type DurationUnit } from './duration';
+export { evaluateAlertConditions, getAlertMetricValue } from './alerts';
 export {
   EMAIL_CODE_LENGTH,
   EMAIL_MAX_LENGTH,

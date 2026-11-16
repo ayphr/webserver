@@ -26,6 +26,7 @@ export const AVATARS_COLLECTION = 'avatars';
 export const DOMAIN_VERIFICATIONS_COLLECTION = 'domain_verifications';
 export const LOCATIONS_COLLECTION = 'locations';
 export const INTEGRATIONS_COLLECTION = 'integrations';
+export const ALERTS_COLLECTION = 'device_alerts';
 export const NOTIFICATIONS_COLLECTION = 'notifications';
 
 export const API_PORT = envNumber('API_PORT', 7233);

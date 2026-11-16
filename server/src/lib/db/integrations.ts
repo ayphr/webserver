@@ -1,4 +1,5 @@
 import { getCollection, trackMongoOperation, normalizeDateValues, INTEGRATIONS_COLLECTION } from './internal';
+import { removeIntegrationFromAlerts } from './alerts';
 import type { Integration } from '@common';
 
 export async function getIntegrationsForTeamId(teamId: string): Promise<Integration[]> {
@@ -36,5 +37,8 @@ export async function deleteIntegration(id: string, teamId: string): Promise<boo
   const integrations = await getCollection(INTEGRATIONS_COLLECTION);
   trackMongoOperation('deleteOne', INTEGRATIONS_COLLECTION);
   const result = await integrations.deleteOne({ id, teamId });
+  if (result.deletedCount > 0) {
+    await removeIntegrationFromAlerts(teamId, id);
+  }
   return result.deletedCount > 0;
 }

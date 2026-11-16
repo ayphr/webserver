@@ -1,5 +1,6 @@
 export * from './api';
 export * from './device';
+export * from './alert';
 export * from './punishment';
 export * from './appeal';
 export * from './session';

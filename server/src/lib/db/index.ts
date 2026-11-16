@@ -7,6 +7,7 @@ export * from './appeals';
 export * from './devices';
 export * from './locations';
 export * from './integrations';
+export * from './alerts';
 export * from './sessions';
 export * from './domainVerifications';
 export * from './emailCodes';
