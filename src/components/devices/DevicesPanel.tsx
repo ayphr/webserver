@@ -25,7 +25,7 @@ import { getPlanFeaturesForUser, type CreditBalance, type DataPoint, type Device
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
-import { Button, Card, Checkbox, ConfirmDialog, Input, Pagination, ToggleDropdown, Tooltip } from '../common';
+import { Button, Card, ConfirmDialog, Input, Pagination, ToggleDropdown, Tooltip } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphScale } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
@@ -177,7 +177,15 @@ function resolveCssColor(value: string): string {
   return resolved || value;
 }
 
-function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoomWindow: GraphWindow | null) {
+function createMetricConfig(
+  unit: string,
+  showAxes: boolean,
+  showXAxis: boolean,
+  showLegend: boolean,
+  showGrid: boolean,
+  period: Period,
+  zoomWindow: GraphWindow | null,
+) {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -201,7 +209,7 @@ function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoo
         samples: 300,
         threshold: 350,
       },
-      legend: { display: false },
+      legend: { display: showLegend },
       tooltip: {
         backgroundColor: 'rgba(18, 18, 18, 0.96)',
         titleColor: 'hsla(180, 67%, 99%, 1)',
@@ -238,8 +246,9 @@ function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoo
     scales: {
       x: {
         type: 'linear' as const,
+        display: showXAxis,
         ...(zoomWindow ? { min: zoomWindow.initialMin, max: zoomWindow.initialMax } : {}),
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
           color: 'hsl(180, 1%, 53%)',
           maxTicksLimit: 8,
@@ -251,7 +260,7 @@ function createMetricConfig(unit: string, showAxes: boolean, period: Period, zoo
         display: showAxes,
         position: 'left' as const,
         title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
         ticks: { color: 'hsl(180, 1%, 53%)' },
       },
     },
@@ -292,6 +301,30 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
       return true;
     }
   });
+  const [showXAxis, setShowXAxis] = useState<boolean>(() => {
+    try {
+      const raw = window.localStorage.getItem('ayphr:device:showXAxis');
+      return raw === null ? true : raw === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [showLegend, setShowLegend] = useState<boolean>(() => {
+    try {
+      const raw = window.localStorage.getItem('ayphr:device:showLegend');
+      return raw === null ? true : raw === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [showGrid, setShowGrid] = useState<boolean>(() => {
+    try {
+      const raw = window.localStorage.getItem('ayphr:device:showGrid');
+      return raw === null ? true : raw === 'true';
+    } catch {
+      return true;
+    }
+  });
   useEffect(() => {
     try {
       window.localStorage.setItem('ayphr:device:showAxes', String(showAxes));
@@ -299,6 +332,27 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
       // ignore
     }
   }, [showAxes]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('ayphr:device:showXAxis', String(showXAxis));
+    } catch {
+      // ignore
+    }
+  }, [showXAxis]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('ayphr:device:showLegend', String(showLegend));
+    } catch {
+      // ignore
+    }
+  }, [showLegend]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('ayphr:device:showGrid', String(showGrid));
+    } catch {
+      // ignore
+    }
+  }, [showGrid]);
 
   // Handle fullscreen graph overlay: escape to close and prevent background scrolling
   useEffect(() => {
@@ -593,8 +647,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
     const scales: Record<string, LineGraphScale> = {
       x: {
         type: 'linear',
+        display: showXAxis,
         ...(graphWindow ? { min: graphWindow.initialMin, max: graphWindow.initialMax } : {}),
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
           color: 'hsl(180, 1%, 53%)',
           maxTicksLimit: 8,
@@ -609,7 +664,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         display: showAxes,
         position: i === 0 ? 'left' : 'right',
         title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
-        grid: i === 0 ? { color: 'rgba(255, 255, 255, 0.08)' } : { drawOnChartArea: false },
+        grid: i === 0
+          ? { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' }
+          : { drawOnChartArea: false },
         ticks: { color: 'hsl(180, 1%, 53%)' },
       };
     });
@@ -619,7 +676,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         display: showAxes,
         position: 'left',
         title: { display: showAxes, text: '', color: 'hsl(180, 1%, 53%)' },
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
         ticks: { color: 'hsl(180, 1%, 53%)' },
       };
     }
@@ -642,7 +699,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
           threshold: 350,
         },
         legend: {
-          display: true,
+          display: showLegend,
           position: 'top' as const,
           labels: { color: 'hsla(180, 67%, 99%, 1)', boxWidth: 16, padding: 14 },
         },
@@ -681,7 +738,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
       },
       scales,
     };
-  }, [unitGroups, showAxes, period, graphWindow]);
+  }, [unitGroups, showAxes, showXAxis, showLegend, showGrid, period, graphWindow]);
 
   const separateCharts = useMemo(
     () =>
@@ -709,9 +766,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
             },
           ],
         },
-        config: createMetricConfig(def.unit, showAxes, period, graphWindow),
+        config: createMetricConfig(def.unit, showAxes, showXAxis, showLegend, showGrid, period, graphWindow),
       })),
-    [dataPoints, period, enabledDefs, showAxes, gapThreshold, graphWindow],
+    [dataPoints, period, enabledDefs, showAxes, showXAxis, showLegend, showGrid, gapThreshold, graphWindow],
   );
 
   if (isLoading) {
@@ -993,11 +1050,23 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
                 />
               </div>
 
-              <div className="devices__axes-toggle">
-                <Checkbox
-                  label="Y axes"
-                  checked={showAxes}
-                  onChange={(e) => setShowAxes(e.target.checked)}
+              <div className="devices__layers-selector">
+                <ToggleDropdown
+                  buttonLabel="Layers"
+                  options={['Y-axis', 'X-axis', 'Legend', 'Grid']}
+                  value={[
+                    ...(showAxes ? ['Y-axis'] : []),
+                    ...(showXAxis ? ['X-axis'] : []),
+                    ...(showLegend ? ['Legend'] : []),
+                    ...(showGrid ? ['Grid'] : []),
+                  ]}
+                  onChange={(labels) => {
+                    setShowAxes(labels.includes('Y-axis'));
+                    setShowXAxis(labels.includes('X-axis'));
+                    setShowLegend(labels.includes('Legend'));
+                    setShowGrid(labels.includes('Grid'));
+                  }}
+                  placeholder="Layers"
                 />
               </div>
 

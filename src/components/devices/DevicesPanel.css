@@ -694,6 +694,10 @@
   min-width: 12rem;
 }
 
+.devices__layers-selector {
+  min-width: 10rem;
+}
+
 .devices__selection-overlay {
   position: absolute;
   inset: 0;

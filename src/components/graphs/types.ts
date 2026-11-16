@@ -27,6 +27,7 @@ export type LineGraphScale = {
   display?: boolean;
   position?: 'right' | 'left';
   grid?: {
+    display?: boolean;
     drawOnChartArea?: boolean;
     color?: string;
   };
