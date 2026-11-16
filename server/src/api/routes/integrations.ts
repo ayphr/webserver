@@ -41,14 +41,6 @@ function parseUrl(value: unknown): string | null {
   }
 }
 
-function parseIcon(value: unknown): string | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'string') return undefined;
-  const icon = value.trim();
-  if (!icon || icon.length > 8) return undefined;
-  return icon;
-}
-
 const handleListMine = requireAuth(async (_request, user: User) => {
   const scopeUuid = await getTeamScopeUuid(user);
   const integrations = await getIntegrationsForTeamId(scopeUuid);
@@ -69,8 +61,6 @@ const handleCreate = requireAuth(async (request, user: User) => {
   const webhookUrl = parseUrl(body?.webhookUrl);
   if (!webhookUrl) return json({ error: 'invalid webhook url' }, 400);
 
-  const icon = parseIcon(body?.icon);
-
   const scopeUuid = await getTeamScopeUuid(user);
 
   const integration: Integration = {
@@ -78,7 +68,6 @@ const handleCreate = requireAuth(async (request, user: User) => {
     teamId: scopeUuid,
     name,
     provider,
-    icon,
     webhookUrl,
     enabled: true,
     createdAt: new Date(),
@@ -130,9 +119,6 @@ const handleUpdate = requireAuth(async (request, user: User, params) => {
     const webhookUrl = parseUrl(body.webhookUrl);
     if (!webhookUrl) return json({ error: 'invalid webhook url' }, 400);
     updates.webhookUrl = webhookUrl;
-  }
-  if (body?.icon !== undefined) {
-    updates.icon = parseIcon(body.icon);
   }
   if (body?.enabled !== undefined) {
     if (typeof body.enabled !== 'boolean') return json({ error: 'invalid enabled' }, 400);

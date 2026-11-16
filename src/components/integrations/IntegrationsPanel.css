@@ -16,12 +16,6 @@
   font-size: 1.1rem;
 }
 
-.integrations-panel__desc {
-  margin: 0;
-  color: var(--text-muted, #666);
-  font-size: 0.9rem;
-}
-
 .integrations-panel__empty {
   color: var(--text-muted, #666);
 }
@@ -44,10 +38,6 @@
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.integrations-panel__icon {
-  font-size: 1.4rem;
 }
 
 .integrations-panel__card-meta {
@@ -86,37 +76,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-}
-
-.integrations-panel__icon-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.integrations-panel__icon-label {
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.integrations-panel__icon-options {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.integrations-panel__icon-option {
-  border: 1px solid var(--border, #ddd);
-  border-radius: 0.5rem;
-  background: transparent;
-  padding: 0.25rem 0.5rem;
-  cursor: pointer;
-  font-size: 1.1rem;
-}
-
-.integrations-panel__icon-option--active {
-  border-color: var(--accent, #3b82f6);
-  background: var(--accent-soft, rgba(59, 130, 246, 0.1));
 }
 
 .integrations-panel__error {

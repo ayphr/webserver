@@ -11,19 +11,15 @@ const PROVIDER_OPTIONS = [
   { value: 'webhook', label: 'Custom webhook' },
 ];
 
-const ICON_OPTIONS = ['🔗', '📣', '🔔', '⚡', '🤖', '📊', '✅', '🚨'];
-
 type Draft = {
   name: string;
   provider: IntegrationProvider;
-  icon: string;
   webhookUrl: string;
 };
 
 const emptyDraft: Draft = {
   name: '',
   provider: 'discord',
-  icon: '🔗',
   webhookUrl: '',
 };
 
@@ -78,7 +74,6 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
     setDraft({
       name: item.name,
       provider: item.provider,
-      icon: item.icon ?? '🔗',
       webhookUrl: item.webhookUrl,
     });
     setFormError(null);
@@ -108,7 +103,6 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
         const input: IntegrationUpdateRequest = {
           name,
           provider: draft.provider,
-          icon: draft.icon,
           webhookUrl: url,
         };
         const updated = await api.integrations.update(editing.id, input);
@@ -117,7 +111,6 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
         const input: IntegrationCreateRequest = {
           name,
           provider: draft.provider,
-          icon: draft.icon,
           webhookUrl: url,
         };
         const created = await api.integrations.create(input);
@@ -182,10 +175,6 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
         )}
       </div>
 
-      <p className="integrations-panel__desc">
-        Shared with your team. Configure webhooks for Discord, Slack, and other services.
-      </p>
-
       {error && <p className="integrations-panel__error">{error}</p>}
 
       {integrations.length === 0 ? (
@@ -195,7 +184,6 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
           {integrations.map((item) => (
             <div key={item.id} className="integrations-panel__card">
               <div className="integrations-panel__card-header">
-                <span className="integrations-panel__icon">{item.icon ?? '🔗'}</span>
                 <div className="integrations-panel__card-meta">
                   <span className="integrations-panel__name">{item.name}</span>
                   <span className="integrations-panel__provider">
@@ -255,21 +243,6 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
             options={PROVIDER_OPTIONS}
             fullWidth
           />
-          <div className="integrations-panel__icon-picker">
-            <span className="integrations-panel__icon-label">Icon</span>
-            <div className="integrations-panel__icon-options">
-              {ICON_OPTIONS.map((icon) => (
-                <button
-                  key={icon}
-                  type="button"
-                  className={`integrations-panel__icon-option ${draft.icon === icon ? 'integrations-panel__icon-option--active' : ''}`}
-                  onClick={() => setDraft((d) => ({ ...d, icon }))}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
-          </div>
           <Input
             label="Webhook URL"
             value={draft.webhookUrl}

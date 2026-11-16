@@ -5,7 +5,6 @@ export type Integration = {
   teamId: string;
   name: string;
   provider: IntegrationProvider;
-  icon?: string;
   webhookUrl: string;
   enabled: boolean;
   createdAt: Date;
@@ -23,14 +22,12 @@ export type IntegrationPayload = {
 export type IntegrationCreateRequest = {
   name: string;
   provider: IntegrationProvider;
-  icon?: string;
   webhookUrl: string;
 };
 
 export type IntegrationUpdateRequest = {
   name?: string;
   provider?: IntegrationProvider;
-  icon?: string;
   webhookUrl?: string;
   enabled?: boolean;
 };
