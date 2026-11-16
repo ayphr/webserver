@@ -176,7 +176,13 @@
 .team-panel__usage-list {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.75rem;
+}
+
+.team-panel__usage-row-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .team-panel__usage-row-modern {
