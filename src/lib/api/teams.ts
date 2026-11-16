@@ -1,4 +1,5 @@
 import type {
+  Team,
   TeamMember,
   TeamMemberAddRequest,
   TeamMemberRoleUpdateRequest,
@@ -12,6 +13,13 @@ export function createTeamsApi(client: RequestClient) {
     async me() {
       const response = await client.requestJson<TeamPayload>('/api/team');
       return response;
+    },
+    async updateTeam(input: { name: string }) {
+      const response = await client.requestJson<{ team: Team }>('/api/team', {
+        method: 'PATCH',
+        body: input,
+      });
+      return response.team;
     },
     async listMembers() {
       const response = await client.requestJson<{ members: TeamMember[] }>('/api/team/members');

@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { Button, Checkbox, Input, Modal, Select } from '../common';
 import { IconUserPlus, IconEdit } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite } from '@common';
+import { TeamAuditPanel } from './TeamAuditPanel';
 import './TeamPanel.css';
 
 const ROLE_OPTIONS = [
@@ -11,7 +12,14 @@ const ROLE_OPTIONS = [
   { value: 'manager', label: 'Manager' },
 ];
 
-export function TeamPanel() {
+type TeamPanelProps = {
+  isManager?: boolean;
+  userUuid?: string;
+};
+
+type TeamTab = 'members' | 'audit' | 'settings';
+
+export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<TeamInvite[]>([]);
@@ -23,6 +31,11 @@ export function TeamPanel() {
   const [identifier, setIdentifier] = useState('');
   const [role, setRole] = useState<TeamRole>('member');
   const [migrateData, setMigrateData] = useState(false);
+  const [activeTab, setActiveTab] = useState<TeamTab>('members');
+  const [teamName, setTeamName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [nameSuccess, setNameSuccess] = useState<string | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -31,6 +44,7 @@ export function TeamPanel() {
       const data = await api.teams.me();
       setTeam(data.team);
       setMembers(data.members);
+      setTeamName(data.team.name ?? '');
       try {
         setInvites(await api.teams.listInvites());
       } catch {
@@ -101,65 +115,141 @@ export function TeamPanel() {
     }
   };
 
+  const handleSaveName = async () => {
+    const value = teamName.trim();
+    if (!value) {
+      setNameError('Name is required');
+      return;
+    }
+    setIsSavingName(true);
+    setNameError(null);
+    setNameSuccess(null);
+    try {
+      const updated = await api.teams.updateTeam({ name: value });
+      setTeam(updated);
+      setTeamName(updated.name ?? value);
+      setNameSuccess('Team name updated.');
+    } catch (err) {
+      setNameError(err instanceof Error ? err.message : 'Failed to update team name');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
   if (isLoading) return <p className="team-panel__loading">Loading team…</p>;
   if (error) return <p className="team-panel__error">{error}</p>;
   if (!team) return <p className="team-panel__empty">No team found. A team plan is required.</p>;
+
+  const isTeamManager = !!userUuid && team?.managerUuid === userUuid;
+
+  const tabs: { id: TeamTab; label: string }[] = [
+    { id: 'members', label: 'Members' },
+    ...(isManager ? [{ id: 'audit' as TeamTab, label: 'Audit' }, { id: 'settings' as TeamTab, label: 'Settings' }] : []),
+  ];
 
   return (
     <div className="team-panel">
       <header className="team-panel__header">
         <h3 className="team-panel__title">{team.name ?? 'Team'}</h3>
-        <Button variant="secondary" onClick={() => setIsInviteOpen(true)}>
-          <IconUserPlus size={16} />
-          Invite member
-        </Button>
+        {activeTab === 'members' && (
+          <Button variant="secondary" onClick={() => setIsInviteOpen(true)}>
+            <IconUserPlus size={16} />
+            Invite member
+          </Button>
+        )}
       </header>
 
-      <section className="team-panel__section team-panel__section--plain">
-        <h4 className="team-panel__section-title">Members</h4>
-        <ul className="team-panel__list team-panel__list--plain">
-          {members.map((m) => {
-            const isPayingManager = team !== null && m.uuid === team.managerUuid;
-            return (
-            <li key={m.uuid} className="team-panel__member-row">
-              <div className="team-panel__member-info">
-                <span className="team-panel__member-name">{m.username}</span>
-                <span className="team-panel__member-role">{isPayingManager ? 'Team Manager' : m.role}</span>
-              </div>
-              {!isPayingManager && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setEditingMember(m);
-                  setEditRole(m.role);
-                }}
-              >
-                <IconEdit size={16} />
-                Edit
-              </Button>
-              )}
-            </li>
-            );
-          })}
-        </ul>
-      </section>
+      <div className="settings__tabs" role="tablist" aria-label="Team sections">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={`settings__tab ${activeTab === tab.id ? 'settings__tab--active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {invites.length > 0 && (
+      {activeTab === 'members' && (
+        <>
+          <section className="team-panel__section team-panel__section--plain">
+            <h4 className="team-panel__section-title">Members</h4>
+            <ul className="team-panel__list team-panel__list--plain">
+              {members.map((m) => {
+                const isPayingManager = team !== null && m.uuid === team.managerUuid;
+                return (
+                <li key={m.uuid} className="team-panel__member-row">
+                  <div className="team-panel__member-info">
+                    <span className="team-panel__member-name">{m.username}</span>
+                    <span className="team-panel__member-role">{isPayingManager ? 'Team Manager' : m.role}</span>
+                  </div>
+                  {!isPayingManager && isTeamManager && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setEditingMember(m);
+                      setEditRole(m.role);
+                    }}
+                  >
+                    <IconEdit size={16} />
+                    Edit
+                  </Button>
+                  )}
+                </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          {invites.length > 0 && (
+            <section className="team-panel__section">
+              <h4 className="team-panel__section-title">Pending invites</h4>
+              <ul className="team-panel__list team-panel__list--plain">
+                {invites.map((invite) => (
+                  <li key={invite.id} className="team-panel__member-row">
+                    <div className="team-panel__member-info">
+                      <span className="team-panel__member-name">{invite.email}</span>
+                      <span className="team-panel__member-role">{invite.role}</span>
+                    </div>
+                    {isManager && (
+                      <Button variant="secondary" onClick={() => handleRevokeInvite(invite.id)}>
+                        Revoke
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+
+      {activeTab === 'audit' && isManager && (
+        <TeamAuditPanel />
+      )}
+
+      {activeTab === 'settings' && isManager && (
         <section className="team-panel__section">
-          <h4 className="team-panel__section-title">Pending invites</h4>
-          <ul className="team-panel__list team-panel__list--plain">
-            {invites.map((invite) => (
-              <li key={invite.id} className="team-panel__member-row">
-                <div className="team-panel__member-info">
-                  <span className="team-panel__member-name">{invite.email}</span>
-                  <span className="team-panel__member-role">{invite.role}</span>
-                </div>
-                <Button variant="secondary" onClick={() => handleRevokeInvite(invite.id)}>
-                  Revoke
-                </Button>
-              </li>
-            ))}
-          </ul>
+          <h4 className="team-panel__section-title">Team name</h4>
+          <div className="team-panel__invite-form">
+            <Input
+              label="Name"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              fullWidth
+            />
+            {nameError && <p className="team-panel__error">{nameError}</p>}
+            {nameSuccess && <p className="team-panel__loading">{nameSuccess}</p>}
+            <div className="team-panel__edit-actions">
+              <Button onClick={() => void handleSaveName()} isLoading={isSavingName} disabled={isSavingName}>
+                Save
+              </Button>
+            </div>
+          </div>
         </section>
       )}
 

@@ -2,12 +2,14 @@ import { json, readJsonBody } from '../../lib/http';
 import { requireAuth } from '../auth';
 import {
   getTeamForUser,
+  getTeamById,
   ensureTeamForManager,
   getTeamMembers,
   removeTeamMember as removeMember,
   updateTeamMemberRole as updateRole,
   getTeamAuditLogs,
   canManageTeam,
+  updateTeamName,
   createTeamInvite,
   getTeamInvites,
   getPendingInvitesForEmail,
@@ -120,6 +122,7 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
       inviterUsername: user.username,
       inviteUrl: link,
       migrateData,
+      teamName: team.name,
     });
     await sendEmail({
       to: inviteEmail,
@@ -135,7 +138,7 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
     await notifyUser({
       userUuid: target.uuid,
       type: 'team_invite',
-      title: `${user.username} invited you to join their team`,
+      title: `${user.username} invited you to join ${team.name ?? 'their team'}`,
       message: 'Open this notification to review and accept the invitation.',
       link: `/dashboard?invite=${encodeURIComponent(invite.token)}`,
     });
@@ -147,7 +150,7 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
 const handleTeamMemberRoleUpdate = requireAuth(async (request, user: User, params) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
-  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  if (team.managerUuid !== user.uuid) return json({ error: 'Forbidden' }, 403);
 
   const targetUuid = params.uuid;
   if (!targetUuid) return json({ error: 'user uuid is required' }, 400);
@@ -170,7 +173,7 @@ const handleTeamMemberRoleUpdate = requireAuth(async (request, user: User, param
 const handleTeamMemberRemove = requireAuth(async (_request, user: User, params) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
-  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  if (team.managerUuid !== user.uuid) return json({ error: 'Forbidden' }, 403);
 
   const targetUuid = params.uuid;
   if (!targetUuid) return json({ error: 'user uuid is required' }, 400);
@@ -245,12 +248,35 @@ const handleTeamInviteAccept = requireAuth(async (request, user: User) => {
 const handlePendingTeamInvites = requireAuth(async (_request, user: User) => {
   if (!user.email) return json({ invites: [] });
   const invites = await getPendingInvitesForEmail(user.email);
-  return json({ invites });
+  const enriched = await Promise.all(
+    invites.map(async (invite) => {
+      const team = await getTeamById(invite.teamId);
+      return { ...invite, teamName: team?.name };
+    }),
+  );
+  return json({ invites: enriched });
 });
 
 
+const handleTeamUpdate = requireAuth(async (request, user: User) => {
+  const team = await getTeamForUser(user);
+  if (!team) return json({ error: 'No team found' }, 404);
+  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+
+  const body = await readJsonBody(request);
+  const nameRaw = body?.name;
+  if (typeof nameRaw !== 'string') return json({ error: 'name is required' }, 400);
+  const name = nameRaw.trim();
+  if (!name) return json({ error: 'name is required' }, 400);
+  if (name.length > 64) return json({ error: 'name is too long' }, 400);
+
+  const updated = await updateTeamName(team, user, name);
+  return json({ team: updated });
+});
+
 export {
   handleTeamMe,
+  handleTeamUpdate,
   handleTeamMembersList,
   handleTeamMemberAdd,
   handleTeamMemberRoleUpdate,

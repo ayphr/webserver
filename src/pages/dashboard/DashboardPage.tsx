@@ -21,7 +21,6 @@ const SubscriptionPanel = lazy(() => import('../../components/subscriptions/Subs
 const NotificationsPanel = lazy(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
 const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
 const TeamPanel = lazy(() => import('../../components/team/TeamPanel').then((m) => ({ default: m.TeamPanel })));
-const TeamAuditPanel = lazy(() => import('../../components/team/TeamAuditPanel').then((m) => ({ default: m.TeamAuditPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
@@ -369,6 +368,13 @@ export const DashboardPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, user, activePage]);
 
+  useEffect(() => {
+    if (activePage === 'team-audit') {
+      changeTab('team');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePage]);
+
   const setDefaultTabPref = (value: string) => {
     setDefaultTab(value);
     localStorage.setItem('ayphr-pref-default-tab', value);
@@ -605,18 +611,10 @@ export const DashboardPage = () => {
               </DashboardPanel>
             )}
 
-            {activePage === 'team' && isTeamMember && (
+            {(activePage === 'team' || activePage === 'team-audit') && isTeamMember && (
               <DashboardPanel title="Team" description="Manage your team members" className="dashboard-panel--wide">
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <TeamPanel />
-                </Suspense>
-              </DashboardPanel>
-            )}
-
-            {activePage === 'team-audit' && isTeamManager && (
-              <DashboardPanel title="Team audit log" description="Recent team activity" className="dashboard-panel--wide">
-                <Suspense fallback={<DashboardContentSkeleton />}>
-                  <TeamAuditPanel />
+                  <TeamPanel isManager={isTeamManager} userUuid={user?.uuid} />
                 </Suspense>
               </DashboardPanel>
             )}

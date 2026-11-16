@@ -211,8 +211,12 @@ export function buildTeamInviteEmail(params: {
   inviterUsername: string;
   inviteUrl: string;
   migrateData: boolean;
+  teamName?: string;
 }): { subject: string; html: string; text: string } {
-  const subject = 'You have been invited to join an Ayphr team';
+  const teamLabel = params.teamName ? params.teamName : 'their team';
+  const subject = params.teamName
+    ? `You have been invited to join ${params.teamName} on Ayphr`
+    : 'You have been invited to join an Ayphr team';
   const migrationNote = params.migrateData
     ? '<p style="margin:0 0 12px;font-family:inherit;font-size:14px;line-height:1.5;color:#fbfefb;">Accepting will move your existing devices and locations into the team.</p>'
     : '';
@@ -222,7 +226,7 @@ export function buildTeamInviteEmail(params: {
       <div style="max-width:480px;margin:0 auto;background:#1a1a1a;border:1px solid #333333;border-radius:12px;padding:24px;">
         <h1 style="margin:0 0 12px;font-size:20px;color:#fbfefb;">Team invitation</h1>
         <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#878787;">
-          ${params.inviterUsername} has invited you to join their team on Ayphr.
+          ${params.inviterUsername} has invited you to join ${teamLabel} on Ayphr.
         </p>
         ${migrationNote}
         <p style="margin:16px 0;">
@@ -233,7 +237,7 @@ export function buildTeamInviteEmail(params: {
     </div>
   `;
 
-  const text = `You have been invited to join a team on Ayphr by ${params.inviterUsername}.${params.migrateData ? ' Accepting will move your existing devices and locations into the team.' : ''} Accept: ${params.inviteUrl}`;
+  const text = `You have been invited to join ${teamLabel} on Ayphr by ${params.inviterUsername}.${params.migrateData ? ' Accepting will move your existing devices and locations into the team.' : ''} Accept: ${params.inviteUrl}`;
 
   return { subject, html, text };
 }

@@ -83,7 +83,6 @@ export const Sidebar: React.FC<Props> = ({
   isSuspended = false,
   isStaff = false,
   isTeamMember = false,
-  isTeamManager = false,
   credits = null,
   accounts = [],
   activeToken = null,
@@ -95,7 +94,6 @@ export const Sidebar: React.FC<Props> = ({
   const teamTabs: Tab[] = isTeamMember
     ? [
         { id: 'team', name: 'Team' },
-        ...(isTeamManager ? [{ id: 'team-audit', name: 'Team Audit' }] : []),
       ]
     : [];
 

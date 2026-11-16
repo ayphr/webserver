@@ -65,6 +65,7 @@ export type TeamInvite = {
   migrateData?: boolean;
   id: string;
   teamId: string;
+  teamName?: string;
   email: string;
   role: TeamRole;
   token: string;

@@ -125,6 +125,22 @@ export function canManageTeam(user: Pick<User, 'uuid' | 'teamId' | 'teamRole' | 
   return isTeamManager(user, team);
 }
 
+export async function updateTeamName(team: Team, actor: User, name: string): Promise<Team> {
+  const teams = await getCollection('teams');
+  trackMongoOperation('updateOne', TEAMS_COLLECTION);
+  const now = new Date();
+  await teams.updateOne({ id: team.id }, { $set: { name, updatedAt: now } });
+  await logTeamAudit({
+    teamId: team.id,
+    actorUuid: actor.uuid,
+    actorUsername: actor.username,
+    action: 'team.renamed',
+    details: { name },
+  });
+  const updated = await getTeamById(team.id);
+  return updated ?? { ...team, name, updatedAt: now };
+}
+
 
 export async function syncTeamSubscriptionQuantity(team: Team, manager: User): Promise<void> {
   const paid = getActivePaidSubscription(manager);
@@ -240,7 +256,7 @@ export async function removeTeamMember(params: {
     userUuid: target.uuid,
     type: 'team',
     title: 'You were removed from a team',
-    message: `${actor.username} removed you from their team.`,
+    message: `${actor.username} removed you from ${team.name ?? 'the team'}.`,
     link: '/dashboard?tab=overview',
   });
 }
@@ -268,7 +284,7 @@ export async function updateTeamMemberRole(params: {
     userUuid: target.uuid,
     type: 'team',
     title: 'Your team role was updated',
-    message: `${actor.username} changed your team role to ${role}.`,
+    message: `${actor.username} changed your team role to ${role} in ${team.name ?? 'the team'}.`,
     link: '/dashboard?tab=team',
   });
 }
@@ -432,8 +448,8 @@ export async function acceptTeamInvite(params: {
     await notifyUser({
       userUuid: team.managerUuid,
       type: 'team',
-      title: `${user.username} joined your team`,
-      message: `${user.username} accepted your invitation and joined the team.`,
+      title: `${user.username} joined ${team.name ?? 'your team'}`,
+      message: `${user.username} accepted your invitation and joined ${team.name ?? 'the team'}.`,
       link: '/dashboard?tab=team',
     });
   }
