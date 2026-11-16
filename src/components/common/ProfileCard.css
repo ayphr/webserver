@@ -2,7 +2,7 @@
   padding: 1.5rem;
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
 }
 
 .profile-card--loading,
@@ -21,7 +21,7 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 0.25rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
   gap: 1rem;
 }
@@ -108,7 +108,7 @@
   width: 2.35rem;
   height: 2.35rem;
   border-radius: 999px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   background-color: transparent;
   color: hsl(0, 0%, 72%);
   text-decoration: none;
@@ -168,7 +168,7 @@
 
 .profile-card__form-select {
   background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.65rem 0.75rem;
   color: var(--text-primary);
@@ -207,7 +207,7 @@
 
 .profile-card__socials-clearButton,
 .profile-card__socialRemoveButton {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--text-muted);
   border-radius: 999px;
@@ -244,7 +244,7 @@
 .profile-card__socialTypeSelect,
 .profile-card__socialValueInput {
   background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.45rem 0.6rem;
   color: var(--text-primary);
@@ -291,7 +291,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
   color: var(--text-muted);
@@ -314,7 +314,7 @@
 
 .profile-card__form-input {
   background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.5rem 0.65rem;
   color: var(--text-primary);
@@ -343,6 +343,6 @@
   padding: 0.6rem 0.75rem;
   margin: 0;
   background: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }

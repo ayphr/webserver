@@ -39,7 +39,7 @@
   gap: 1rem;
   padding: 0.9rem;
   background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
 
@@ -119,7 +119,7 @@
   width: 100%;
   padding: 0.65rem 0.75rem;
   background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-family: var(--font-family-base);
@@ -163,5 +163,5 @@
 
 .manage-subs__close {
   padding-top: 0.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--border);
 }

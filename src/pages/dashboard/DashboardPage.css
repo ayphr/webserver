@@ -180,7 +180,7 @@
 
 .dashboard-page__countdown {
   color: var(--status-error);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-hv);
   font-size: 1.1rem;
 }
 
@@ -242,7 +242,7 @@
 .dashboard-page__appeal-textarea {
   width: 100%;
   background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.75rem;
   color: var(--text-primary);

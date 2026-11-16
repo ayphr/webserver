@@ -1,49 +1,5 @@
 .bio-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.bio-text__line {
   margin: 0;
-}
-
-.bio-text__list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  margin: 0;
-  padding-left: 1.35rem;
-  list-style: disc;
-}
-
-.bio-text__listItem {
-  margin: 0;
-}
-
-.bio-text__code {
-  padding: 0.1em 0.3em;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  font-family: var(--font-family-mono);
-  font-size: 0.88em;
-}
-
-.bio-text__codeBlock {
-  margin: 0.2rem 0;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font-family: var(--font-family-mono);
-  font-size: 0.85rem;
-  line-height: 1.45;
-  overflow-x: auto;
-  user-select: text;
-  white-space: pre;
-}
-
-.bio-text__codeBlock code {
-  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

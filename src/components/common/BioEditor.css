@@ -5,11 +5,10 @@
 }
 
 .bio-editor__wrap {
-  position: relative;
   min-height: 7rem;
   max-height: 18rem;
   background-color: var(--bg-base);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
   resize: vertical;
@@ -24,11 +23,22 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
-.bio-editor__layer,
 .bio-editor__surface {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 7rem;
   margin: 0;
   padding: 0.75rem;
   border: none;
+  background: transparent;
+  color: var(--text-primary);
+  caret-color: var(--text-primary);
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  cursor: text;
+  user-select: text;
   font-family: var(--font-family-base);
   font-size: 0.95rem;
   line-height: 1.5;
@@ -37,32 +47,6 @@
   overflow-wrap: break-word;
   white-space: pre-wrap;
   tab-size: 4;
-}
-
-.bio-editor__layer {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  color: var(--text-primary);
-  pointer-events: none;
-  user-select: none;
-}
-
-.bio-editor__surface {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 7rem;
-  background: transparent;
-  outline: none;
-  /* The layer underneath provides the visible glyphs. */
-  color: transparent;
-  caret-color: var(--text-primary);
-  resize: none;
-  overflow-y: auto;
-  cursor: text;
-  user-select: text;
 }
 
 .bio-editor__surface::placeholder {
@@ -75,32 +59,6 @@
 
 .bio-editor__surface::selection {
   background: rgba(255, 255, 255, 0.18);
-}
-
-.bio-editor__marker {
-  color: transparent;
-}
-
-.bio-editor__visibleMarker {
-  color: var(--text-dim);
-}
-
-.bio-editor__code {
-  padding: 0.1em 0.25em;
-  margin: 0 -0.25em;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  font-family: var(--font-family-mono);
-  font-size: 0.88em;
-}
-
-.bio-editor__code--block {
-  display: inline-block;
-  padding: 0.3em 0.45em;
-  margin: 0 -0.45em;
-  color: var(--text-primary);
-  line-height: 1.45;
-  white-space: pre-wrap;
 }
 
 .bio-editor__footer {

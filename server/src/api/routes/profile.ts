@@ -2,12 +2,7 @@ import { json } from '../../lib/http';
 import { requireAuth } from '../auth';
 import { normalizeCountryCode, getSupportedCountries } from '@common';
 import { toPublicUser, toSelfUser } from '../../lib/user';
-import {
-  BIO_MAX_LENGTH,
-  BIO_MAX_SOURCE_LENGTH,
-  DEFAULT_BIO,
-  Markdown,
-} from '@common/utils/markdown';
+import { BIO_MAX_LENGTH, DEFAULT_BIO } from '@common/utils/bio';
 import { updateUser, getUserFromUuid, deleteDomainVerifications } from '../../lib/db';
 import { isSocialLinkType, normalizeSocialHandle } from '@common/utils/social';
 import { profileUpdatesTotal } from '../../lib/metrics';
@@ -103,20 +98,11 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
   }
 
   if (typeof body.bio === 'string') {
-    if (body.bio.length > BIO_MAX_SOURCE_LENGTH) {
-      return json({ error: 'bio is too long' }, 400);
-    }
-
-    const extended = isStaff;
-    const markdown = new Markdown(body.bio, extended);
-    const bio = markdown.sanitize();
-
-    if (markdown.visibleLength() > BIO_MAX_LENGTH) {
+    if (body.bio.length > BIO_MAX_LENGTH) {
       return json({ error: `bio must be ${BIO_MAX_LENGTH} characters or fewer` }, 400);
     }
 
-    targetUser.bio = bio.length > 0 ? bio : DEFAULT_BIO;
-    targetUser.bioFormat = extended ? 'markdown' : 'limited';
+    targetUser.bio = body.bio.length > 0 ? body.bio : DEFAULT_BIO;
     changes.add('bio');
   }
 

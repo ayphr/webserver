@@ -1,10 +1,3 @@
-export type MarkdownFormat = 'limited' | 'markdown';
-
-export const BIO_MAX_LENGTH = 200;
-export const BIO_MAX_SOURCE_LENGTH = 4000;
-
-export const DEFAULT_BIO = "Hi! I'm an Ayphr user";
-
 export type MarkdownInline =
   | { kind: 'text'; value: string }
   | { kind: 'bold'; children: MarkdownInline[] }

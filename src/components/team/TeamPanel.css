@@ -207,7 +207,7 @@
 
 .team-panel__usage-row-modern__icon {
   display: inline-flex;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -221,7 +221,7 @@
 
 .team-panel__usage-row-modern__value {
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }

@@ -27,7 +27,7 @@ import {
  getUserByEmail } from '../../lib/db';
 import { type User, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
 import { toSelfUser } from '../../lib/user';
-import { DEFAULT_BIO } from '@common/utils/markdown';
+import { DEFAULT_BIO } from '@common/utils/bio';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { normalizeEmail, getEmailValidationError } from '@common/utils/email';

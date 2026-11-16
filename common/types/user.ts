@@ -1,4 +1,3 @@
-import type { MarkdownFormat } from '../utils/markdown';
 import type { BadgeId } from './badges';
 
 import type {
@@ -47,7 +46,6 @@ export type User = {
   role: UserRole;
   avatar?: UserAvatar;
   bio?: string;
-  bioFormat?: MarkdownFormat;
   socialLinks?: SocialLinks;
   socialLinkVerified?: Partial<Record<SocialLinkType, boolean>>;
   policyAgreements?: PolicyAgreements;

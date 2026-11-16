@@ -1,11 +1,8 @@
 export { countryCodeToFlag, normalizeCountryCode, getSupportedCountries, type CountryOption } from './country';
+export { BIO_MAX_LENGTH, DEFAULT_BIO } from './bio';
 export {
-  BIO_MAX_LENGTH,
-  BIO_MAX_SOURCE_LENGTH,
-  DEFAULT_BIO,
   Markdown,
   type MarkdownBlock,
-  type MarkdownFormat,
   type MarkdownInline,
   type MarkdownToken,
 } from './markdown';

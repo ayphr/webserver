@@ -21,7 +21,7 @@ import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
 import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
 import { toDate } from '../../lib/date';
 import type { ProfileCountriesPayload, PublicUser, SocialLinkType, SocialLinks, UserRole, DomainChallengePayload } from '@common';
-import { BIO_MAX_LENGTH, DEFAULT_BIO, Markdown } from '@common';
+import { BIO_MAX_LENGTH, DEFAULT_BIO } from '@common';
 import {
   SOCIAL_LINK_LABELS,
   SOCIAL_LINK_HANDLE_HINTS,
@@ -164,7 +164,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     try {
       const updated = await api.profile.editUser(userUuid, {
         country: selectedCountry,
-        bio: new Markdown(bio, canUseMarkdown).sanitize(),
+        bio,
         socialLinks,
       });
       setUser(updated);
@@ -265,7 +265,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const isSelfProfile = viewerUuid === user?.uuid;
   const canEditThisProfile = canEditProfile || isSelfProfile || isStaff;
   const canPunishThisProfile = (isPunishable || isStaff) && !!user;
-  const canUseMarkdown = isStaff;
 
   const invalidSocialLinkKey = SOCIAL_LINK_FIELDS.map(({ key }) => key).find((key) => {
     const handle = socialLinks[key];
@@ -276,7 +275,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
     ? `Enter a ${SOCIAL_LINK_LABELS[invalidSocialLinkKey]} handle, not a link`
     : null;
 
-  const bioError = new Markdown(bio, canUseMarkdown).visibleLength() > BIO_MAX_LENGTH
+  const bioError = bio.length > BIO_MAX_LENGTH
     ? `Bio must be ${BIO_MAX_LENGTH} characters or fewer`
     : null;
 
@@ -358,7 +357,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         {!isEditingProfile ? (
           <>
             <div className="profile-card__bio">
-              <BioText value={user.bio ?? DEFAULT_BIO} format={user.bioFormat} />
+              <BioText value={user.bio ?? DEFAULT_BIO} />
             </div>
             <div className="profile-card__meta">
               <p>
@@ -455,7 +454,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 onChange={setBio}
                 disabled={isSaving}
                 maxLength={BIO_MAX_LENGTH}
-                markdown={canUseMarkdown}
               />
               {bioError && <p className="profile-card__form-error">{bioError}</p>}
             </div>
