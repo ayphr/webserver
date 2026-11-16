@@ -3,7 +3,6 @@ import { requireAuth } from '../auth';
 import {
   getTeamForUser,
   getTeamById,
-  ensureTeamForManager,
   getTeamMembers,
   removeTeamMember as removeMember,
   updateTeamMemberRole as updateRole,
@@ -28,11 +27,7 @@ import { isTeamRole } from '@common';
 import { notifyUser } from '../../lib/notifications';
 
 const handleTeamMe = requireAuth(async (_request, user: User) => {
-  let team = await getTeamForUser(user);
-  if (!team && user.paidSubscriptions?.some((s) => s.tier.startsWith('team-') && (s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'))) {
-    const paid = user.paidSubscriptions.find((s) => s.tier.startsWith('team-'));
-    if (paid) team = await ensureTeamForManager(user.uuid, paid.tier);
-  }
+  const team = await getTeamForUser(user);
 
   if (!team) {
     return json({ error: 'No team found' }, 404);

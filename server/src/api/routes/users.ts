@@ -31,7 +31,7 @@ const handleMe = requireAuth(async (request, user) => {
     user: toSelfUser(user, teamSeats),
     activeSuspension,
     policyStatus,
-    credits: getCreditBalance(user),
+    credits: await getCreditBalance(user),
   });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 

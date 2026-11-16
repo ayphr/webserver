@@ -1,20 +1,20 @@
 import type { PlanTier } from './plans';
 
 /**
- * Credit state stored on a user document.
+ * Credit state stored on a team document (shared by all members).
  *
  * `monthlyUsed` only applies to the calendar month (in the server's timezone)
  * recorded in `periodStart`.
  * `additional` and `onHold` are not tied to a period and persist across resets.
  */
-export type UserCredits = {
+export type TeamCredits = {
   periodStart?: Date | null;
   monthlyUsed: number;
   additional: number;
   onHold: number;
 };
 
-/** A fully resolved credit balance for the user's current plan. */
+/** A fully resolved credit balance for the team's current plan. */
 export type CreditBalance = {
   plan: PlanTier;
   /** IANA timezone the monthly reset boundary is based on. */

@@ -47,7 +47,7 @@ export type DevicePairing = {
   createdAt: Date;
   expiresAt: Date;
   linked: boolean;
-  ownerUuid?: string;
+  teamId?: string;
   ownerUsername?: string;
   linkedAt?: Date;
   fetched?: boolean;
@@ -148,8 +148,8 @@ export const NONE = 'none';
 export const userCacheKey = (uuid: string) => `user:${uuid}`;
 export const suspensionCacheKey = (uuid: string) => `suspension:${uuid}`;
 export const deviceCacheKey = (serial: number) => `device:${serial}`;
-export const deviceListCacheKey = (ownerUuid: string) => `device_list:${ownerUuid}`;
-export const deviceStatsCacheKey = (ownerUuid: string) => `device_stats:${ownerUuid}`;
+export const deviceListCacheKey = (teamId: string) => `device_list:${teamId}`;
+export const deviceStatsCacheKey = (teamId: string) => `device_stats:${teamId}`;
 
 export async function invalidateUserCache(uuid: string): Promise<void> {
   await cacheDel(USER_CACHE, userCacheKey(uuid));
@@ -230,7 +230,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1 })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
-    [DEVICES_COLLECTION, () => cols.devices.createIndex({ ownerUuid: 1 })],
+    [DEVICES_COLLECTION, () => cols.devices.createIndex({ teamId: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex(
       { tokenHash: 1 },
       { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
@@ -241,10 +241,10 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ email: 1, purpose: 1, userUuid: 1 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
-    [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ ownerUuid: 1 })],
+    [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ teamId: 1 })],
     ['teams', () => cols.teams.createIndex({ managerUuid: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex(
-      { ownerUuid: 1, isDefault: 1 },
+      { teamId: 1, isDefault: 1 },
       { unique: true, partialFilterExpression: { isDefault: true } }
     )],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],

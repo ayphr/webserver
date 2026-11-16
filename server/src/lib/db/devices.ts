@@ -19,21 +19,21 @@ import type {
   
 import { cacheDel, cacheGet, cacheSet } from '../cache';
 
-export async function deleteDevicesForOwnerUuid(ownerUuid: string) {
+export async function deleteDevicesForTeamId(teamId: string) {
   const devices = await getCollection('devices');
 
   // Collect serials before deleting so their cache entries can be dropped.
   trackMongoOperation('find', DEVICES_COLLECTION);
-  const existing = await devices.find({ ownerUuid }, { projection: { serial: 1, _id: 0 } }).toArray();
+  const existing = await devices.find({ teamId }, { projection: { serial: 1, _id: 0 } }).toArray();
 
   trackMongoOperation('deleteMany', DEVICES_COLLECTION);
-  await devices.deleteMany({ ownerUuid });
+  await devices.deleteMany({ teamId });
 
   await cacheDel(
     DEVICE_CACHE,
     ...existing.map((device) => deviceCacheKey(device.serial)),
-    deviceListCacheKey(ownerUuid),
-    deviceStatsCacheKey(ownerUuid),
+    deviceListCacheKey(teamId),
+    deviceStatsCacheKey(teamId),
   );
 }
 
@@ -46,7 +46,7 @@ export async function createDevice(device: DeviceDocument) {
 
   await cacheDevice(normalizedDevice);
   // The owner's device list no longer matches.
-  await cacheDel(DEVICE_LIST_CACHE, deviceListCacheKey(normalizedDevice.ownerUuid));
+  await cacheDel(DEVICE_LIST_CACHE, deviceListCacheKey(normalizedDevice.teamId));
 
   return normalizedDevice;
 }
@@ -89,14 +89,14 @@ export async function getDeviceBySerial(serial: number) {
 }
 
 
-export async function getDevicesForOwnerUuid(ownerUuid: string) {
-  const cacheKey = deviceListCacheKey(ownerUuid);
+export async function getDevicesForTeamId(teamId: string) {
+  const cacheKey = deviceListCacheKey(teamId);
   const cached = await cacheGet<DeviceDocument[]>(DEVICE_LIST_CACHE, cacheKey);
   if (cached) return cached;
 
   const devices = await getCollection('devices');
   trackMongoOperation('find', DEVICES_COLLECTION);
-  const list = await devices.find({ ownerUuid }).sort({ registeredAt: -1 }).toArray();
+  const list = await devices.find({ teamId }).sort({ registeredAt: -1 }).toArray();
 
   await cacheSet(DEVICE_LIST_CACHE, cacheKey, list, DEVICE_LIST_CACHE_TTL_SECONDS);
 
@@ -104,8 +104,8 @@ export async function getDevicesForOwnerUuid(ownerUuid: string) {
 }
 
 /** Drops only the per-owner statistics cache (counts / latest point). */
-export async function invalidateDeviceStatsForOwner(ownerUuid: string): Promise<void> {
-  await cacheDel(DEVICE_STATS_CACHE, deviceStatsCacheKey(ownerUuid));
+export async function invalidateDeviceStatsForOwner(teamId: string): Promise<void> {
+  await cacheDel(DEVICE_STATS_CACHE, deviceStatsCacheKey(teamId));
 }
 
 /**
@@ -116,11 +116,11 @@ export async function invalidateDeviceStatsForOwner(ownerUuid: string): Promise<
  * than the dashboard is read, so invalidating here would keep the keys cold
  * forever. New points reach readers on the next cache fill (bounded by TTL).
  */
-export async function invalidateDeviceCachesForOwner(ownerUuid: string): Promise<void> {
+export async function invalidateDeviceCachesForOwner(teamId: string): Promise<void> {
   await cacheDel(
     DEVICE_LIST_CACHE,
-    deviceListCacheKey(ownerUuid),
-    deviceStatsCacheKey(ownerUuid),
+    deviceListCacheKey(teamId),
+    deviceStatsCacheKey(teamId),
   );
 }
 
@@ -144,8 +144,8 @@ export async function updateDeviceLocation(serial: number, locationId: string) {
   await devices.updateOne({ serial }, { $set: { locationId } });
   await cacheDel(DEVICE_CACHE, deviceCacheKey(serial));
   const device = await devices.findOne({ serial });
-  if (device?.ownerUuid) {
-    await cacheDel(DEVICE_LIST_CACHE, deviceListCacheKey(device.ownerUuid));
+  if (device?.teamId) {
+    await cacheDel(DEVICE_LIST_CACHE, deviceListCacheKey(device.teamId));
   }
 }
 
@@ -173,12 +173,12 @@ export async function getDevicePairingByCode(code: string) {
   return devicePairings.findOne({ code });
 }
 
-export async function markDevicePairingLinked(code: string, ownerUuid: string, ownerUsername: string): Promise<boolean> {
+export async function markDevicePairingLinked(code: string, teamId: string, ownerUsername: string): Promise<boolean> {
   const devicePairings = await getCollection('devicePairings');
   trackMongoOperation('updateOne', 'device_pairings');
   const result = await devicePairings.updateOne(
     { code, linked: false },
-    { $set: { linked: true, ownerUuid, ownerUsername, linkedAt: new Date() } },
+    { $set: { linked: true, teamId, ownerUsername, linkedAt: new Date() } },
   );
   return result.modifiedCount > 0;
 }
@@ -191,7 +191,7 @@ export async function markDevicePairingFetched(code: string) {
 
 export async function updateDevice(
   serial: number,
-  ownerUuid: string,
+  teamId: string,
   patch: { name?: string; locationId?: string },
 ): Promise<DeviceDocument | null> {
   const devices = await getCollection('devices');
@@ -210,23 +210,23 @@ export async function updateDevice(
 
   trackMongoOperation('findOneAndUpdate', DEVICES_COLLECTION);
   const updated = await devices.findOneAndUpdate(
-    { serial, ownerUuid },
+    { serial, teamId },
     { $set: updateFields },
     { returnDocument: 'after' },
   );
 
   if (updated) {
     await cacheSet(DEVICE_CACHE, deviceCacheKey(serial), updated, DEVICE_CACHE_TTL_SECONDS);
-    await invalidateDeviceCachesForOwner(ownerUuid);
+    await invalidateDeviceCachesForOwner(teamId);
   }
 
   return updated;
 }
 
-export async function unlinkDevice(serial: number, ownerUuid: string): Promise<boolean> {
+export async function unlinkDevice(serial: number, teamId: string): Promise<boolean> {
   const devices = await getCollection('devices');
   trackMongoOperation('deleteOne', DEVICES_COLLECTION);
-  const result = await devices.deleteOne({ serial, ownerUuid });
+  const result = await devices.deleteOne({ serial, teamId });
 
   if (result.deletedCount > 0) {
     const dataPoints = await getCollection('dataPoints');
@@ -236,8 +236,8 @@ export async function unlinkDevice(serial: number, ownerUuid: string): Promise<b
     await cacheDel(
       DEVICE_CACHE,
       deviceCacheKey(serial),
-      deviceListCacheKey(ownerUuid),
-      deviceStatsCacheKey(ownerUuid),
+      deviceListCacheKey(teamId),
+      deviceStatsCacheKey(teamId),
     );
     return true;
   }

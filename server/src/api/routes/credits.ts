@@ -3,7 +3,7 @@ import { requireAuth } from '../auth';
 import { getCreditBalance } from '../../lib/credits';
 
 const handleCreditsMe = requireAuth(async (_request, user) => {
-  return json({ credits: getCreditBalance(user) });
+  return json({ credits: await getCreditBalance(user) });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 export { handleCreditsMe };

@@ -38,19 +38,19 @@ export function getPlanSeats(user: PlanUser): number {
   }
 
   if ('paidSubscriptions' in user && Array.isArray(user.paidSubscriptions)) {
-    const activeTeam = user.paidSubscriptions.find(
-      (s: PaidSubscription) => s.tier.startsWith('team-') && isPaidSubscriptionActive(s),
+    const activePaid = user.paidSubscriptions.find(
+      (s: PaidSubscription) => isPaidSubscriptionActive(s),
     );
-    if (activeTeam && typeof activeTeam.quantity === 'number') {
-      return Math.max(1, activeTeam.quantity);
+    if (activePaid && typeof activePaid.quantity === 'number' && activePaid.quantity > 1) {
+      return Math.max(1, activePaid.quantity);
     }
   }
 
   if ('attachedSubscriptions' in user && Array.isArray(user.attachedSubscriptions)) {
     const activeAttached = user.attachedSubscriptions.find(
-      (s: AttachedSubscription) => s.tier.startsWith('team-') && isAttachedSubscriptionActive(s),
+      (s: AttachedSubscription) => isAttachedSubscriptionActive(s),
     );
-    if (activeAttached && typeof activeAttached.seats === 'number') {
+    if (activeAttached && typeof activeAttached.seats === 'number' && activeAttached.seats > 1) {
       return Math.max(1, activeAttached.seats);
     }
   }
@@ -61,11 +61,12 @@ export function getPlanSeats(user: PlanUser): number {
 export function getPlanFeatures(plan: PlanTier | PlanUser, seatsOverride?: number): PlanFeatures {
   if (typeof plan === 'string') {
     const base = PLAN_FEATURES[plan];
-    if (plan.startsWith('team-') && typeof seatsOverride === 'number' && seatsOverride > 1) {
+    if (typeof seatsOverride === 'number' && seatsOverride > 1) {
       return {
         ...base,
         sharedMaxDataPointsPerUser: base.sharedMaxDataPointsPerUser * seatsOverride,
         sharedQueryBoostLimitMonthlyPerUser: base.sharedQueryBoostLimitMonthlyPerUser * seatsOverride,
+        dataFillMaxPoints: base.dataFillMaxPoints * seatsOverride,
       };
     }
     return base;
@@ -81,15 +82,16 @@ export function getPlanFeaturesForTier(tier: PlanTier, seats = 1): PlanFeatures 
 export function getPlanFeaturesForUser(user: PlanUser, seatsOverride?: number): PlanFeatures {
   const tier = getPlanTier(user);
   const base = PLAN_FEATURES[tier];
-  if (!tier.startsWith('team-')) {
+  const seats = Math.max(1, seatsOverride ?? getPlanSeats(user));
+  if (seats <= 1) {
     return base;
   }
 
-  const seats = Math.max(1, seatsOverride ?? getPlanSeats(user));
   return {
     ...base,
     sharedMaxDataPointsPerUser: base.sharedMaxDataPointsPerUser * seats,
     sharedQueryBoostLimitMonthlyPerUser: base.sharedQueryBoostLimitMonthlyPerUser * seats,
+    dataFillMaxPoints: base.dataFillMaxPoints * seats,
   };
 }
 

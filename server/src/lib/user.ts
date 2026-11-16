@@ -5,7 +5,7 @@ import { buildAvatarUrl } from './avatars';
 
 export function toPublicUser(user: User, teamSeats?: number): PublicUser {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { auth, stripeCustomerId, paidSubscriptions, attachedSubscriptions, credits, avatar, email, emailVerifiedAt, ...rest } = user;
+  const { auth, stripeCustomerId, paidSubscriptions, attachedSubscriptions, avatar, email, emailVerifiedAt, ...rest } = user;
   const resolved = getUserSubscription(user);
   const seats = teamSeats ?? resolved?.seats;
 
@@ -18,7 +18,7 @@ export function toPublicUser(user: User, teamSeats?: number): PublicUser {
           tier: resolved.tier,
           source: resolved.source,
           expiresAt: resolved.expiresAt,
-          seats: resolved.tier.startsWith('team-') ? (seats ?? 1) : undefined,
+          seats: (seats ?? 1) > 1 ? (seats ?? 1) : undefined,
         }
       : null,
   };

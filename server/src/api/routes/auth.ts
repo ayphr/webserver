@@ -13,7 +13,7 @@ import {
 import {
   createUser,
   deleteAvatar,
-  deleteDevicesForOwnerUuid,
+  deleteDevicesForTeamId,
   deleteDomainVerificationsForUser,
   deletePunishmentsForUserUuid,
   deleteSessionsForUserUuid,
@@ -21,11 +21,11 @@ import {
   deleteNotificationsForUserUuid,
   getActiveSuspensionForUserUuid,
   getCollection,
-  getDevicesForOwnerUuid,
+  getDevicesForTeamId,
   getUserFromUsername,
   updateUser,
  getUserByEmail } from '../../lib/db';
-import { type User, getCreditPeriodStart, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
+import { type User, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
 import { toSelfUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/markdown';
 import { getPasswordValidationErrors } from '@common/utils/password';
@@ -39,7 +39,7 @@ import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { authEventsTotal, userRegistrationsByCountry , setTotalUsers } from '../../lib/metrics';
 import { getUserCount } from '../../lib/db/users';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
-import { getTeamInviteByToken, acceptTeamInvite } from '../../lib/db/teams';
+import { getTeamInviteByToken, acceptTeamInvite, ensureTeamForManager, getTeamForUser } from '../../lib/db/teams';
 
 type AuthPayload = JsonObject & {
   username?: string;
@@ -178,27 +178,28 @@ async function handleRegister(request: Request) {
     createdAt: now,
     lastActive: now,
     country,
-    credits: {
-      periodStart: getCreditPeriodStart(now),
-      monthlyUsed: 0,
-      additional: 0,
-      onHold: 0,
-    },
   };
 
   try {
     await createUser(user);
 
     const inviteToken = typeof body.inviteToken === 'string' ? body.inviteToken.trim() : '';
+    let inviteAccepted = false;
     if (inviteToken) {
       try {
         const invite = await getTeamInviteByToken(inviteToken);
         if (invite && !invite.acceptedAt && invite.expiresAt.getTime() > Date.now() && invite.email === user.email?.toLowerCase()) {
           await acceptTeamInvite({ invite, user });
+          inviteAccepted = true;
         }
       } catch (inviteError) {
         console.error('Failed to accept team invite during registration:', inviteError);
       }
+    }
+
+    if (!inviteAccepted) {
+      // Every user belongs to a team (solo users get a free team).
+      await ensureTeamForManager(user.uuid, 'free');
     }
   } catch (error) {
     // The unique username/email indexes are the source of truth, closing the
@@ -505,8 +506,11 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
     return json({ error: 'invalid password' }, 401);
   }
 
-  // Cascade-delete all data owned by the account before removing the user.
-  const devices = await getDevicesForOwnerUuid(user.uuid);
+  // Cascade-delete all data owned by the account's team (if they are the manager).
+  const team = await getTeamForUser(user);
+  const scopeId = team && team.managerUuid === user.uuid ? team.id : null;
+
+  const devices = scopeId ? await getDevicesForTeamId(scopeId) : [];
   const deviceSerials = devices.map((device) => device.serial);
   const dataPoints = await getCollection('dataPoints');
   if (deviceSerials.length > 0) {
@@ -515,15 +519,17 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
 
   await Promise.all([
     deletePunishmentsForUserUuid(user.uuid),
-    deleteDevicesForOwnerUuid(user.uuid),
+    scopeId ? deleteDevicesForTeamId(scopeId) : Promise.resolve(),
     deleteSessionsForUserUuid(user.uuid),
     deleteAvatar(user.uuid),
     deleteDomainVerificationsForUser(user.uuid),
     deleteNotificationsForUserUuid(user.uuid),
   ]);
 
-  const locations = await getCollection('locations');
-  await locations.deleteMany({ ownerUuid: user.uuid });
+  if (scopeId) {
+    const locations = await getCollection('locations');
+    await locations.deleteMany({ teamId: scopeId });
+  }
 
   await deleteUser(user.uuid);
   authEventsTotal.inc({ event: 'account_delete', result: 'success' });

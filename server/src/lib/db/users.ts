@@ -12,7 +12,7 @@ import {
 } from './internal';
 
 import type {
-  User, UserRole, AttachedSubscription, PaidSubscription, UserCredits
+  User, UserRole, AttachedSubscription, PaidSubscription
 } from '@common';
 import { cacheGet, cacheSet } from '../cache';
 import { invalidateAuthEntries } from '../authCache';
@@ -194,18 +194,6 @@ export async function updateUserLastActive(uuid: string, when: Date) {
 }
 
 
-export async function updateUserCredits(userUuid: string, credits: UserCredits) {
-  const users = await getCollection('users');
-  const normalizedCredits = normalizeDateValues(credits);
-
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne({ uuid: userUuid }, { $set: { credits: normalizedCredits } });
-
-  await invalidateUserCache(userUuid);
-  await invalidateAuthEntries();
-
-  return normalizedCredits;
-}
 
 
 export async function updateUserRole(userUuid: string, role: UserRole) {

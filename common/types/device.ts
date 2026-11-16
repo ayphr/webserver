@@ -1,7 +1,7 @@
 export type Device = {
   serial: number;
   name?: string;
-  ownerUuid: string;
+  teamId: string;
   ownerUsername: string;
   locationId?: string;
   registeredAt: Date;

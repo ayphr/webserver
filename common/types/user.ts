@@ -1,6 +1,6 @@
 import type { MarkdownFormat } from '../utils/markdown';
 import type { BadgeId } from './badges';
-import type { UserCredits } from './credits';
+
 import type {
   AttachedSubscription,
   PaidSubscription,
@@ -63,7 +63,6 @@ export type User = {
   attachedSubscriptions?: AttachedSubscription[];
   teamId?: string;
   teamRole?: 'member' | 'helper' | 'manager';
-  credits?: UserCredits;
   trustedDevices?: string[];
   usernameChangedAt?: Date;
 };

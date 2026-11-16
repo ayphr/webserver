@@ -1,6 +1,6 @@
 export type Location = {
   id: string;
-  ownerUuid: string;
+  teamId: string;
   ownerUsername: string;
   name: string;
   isDefault?: boolean;

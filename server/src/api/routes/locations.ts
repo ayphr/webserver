@@ -4,7 +4,7 @@ import {
   createLocation,
   deleteLocation,
   ensureDefaultLocation,
-  getLocationsForOwnerUuid,
+  getLocationsForTeamId,
   getLocationById,
   updateLocation,
   countLocations,
@@ -26,7 +26,7 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   const scopeUuid = await getTeamScopeUuid(user);
   const scopeUsername = await getTeamScopeUsername(user);
   const defaultLocation = await ensureDefaultLocation(scopeUuid, scopeUsername);
-  const locations = await getLocationsForOwnerUuid(scopeUuid);
+  const locations = await getLocationsForTeamId(scopeUuid);
   if (!locations.some((location) => location.id === defaultLocation.id)) {
     locations.unshift(defaultLocation);
   }
@@ -59,7 +59,7 @@ const handleCreate = requireAuth(async (request, user: User) => {
 
   const location: Location = {
     id: crypto.randomUUID(),
-    ownerUuid: scopeUuid,
+    teamId: scopeUuid,
     ownerUsername: scopeUsername,
     name,
     isDefault: false,
@@ -78,7 +78,7 @@ const handleGet = requireAuth(async (_request, user: User, params) => {
 
   const location = await getLocationById(id);
   if (!location) return json({ error: 'not found' }, 404);
-  if (location.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (location.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   return json({ location });
 });
@@ -91,7 +91,7 @@ const handleUpdate = requireAuth(async (request, user: User, params) => {
 
   const location = await getLocationById(id);
   if (!location) return json({ error: 'not found' }, 404);
-  if (location.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (location.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const body = await readJsonBody(request);
   const updates: { name?: string } = {};
@@ -114,7 +114,7 @@ const handleDelete = requireAuth(async (_request, user: User, params) => {
 
   const location = await getLocationById(id);
   if (!location) return json({ error: 'not found' }, 404);
-  if (location.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (location.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
   if (location.isDefault) return json({ error: 'cannot delete default location' }, 409);
 
   if (team) {

@@ -1,4 +1,5 @@
-import type { SubscriptionTier } from './subscription';
+import type { PlanTier } from './plans';
+import type { TeamCredits } from './credits';
 
 export type TeamRole = 'member' | 'helper' | 'manager';
 
@@ -12,7 +13,8 @@ export type Team = {
   id: string;
   name?: string;
   managerUuid: string;
-  tier: SubscriptionTier;
+  tier: PlanTier;
+  credits?: TeamCredits;
   createdAt: Date;
   updatedAt: Date;
 };

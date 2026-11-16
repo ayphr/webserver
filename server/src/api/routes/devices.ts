@@ -19,7 +19,7 @@ import {
   deleteDataPointsForDevice,
   getDeviceBySerial,
   getDeviceByTokenHash,
-  getDevicesForOwnerUuid,
+  getDevicesForTeamId,
   getUserFromUuid,
   invalidateDeviceStatsForOwner,
   pruneDataPointsForSerials,
@@ -32,7 +32,7 @@ import {
   upsertDataPoints,
   type DeviceDocument,
 } from '../../lib/db';
-import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSeatLimit } from '../../lib/db/teams';
+import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSeatLimit, getTeamById } from '../../lib/db/teams';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
@@ -146,19 +146,19 @@ function getDeviceToken(body: Record<string, unknown> | null): string | null {
   return null;
 }
 
-async function shouldPruneOwnerDataPoints(ownerUuid: string): Promise<boolean> {
+async function shouldPruneOwnerDataPoints(teamId: string): Promise<boolean> {
   const now = Date.now();
   try {
     const { count } = await redisFixedWindow(
-      `${DATA_POINT_PRUNE_KEY_PREFIX}${ownerUuid}`,
+      `${DATA_POINT_PRUNE_KEY_PREFIX}${teamId}`,
       DATA_POINT_PRUNE_COOLDOWN_MS,
     );
     return count === 1;
   } catch {
-    const lastPrunedAt = localDataPointPruneByOwner.get(ownerUuid) ?? 0;
+    const lastPrunedAt = localDataPointPruneByOwner.get(teamId) ?? 0;
     if (now - lastPrunedAt < DATA_POINT_PRUNE_COOLDOWN_MS) return false;
 
-    localDataPointPruneByOwner.set(ownerUuid, now);
+    localDataPointPruneByOwner.set(teamId, now);
     if (localDataPointPruneByOwner.size > 10_000) {
       for (const [uuid, timestamp] of localDataPointPruneByOwner) {
         if (now - timestamp >= DATA_POINT_PRUNE_COOLDOWN_MS) localDataPointPruneByOwner.delete(uuid);
@@ -174,16 +174,20 @@ async function shouldPruneOwnerDataPoints(ownerUuid: string): Promise<boolean> {
 }
 
 async function pruneOwnerDataPoints(
-  ownerUuid: string,
+  teamId: string,
   user?: User,
   devices?: DeviceDocument[],
 ): Promise<boolean> {
-  if (!(await shouldPruneOwnerDataPoints(ownerUuid))) return false;
+  if (!(await shouldPruneOwnerDataPoints(teamId))) return false;
 
   try {
     const now = Date.now();
-    const owner = user ?? await getUserFromUuid(ownerUuid);
-    const ownerDevices = devices ?? await getDevicesForOwnerUuid(ownerUuid);
+    let owner: User | undefined = user;
+    if (!owner) {
+      const team = await getTeamById(teamId);
+      owner = team ? (await getUserFromUuid(team.managerUuid)) ?? undefined : (await getUserFromUuid(teamId)) ?? undefined;
+    }
+    const ownerDevices = devices ?? await getDevicesForTeamId(teamId);
     if (!owner) return false;
 
     const team = await getTeamForUser(owner);
@@ -268,7 +272,7 @@ const handleLink = requireAuth(async (request, user: User) => {
   let resolvedLocationId: string | null = null;
   if (requestedLocationId) {
     const requestedLocation = await getLocationById(requestedLocationId);
-    if (requestedLocation?.ownerUuid !== scopeUuid) {
+    if (requestedLocation?.teamId !== scopeUuid) {
       return json({ error: 'invalid location' }, 400);
     }
     resolvedLocationId = requestedLocation.id;
@@ -294,7 +298,7 @@ const handleLink = requireAuth(async (request, user: User) => {
   let device: DeviceDocument;
 
   if (existing) {
-    if (existing.ownerUuid !== scopeUuid) {
+    if (existing.teamId !== scopeUuid) {
       return json({ error: 'forbidden' }, 403);
     }
 
@@ -312,7 +316,7 @@ const handleLink = requireAuth(async (request, user: User) => {
         return json({ error: 'Forbidden' }, 403);
       }
     }
-    const ownedDevices = await getDevicesForOwnerUuid(scopeUuid);
+    const ownedDevices = await getDevicesForTeamId(scopeUuid);
     const maxDevices = getPlanFeaturesForUser(user).maxDevices;
     if (ownedDevices.length >= maxDevices) {
       return json({ error: 'device limit reached for your plan' }, 409);
@@ -331,7 +335,7 @@ const handleLink = requireAuth(async (request, user: User) => {
     const newDevice: DeviceDocument = {
       serial,
       name,
-      ownerUuid: scopeUuid,
+      teamId: scopeUuid,
       ownerUsername: scopeUsername,
       locationId,
       registeredAt: now,
@@ -391,7 +395,7 @@ const handleListMine = requireAuth(async (_request, user: User) => {
   const scopeUuid = await getTeamScopeUuid(user);
   const scopeUsername = await getTeamScopeUsername(user);
   await ensureDefaultLocation(scopeUuid, scopeUsername);
-  const devices = await getDevicesForOwnerUuid(scopeUuid);
+  const devices = await getDevicesForTeamId(scopeUuid);
 
   if (await pruneOwnerDataPoints(scopeUuid, user, devices)) {
     await invalidateDeviceStatsForOwner(scopeUuid);
@@ -419,7 +423,7 @@ const handleGetBySerial = requireAuth(async (_request, user: User, params) => {
   if (!device) return json({ error: 'not found' }, 404);
 
   const scopeUuid = await getTeamScopeUuid(user);
-  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   return json({ device: toPublicDevice(device) });
 });
@@ -457,8 +461,8 @@ async function handleUpload(request: Request): Promise<Response> {
     device.lastUploadAt = now;
     await cacheDevice(device);
 
-    if (await pruneOwnerDataPoints(device.ownerUuid)) {
-      await invalidateDeviceStatsForOwner(device.ownerUuid);
+    if (await pruneOwnerDataPoints(device.teamId)) {
+      await invalidateDeviceStatsForOwner(device.teamId);
     }
 
     telemetryRecordsAcceptedTotal.inc(points.length);
@@ -527,7 +531,7 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
   const scopeUuid = await getTeamScopeUuid(user);
-  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const url = new URL(request.url);
   const period = url.searchParams.get('period') ?? '24h';
@@ -567,7 +571,7 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
   const scopeUuid = await getTeamScopeUuid(user);
-  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const body = await readJsonBody<DeviceQueryRequest>(request);
   const query = typeof body?.query === 'string' ? body.query.trim() : '';
@@ -607,7 +611,7 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const creditCost = Math.max(0.1, computeUnits * features.queryCostCredits);
 
   if (creditCost > 0) {
-    const balance = getCreditBalance(user);
+    const balance = await getCreditBalance(user);
     if (balance.available < creditCost) {
       return json({ error: 'insufficient credits' }, 402);
     }
@@ -647,7 +651,7 @@ const handleDeleteDeviceDataPoints = requireAuth(async (request, user: User, par
 
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   if (team) {
     const role = getTeamRole(user);
@@ -678,7 +682,7 @@ const handleUpdateDevice = requireAuth(async (request, user: User, params) => {
 
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const body = await readJsonBody(request);
   const patch: { name?: string; locationId?: string } = {};
@@ -693,7 +697,7 @@ const handleUpdateDevice = requireAuth(async (request, user: User, params) => {
     const locId = typeof body.locationId === 'string' ? body.locationId.trim() : '';
     if (locId) {
       const location = await getLocationById(locId);
-      if (location?.ownerUuid !== scopeUuid) {
+      if (location?.teamId !== scopeUuid) {
         return json({ error: 'invalid location' }, 400);
       }
       patch.locationId = location.id;
@@ -715,7 +719,7 @@ const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
 
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
-  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   // Role check: deleting requires manager (or individual owner).
   if (team) {
@@ -739,7 +743,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
   const scopeUuid = await getTeamScopeUuid(user);
-  if (device.ownerUuid !== scopeUuid) return json({ error: 'forbidden' }, 403);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const body = await readJsonBody(request);
   const startMs = typeof body?.start === 'string' ? Date.parse(body.start) : Number.NaN;
@@ -768,7 +772,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
     return json({ error: `requested range produces too many points (max ${features.dataFillMaxPoints.toLocaleString()})` }, 400);
   }
 
-  const devices = await getDevicesForOwnerUuid(scopeUuid);
+  const devices = await getDevicesForTeamId(scopeUuid);
   const existingStats = await getDataPointStats(devices.map((d) => d.serial), scopeUuid);
 
   let existingCount = 0;
@@ -784,7 +788,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
 
   const creditCost = Math.max(0.1, (count / 1000) * features.dataFillCreditCostPerThousandPoints);
   if (creditCost > 0) {
-    const balance = getCreditBalance(user);
+    const balance = await getCreditBalance(user);
     if (balance.available < creditCost) {
       return json({ error: 'insufficient credits' }, 402);
     }

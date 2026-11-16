@@ -1,4 +1,4 @@
-import type { CreditBalance, PlanTier, UserCredits } from '../types';
+import type { CreditBalance, PlanTier, TeamCredits } from '../types';
 import { getPlanFeatures } from './plans';
 
 /** Timezone used for monthly credit reset boundaries. */
@@ -96,8 +96,9 @@ function toNonNegative(value: number | null | undefined): number {
  */
 export function resolveCreditBalance(
   plan: PlanTier,
-  credits: UserCredits | null | undefined,
+  credits: TeamCredits | null | undefined,
   now: Date = new Date(),
+  seats: number = 1,
 ): CreditBalance {
   const features = getPlanFeatures(plan);
   const storedPeriodStart = credits?.periodStart ? new Date(credits.periodStart) : null;
@@ -105,7 +106,7 @@ export function resolveCreditBalance(
     && !Number.isNaN(storedPeriodStart.getTime())
     && isSameZonedMonth(storedPeriodStart, now);
 
-  const monthlyAllowance = toNonNegative(features.sharedMonthlyCreditsPerUser);
+  const monthlyAllowance = toNonNegative(features.sharedMonthlyCreditsPerUser) * Math.max(1, seats);
   const monthlyUsed = periodIsCurrent
     ? Math.min(toNonNegative(credits?.monthlyUsed), monthlyAllowance)
     : 0;

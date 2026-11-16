@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUserCache } from './internal';
 import { isDuplicateKeyError } from '../http';
 import { invalidateAuthEntries } from '../authCache';
-import type { Team, TeamAuditLog, TeamRole, User, AttachedSubscription, TeamInvite } from '@common';
+import type { Team, TeamAuditLog, TeamRole, User, AttachedSubscription, TeamInvite, TeamCredits, SubscriptionTier } from '@common';
+import { getCreditPeriodStart } from '@common';
 import { addAttachedSubscription, removeAttachedSubscription, getUserFromUuid, upsertPaidSubscription, removePaidSubscription } from './users';
 import { getActivePaidSubscription } from '@common';
 import { updateSubscriptionQuantity, cancelStripeSubscription } from '../stripe';
@@ -17,6 +18,12 @@ export async function getTeamById(id: string): Promise<Team | null> {
   return teams.findOne({ id });
 }
 
+export async function updateTeamCredits(teamId: string, credits: TeamCredits): Promise<void> {
+  const teams = await getCollection('teams');
+  trackMongoOperation('updateOne', TEAMS_COLLECTION);
+  await teams.updateOne({ id: teamId }, { $set: { credits: normalizeDateValues(credits), updatedAt: new Date() } });
+}
+
 export async function getTeamByManagerUuid(managerUuid: string): Promise<Team | null> {
   const teams = await getCollection('teams');
   trackMongoOperation('findOne', TEAMS_COLLECTION);
@@ -28,19 +35,20 @@ export async function getTeamForUser(user: Pick<User, 'uuid' | 'teamId' | 'paidS
     return getTeamById(user.teamId);
   }
 
-  // A user with an active paid team subscription is an implicit team manager.
+  // Every user belongs to a team. The team's subscription tier determines the
+  // shared features and seat limit; fall back to 'free' when there is no paid
+  // or attached subscription.
   const paid = getActivePaidSubscription(user as Pick<User, 'paidSubscriptions'>);
-  if (paid?.tier.startsWith('team-')) {
+  if (paid) {
     return ensureTeamForManager(user.uuid, paid.tier);
   }
 
-  // Attached (granted) team subscriptions also create a team, with no seat billing.
-  const attached = (user.attachedSubscriptions ?? []).find((s) => s.tier.startsWith('team-') && (s.expiresAt === null || new Date(s.expiresAt).getTime() > Date.now()));
+  const attached = (user.attachedSubscriptions ?? []).find((s) => s.expiresAt === null || new Date(s.expiresAt).getTime() > Date.now());
   if (attached) {
     return ensureTeamForManager(user.uuid, attached.tier);
   }
 
-  return null;
+  return ensureTeamForManager(user.uuid, 'free');
 }
 
 export async function ensureTeamForManager(managerUuid: string, tier?: string): Promise<Team | null> {
@@ -51,14 +59,19 @@ export async function ensureTeamForManager(managerUuid: string, tier?: string): 
   if (!user) return null;
 
   const paid = getActivePaidSubscription(user);
-  const resolvedTier = (tier ?? paid?.tier) as string | undefined;
-  if (!resolvedTier?.startsWith('team-')) return null;
+  const resolvedTier = (tier ?? paid?.tier ?? 'free') as string;
 
   const now = new Date();
   const team: Team = {
     id: randomUUID(),
     managerUuid,
     tier: resolvedTier as Team['tier'],
+    credits: {
+      periodStart: getCreditPeriodStart(now),
+      monthlyUsed: 0,
+      additional: 0,
+      onHold: 0,
+    },
     createdAt: now,
     updatedAt: now,
   };
@@ -99,7 +112,7 @@ export async function clearUserTeamMembership(userUuid: string): Promise<void> {
 
 export async function getTeamScopeUuid(user: Pick<User, 'uuid' | 'teamId' | 'paidSubscriptions' | 'attachedSubscriptions'>): Promise<string> {
   const team = await getTeamForUser(user as User);
-  return team ? team.managerUuid : user.uuid;
+  return team ? team.id : user.uuid;
 }
 
 export async function getTeamScopeUsername(user: Pick<User, 'uuid' | 'teamId' | 'paidSubscriptions' | 'attachedSubscriptions'>): Promise<string> {
@@ -188,17 +201,17 @@ export async function addTeamMember(params: {
   await cancelUserPaidSubscriptions(target);
 
   // Attach team subscription to target if not already on this team.
-  const existingSub = (target.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === team.tier);
+  const existingSub = (target.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === (team.tier as SubscriptionTier));
   let subscriptionId: string;
   if (existingSub) {
     subscriptionId = existingSub.id;
   } else {
-    const seats = manager.paidSubscriptions?.find((s) => s.tier === team.tier)?.quantity ?? 1;
+    const seats = manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.quantity ?? 1;
     const subscription: AttachedSubscription = {
       id: randomUUID(),
-      tier: team.tier,
+      tier: team.tier as SubscriptionTier,
       createdAt: new Date(),
-      expiresAt: manager.paidSubscriptions?.find((s) => s.tier === team.tier)?.currentPeriodEnd ?? null,
+      expiresAt: manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.currentPeriodEnd ?? null,
       addedByUuid: manager.uuid,
       addedByUsername: manager.username,
       reason: 'team membership',
@@ -371,16 +384,16 @@ export async function revokeTeamInvite(teamId: string, inviteId: string): Promis
 
 async function migrateUserDataToTeam(userUuid: string, team: Team): Promise<void> {
   const manager = await getUserFromUuid(team.managerUuid);
-  const scopeUuid = team.managerUuid;
+  const scopeUuid = team.id;
   const scopeUsername = manager?.username ?? '';
 
   const devices = await getCollection('devices');
   trackMongoOperation('updateMany', 'devices');
-  await devices.updateMany({ ownerUuid: userUuid }, { $set: { ownerUuid: scopeUuid, ownerUsername: scopeUsername } });
+  await devices.updateMany({ teamId: userUuid }, { $set: { teamId: scopeUuid, ownerUsername: scopeUsername } });
 
   const locations = await getCollection('locations');
   trackMongoOperation('updateMany', 'locations');
-  await locations.updateMany({ ownerUuid: userUuid }, { $set: { ownerUuid: scopeUuid, ownerUsername: scopeUsername } });
+  await locations.updateMany({ teamId: userUuid }, { $set: { teamId: scopeUuid, ownerUsername: scopeUsername } });
 
   try {
     const { invalidateDeviceCachesForOwner } = await import('./devices');
@@ -406,14 +419,14 @@ export async function acceptTeamInvite(params: {
   await cancelUserPaidSubscriptions(user);
 
   // Attach subscription + membership.
-  const existingSub = (user.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === team.tier);
+  const existingSub = (user.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === (team.tier as SubscriptionTier));
   if (!existingSub) {
-    const seats = manager.paidSubscriptions?.find((s) => s.tier === team.tier)?.quantity ?? 1;
+    const seats = manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.quantity ?? 1;
     const subscription: AttachedSubscription = {
       id: randomUUID(),
-      tier: team.tier,
+      tier: team.tier as SubscriptionTier,
       createdAt: new Date(),
-      expiresAt: manager.paidSubscriptions?.find((s) => s.tier === team.tier)?.currentPeriodEnd ?? null,
+      expiresAt: manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.currentPeriodEnd ?? null,
       addedByUuid: manager.uuid,
       addedByUsername: manager.username,
       reason: 'team membership',
