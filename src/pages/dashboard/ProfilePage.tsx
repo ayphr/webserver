@@ -30,8 +30,8 @@ export const ProfilePage = () => {
     void load();
   }, []);
 
-  const handleTabChange = (id: string) => {
-    navigate(`/dashboard?tab=${encodeURIComponent(id)}`);
+  const handleTabChange = async (id: string) => {
+    await navigate(`/dashboard?tab=${encodeURIComponent(id)}`);
   };
 
   if (isLoadingCurrent) {

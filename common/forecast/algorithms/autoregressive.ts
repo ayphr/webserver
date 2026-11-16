@@ -41,7 +41,7 @@ function levinsonDurbin(r: number[], order: number): number[] {
   const tmp = new Array<number>(order + 1).fill(0);
   a[0] = 1;
   let error = r[0] ?? 0;
-  if (!(error > 1e-12)) return new Array<number>(order).fill(0);
+  if (error <= 1e-12) return new Array<number>(order).fill(0);
 
   for (let i = 1; i <= order; i += 1) {
     let acc = r[i] ?? 0;
@@ -51,7 +51,7 @@ function levinsonDurbin(r: number[], order: number): number[] {
     tmp[i] = reflection;
     for (let j = 1; j <= i; j += 1) a[j] = tmp[j]!;
     error *= 1 - reflection * reflection;
-    if (!(error > 1e-12)) break;
+    if (error <= 1e-12) break;
   }
 
   const coefficients = new Array<number>(order).fill(0);
@@ -186,7 +186,7 @@ export class RecursiveLeastSquaresAR implements ForecastAlgorithm {
       );
       let denominator = this.forgetting;
       for (let i = 0; i < this.size; i += 1) denominator += phi[i]! * pPhi[i]!;
-      if (!(Math.abs(denominator) > 1e-12)) return;
+      if (Math.abs(denominator) <= 1e-12) return;
 
       const gain = pPhi.map((entry) => entry / denominator);
       let prediction = 0;

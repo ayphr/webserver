@@ -62,8 +62,7 @@ export class UnscentedKalmanFilter {
     const points: number[][] = [this.mean.slice()];
     for (let i = 0; i < this.dimension; i += 1) {
       const column = root.map((row) => row[i]!);
-      points.push(this.mean.map((value, d) => value + column[d]!));
-      points.push(this.mean.map((value, d) => value - column[d]!));
+      points.push(this.mean.map((value, d) => value + column[d]!), this.mean.map((value, d) => value - column[d]!));
     }
     this.sigmaPoints = points;
   }

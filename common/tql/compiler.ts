@@ -109,7 +109,7 @@ export function setNestedValue(obj: Record<string, unknown>, path: string, value
  */
 export function parseDurationMs(duration: string): number {
   const trimmed = duration.trim().toLowerCase();
-  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)?$/);
+  const match = new RegExp(/^(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)?$/).exec(trimmed);
   if (!match) {
     const asNum = Number(trimmed);
     if (!Number.isNaN(asNum)) return asNum;
@@ -273,7 +273,7 @@ export class Compiler {
         const field = normalizeFieldPath(ast.field, varName);
         return (point: T) => {
           const val = getNestedValue(point, field);
-          const has = values.some((candidate) => candidate === val);
+          const has = values.includes(val as string | number | boolean);
           return negated ? !has : has;
         };
       }

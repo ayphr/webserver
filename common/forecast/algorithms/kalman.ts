@@ -36,12 +36,10 @@ function buildProcessNoise(dt: number, order: number): number[][] {
 }
 
 function measurementNoise(ctx: AlgorithmContext, index: number, varScale: number): number {
-  const frameNoise =
-    index === 0
-      ? ctx.frame.temperatureNoise
-      : index === 1
-        ? ctx.frame.mixingRatioNoise
-        : ctx.frame.pressureNoise;
+  let frameNoise = ctx.frame.pressureNoise;
+  if (index == 0) frameNoise = ctx.frame.temperatureNoise;
+  if (index == 1) frameNoise = ctx.frame.mixingRatioNoise;
+  
   return Math.max(frameNoise, 1e-3 * varScale, 1e-10);
 }
 
