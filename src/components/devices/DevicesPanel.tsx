@@ -246,10 +246,12 @@ function createMetricConfig(
     scales: {
       x: {
         type: 'linear' as const,
-        display: showXAxis,
+        display: true,
         ...(zoomWindow ? { min: zoomWindow.initialMin, max: zoomWindow.initialMax } : {}),
+        border: { display: showXAxis },
         grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
+          display: showXAxis,
           color: 'hsl(180, 1%, 53%)',
           maxTicksLimit: 8,
           callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
@@ -257,11 +259,12 @@ function createMetricConfig(
       },
       y: {
         type: 'linear' as const,
-        display: showAxes,
+        display: true,
         position: 'left' as const,
+        border: { display: showAxes },
         title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
         grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)' },
+        ticks: { display: showAxes, color: 'hsl(180, 1%, 53%)' },
       },
     },
   };
@@ -647,10 +650,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
     const scales: Record<string, LineGraphScale> = {
       x: {
         type: 'linear',
-        display: showXAxis,
+        display: true,
         ...(graphWindow ? { min: graphWindow.initialMin, max: graphWindow.initialMax } : {}),
+        border: { display: showXAxis },
         grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
         ticks: {
+          display: showXAxis,
           color: 'hsl(180, 1%, 53%)',
           maxTicksLimit: 8,
           callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
@@ -661,23 +666,25 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
       const id = i === 0 ? 'y' : `y${i}`;
       scales[id] = {
         type: 'linear',
-        display: showAxes,
+        display: true,
         position: i === 0 ? 'left' : 'right',
+        border: { display: showAxes },
         title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
         grid: i === 0
           ? { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' }
           : { drawOnChartArea: false },
-        ticks: { color: 'hsl(180, 1%, 53%)' },
+        ticks: { display: showAxes, color: 'hsl(180, 1%, 53%)' },
       };
     });
     if (unitGroups.length === 0) {
       scales.y = {
         type: 'linear',
-        display: showAxes,
+        display: true,
         position: 'left',
+        border: { display: showAxes },
         title: { display: showAxes, text: '', color: 'hsl(180, 1%, 53%)' },
         grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)' },
+        ticks: { display: showAxes, color: 'hsl(180, 1%, 53%)' },
       };
     }
     return {

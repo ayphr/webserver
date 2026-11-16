@@ -32,6 +32,7 @@ export type LineGraphScale = {
     color?: string;
   };
   ticks?: {
+    display?: boolean;
     color?: string;
     maxTicksLimit?: number;
     callback?: (value: number | string) => string;
@@ -40,6 +41,11 @@ export type LineGraphScale = {
     display?: boolean;
     text?: string;
     color?: string;
+  };
+  border?: {
+    display?: boolean;
+    color?: string;
+    width?: number;
   };
   min?: number;
   max?: number;
