@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Checkbox, Input, Modal, Select, ProgressBar } from '../common';
-import { IconUserPlus, IconEdit } from '@tabler/icons-react';
+import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance } from '@common';
 import { getPlanFeatures } from '@common/utils/plans';
 import { TeamAuditPanel } from './TeamAuditPanel';
@@ -258,52 +258,59 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
       )}
 
       {activeTab === 'usage' && (
-        <section className="team-panel__section">
-          <h4 className="team-panel__section-title">Team usage</h4>
+        <div className="team-panel__usage-grid">
           {(() => {
             const seats = Math.max(1, members.length);
             const features = getPlanFeatures(team.tier, seats);
-            return (
-              <div className="team-panel__usage">
-                <div className="team-panel__usage-row">
-                  <span>Credits (monthly)</span>
-                  <span>
-                    {usageCredits ? `${usageCredits.monthlyUsed.toLocaleString()} / ${usageCredits.monthlyAllowance.toLocaleString()}` : '—'}
-                  </span>
-                  <ProgressBar
-                    value={usageCredits ? usageCredits.monthlyUsed : 0}
-                    max={usageCredits ? usageCredits.monthlyAllowance || 1 : 1}
-                  />
+            const items = [
+              {
+                icon: <IconCoin size={20} />,
+                label: 'Monthly credits',
+                value: usageCredits ? `${usageCredits.monthlyUsed.toLocaleString()} / ${usageCredits.monthlyAllowance.toLocaleString()}` : '—',
+                used: usageCredits ? usageCredits.monthlyUsed : 0,
+                max: usageCredits ? usageCredits.monthlyAllowance || 1 : 1,
+              },
+              {
+                icon: <IconCoin size={20} />,
+                label: 'Additional credits',
+                value: usageCredits ? `${usageCredits.additional.toLocaleString()} / ${usageCredits.additionalLimit.toLocaleString()}` : '—',
+                used: usageCredits ? usageCredits.additional : 0,
+                max: usageCredits ? usageCredits.additionalLimit || 1 : 1,
+              },
+              {
+                icon: <IconDeviceDesktop size={20} />,
+                label: 'Devices',
+                value: `${usageDevices.count} / ${features.maxDevices}`,
+                used: usageDevices.count,
+                max: features.maxDevices,
+              },
+              {
+                icon: <IconMapPin size={20} />,
+                label: 'Locations',
+                value: `${usageLocations} / ${features.maxLocations}`,
+                used: usageLocations,
+                max: features.maxLocations,
+              },
+              {
+                icon: <IconDatabase size={20} />,
+                label: 'Data points',
+                value: `${usageDevices.dataPoints.toLocaleString()} / ${features.sharedMaxDataPointsPerUser.toLocaleString()}`,
+                used: usageDevices.dataPoints,
+                max: features.sharedMaxDataPointsPerUser,
+              },
+            ];
+            return items.map((item) => (
+              <div key={item.label} className="team-panel__usage-card">
+                <div className="team-panel__usage-card__header">
+                  <span className="team-panel__usage-card__icon">{item.icon}</span>
+                  <span className="team-panel__usage-card__label">{item.label}</span>
                 </div>
-                <div className="team-panel__usage-row">
-                  <span>Additional credits</span>
-                  <span>
-                    {usageCredits ? `${usageCredits.additional.toLocaleString()} / ${usageCredits.additionalLimit.toLocaleString()}` : '—'}
-                  </span>
-                  <ProgressBar
-                    value={usageCredits ? usageCredits.additional : 0}
-                    max={usageCredits ? usageCredits.additionalLimit || 1 : 1}
-                  />
-                </div>
-                <div className="team-panel__usage-row">
-                  <span>Devices</span>
-                  <span>{usageDevices.count} / {features.maxDevices}</span>
-                  <ProgressBar value={usageDevices.count} max={features.maxDevices} />
-                </div>
-                <div className="team-panel__usage-row">
-                  <span>Locations</span>
-                  <span>{usageLocations} / {features.maxLocations}</span>
-                  <ProgressBar value={usageLocations} max={features.maxLocations} />
-                </div>
-                <div className="team-panel__usage-row">
-                  <span>Data points</span>
-                  <span>{usageDevices.dataPoints.toLocaleString()} / {features.sharedMaxDataPointsPerUser.toLocaleString()}</span>
-                  <ProgressBar value={usageDevices.dataPoints} max={features.sharedMaxDataPointsPerUser} />
-                </div>
+                <div className="team-panel__usage-card__value">{item.value}</div>
+                <ProgressBar value={item.used} max={item.max} />
               </div>
-            );
+            ));
           })()}
-        </section>
+        </div>
       )}
 
       {activeTab === 'audit' && isManager && (
