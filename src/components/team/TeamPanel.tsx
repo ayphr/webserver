@@ -258,7 +258,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
       )}
 
       {activeTab === 'usage' && (
-        <div className="team-panel__usage-grid">
+        <div className="team-panel__usage-list">
           {(() => {
             const seats = Math.max(1, members.length);
             const features = getPlanFeatures(team.tier, seats);
@@ -300,12 +300,14 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
               },
             ];
             return items.map((item) => (
-              <div key={item.label} className="team-panel__usage-card">
-                <div className="team-panel__usage-card__header">
-                  <span className="team-panel__usage-card__icon">{item.icon}</span>
-                  <span className="team-panel__usage-card__label">{item.label}</span>
+              <div key={item.label} className="team-panel__usage-row-modern">
+                <div className="team-panel__usage-row-modern__top">
+                  <div className="team-panel__usage-row-modern__left">
+                    <span className="team-panel__usage-row-modern__icon">{item.icon}</span>
+                    <span className="team-panel__usage-row-modern__label">{item.label}</span>
+                  </div>
+                  <span className="team-panel__usage-row-modern__value">{item.value}</span>
                 </div>
-                <div className="team-panel__usage-card__value">{item.value}</div>
                 <ProgressBar value={item.used} max={item.max} />
               </div>
             ));
