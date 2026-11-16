@@ -2,7 +2,7 @@ import { Binary, Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type App, type OAuthAuthorizationCode, type OAuthAccessToken, type Connection, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification } from '@common';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -13,10 +13,6 @@ import {
   SESSIONS_COLLECTION,
   STRIPE_EVENTS_COLLECTION,
   AVATARS_COLLECTION,
-  APPS_COLLECTION,
-  OAUTH_CODES_COLLECTION,
-  OAUTH_TOKENS_COLLECTION,
-  CONNECTIONS_COLLECTION,
   DOMAIN_VERIFICATIONS_COLLECTION,
   LOCATIONS_COLLECTION,
   EMAIL_CODES_COLLECTION,
@@ -94,10 +90,6 @@ export interface Collections {
   sessions: Collection<Session>;
   stripeEvents: Collection<{ id: string; type: string; createdAt: Date }>;
   avatars: Collection<StoredAvatar>;
-  apps: Collection<App>;
-  oauthCodes: Collection<OAuthAuthorizationCode>;
-  oauthTokens: Collection<OAuthAccessToken>;
-  connections: Collection<Connection>;
   domainVerifications: Collection<DomainVerification>;
   locations: Collection<Location>;
   emailCodes: Collection<EmailCode>;
@@ -217,10 +209,6 @@ export async function setupCollections(db: Db): Promise<Collections> {
     sessions: db.collection<Session>(SESSIONS_COLLECTION),
     stripeEvents: db.collection<{ id: string; type: string; createdAt: Date }>(STRIPE_EVENTS_COLLECTION),
     avatars: db.collection<StoredAvatar>(AVATARS_COLLECTION),
-    apps: db.collection<App>(APPS_COLLECTION),
-    oauthCodes: db.collection<OAuthAuthorizationCode>(OAUTH_CODES_COLLECTION),
-    oauthTokens: db.collection<OAuthAccessToken>(OAUTH_TOKENS_COLLECTION),
-    connections: db.collection<Connection>(CONNECTIONS_COLLECTION),
     domainVerifications: db.collection<DomainVerification>(DOMAIN_VERIFICATIONS_COLLECTION),
     locations: db.collection<Location>(LOCATIONS_COLLECTION),
     emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION),

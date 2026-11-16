@@ -52,14 +52,6 @@ const handleUserByUuid = requireAuth(async (_request, user, params) => {
 
 
 
-const handleDeveloperToggle = requireAuth(async (request, user) => {
-  const body = await request.json().catch(() => null) as { enabled?: boolean } | null;
-  const enabled = body?.enabled === true;
-  user.developerAccount = enabled;
-  await updateUser(user);
-  return json({ user: toSelfUser(user) });
-}, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
-
 const USERNAME_CHANGE_COOLDOWN_MS = 29 * 24 * 60 * 60 * 1000;
 
 const handleUsernameChange = requireAuth(async (request, user) => {
@@ -104,4 +96,4 @@ const handleUsernameChange = requireAuth(async (request, user) => {
   return json({ user: toSelfUser(user) });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
-export { handleMe, handleUserByUuid, handleDeveloperToggle, handleUsernameChange };
+export { handleMe, handleUserByUuid, handleUsernameChange };

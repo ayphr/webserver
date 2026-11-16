@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconApps, IconPlugConnected, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -24,10 +24,6 @@ const staffTabs: Tab[] = [
   { id: 'appeals', name: 'Appeals' },
 ];
 
-const developerTabs: Tab[] = [
-  { id: 'my-apps', name: 'My Apps' },
-];
-
 const iconFor = (id: string) => {
   switch (id) {
     case 'assistant':
@@ -44,8 +40,6 @@ const iconFor = (id: string) => {
       return <IconUsers size={18} />;
     case 'appeals':
       return <IconMessage size={18} />;
-    case 'my-apps':
-      return <IconApps size={18} />;
     case 'team':
       return <IconUsersGroup size={18} />;
     case 'team-audit':
@@ -68,7 +62,6 @@ type Props = {
   avatarUrl?: string;
   isSuspended?: boolean;
   isStaff?: boolean;
-  isDeveloper?: boolean;
   isTeamMember?: boolean;
   isTeamManager?: boolean;
   credits?: CreditBalance | null;
@@ -89,7 +82,6 @@ export const Sidebar: React.FC<Props> = ({
   avatarUrl,
   isSuspended = false,
   isStaff = false,
-  isDeveloper = false,
   isTeamMember = false,
   isTeamManager = false,
   credits = null,
@@ -110,7 +102,6 @@ export const Sidebar: React.FC<Props> = ({
   const visibleTabs = [
     ...tabs,
     ...teamTabs,
-    ...(isDeveloper ? developerTabs : []),
     ...(isStaff ? staffTabs : []),
   ];
 
@@ -230,15 +221,6 @@ export const Sidebar: React.FC<Props> = ({
           >
             <span className="n-sidebar__menuIcon"><IconUser size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Profile</span>
-          </button>
-          <button
-            className={`n-sidebar__menuItem ${activeTab === 'connections' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onChange('connections')}
-            aria-label="Connections"
-          >
-            <span className="n-sidebar__menuIcon"><IconPlugConnected size={16} strokeWidth={1.5} /></span>
-            <span className="n-sidebar__menuLabel">Connections</span>
           </button>
           <button
             className={`n-sidebar__menuItem ${activeTab === 'account-settings' || activeTab === 'settings' ? 'active' : ''}`}

@@ -525,23 +525,6 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
   const locations = await getCollection('locations');
   await locations.deleteMany({ ownerUuid: user.uuid });
 
-  const apps = await getCollection('apps');
-  await apps.deleteMany({ ownerId: user.uuid });
-
-  const connections = await getCollection('connections');
-  const userConnections = await connections.find({ userId: user.uuid } as Record<string, unknown>).toArray();
-  const connectionIds = userConnections.map((connection) => connection.id);
-  await connections.deleteMany({ userId: user.uuid } as Record<string, unknown>);
-  if (connectionIds.length > 0) {
-    const oauthTokens = await getCollection('oauthTokens');
-    await oauthTokens.deleteMany({ connectionId: { $in: connectionIds } } as Record<string, unknown>);
-  }
-
-  const oauthTokens = await getCollection('oauthTokens');
-  await oauthTokens.deleteMany({ userId: user.uuid } as Record<string, unknown>);
-  const oauthCodes = await getCollection('oauthCodes');
-  await oauthCodes.deleteMany({ userId: user.uuid } as Record<string, unknown>);
-
   await deleteUser(user.uuid);
   authEventsTotal.inc({ event: 'account_delete', result: 'success' });
 

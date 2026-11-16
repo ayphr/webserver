@@ -47,14 +47,6 @@ export function createUsersApi(client: RequestClient) {
         requestedBy: response.requestedBy,
       };
     },
-    async setDeveloperAccount(enabled: boolean) {
-      const response = await client.requestJson<{ user: SelfUser }>('/api/users/me/developer', {
-        method: 'PATCH',
-        body: { enabled },
-      });
-      invalidateMe();
-      return response.user;
-    },
     async changeUsername(username: string, currentPassword: string) {
       const response = await client.requestJson<{ user: SelfUser }>('/api/users/me/username', {
         method: 'PATCH',

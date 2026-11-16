@@ -17,8 +17,6 @@ import { buildSettingsSections } from './dashboardSettings';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
-const MyAppsPanel = lazy(() => import('../../components/developer/MyAppsPanel').then((m) => ({ default: m.MyAppsPanel })));
-const ConnectionsPanel = lazy(() => import('../../components/connections/ConnectionsPanel').then((m) => ({ default: m.ConnectionsPanel })));
 const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
 const NotificationsPanel = lazy(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
 const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
@@ -28,7 +26,7 @@ const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ de
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'notifications', 'credits', 'users', 'my-apps', 'connections', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
+const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'appeal', 'appeals']);
 
 function formatDisplayDate(date: Date | string): string {
   return toDate(date).toLocaleDateString('en-GB');
@@ -77,7 +75,7 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 
 function getStoredDefaultTab(): string {
   const stored = localStorage.getItem('ayphr-pref-default-tab');
-  return stored === 'overview' || stored === 'devices' || stored === 'users' || stored === 'my-apps' ? stored : 'overview';
+  return stored === 'overview' || stored === 'devices' || stored === 'users' ? stored : 'overview';
 }
 
 type DashboardPanelProps = {
@@ -245,7 +243,6 @@ export const DashboardPage = () => {
     ? Math.min(100, Math.max(0, ((now - toDate(activeSuspension.issuedAt).getTime()) / (toDate(activeSuspension.endsAt).getTime() - toDate(activeSuspension.issuedAt).getTime())) * 100))
     : null;
   const isStaff = user?.role === 'staff';
-  const isDeveloper = user?.developerAccount === true;
   const isTeamMember = Boolean(user?.teamId) || (user?.subscription?.tier ?? '').startsWith('team-');
   const isTeamManager = user?.teamRole === 'manager' || ((user?.subscription?.tier ?? '').startsWith('team-') && !user?.teamId);
 
@@ -369,9 +366,6 @@ export const DashboardPage = () => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
       changeTab('overview');
     }
-    if (!isLoading && user && activePage === 'my-apps' && user.developerAccount !== true) {
-      changeTab('overview');
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, user, activePage]);
 
@@ -395,23 +389,14 @@ export const DashboardPage = () => {
         sidebarPinned,
         setSidebarPinnedPref,
         isStaff,
-        isDeveloper,
         now,
         navigate,
         setIsSessionsOpen,
         setIsChangePasswordOpen,
         setIsChangeEmailOpen,
         setIsChangeUsernameOpen,
-        onDeveloperToggle: async (checked) => {
-          try {
-            const updated = await api.users.setDeveloperAccount(checked);
-            setUser(updated);
-          } catch (err) {
-            console.error('Failed to update developer account:', err);
-          }
-        },
       }),
-    [credits, defaultTab, sidebarPinned, navigate, isStaff, isDeveloper, user, now],
+    [credits, defaultTab, sidebarPinned, navigate, isStaff, user, now],
   );
 
   if (isLoading) {
@@ -421,7 +406,7 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main">
           <DashboardPanel title="Dashboard">
             <p>Could not load user profile.</p>
@@ -433,7 +418,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isDeveloper={isDeveloper} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
@@ -604,22 +589,6 @@ export const DashboardPage = () => {
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <CreditsPanel key={user.uuid} initialCredits={credits} onCreditsChange={setCredits} />
-                </Suspense>
-              </DashboardPanel>
-            )}
-
-            {activePage === 'my-apps' && isDeveloper && (
-              <DashboardPanel title="My Apps" description="Create and manage your Ayphr apps">
-                <Suspense fallback={<DashboardContentSkeleton />}>
-                  <MyAppsPanel />
-                </Suspense>
-              </DashboardPanel>
-            )}
-
-            {activePage === 'connections' && (
-              <DashboardPanel title="Connections" description="Apps connected to your account">
-                <Suspense fallback={<DashboardContentSkeleton />}>
-                  <ConnectionsPanel />
                 </Suspense>
               </DashboardPanel>
             )}

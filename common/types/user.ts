@@ -58,7 +58,6 @@ export type User = {
   lastActive: Date;
   country?: string;
   gameBests?: GameBests;
-  developerAccount?: boolean;
   stripeCustomerId?: string;
   paidSubscriptions?: PaidSubscription[];
   attachedSubscriptions?: AttachedSubscription[];

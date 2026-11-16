@@ -1,4 +1,4 @@
-import { IconApps, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconTrash, IconUser } from '@tabler/icons-react';
+import { IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconTrash, IconUser } from '@tabler/icons-react';
 import type { SettingsSection } from '../../lib/settings';
 import type { SelfUser , CreditBalance } from '@common';
 import type { NavigateFunction } from 'react-router-dom';
@@ -11,14 +11,12 @@ export interface SettingsSectionsParams {
   sidebarPinned: boolean;
   setSidebarPinnedPref: (checked: boolean) => void;
   isStaff: boolean;
-  isDeveloper: boolean;
   now: number;
   navigate: NavigateFunction;
   setIsSessionsOpen: (open: boolean) => void;
   setIsChangePasswordOpen: (open: boolean) => void;
   setIsChangeEmailOpen: (open: boolean) => void;
   setIsChangeUsernameOpen: (open: boolean) => void;
-  onDeveloperToggle: (checked: boolean) => Promise<void>;
 }
 
 export function buildSettingsSections(params: SettingsSectionsParams): SettingsSection[] {
@@ -29,14 +27,12 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
     sidebarPinned,
     setSidebarPinnedPref,
     isStaff,
-    isDeveloper,
     now,
     navigate,
     setIsSessionsOpen,
     setIsChangePasswordOpen,
     setIsChangeEmailOpen,
     setIsChangeUsernameOpen,
-    onDeveloperToggle,
   } = params;
 
   return [
@@ -186,27 +182,6 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
       ],
     },
     {
-      id: 'developer',
-      title: 'Developer',
-      options: [
-        {
-          id: 'developer-account',
-          optionType: 'checkbox',
-          icon: <IconApps size={18} strokeWidth={1.75} />,
-          title: 'Developer account',
-          description: 'Enable developer features like creating apps.',
-          checked: user?.developerAccount === true,
-          onChange: async (checked) => {
-            try {
-              await onDeveloperToggle(checked);
-            } catch {
-              // ignore
-            }
-          },
-        },
-      ],
-    },
-    {
       id: 'preferences',
       title: 'Preferences',
       options: [
@@ -224,11 +199,9 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
             { value: 'profile', label: 'Profile' },
             { value: 'credits', label: 'Credits' },
             { value: 'games', label: 'Games' },
-            { value: 'connections', label: 'Connections' },
             { value: 'subscription', label: 'Subscription' },
             { value: 'team', label: 'Team' },
             ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
-            ...(isDeveloper ? [{ value: 'my-apps', label: 'My Apps' }] : []),
           ],
           onChange: setDefaultTabPref,
         },

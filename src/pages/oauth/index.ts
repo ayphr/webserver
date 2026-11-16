@@ -1,1 +1,0 @@
-export { AuthorizePage } from './AuthorizePage';

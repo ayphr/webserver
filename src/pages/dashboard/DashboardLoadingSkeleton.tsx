@@ -38,7 +38,6 @@ export const DashboardLoadingSkeleton = ({ activeTab = 'overview' }: DashboardLo
       activeTab={activeTab}
       onChange={() => undefined}
       username="..."
-      isDeveloper={false}
       pinned={localStorage.getItem('ayphr-pref-sidebar-pinned') === '1'}
       credits={null}
     />

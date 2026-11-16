@@ -1,7 +1,4 @@
 import { createAuthApi } from './auth';
-import { createOAuthApi } from './oauth';
-import { createDeveloperApi } from './developer';
-import { createConnectionsApi } from './connections';
 import { createDevicesApi } from './devices';
 import { createLocationsApi } from './locations';
 import { createGamesApi } from './games';
@@ -24,9 +21,6 @@ export type AyphrApiClient = RequestClient & {
   getStatus: () => Promise<string>;
   auth: ReturnType<typeof createAuthApi>;
   games: ReturnType<typeof createGamesApi>;
-  oauth: ReturnType<typeof createOAuthApi>;
-  developer: ReturnType<typeof createDeveloperApi>;
-  connections: ReturnType<typeof createConnectionsApi>;
   users: ReturnType<typeof createUsersApi>;
   profile: ReturnType<typeof createProfileApi>;
   punishments: ReturnType<typeof createPunishmentsApi>;
@@ -59,9 +53,6 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
       return client.requestText('/api/status', { auth: false });
     },
     auth: createAuthApi(client),
-    oauth: createOAuthApi(client),
-    developer: createDeveloperApi(client),
-    connections: createConnectionsApi(client),
     users: createUsersApi(client),
     profile: createProfileApi(client),
     punishments: createPunishmentsApi(client),

@@ -54,26 +54,8 @@ import {
   handleUpload,
 } from './routes/devices';
 import { handleLocationsListMine, handleLocationCreate, handleLocationGet, handleLocationUpdate, handleLocationDelete } from './routes/locations';
-import {
-  handleListApps,
-  handleCreateApp,
-  handleGetApp,
-  handleUpdateApp,
-  handleDeleteApp,
-  handleRegenerateSecret,
-} from './routes/developer';
-import {
-  handlePublicApp,
-  handleAuthorize,
-  handleToken,
-  handleUserinfo,
-  handleOAuthDevices,
-  handleConnectionsList,
-  handleRevokeConnection,
-  handleRevokeToken,
-} from './routes/oauth';
 import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './routes/avatars';
-import { handleUserByUuid, handleMe as handleUsersMe, handleDeveloperToggle, handleUsernameChange } from './routes/users';
+import { handleUserByUuid, handleMe as handleUsersMe, handleUsernameChange } from './routes/users';
 import { handleCreditsMe } from './routes/credits';
 import { handleGetBests as handleGamesBestsGet, handleUpdateBest as handleGamesBestsUpdate } from './routes/games';
 import {
@@ -150,7 +132,6 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/games/bests', handle: handleGamesBestsGet },
   { method: 'POST', path: '/api/games/bests', handle: handleGamesBestsUpdate },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
-  { method: 'PATCH', path: '/api/users/me/developer', handle: handleDeveloperToggle },
   { method: 'PATCH', path: '/api/users/me/username', handle: handleUsernameChange },
 
   { method: 'GET', path: '/api/avatars/:uuid', handle: handleAvatarGet },
@@ -237,23 +218,6 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/profile/domain-challenge', handle: handleDomainChallenge },
   { method: 'POST', path: '/api/profile/domain-verify', handle: handleDomainVerify },
   { method: 'POST', path: '/api/profile/domain-reverify', handle: handleDomainReverify },
-
-  { method: 'GET', path: '/api/developer/apps', handle: handleListApps },
-  { method: 'POST', path: '/api/developer/apps', handle: handleCreateApp },
-  { method: 'GET', path: '/api/developer/apps/:id', handle: handleGetApp },
-  { method: 'PATCH', path: '/api/developer/apps/:id', handle: handleUpdateApp },
-  { method: 'DELETE', path: '/api/developer/apps/:id', handle: handleDeleteApp },
-  { method: 'POST', path: '/api/developer/apps/:id/regenerate-secret', handle: handleRegenerateSecret },
-
-  { method: 'GET', path: '/api/oauth/apps/:clientId', handle: handlePublicApp },
-  { method: 'POST', path: '/api/oauth/authorize', handle: handleAuthorize },
-  { method: 'POST', path: '/api/oauth/token', handle: handleToken },
-  { method: 'POST', path: '/api/oauth/revoke', handle: handleRevokeToken },
-  { method: 'GET', path: '/api/oauth/userinfo', handle: handleUserinfo },
-  { method: 'GET', path: '/api/oauth/devices', handle: handleOAuthDevices },
-
-  { method: 'GET', path: '/api/connections', handle: handleConnectionsList },
-  { method: 'DELETE', path: '/api/connections/:id', handle: handleRevokeConnection },
 
   { method: 'GET', path: '/api/staff/summary', handle: handleUsersSummary },
   { method: 'GET', path: '/api/staff/users', handle: handleStaffUsers },
