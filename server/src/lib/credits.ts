@@ -1,14 +1,14 @@
 import type { CreditBalance, User, TeamCredits } from '@common';
 import { getCreditPeriodStart, getPlanTier, resolveCreditBalance } from '@common';
 import { getUserFromUuid } from './db';
-import { getTeamForUser, updateTeamCredits, getTeamSeatLimit } from './db/teams';
+import { getTeamForUser, updateTeamCredits, getTeamSharedSeats } from './db/teams';
 
 type CreditUser = Pick<User, 'uuid' | 'paidSubscriptions' | 'attachedSubscriptions' | 'teamId'>;
 
 async function getTeamContext(user: CreditUser) {
   const team = await getTeamForUser(user as unknown as User);
   const manager = team ? await getUserFromUuid(team.managerUuid) : null;
-  const seats = team && manager ? await getTeamSeatLimit(team, manager) : 1;
+  const seats = team && manager ? await getTeamSharedSeats(team, manager) : 1;
   const tier = (team?.tier ?? getPlanTier(user)) as Parameters<typeof resolveCreditBalance>[0];
   return { team, manager, seats, tier };
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Checkbox, Input, Modal, Select } from '../common';
+import { Button, Checkbox, Input, Modal, Select, ProgressBar } from '../common';
 import { IconUserPlus, IconEdit } from '@tabler/icons-react';
-import type { Team, TeamMember, TeamRole, TeamInvite } from '@common';
+import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance } from '@common';
+import { getPlanFeatures } from '@common/utils/plans';
 import { TeamAuditPanel } from './TeamAuditPanel';
 import './TeamPanel.css';
 
@@ -17,7 +18,7 @@ type TeamPanelProps = {
   userUuid?: string;
 };
 
-type TeamTab = 'members' | 'audit' | 'settings';
+type TeamTab = 'members' | 'usage' | 'audit' | 'settings';
 
 export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [team, setTeam] = useState<Team | null>(null);
@@ -34,6 +35,9 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [activeTab, setActiveTab] = useState<TeamTab>('members');
   const [teamName, setTeamName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
+  const [usageCredits, setUsageCredits] = useState<CreditBalance | null>(null);
+  const [usageDevices, setUsageDevices] = useState<{ count: number; dataPoints: number }>({ count: 0, dataPoints: 0 });
+  const [usageLocations, setUsageLocations] = useState(0);
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameSuccess, setNameSuccess] = useState<string | null>(null);
 
@@ -61,6 +65,30 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'usage') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const credits = await api.credits.me();
+        const devices = await api.devices.listMine();
+        const locations = await api.locations.listMine();
+        if (cancelled) return;
+        setUsageCredits(credits);
+        setUsageDevices({
+          count: devices.length,
+          dataPoints: devices.reduce((sum, d) => sum + (d.dataPointCount ?? 0), 0),
+        });
+        setUsageLocations(locations.length);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
   const handleInvite = async () => {
     const value = identifier.trim();
@@ -144,6 +172,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
 
   const tabs: { id: TeamTab; label: string }[] = [
     { id: 'members', label: 'Members' },
+    { id: 'usage', label: 'Usage' },
     ...(isManager ? [{ id: 'audit' as TeamTab, label: 'Audit' }, { id: 'settings' as TeamTab, label: 'Settings' }] : []),
   ];
 
@@ -226,6 +255,55 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
             </section>
           )}
         </>
+      )}
+
+      {activeTab === 'usage' && (
+        <section className="team-panel__section">
+          <h4 className="team-panel__section-title">Team usage</h4>
+          {(() => {
+            const seats = Math.max(1, members.length);
+            const features = getPlanFeatures(team.tier, seats);
+            return (
+              <div className="team-panel__usage">
+                <div className="team-panel__usage-row">
+                  <span>Credits (monthly)</span>
+                  <span>
+                    {usageCredits ? `${usageCredits.monthlyUsed.toLocaleString()} / ${usageCredits.monthlyAllowance.toLocaleString()}` : '—'}
+                  </span>
+                  <ProgressBar
+                    value={usageCredits ? usageCredits.monthlyUsed : 0}
+                    max={usageCredits ? usageCredits.monthlyAllowance || 1 : 1}
+                  />
+                </div>
+                <div className="team-panel__usage-row">
+                  <span>Additional credits</span>
+                  <span>
+                    {usageCredits ? `${usageCredits.additional.toLocaleString()} / ${usageCredits.additionalLimit.toLocaleString()}` : '—'}
+                  </span>
+                  <ProgressBar
+                    value={usageCredits ? usageCredits.additional : 0}
+                    max={usageCredits ? usageCredits.additionalLimit || 1 : 1}
+                  />
+                </div>
+                <div className="team-panel__usage-row">
+                  <span>Devices</span>
+                  <span>{usageDevices.count} / {features.maxDevices}</span>
+                  <ProgressBar value={usageDevices.count} max={features.maxDevices} />
+                </div>
+                <div className="team-panel__usage-row">
+                  <span>Locations</span>
+                  <span>{usageLocations} / {features.maxLocations}</span>
+                  <ProgressBar value={usageLocations} max={features.maxLocations} />
+                </div>
+                <div className="team-panel__usage-row">
+                  <span>Data points</span>
+                  <span>{usageDevices.dataPoints.toLocaleString()} / {features.sharedMaxDataPointsPerUser.toLocaleString()}</span>
+                  <ProgressBar value={usageDevices.dataPoints} max={features.sharedMaxDataPointsPerUser} />
+                </div>
+              </div>
+            );
+          })()}
+        </section>
       )}
 
       {activeTab === 'audit' && isManager && (

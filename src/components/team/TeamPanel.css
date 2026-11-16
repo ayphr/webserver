@@ -172,3 +172,19 @@
   justify-content: space-between;
   gap: 0.5rem;
 }
+
+.team-panel__usage {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.team-panel__usage-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.team-panel__usage-row > span:first-child {
+  font-weight: 600;
+}

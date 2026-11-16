@@ -5,7 +5,7 @@ import type { DataPoint, DeviceForecastPayload, ForecastSample } from '@common';
 import { forecastFromHistory, forecastHorizons, FORECAST_STEP_SECONDS } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
-import { Button } from '../common';
+import { Button, ProgressBar } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphConfig, LineGraphData } from '../graphs/types';
 import { getSeriesDefinition } from '../../lib/series';
@@ -435,7 +435,7 @@ const historyOptions = [
       {loading ? (
         <div className="forecast-tab forecast-tab--loading">
           <div className="forecast-tab__progress">
-            <div className="forecast-tab__progress-bar" style={{ width: `${progress}%` }} />
+            <ProgressBar value={progress} />
           </div>
           <p className="forecast-tab__progress-caption">Calculating forecast… {progress}%</p>
         </div>

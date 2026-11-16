@@ -478,3 +478,16 @@ export async function getTeamSeatLimit(team: Team, manager: User): Promise<numbe
   // Attached/granted team plans: no seat billing, use plan max.
   return (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
 }
+
+/**
+ * Seat count used for shared, per-seat limits (credits, data points, ...).
+ * Paid teams use billed seats; granted teams use the actual member count.
+ */
+export async function getTeamSharedSeats(team: Team, manager: User): Promise<number> {
+  const paid = getActivePaidSubscription(manager);
+  if (paid?.tier === (team.tier as SubscriptionTier)) {
+    return Math.max(1, paid.quantity ?? 1);
+  }
+  const members = await getTeamMembers(team.id);
+  return Math.max(1, members.length);
+}

@@ -32,7 +32,7 @@ import {
   upsertDataPoints,
   type DeviceDocument,
 } from '../../lib/db';
-import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSeatLimit, getTeamById } from '../../lib/db/teams';
+import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSharedSeats, getTeamById } from '../../lib/db/teams';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
@@ -192,7 +192,7 @@ async function pruneOwnerDataPoints(
 
     const team = await getTeamForUser(owner);
     const manager = team ? await getUserFromUuid(team.managerUuid) : null;
-    const seats = team && manager ? await getTeamSeatLimit(team, manager) : undefined;
+    const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
     const features = getPlanFeaturesForUser(owner, seats);
     const cutoff = new Date(now - features.dataRetentionDays * 86_400_000);
     const removed = await pruneDataPointsForSerials(
@@ -594,7 +594,7 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
 
   const team = await getTeamForUser(user);
   const manager = team ? await getUserFromUuid(team.managerUuid) : null;
-  const seats = team && manager ? await getTeamSeatLimit(team, manager) : undefined;
+  const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
   const features = getPlanFeaturesForUser(user, seats);
 
   const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
@@ -765,7 +765,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
 
   const team = await getTeamForUser(user);
   const manager = team ? await getUserFromUuid(team.managerUuid) : null;
-  const seats = team && manager ? await getTeamSeatLimit(team, manager) : undefined;
+  const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
   const features = getPlanFeaturesForUser(user, seats);
 
   if (count < 1 || count > features.dataFillMaxPoints) {

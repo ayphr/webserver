@@ -6,7 +6,7 @@ import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAcc
 import { toDate } from '../../lib/date';
 import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
 
-import { ProfileCard, Button, AssistantInput, Pagination } from '../../components/common';
+import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -445,10 +445,7 @@ export const DashboardPage = () => {
               {suspensionProgress !== null && (
                 <div className="dashboard-page__suspension-card__progress">
                   <div className="dashboard-page__suspension-card__progress-bar">
-                    <div
-                      className="dashboard-page__suspension-card__progress-fill"
-                      style={{ width: `${suspensionProgress}%` }}
-                    />
+                    <ProgressBar value={suspensionProgress} color="var(--status-error)" />
                   </div>
                   <span className="dashboard-page__suspension-card__progress-label">{Math.round(suspensionProgress)}% elapsed</span>
                 </div>
