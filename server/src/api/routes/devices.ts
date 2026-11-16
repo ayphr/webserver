@@ -728,7 +728,7 @@ const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
   if (!device) return json({ error: 'not found' }, 404);
   if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
-  // Role check: deleting requires manager (or individual owner).
+  // Role check: deleting requires a team manager.
   if (team) {
     const role = getTeamRole(user);
     if (role !== 'manager') {
