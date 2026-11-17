@@ -1,21 +1,21 @@
-import type { AttachedSubscription, PaidSubscription, PlanFeatures, PlanTier, PublicUser, User } from '../types';
+import type { PlanFeatures, PlanTier, PublicUser } from '../types';
 import { PLAN_FEATURES } from '../types/plans';
-import { isAttachedSubscriptionActive, isPaidSubscriptionActive, resolveSubscription } from './subscriptions';
 
 export type PlanUser =
-  | Pick<User, 'paidSubscriptions' | 'attachedSubscriptions'>
+  | PlanTier
   | Pick<PublicUser, 'subscription'>
   | null
   | undefined;
 
 export function getPlanTier(user: PlanUser): PlanTier {
   if (!user) return 'free';
+  if (typeof user === 'string') return user;
 
   if ('subscription' in user) {
     return user.subscription?.tier ?? 'free';
   }
 
-  return resolveSubscription(user)?.tier ?? 'free';
+  return 'free';
 }
 
 export function resolvePlanTier(user: PlanUser): PlanTier {
@@ -32,27 +32,10 @@ export function getTierForUser(user: PlanUser): PlanTier {
 
 export function getPlanSeats(user: PlanUser): number {
   if (!user) return 1;
+  if (typeof user === 'string') return 1;
 
   if ('subscription' in user && user.subscription && typeof user.subscription.seats === 'number') {
     return Math.max(1, user.subscription.seats);
-  }
-
-  if ('paidSubscriptions' in user && Array.isArray(user.paidSubscriptions)) {
-    const activePaid = user.paidSubscriptions.find(
-      (s: PaidSubscription) => isPaidSubscriptionActive(s),
-    );
-    if (activePaid && typeof activePaid.quantity === 'number' && activePaid.quantity > 1) {
-      return Math.max(1, activePaid.quantity);
-    }
-  }
-
-  if ('attachedSubscriptions' in user && Array.isArray(user.attachedSubscriptions)) {
-    const activeAttached = user.attachedSubscriptions.find(
-      (s: AttachedSubscription) => isAttachedSubscriptionActive(s),
-    );
-    if (activeAttached && typeof activeAttached.seats === 'number' && activeAttached.seats > 1) {
-      return Math.max(1, activeAttached.seats);
-    }
   }
 
   return 1;

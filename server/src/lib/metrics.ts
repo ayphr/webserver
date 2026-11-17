@@ -238,13 +238,6 @@ export const stripeWebhookErrorsTotal = new Counter({
   registers: [registry],
 });
 
-export const subscriptionEventsTotal = new Counter({
-  name: 'ayphr_subscription_events_total',
-  help: 'Application-level subscription events (checkout, portal, auto-renew).',
-  labelNames: ['event'],
-  registers: [registry],
-});
-
 // ---------------------------------------------------------------------------
 // Storage / cache
 // ---------------------------------------------------------------------------

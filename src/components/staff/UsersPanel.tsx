@@ -5,12 +5,11 @@ import { api } from '../../lib/api';
 import type {
   PublicUser,
   StaffUserSubscriptionStatus,
-  SubscriptionSource,
   SubscriptionTier,
   UserRole,
 } from '@common';
 import { BADGES, SUBSCRIPTION_TIERS } from '@common';
-import { Button, Input, ManageSubscriptionsModal, Pagination, PunishModal, Select, UsernameDisplay } from '../common';
+import { Button, Input, Pagination, PunishModal, Select, UsernameDisplay } from '../common';
 import { SetPasswordModal } from './SetPasswordModal';
 import { getBadgeIcon } from '../../lib/badges';
 import './UsersPanel.css';
@@ -24,12 +23,6 @@ function getTierName(tier: SubscriptionTier): string {
 const TIER_OPTIONS = [
   { value: '', label: 'Any subscription' },
   ...SUBSCRIPTION_TIERS.map((tier) => ({ value: tier, label: getTierName(tier) })),
-];
-
-const SOURCE_OPTIONS = [
-  { value: '', label: 'Any source' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'attached', label: 'Granted' },
 ];
 
 const STATUS_OPTIONS = [
@@ -49,11 +42,10 @@ type Filters = {
   search: string;
   role: '' | UserRole;
   tier: '' | SubscriptionTier;
-  source: '' | SubscriptionSource;
   status: '' | StaffUserSubscriptionStatus;
 };
 
-const EMPTY_FILTERS: Filters = { search: '', role: '', tier: '', source: '', status: '' };
+const EMPTY_FILTERS: Filters = { search: '', role: '', tier: '', status: '' };
 
 type PagedUsers = {
   users: PublicUser[];
@@ -71,7 +63,6 @@ export const UsersPanel = () => {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [punishTarget, setPunishTarget] = useState<PublicUser | null>(null);
-  const [subsTarget, setSubsTarget] = useState<PublicUser | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<PublicUser | null>(null);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
 
@@ -95,7 +86,6 @@ export const UsersPanel = () => {
           search: debouncedSearch || undefined,
           role: filters.role || undefined,
           tier: filters.tier || undefined,
-          source: filters.source || undefined,
           status: filters.status || undefined,
           page,
           pageSize: PAGE_SIZE,
@@ -117,7 +107,7 @@ export const UsersPanel = () => {
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, filters.role, filters.tier, filters.source, filters.status, page, reloadToken]);
+  }, [debouncedSearch, filters.role, filters.tier, filters.status, page, reloadToken]);
 
   const hasFilters = useMemo(
     () => Object.values(filters).some((value) => value !== ''),
@@ -188,13 +178,6 @@ export const UsersPanel = () => {
           />
           <Select
             className="users-panel__filter"
-            aria-label="Filter by subscription source"
-            value={filters.source}
-            onChange={(event) => updateFilter('source', event.target.value as Filters['source'])}
-            options={SOURCE_OPTIONS}
-          />
-          <Select
-            className="users-panel__filter"
             aria-label="Filter by subscription status"
             value={filters.status}
             onChange={(event) => updateFilter('status', event.target.value as Filters['status'])}
@@ -242,13 +225,8 @@ export const UsersPanel = () => {
                         {getBadgeIcon(user.subscription.tier)}
                       </span>
                       {getTierName(user.subscription.tier)}
-                      <span className="users-panel__subscriptionSource">({user.subscription.source})</span>
                     </span>
-                  ) : (
-                    <span className="users-panel__subscription users-panel__subscription--none">
-                      No active subscription
-                    </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -270,9 +248,7 @@ export const UsersPanel = () => {
                 >
                   <IconEdit size={16} /> Edit
                 </Button>
-                <Button variant="secondary" onClick={() => setSubsTarget(user)}>
-                  Subscriptions
-                </Button>
+
                 <Button variant="secondary" onClick={() => setPasswordTarget(user)}>
                   <IconKey size={16} /> Password
                 </Button>
@@ -305,18 +281,6 @@ export const UsersPanel = () => {
         />
       )}
 
-      {subsTarget && (
-        <ManageSubscriptionsModal
-          isOpen={!!subsTarget}
-          userUuid={subsTarget.uuid}
-          username={subsTarget.username}
-          onClose={() => setSubsTarget(null)}
-          onChanged={(updated) => {
-            if (updated) replaceUser(updated);
-            setReloadToken((token) => token + 1);
-          }}
-        />
-      )}
 
       {passwordTarget && (
         <SetPasswordModal

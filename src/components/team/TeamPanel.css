@@ -22,6 +22,29 @@
   font-size: 0.85rem;
 }
 
+.team-panel__switcher {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.team-panel__switcher-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.team-panel__team-count {
+  padding-bottom: 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .team-panel__header {
   display: flex;
   align-items: center;
@@ -224,4 +247,101 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+}
+
+.team-panel__subscription {
+  gap: 1.1rem;
+}
+
+.team-panel__subscription-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.team-panel__subscription-current {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-transform: capitalize;
+}
+
+.team-panel__subscription-interval {
+  max-width: 180px;
+}
+
+.team-panel__plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.team-panel__plan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.team-panel__plan--current {
+  border-color: var(--accent, #19c233);
+}
+
+.team-panel__plan-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.team-panel__plan-name {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-hv);
+}
+
+.team-panel__plan-price {
+  color: var(--text-primary);
+  font-size: 1.35rem;
+  font-weight: var(--font-weight-hv);
+  font-variant-numeric: tabular-nums;
+}
+
+.team-panel__plan-price span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.team-panel__plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  flex: 1;
+}
+
+.team-panel__subscription-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 720px) {
+  .team-panel__switcher {
+    flex-wrap: wrap;
+  }
+  .team-panel__switcher-field {
+    flex-basis: 100%;
+  }
+  .team-panel__subscription-head {
+    flex-direction: column;
+  }
 }

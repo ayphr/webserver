@@ -17,7 +17,7 @@ import { EmojiText } from './EmojiText';
 import { Tooltip } from './Tooltip';
 import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
-import { ManageSubscriptionsModal } from './ManageSubscriptionsModal';
+
 import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
 import { toDate } from '../../lib/date';
 import type { ProfileCountriesPayload, PublicUser, SocialLinkType, SocialLinks, UserRole, DomainChallengePayload } from '@common';
@@ -117,7 +117,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [isPunishModalOpen, setIsPunishModalOpen] = useState(false);
-  const [isSubscriptionsModalOpen, setIsSubscriptionsModalOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [isDnsModalOpen, setIsDnsModalOpen] = useState(false);
   const [dnsChallenge, setDnsChallenge] = useState<DomainChallengePayload | null>(null);
@@ -315,11 +314,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               Punish
             </Button>
           )}
-          {isStaff && !isEditingProfile && (
-            <Button onClick={() => setIsSubscriptionsModalOpen(true)} variant="secondary">
-              Subscriptions
-            </Button>
-          )}
+
           {isEditingProfile && (
             <>
               <Button
@@ -595,15 +590,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         />
       )}
 
-      {isStaff && user && (
-        <ManageSubscriptionsModal
-          isOpen={isSubscriptionsModalOpen}
-          userUuid={user.uuid}
-          username={user.username}
-          onClose={() => setIsSubscriptionsModalOpen(false)}
-          onChanged={() => setReloadToken((token) => token + 1)}
-        />
-      )}
 
       <DnsChallengeModal
         isOpen={isDnsModalOpen}

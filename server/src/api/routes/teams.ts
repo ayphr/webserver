@@ -18,14 +18,25 @@ import {
   getTeamSeatLimit,
   getTeamsForUser,
   setActiveTeam,
+  createTeamForUser,
+  setTeamStripeCustomerId,
 } from '../../lib/db/teams';
+import {
+  createBillingPortalSession,
+  createTeamCheckoutSession,
+  createTeamStripeCustomer,
+  getPriceIdForTier,
+  getStripe,
+  getSubscriptionPlans,
+} from '../../lib/stripe';
+import { CLIENT_URL, STRIPE_TRIAL_DAYS } from '../../env';
 import {
   getUserFromUuid,
   getUserFromUsername,
   getUserByEmail,
 } from '../../lib/db/users';
 import type { TeamRole, User } from '@common';
-import { isTeamRole } from '@common';
+import { isTeamRole, isSubscriptionTier, isPurchasableTier, isBillingInterval } from '@common';
 import { notifyUser } from '../../lib/notifications';
 
 const handleTeamMe = requireAuth(async (_request, user: User) => {
@@ -272,22 +283,6 @@ const handleTeamUpdate = requireAuth(async (request, user: User) => {
   return json({ team: updated });
 });
 
-export {
-  handleTeamMe,
-  handleTeamUpdate,
-  handleTeamMembersList,
-  handleTeamMemberAdd,
-  handleTeamMemberRoleUpdate,
-  handleTeamMemberRemove,
-  handleTeamAuditLogs,
-  handleTeamInvitesList,
-  handleTeamInviteRevoke,
-  handleTeamInviteAccept,
-  handlePendingTeamInvites,
-  handleListMyTeams,
-  handleSwitchTeam,
-};
-
 const handleListMyTeams = requireAuth(async (_request, user: User) => {
   const teams = await getTeamsForUser(user);
   return json({ teams });
@@ -305,3 +300,100 @@ const handleSwitchTeam = requireAuth(async (request, user: User) => {
   const team = await getTeamById(teamId);
   return json({ team });
 });
+
+const handleCreateTeam = requireAuth(async (request, user: User) => {
+  const body = await readJsonBody(request);
+  const name = typeof body?.name === 'string' ? body.name.trim() : undefined;
+  const current = await getTeamsForUser(user);
+  if (current.length >= 3) return json({ error: 'team limit reached' }, 409);
+  const team = await createTeamForUser(user.uuid, name);
+  if (!team) return json({ error: 'failed to create team' }, 500);
+  return json({ team }, 201);
+});
+
+const handleTeamSubscription = requireAuth(async (_request, user: User) => {
+  const team = await getTeamForUser(user);
+  if (!team) return json({ error: 'No team found' }, 404);
+  const plans = (await getSubscriptionPlans()).filter((plan) => plan.tier.startsWith('team-'));
+  return json({ team, plans, trialDays: STRIPE_TRIAL_DAYS });
+});
+
+const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) => {
+  const team = await getTeamForUser(user);
+  if (!team) return json({ error: 'No team found' }, 404);
+  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+
+  const body = await readJsonBody(request);
+  const tier = body?.tier;
+  const interval = body?.interval;
+  if (!isSubscriptionTier(tier) || !tier.startsWith('team-')) {
+    return json({ error: 'select a valid team plan' }, 400);
+  }
+  if (!isPurchasableTier(tier)) {
+    return json({ error: 'This plan is not available for purchase' }, 400);
+  }
+  if (!isBillingInterval(interval)) {
+    return json({ error: 'interval must be "month" or "year"' }, 400);
+  }
+
+  const priceId = getPriceIdForTier(tier, interval);
+  if (!priceId) return json({ error: 'This plan is not available for purchase' }, 503);
+  if (!getStripe()) return json({ error: 'Stripe is not configured' }, 503);
+
+  let customerId = team.stripeCustomerId;
+  if (!customerId) {
+    customerId = await createTeamStripeCustomer({
+      teamId: team.id,
+      name: team.name ?? `${user.username}'s Team`,
+    }) ?? undefined;
+    if (!customerId) return json({ error: 'Failed to create billing customer' }, 502);
+    await setTeamStripeCustomerId(team.id, customerId);
+  }
+
+  const url = await createTeamCheckoutSession({
+    customerId,
+    priceId,
+    tier,
+    teamId: team.id,
+    successUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=success`,
+    cancelUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=cancel`,
+  });
+
+  if (!url) return json({ error: 'Failed to create checkout session' }, 502);
+  return json({ url });
+});
+
+const handleTeamSubscriptionPortal = requireAuth(async (_request, user: User) => {
+  const team = await getTeamForUser(user);
+  if (!team) return json({ error: 'No team found' }, 404);
+  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  if (!team.stripeCustomerId) return json({ error: 'No billing account found' }, 404);
+
+  const url = await createBillingPortalSession({
+    customerId: team.stripeCustomerId,
+    returnUrl: `${CLIENT_URL}/dashboard?tab=team`,
+  });
+
+  if (!url) return json({ error: 'Stripe is not configured' }, 503);
+  return json({ url });
+});
+
+export {
+  handleTeamMe,
+  handleTeamUpdate,
+  handleTeamMembersList,
+  handleTeamMemberAdd,
+  handleTeamMemberRoleUpdate,
+  handleTeamMemberRemove,
+  handleTeamAuditLogs,
+  handleTeamInvitesList,
+  handleTeamInviteRevoke,
+  handleTeamInviteAccept,
+  handlePendingTeamInvites,
+  handleListMyTeams,
+  handleSwitchTeam,
+  handleCreateTeam,
+  handleTeamSubscription,
+  handleTeamSubscriptionCheckout,
+  handleTeamSubscriptionPortal,
+};

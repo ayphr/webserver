@@ -307,7 +307,7 @@ const handleEmailConfirm = requireAuth(async (request, user) => {
   });
   void sendEmail({ to: email, subject: welcome.subject, html: welcome.html, text: welcome.text });
 
-  return json({ user: toSelfUser(user) }, 200);
+  return json({ user: await toSelfUser(user) }, 200);
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 export {

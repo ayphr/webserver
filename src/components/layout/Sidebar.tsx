@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -233,15 +233,6 @@ export const Sidebar: React.FC<Props> = ({
           >
             <span className="n-sidebar__menuIcon"><IconSettings size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Settings</span>
-          </button>
-          <button
-            className={`n-sidebar__menuItem ${activeTab === 'subscription' ? 'active' : ''}`}
-            type="button"
-            onClick={() => onChange('subscription')}
-            aria-label="Subscription"
-          >
-            <span className="n-sidebar__menuIcon"><IconCreditCard size={16} strokeWidth={1.5} /></span>
-            <span className="n-sidebar__menuLabel">Subscription</span>
           </button>
           <button
             className={`n-sidebar__menuItem ${activeTab === 'notifications' ? 'active' : ''}`}

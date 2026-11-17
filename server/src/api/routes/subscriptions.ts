@@ -1,39 +1,24 @@
-import { json, readJsonBody } from '../../lib/http';
 import type Stripe from 'stripe';
 import { createLogger } from '../../lib/logger';
-import { requireAuth } from '../auth';
 import {
   stripeWebhookErrorsTotal,
   stripeWebhookEventsTotal,
-  subscriptionEventsTotal,
 } from '../../lib/metrics';
 import {
   constructStripeEvent,
-  createBillingPortalSession,
-  createCheckoutSession,
-  createStripeCustomer,
-  getPriceIdForTier,
-  getStripe,
-  getSubscriptionPlans,
-  mapStripeSubscription,
   retrieveStripeSubscription,
-  setStripeSubscriptionAutoRenew,
 } from '../../lib/stripe';
-import { CLIENT_URL, STRIPE_TRIAL_DAYS, STRIPE_WEBHOOK_SECRET } from '../../env';
-import { isSubscriptionTier, isPurchasableTier, isBillingInterval } from '@common';
-import { getActivePaidSubscription } from '@common';
-import { getUserSubscription } from '../../lib/subscriptions';
+import { STRIPE_WEBHOOK_SECRET } from '../../env';
 import {
-  getPaidSubscriptionsForUserUuid,
-  getUserByStripeCustomerId,
-  getUserUuidByStripeCustomerId,
   hasStripeEvent,
   recordStripeEvent,
-  removeAttachedSubscription,
-  removePaidSubscription,
-  setUserStripeCustomerId,
-  upsertPaidSubscription,
 } from '../../lib/db';
+import {
+  clearTeamStripeSubscription,
+  getTeamByStripeCustomerId,
+  setTeamStripeCustomerId,
+  syncTeamStripeSubscription,
+} from '../../lib/db/teams';
 
 const log = createLogger('stripe-webhook');
 export function getStripeCustomerId(
@@ -43,60 +28,58 @@ export function getStripeCustomerId(
   return typeof customer === 'string' ? customer : customer.id;
 }
 
-/** Resolves the internal user uuid for a Stripe subscription. */
-async function resolveUserUuid(subscription: Stripe.Subscription): Promise<string | null> {
-  const metadataUuid = subscription.metadata?.userUuid;
-  if (metadataUuid) return metadataUuid;
+/** Resolves the team owner of a Stripe subscription. */
+async function resolveSubscriptionTarget(subscription: Stripe.Subscription): Promise<string | null> {
+  const teamId = subscription.metadata?.teamId;
+  if (teamId) return teamId;
 
   const customerId = getStripeCustomerId(subscription.customer);
   if (!customerId) return null;
 
-  return getUserUuidByStripeCustomerId(customerId);
+  const team = await getTeamByStripeCustomerId(customerId);
+  return team?.id ?? null;
 }
 
 async function handleSubscriptionUpsert(subscription: Stripe.Subscription) {
-  const userUuid = await resolveUserUuid(subscription);
-  if (!userUuid) {
-    log.warn({ stripeSubscriptionId: subscription.id }, 'received subscription event for unknown user');
+  const teamId = await resolveSubscriptionTarget(subscription);
+  if (!teamId) {
+    log.warn({ stripeSubscriptionId: subscription.id }, 'received subscription event for unknown team');
     return;
   }
 
-  const existing = await getPaidSubscriptionsForUserUuid(userUuid);
-  const match = existing.find((record) => record.stripeSubscriptionId === subscription.id);
-
-  const record = mapStripeSubscription(subscription, { id: match?.id });
-  if (!record) return;
-
-  await upsertPaidSubscription(userUuid, record);
+  await syncTeamStripeSubscription(teamId, subscription);
   log.info(
-    { userUuid, stripeSubscriptionId: subscription.id, status: record.status, tier: record.tier },
-    'synced Stripe subscription',
+    { teamId, stripeSubscriptionId: subscription.id, status: subscription.status },
+    'synced team Stripe subscription',
   );
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const userUuid = await resolveUserUuid(subscription);
-  if (!userUuid) return;
+  const teamId = await resolveSubscriptionTarget(subscription);
+  if (!teamId) return;
 
-  await removePaidSubscription(userUuid, subscription.id);
-  log.info({ userUuid, stripeSubscriptionId: subscription.id }, 'removed Stripe subscription');
+  await clearTeamStripeSubscription(teamId);
+  log.info({ teamId, stripeSubscriptionId: subscription.id }, 'removed team Stripe subscription');
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const customerId = getStripeCustomerId(session.customer);
-  const userUuid = session.metadata?.userUuid
-    ?? (customerId ? await getUserUuidByStripeCustomerId(customerId) : null);
+  const teamId = session.metadata?.teamId;
 
-  if (!userUuid) {
-    log.warn({ checkoutSessionId: session.id }, 'checkout completed for unknown user');
+  if (!teamId) {
+    log.warn({ checkoutSessionId: session.id }, 'checkout completed without team metadata');
     return;
   }
 
   if (customerId) {
-    const user = await getUserByStripeCustomerId(customerId);
-    if (!user) await setUserStripeCustomerId(userUuid, customerId);
+    const team = await getTeamByStripeCustomerId(customerId);
+    if (!team) await setTeamStripeCustomerId(teamId, customerId);
   }
 
+  await syncFromCheckoutSession(session);
+}
+
+async function syncFromCheckoutSession(session: Stripe.Checkout.Session) {
   const subscriptionId = typeof session.subscription === 'string'
     ? session.subscription
     : session.subscription?.id;
@@ -178,7 +161,6 @@ export async function handleStripeWebhook(request: Request) {
 
   stripeWebhookEventsTotal.inc({ type: event.type });
 
-  // Idempotency: skip events we have already successfully processed.
   if (await hasStripeEvent(event.id)) {
     return Response.json({ received: true });
   }
@@ -194,155 +176,3 @@ export async function handleStripeWebhook(request: Request) {
 
   return Response.json({ received: true });
 }
-
-const handleSubscriptionMe = requireAuth(async (_request, user) => {
-  const plans = await getSubscriptionPlans();
-  const paid = getActivePaidSubscription(user);
-
-  return json({
-    subscription: getUserSubscription(user),
-    paidSubscription: paid,
-    attachedSubscriptions: user.attachedSubscriptions ?? [],
-    plans,
-    trialDays: STRIPE_TRIAL_DAYS,
-  });
-}, { allowSuspended: true });
-
-const handleSubscriptionCheckout = requireAuth(async (request, user) => {
-  const stripe = getStripe();
-  if (!stripe) {
-    return json({ error: 'Stripe is not configured' }, 503);
-  }
-
-  const body = await readJsonBody(request);
-  const tier = body?.tier;
-  const interval = body?.interval;
-  const quantityRaw = body?.quantity;
-  if (!isSubscriptionTier(tier)) {
-    return json({ error: 'tier must be a valid subscription tier' }, 400);
-  }
-
-  if (!isBillingInterval(interval)) {
-    return json({ error: 'interval must be "month" or "year"' }, 400);
-  }
-
-  let quantity = 1;
-  if (quantityRaw !== undefined && quantityRaw !== null) {
-    if (typeof quantityRaw !== 'number' || !Number.isInteger(quantityRaw) || quantityRaw < 1) {
-      return json({ error: 'quantity must be a positive integer' }, 400);
-    }
-    quantity = quantityRaw;
-  }
-
-  if (!isPurchasableTier(tier)) {
-    return json({ error: 'This plan is not available for purchase' }, 400);
-  }
-
-  const priceId = getPriceIdForTier(tier, interval);
-  if (!priceId) {
-    return json({ error: 'This plan is not available for purchase' }, 503);
-  }
-
-  let customerId = user.stripeCustomerId;
-  if (!customerId) {
-    customerId = await createStripeCustomer({ userUuid: user.uuid, username: user.username }) ?? undefined;
-    if (!customerId) {
-      return json({ error: 'Failed to create billing customer' }, 502);
-    }
-    await setUserStripeCustomerId(user.uuid, customerId);
-  }
-
-  const url = await createCheckoutSession({
-    customerId,
-    priceId,
-    tier,
-    userUuid: user.uuid,
-    quantity,
-    successUrl: `${CLIENT_URL}/dashboard?tab=subscription&checkout=success`,
-    cancelUrl: `${CLIENT_URL}/dashboard?tab=subscription&checkout=cancel`,
-  });
-
-  if (!url) {
-    subscriptionEventsTotal.inc({ event: 'checkout_failed' });
-    return json({ error: 'Failed to create checkout session' }, 502);
-  }
-
-  subscriptionEventsTotal.inc({ event: 'checkout_started' });
-  return json({ url });
-});
-
-const handleSubscriptionAutoRenew = requireAuth(async (request, user) => {
-  const body = await readJsonBody(request);
-  const autoRenew = body?.autoRenew;
-  if (typeof autoRenew !== 'boolean') {
-    return json({ error: 'autoRenew must be a boolean' }, 400);
-  }
-
-  const paid = getActivePaidSubscription(user);
-  if (!paid) {
-    return json({ error: 'No active paid subscription' }, 404);
-  }
-
-  if (paid.status === 'trialing' && !autoRenew) {
-    return json({ error: 'Auto-renew cannot be disabled during a free trial' }, 400);
-  }
-
-  const updated = await setStripeSubscriptionAutoRenew(paid.stripeSubscriptionId, autoRenew);
-  if (!updated) {
-    return json({ error: 'Stripe is not configured' }, 503);
-  }
-
-  paid.cancelAtPeriodEnd = !autoRenew;
-  paid.updatedAt = new Date();
-  if (updated.status) paid.status = updated.status as typeof paid.status;
-  await upsertPaidSubscription(user.uuid, paid);
-
-  subscriptionEventsTotal.inc({ event: autoRenew ? 'auto_renew_enabled' : 'auto_renew_disabled' });
-
-  return json({ paidSubscription: paid });
-}, { allowSuspended: true });
-
-const handleSubscriptionPortal = requireAuth(async (_request, user) => {
-  if (!user.stripeCustomerId) {
-    return json({ error: 'No billing account found' }, 404);
-  }
-
-  const url = await createBillingPortalSession({
-    customerId: user.stripeCustomerId,
-    returnUrl: `${CLIENT_URL}/dashboard?tab=subscription`,
-  });
-
-  if (!url) {
-    subscriptionEventsTotal.inc({ event: 'portal_failed' });
-    return json({ error: 'Stripe is not configured' }, 503);
-  }
-
-  subscriptionEventsTotal.inc({ event: 'portal_opened' });
-  return json({ url });
-}, { allowSuspended: true });
-
-const handleSubscriptionCancelGranted = requireAuth(async (_request, user, params) => {
-  const subscriptionId = params.id;
-  if (!subscriptionId) {
-    return json({ error: 'subscription id is required' }, 400);
-  }
-
-  const existing = (user.attachedSubscriptions ?? []).some((subscription) => subscription.id === subscriptionId);
-  if (!existing) {
-    return json({ error: 'subscription not found' }, 404);
-  }
-
-  await removeAttachedSubscription(user.uuid, subscriptionId);
-
-  subscriptionEventsTotal.inc({ event: 'granted_subscription_cancelled' });
-
-  return json({ removed: true });
-}, { allowSuspended: true });
-
-export {
-  handleSubscriptionMe,
-  handleSubscriptionCheckout,
-  handleSubscriptionAutoRenew,
-  handleSubscriptionPortal,
-  handleSubscriptionCancelGranted,
-};

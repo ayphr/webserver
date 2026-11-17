@@ -1,8 +1,8 @@
-import type { BadgeId, User } from '@common';
-import { getUserSubscription } from './subscriptions';
+import type { BadgeId, PlanTier, User } from '@common';
 
 export function getBadgesForUser(
-  user: Pick<User, 'role' | 'paidSubscriptions' | 'attachedSubscriptions'>,
+  user: Pick<User, 'role'>,
+  teamTier: PlanTier = 'free',
 ): BadgeId[] {
   const badges: BadgeId[] = [];
 
@@ -10,9 +10,8 @@ export function getBadgesForUser(
     badges.push('staff');
   }
 
-  const subscription = getUserSubscription(user);
-  if (subscription && !badges.includes(subscription.tier)) {
-    badges.push(subscription.tier);
+  if (teamTier && teamTier !== 'free' && !badges.includes(teamTier as BadgeId)) {
+    badges.push(teamTier as BadgeId);
   }
 
   return badges;

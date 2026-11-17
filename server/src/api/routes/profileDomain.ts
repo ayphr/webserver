@@ -156,7 +156,7 @@ export const handleDomainVerify = requireAuth(async (request, user) => {
   targetUser.socialLinkVerified = { ...targetUser.socialLinkVerified, [type]: true };
   await updateUser(targetUser);
 
-  return json({ verified: true, success: true, ok: true, user: toPublicUser(targetUser) });
+  return json({ verified: true, success: true, ok: true, user: await toPublicUser(targetUser) });
 });
 
 export const handleDomainReverify = requireAuth(async (_request, user) => {
@@ -166,5 +166,5 @@ export const handleDomainReverify = requireAuth(async (_request, user) => {
   }
   await reverifyUserDomains(targetUser);
   const refreshed = await getUserFromUuid(user.uuid);
-  return json({ user: toPublicUser(refreshed ?? targetUser), reverified: true, success: true, ok: true });
+  return json({ user: await toPublicUser(refreshed ?? targetUser), reverified: true, success: true, ok: true });
 });

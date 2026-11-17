@@ -5,6 +5,9 @@ import type {
   TeamMemberRoleUpdateRequest,
   TeamPayload,
   TeamAuditLogListPayload,
+  TeamSubscriptionPayload,
+  SubscriptionTier,
+  BillingInterval,
 } from '@common';
 import type { RequestClient } from './client';
 
@@ -57,6 +60,30 @@ export function createTeamsApi(client: RequestClient) {
     },
     async switchTeam(teamId: string) {
       await client.requestJson('/api/teams/switch', { method: 'POST', body: { teamId } });
+    },
+    async createTeam(name?: string) {
+      const response = await client.requestJson<{ team: Team }>('/api/teams/create', {
+        method: 'POST',
+        body: { name },
+      });
+      return response.team;
+    },
+    async subscription() {
+      const response = await client.requestJson<TeamSubscriptionPayload>('/api/team/subscription');
+      return response;
+    },
+    async subscriptionCheckout(tier: SubscriptionTier, interval: BillingInterval) {
+      const response = await client.requestJson<{ url: string }>('/api/team/subscription/checkout', {
+        method: 'POST',
+        body: { tier, interval },
+      });
+      return response.url;
+    },
+    async subscriptionPortal() {
+      const response = await client.requestJson<{ url: string }>('/api/team/subscription/portal', {
+        method: 'POST',
+      });
+      return response.url;
     },
     async pendingInvites() {
       const response = await client.requestJson<{ invites: import('@common').TeamInvite[] }>('/api/team/invites/pending');

@@ -73,14 +73,7 @@ import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './route
 import { handleUserByUuid, handleMe as handleUsersMe, handleUsernameChange } from './routes/users';
 import { handleCreditsMe } from './routes/credits';
 import { handleGetBests as handleGamesBestsGet, handleUpdateBest as handleGamesBestsUpdate } from './routes/games';
-import {
-  handleStripeWebhook,
-  handleSubscriptionAutoRenew,
-  handleSubscriptionCancelGranted,
-  handleSubscriptionCheckout,
-  handleSubscriptionMe,
-  handleSubscriptionPortal,
-} from './routes/subscriptions';
+import { handleStripeWebhook } from './routes/subscriptions';
 import {
   handleTeamMe,
   handleTeamUpdate,
@@ -95,6 +88,10 @@ import {
   handlePendingTeamInvites,
   handleListMyTeams,
   handleSwitchTeam,
+  handleCreateTeam,
+  handleTeamSubscription,
+  handleTeamSubscriptionCheckout,
+  handleTeamSubscriptionPortal,
 } from './routes/teams';
 import { handleListMine as handleSessionsListMine, handleRevoke as handleSessionRevoke } from './routes/sessions';
 import {
@@ -155,17 +152,16 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/avatars/:uuid', handle: handleAvatarGet },
 
   { method: 'POST', path: '/api/subscriptions/stripe/webhook', handle: handleStripeWebhook },
-  { method: 'GET', path: '/api/subscriptions/me', handle: handleSubscriptionMe },
-  { method: 'POST', path: '/api/subscriptions/checkout', handle: handleSubscriptionCheckout },
-  { method: 'POST', path: '/api/subscriptions/auto-renew', handle: handleSubscriptionAutoRenew },
-  { method: 'POST', path: '/api/subscriptions/portal', handle: handleSubscriptionPortal },
-  { method: 'DELETE', path: '/api/subscriptions/attached/:id', handle: handleSubscriptionCancelGranted },
 
   { method: 'GET', path: '/api/team', handle: handleTeamMe },
   { method: 'GET', path: '/api/team/me', handle: handleTeamMe },
   { method: 'GET', path: '/api/teams', handle: handleTeamMe },
   { method: 'GET', path: '/api/teams/mine', handle: handleListMyTeams },
   { method: 'POST', path: '/api/teams/switch', handle: handleSwitchTeam },
+  { method: 'POST', path: '/api/teams/create', handle: handleCreateTeam },
+  { method: 'GET', path: '/api/team/subscription', handle: handleTeamSubscription },
+  { method: 'POST', path: '/api/team/subscription/checkout', handle: handleTeamSubscriptionCheckout },
+  { method: 'POST', path: '/api/team/subscription/portal', handle: handleTeamSubscriptionPortal },
   { method: 'GET', path: '/api/teams/me', handle: handleTeamMe },
   { method: 'PATCH', path: '/api/team', handle: handleTeamUpdate },
   { method: 'PATCH', path: '/api/teams', handle: handleTeamUpdate },
@@ -265,10 +261,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/staff/punishments', handle: handleStaffPunishments },
   { method: 'GET', path: '/api/staff/appeals', handle: handleStaffAppeals },
   { method: 'POST', path: '/api/staff/appeals/:id/resolve', handle: handleStaffAppealResolve },
-  { method: 'POST', path: '/api/staff/subscriptions/:uuid', handle: handleStaffSubscriptionAttach },
-  { method: 'GET', path: '/api/staff/subscriptions/:uuid', handle: handleStaffSubscriptionList },
-  { method: 'DELETE', path: '/api/staff/subscriptions/:uuid/:id', handle: handleStaffSubscriptionDetach },
-  { method: 'PATCH', path: '/api/staff/subscriptions/:uuid/:id', handle: handleStaffSubscriptionUpdate },
+
 ];
 
 const UNMATCHED_API_TEMPLATE = '/api/other';

@@ -9,7 +9,7 @@ import {
   updateLocation,
   countLocations,
 } from '../../lib/db';
-import { getPlanFeaturesForUser } from '@common';
+import { getPlanFeatures } from '@common';
 import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole } from '../../lib/db/teams';
 import type { Location, User } from '@common';
 
@@ -51,7 +51,7 @@ const handleCreate = requireAuth(async (request, user: User) => {
 
   await ensureDefaultLocation(scopeUuid, scopeUsername);
 
-  const maxLocations = getPlanFeaturesForUser(user).maxLocations;
+  const maxLocations = getPlanFeatures(team?.tier ?? 'free').maxLocations;
   const currentCount = await countLocations(scopeUuid);
   if (currentCount >= maxLocations) {
     return json({ error: 'location limit reached for your plan' }, 409);

@@ -235,7 +235,7 @@ async function handleRegister(request: Request) {
 
   const policyStatus = await getPolicyStatus(user);
 
-  return json({ user: toSelfUser(user), token, policyStatus, expiresAt: getExpiryDate(now) }, 201);
+  return json({ user: await toSelfUser(user), token, policyStatus, expiresAt: getExpiryDate(now) }, 201);
 }
 
 async function handleLogin(request: Request) {
@@ -312,7 +312,7 @@ async function handleLogin(request: Request) {
   const policyStatus = await getPolicyStatus(user);
 
   return json({
-    user: toSelfUser(user),
+    user: await toSelfUser(user),
     token,
     suspension: activeSuspension,
     policyStatus,
@@ -381,7 +381,7 @@ async function handleVerifyLogin(request: Request) {
   const policyStatus = await getPolicyStatus(user);
 
   return json({
-    user: toSelfUser(user),
+    user: await toSelfUser(user),
     token,
     suspension: activeSuspension,
     policyStatus,
@@ -394,7 +394,7 @@ const handleMe = requireAuth(async (request, user) => {
   const policyStatus = await getPolicyStatus(user);
 
   return json({
-    user: toSelfUser(user),
+    user: await toSelfUser(user),
     suspension: activeSuspension,
     policyStatus,
   });
@@ -434,7 +434,7 @@ const handleAcceptPolicies = requireAuth(async (_request, user) => {
 
   const policyStatus = await getPolicyStatus(user);
 
-  return json({ user: toSelfUser(user), policyStatus });
+  return json({ user: await toSelfUser(user), policyStatus });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 const handleChangePassword = requireAuth(async (request, user) => {

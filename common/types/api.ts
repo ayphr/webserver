@@ -5,12 +5,6 @@ import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
 import type { CreditBalance } from './credits';
 import type {
-  AttachedSubscription,
-  BillingInterval,
-  PaidSubscription,
-  ResolvedSubscription,
-  SubscriptionPlan,
-  SubscriptionSource,
   SubscriptionTier,
 } from './subscription';
 import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, SelfUser, UserRole } from './user';
@@ -180,7 +174,6 @@ export type StaffUsersQuery = {
   search?: string;
   role?: UserRole;
   tier?: SubscriptionTier;
-  source?: SubscriptionSource;
   status?: StaffUserSubscriptionStatus;
   page?: number;
   pageSize?: number;
@@ -250,60 +243,6 @@ export type EmailConfirmPayload = {
 export type DeviceVerificationRequiredPayload = {
   requiresDeviceVerification: true;
   expiresAt: Date;
-};
-
-export type StaffSubscriptionAttachRequest = {
-  tier: SubscriptionTier;
-  expiresAt?: string | null;
-  reason?: string;
-};
-
-export type StaffSubscriptionUpdateRequest = {
-  tier?: SubscriptionTier;
-  expiresAt?: string | null;
-  reason?: string;
-};
-
-export type StaffSubscriptionPayload = {
-  user: PublicUser;
-};
-
-export type StaffSubscriptionListPayload = {
-  subscriptions: AttachedSubscription[];
-};
-
-export type StaffSubscriptionUpdatePayload = {
-  subscription: AttachedSubscription;
-};
-
-export type SubscriptionMePayload = {
-  subscription: ResolvedSubscription | null;
-  paidSubscription: PaidSubscription | null;
-  attachedSubscriptions: AttachedSubscription[];
-  plans: SubscriptionPlan[];
-  trialDays: number;
-};
-
-export type SubscriptionCheckoutRequest = {
-  tier: SubscriptionTier;
-  interval: BillingInterval;
-  quantity?: number;
-};
-
-export type SubscriptionCheckoutPayload = {
-  url: string;
-};
-
-export type SubscriptionAutoRenewRequest = {
-  autoRenew: boolean;
-};
-
-export type SubscriptionAutoRenewPayload = {
-  paidSubscription: PaidSubscription;
-};
-
-export type SubscriptionPortalPayload = {
-  url: string;
 };
 
 export type DomainChallengeRequest = {

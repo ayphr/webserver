@@ -54,47 +54,8 @@ export type PaidSubscriptionStatus =
   | 'incomplete_expired'
   | 'paused';
 
-export type PaidSubscription = {
-  id: string;
-  stripeSubscriptionId: string;
-  stripeCustomerId: string;
-  stripePriceId?: string;
-  stripeProductId?: string;
-  tier: SubscriptionTier;
-  status: PaidSubscriptionStatus;
-  currentPeriodStart: Date | null;
-  currentPeriodEnd: Date | null;
-  cancelAtPeriodEnd: boolean;
-  quantity?: number;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-export type AttachedSubscription = {
-  id: string;
-  tier: SubscriptionTier;
-  createdAt: Date;
-  expiresAt: Date | null;
-  addedByUuid: string;
-  addedByUsername?: string;
-  reason?: string;
-  seats?: number;
-};
-
-export type SubscriptionSource = 'paid' | 'attached';
-
-export type ResolvedSubscription = {
-  tier: SubscriptionTier;
-  source: SubscriptionSource;
-  expiresAt: Date | null;
-  paidSubscription?: PaidSubscription;
-  attachedSubscription?: AttachedSubscription;
-  seats?: number;
-};
-
 export type PublicSubscription = {
   tier: SubscriptionTier;
-  source: SubscriptionSource;
   expiresAt: Date | null;
   seats?: number;
 };

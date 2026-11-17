@@ -139,13 +139,13 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
           <span className="overview__stat-sub">Available to spend</span>
         </button>
 
-        <button type="button" className="overview__stat" onClick={() => onNavigate('subscription')}>
+        <button type="button" className="overview__stat" onClick={() => onNavigate('team')}>
           <span className="overview__stat-label">
             <IconCreditCard size={16} strokeWidth={1.75} />
             Plan
           </span>
           <span className="overview__stat-value">{planName}</span>
-          <span className="overview__stat-sub">{user.subscription ? 'Active subscription' : 'Free account'}</span>
+          <span className="overview__stat-sub">{user.subscription ? 'Active plan' : 'Free plan'}</span>
         </button>
 
         <button type="button" className="overview__stat" onClick={() => onNavigate('locations')}>

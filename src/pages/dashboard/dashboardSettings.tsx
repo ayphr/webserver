@@ -199,7 +199,6 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
             { value: 'profile', label: 'Profile' },
             { value: 'credits', label: 'Credits' },
             { value: 'games', label: 'Games' },
-            { value: 'subscription', label: 'Subscription' },
             { value: 'team', label: 'Team' },
             ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
           ],

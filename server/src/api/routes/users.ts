@@ -28,7 +28,7 @@ const handleMe = requireAuth(async (request, user) => {
   }
 
   return json({
-    user: toSelfUser(user, teamSeats),
+    user: await toSelfUser(user, teamSeats),
     activeSuspension,
     policyStatus,
     credits: await getCreditBalance(user),
@@ -47,7 +47,7 @@ const handleUserByUuid = requireAuth(async (_request, user, params) => {
     return json({ error: 'user not found' }, 404);
   }
 
-  return json({ user: toPublicUser(targetUser), requestedBy: toPublicUser(user) });
+  return json({ user: await toPublicUser(targetUser), requestedBy: await toPublicUser(user) });
 }, { allowSuspended: true });
 
 
@@ -93,7 +93,7 @@ const handleUsernameChange = requireAuth(async (request, user) => {
   user.usernameChangedAt = new Date();
   await updateUser(user);
 
-  return json({ user: toSelfUser(user) });
+  return json({ user: await toSelfUser(user) });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
 export { handleMe, handleUserByUuid, handleUsernameChange };

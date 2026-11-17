@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Input, Modal, Select, ProgressBar } from '../common';
-import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase } from '@tabler/icons-react';
-import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance } from '@common';
+import { Button, Input, Modal, Select, ProgressBar, Tooltip } from '../common';
+import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase, IconPlus, IconExternalLink } from '@tabler/icons-react';
+import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance, SubscriptionTier, SubscriptionPlan, BillingInterval, TeamSubscriptionPayload } from '@common';
+import { PLAN_NAMES } from '@common';
 import { getPlanFeatures } from '@common/utils/plans';
 import { TeamAuditPanel } from './TeamAuditPanel';
 import './TeamPanel.css';
@@ -12,6 +13,24 @@ const ROLE_OPTIONS = [
   { value: 'helper', label: 'Helper' },
   { value: 'manager', label: 'Manager' },
 ];
+
+const TEAM_TIERS: SubscriptionTier[] = ['team-lite', 'team-plus', 'team-ultra'];
+const TEAM_LIMIT = 3;
+
+const INTERVAL_OPTIONS = [
+  { value: 'month', label: 'Monthly' },
+  { value: 'year', label: 'Yearly' },
+];
+
+function formatPlanPrice(plan: SubscriptionPlan): string {
+  if (plan.amount == null) return 'Unavailable';
+  const amount = plan.amount / 100;
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: plan.currency ?? 'usd',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
 
 type TeamPanelProps = {
   isManager?: boolean;
@@ -41,6 +60,14 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [nameSuccess, setNameSuccess] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [subscription, setSubscription] = useState<TeamSubscriptionPayload | null>(null);
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('month');
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [checkoutTier, setCheckoutTier] = useState<SubscriptionTier | null>(null);
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -83,6 +110,25 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'settings' || !team || team.managerUuid !== userUuid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.teams.subscription();
+        if (cancelled) return;
+        setSubscription(data);
+        setSubscriptionError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setSubscriptionError(err instanceof Error ? err.message : 'Failed to load plans');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, team?.id, team?.managerUuid, userUuid]);
 
   useEffect(() => {
     if (activeTab !== 'usage') return;
@@ -180,11 +226,64 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
     }
   };
 
+  const handleCreateTeam = async () => {
+    setIsCreating(true);
+    setError(null);
+    try {
+      const created = await api.teams.createTeam(newTeamName.trim() || undefined);
+      setTeams((current) => [...current, created]);
+      setActiveTeamId(created.id);
+      setIsCreateOpen(false);
+      setNewTeamName('');
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create team');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCheckout = async (tier: SubscriptionTier) => {
+    setCheckoutTier(tier);
+    setSubscriptionError(null);
+    try {
+      const url = await api.teams.subscriptionCheckout(tier, billingInterval);
+      window.location.assign(url);
+    } catch (err) {
+      setSubscriptionError(err instanceof Error ? err.message : 'Failed to start checkout');
+      setCheckoutTier(null);
+    }
+  };
+
+  const handlePortal = async () => {
+    setIsOpeningPortal(true);
+    setSubscriptionError(null);
+    try {
+      const url = await api.teams.subscriptionPortal();
+      window.location.assign(url);
+    } catch (err) {
+      setSubscriptionError(err instanceof Error ? err.message : 'Failed to open billing portal');
+    } finally {
+      setIsOpeningPortal(false);
+    }
+  };
+
   if (isLoading) return <p className="team-panel__loading">Loading team…</p>;
   if (error) return <p className="team-panel__error">{error}</p>;
   if (!team) return <p className="team-panel__empty">No team found. A team plan is required.</p>;
 
   const isTeamManager = !!userUuid && team?.managerUuid === userUuid;
+  const configuredPlans = subscription?.plans.filter((plan) => plan.interval === billingInterval) ?? [];
+  const teamPlans: SubscriptionPlan[] = configuredPlans.length > 0
+    ? configuredPlans
+    : TEAM_TIERS.map((tier) => ({
+        tier,
+        interval: billingInterval,
+        priceId: null,
+        amount: null,
+        currency: null,
+        trialDays: subscription?.trialDays ?? 0,
+      }));
 
   const tabs: { id: TeamTab; label: string }[] = [
     { id: 'members', label: 'Members' },
@@ -194,19 +293,35 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
 
   return (
     <div className="team-panel">
-      {teams.length > 1 && (
+      {teams.length > 0 && (
         <div className="team-panel__switcher">
-          <Select
-            label="Current team"
-            value={activeTeamId ?? teams[0]?.id ?? ''}
-            onChange={(event) => {
-              const id = event.target.value;
-              setActiveTeamId(id);
-              void api.teams.switchTeam(id).then(() => window.location.reload());
-            }}
-            options={teams.map((team) => ({ value: team.id, label: team.name ?? 'Team' }))}
-            fullWidth
-          />
+          <div className="team-panel__switcher-field">
+            <Select
+              label="Switch team"
+              value={activeTeamId ?? team.id}
+              onChange={(event) => {
+                const id = event.target.value;
+                setActiveTeamId(id);
+                void api.teams.switchTeam(id).then(() => window.location.reload());
+              }}
+              options={teams.map((item) => ({ value: item.id, label: item.name ?? 'Team' }))}
+              fullWidth
+            />
+          </div>
+          <span className="team-panel__team-count">{teams.length}/{TEAM_LIMIT}</span>
+          {teams.length >= TEAM_LIMIT ? (
+            <Tooltip content="You can be a member of up to 3 teams">
+              <Button variant="secondary" disabled>
+                <IconPlus size={16} />
+                New team
+              </Button>
+            </Tooltip>
+          ) : (
+            <Button variant="secondary" onClick={() => setIsCreateOpen(true)}>
+              <IconPlus size={16} />
+              New team
+            </Button>
+          )}
         </div>
       )}
       <header className="team-panel__header">
@@ -351,24 +466,97 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
       )}
 
       {activeTab === 'settings' && isManager && (
-        <section className="team-panel__section">
-          <h4 className="team-panel__section-title">Team name</h4>
-          <div className="team-panel__invite-form">
-            <Input
-              label="Name"
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              fullWidth
-            />
-            {nameError && <p className="team-panel__error">{nameError}</p>}
-            {nameSuccess && <p className="team-panel__loading">{nameSuccess}</p>}
-            <div className="team-panel__edit-actions">
-              <Button onClick={() => void handleSaveName()} isLoading={isSavingName} disabled={isSavingName}>
-                Save
-              </Button>
+        <>
+          <section className="team-panel__section">
+            <h4 className="team-panel__section-title">Team name</h4>
+            <div className="team-panel__invite-form">
+              <Input
+                label="Name"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                fullWidth
+              />
+              {nameError && <p className="team-panel__error">{nameError}</p>}
+              {nameSuccess && <p className="team-panel__loading">{nameSuccess}</p>}
+              <div className="team-panel__edit-actions">
+                <Button onClick={() => void handleSaveName()} isLoading={isSavingName} disabled={isSavingName}>
+                  Save
+                </Button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section className="team-panel__section team-panel__subscription">
+            <div className="team-panel__subscription-head">
+              <div>
+                <h4 className="team-panel__section-title">Subscription</h4>
+                <p className="team-panel__subscription-current">
+                  Current plan: <strong>{PLAN_NAMES[team.tier]}</strong>
+                  {subscription?.team.subscriptionStatus && ` · ${subscription.team.subscriptionStatus}`}
+                </p>
+              </div>
+              {team.stripeCustomerId && (
+                <Button variant="secondary" onClick={() => void handlePortal()} isLoading={isOpeningPortal}>
+                  <IconExternalLink size={16} />
+                  Manage billing
+                </Button>
+              )}
+            </div>
+
+            <div className="team-panel__subscription-interval">
+              <Select
+                label="Billing interval"
+                value={billingInterval}
+                onChange={(event) => setBillingInterval(event.target.value as BillingInterval)}
+                options={INTERVAL_OPTIONS}
+              />
+            </div>
+
+            {subscriptionError && <p className="team-panel__error">{subscriptionError}</p>}
+            {!subscription && !subscriptionError && (
+              <p className="team-panel__loading">Loading plans…</p>
+            )}
+
+            <div className="team-panel__plans">
+              {teamPlans.map((plan) => {
+                const isCurrent = team.tier === plan.tier && (subscription?.team.billingInterval ?? 'month') === plan.interval;
+                const features = getPlanFeatures(plan.tier);
+                return (
+                  <div
+                    key={plan.tier}
+                    className={`team-panel__plan ${isCurrent ? 'team-panel__plan--current' : ''}`}
+                  >
+                    <div className="team-panel__plan-head">
+                      <span className="team-panel__plan-name">{PLAN_NAMES[plan.tier]}</span>
+                      <span className="team-panel__plan-price">
+                        {formatPlanPrice(plan)}
+                        <span>/{plan.interval === 'year' ? 'yr' : 'mo'}</span>
+                      </span>
+                    </div>
+                    <ul className="team-panel__plan-features">
+                      <li>{features.maxUsers} members</li>
+                      <li>{features.maxDevices.toLocaleString()} devices</li>
+                      <li>{features.sharedMonthlyCreditsPerUser.toLocaleString()} credits / member</li>
+                    </ul>
+                    <Button
+                      variant={isCurrent ? 'secondary' : 'primary'}
+                      disabled={isCurrent || checkoutTier !== null}
+                      isLoading={checkoutTier === plan.tier}
+                      onClick={() => void handleCheckout(plan.tier)}
+                    >
+                      {isCurrent ? 'Current plan' : 'Choose plan'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+            {subscription && subscription.trialDays > 0 && (
+              <p className="team-panel__subscription-note">
+                New subscriptions include a {subscription.trialDays}-day free trial.
+              </p>
+            )}
+          </section>
+        </>
       )}
 
       <Modal
@@ -394,6 +582,27 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
             value={role}
             onChange={(e) => setRole(e.target.value as TeamRole)}
             options={ROLE_OPTIONS}
+            fullWidth
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onConfirm={() => void handleCreateTeam()}
+        title="Create a team"
+        confirmText="Create team"
+        cancelText="Cancel"
+        confirmDisabled={isCreating}
+      >
+        <div className="team-panel__invite-form">
+          <Input
+            label="Team name"
+            placeholder="My team"
+            helperText={`New teams start on the free plan. You can join up to ${TEAM_LIMIT} teams.`}
+            value={newTeamName}
+            onChange={(e) => setNewTeamName(e.target.value)}
             fullWidth
           />
         </div>

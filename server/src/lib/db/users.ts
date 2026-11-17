@@ -12,7 +12,7 @@ import {
 } from './internal';
 
 import type {
-  User, UserRole, AttachedSubscription, PaidSubscription
+  User, UserRole
 } from '@common';
 import { cacheGet, cacheSet } from '../cache';
 import { invalidateAuthEntries } from '../authCache';
@@ -210,49 +210,6 @@ export async function updateUserRole(userUuid: string, role: UserRole) {
 }
 
 
-export async function getPaidSubscriptionsForUserUuid(userUuid: string) {
-  const users = await getCollection('users');
-  trackMongoOperation('findOne', USERS_COLLECTION);
-  const user = await users.findOne({ uuid: userUuid }, { projection: { paidSubscriptions: 1 } });
-  return user?.paidSubscriptions ?? [];
-}
-
-
-export async function getAttachedSubscriptionsForUserUuid(userUuid: string) {
-  const users = await getCollection('users');
-  trackMongoOperation('findOne', USERS_COLLECTION);
-  const user = await users.findOne({ uuid: userUuid }, { projection: { attachedSubscriptions: 1 } });
-  return user?.attachedSubscriptions ?? [];
-}
-
-
-export async function getUserUuidByStripeCustomerId(stripeCustomerId: string) {
-  const users = await getCollection('users');
-  trackMongoOperation('findOne', USERS_COLLECTION);
-  const user = await users.findOne(
-    { stripeCustomerId },
-    { projection: { uuid: 1 } }
-  );
-  return user?.uuid ?? null;
-}
-
-
-export async function getUserByStripeCustomerId(stripeCustomerId: string) {
-  const users = await getCollection('users');
-  trackMongoOperation('findOne', USERS_COLLECTION);
-  return users.findOne({ stripeCustomerId });
-}
-
-
-export async function setUserStripeCustomerId(userUuid: string, stripeCustomerId: string) {
-  const users = await getCollection('users');
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne({ uuid: userUuid }, { $set: { stripeCustomerId } });
-  await invalidateUserCache(userUuid);
-  await invalidateAuthEntries();
-}
-
-
 export async function recordStripeEvent(eventId: string, type: string) {
   const stripeEvents = await getCollection('stripeEvents');
   trackMongoOperation('updateOne', STRIPE_EVENTS_COLLECTION);
@@ -272,89 +229,3 @@ export async function hasStripeEvent(eventId: string): Promise<boolean> {
   const existing = await stripeEvents.findOne({ id: eventId }, { projection: { _id: 1 } });
   return existing !== null;
 }
-
-
-export async function upsertPaidSubscription(userUuid: string, subscription: PaidSubscription) {
-  const users = await getCollection('users');
-  const normalizedSubscription = normalizeDateValues(subscription);
-
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne(
-    { uuid: userUuid },
-    {
-      $pull: { paidSubscriptions: { stripeSubscriptionId: subscription.stripeSubscriptionId } },
-      $push: { paidSubscriptions: normalizedSubscription },
-    },
-  );
-
-  await invalidateUserCache(userUuid);
-  await invalidateAuthEntries();
-
-  return normalizedSubscription;
-}
-
-
-export async function removePaidSubscription(userUuid: string, stripeSubscriptionId: string) {
-  const users = await getCollection('users');
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne(
-    { uuid: userUuid },
-    { $pull: { paidSubscriptions: { stripeSubscriptionId } } }
-  );
-  await invalidateUserCache(userUuid);
-  await invalidateAuthEntries();
-}
-
-
-export async function addAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
-  const users = await getCollection('users');
-  const normalizedSubscription = normalizeDateValues(subscription);
-
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne(
-    { uuid: userUuid },
-    { $push: { attachedSubscriptions: normalizedSubscription } }
-  );
-
-  await invalidateUserCache(userUuid);
-  await invalidateAuthEntries();
-
-  return normalizedSubscription;
-}
-
-
-export async function removeAttachedSubscription(userUuid: string, subscriptionId: string) {
-  const users = await getCollection('users');
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  await users.updateOne(
-    { uuid: userUuid },
-    { $pull: { attachedSubscriptions: { id: subscriptionId } } }
-  );
-  await invalidateUserCache(userUuid);
-  await invalidateAuthEntries();
-}
-
-
-export async function updateAttachedSubscription(userUuid: string, subscription: AttachedSubscription) {
-  const users = await getCollection('users');
-  const normalizedSubscription = normalizeDateValues(subscription);
-
-  trackMongoOperation('updateOne', USERS_COLLECTION);
-  const result = await users.updateOne(
-    {
-      uuid: userUuid,
-      'attachedSubscriptions.id': subscription.id,
-    },
-    { $set: { 'attachedSubscriptions.$': normalizedSubscription } }
-  );
-
-  if (result.matchedCount > 0) {
-    await invalidateUserCache(userUuid);
-    await invalidateAuthEntries();
-    return normalizedSubscription;
-  }
-
-  return null;
-}
-
-

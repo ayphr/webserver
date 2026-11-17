@@ -1,10 +1,9 @@
 import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
-import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid, addAttachedSubscription, removeAttachedSubscription, getAttachedSubscriptionsForUserUuid, updateAttachedSubscription } from '../../lib/db';
+import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid } from '../../lib/db';
 import { getAppeals, getAppealById, resolveAppeal } from '../../lib/db/appeals';
-import type { AttachedSubscription, Punishment, SubscriptionSource, SubscriptionTier, User, UserRole } from '@common';
-import { isSubscriptionTier, resolveSubscription } from '@common';
+import type { Punishment, User, UserRole } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { toPublicUser } from '../../lib/user';
 import { punishmentsTotal, staffActionsTotal } from '../../lib/metrics';
@@ -27,47 +26,6 @@ const handleUsersSummary = requireRole('staff', async () => {
   });
 });
 
-type SubscriptionState = 'active' | 'expired' | 'none';
-
-function getSubscriptionState(user: User): SubscriptionState {
-  const resolved = resolveSubscription(user);
-  if (resolved) return 'active';
-
-  const hasAnySubscription =
-    (user.paidSubscriptions?.length ?? 0) > 0 || (user.attachedSubscriptions?.length ?? 0) > 0;
-
-  return hasAnySubscription ? 'expired' : 'none';
-}
-
-function matchesSubscriptionFilters(
-  user: User,
-  filters: { tier?: SubscriptionTier; source?: SubscriptionSource; status?: SubscriptionState },
-) {
-  const resolved = resolveSubscription(user);
-
-  if (filters.status && getSubscriptionState(user) !== filters.status) {
-    return false;
-  }
-
-  if (filters.tier) {
-    const hasTier =
-      resolved?.tier === filters.tier ||
-      (user.paidSubscriptions ?? []).some((subscription) => subscription.tier === filters.tier) ||
-      (user.attachedSubscriptions ?? []).some((subscription) => subscription.tier === filters.tier);
-    if (!hasTier) return false;
-  }
-
-  if (filters.source) {
-    const hasSource =
-      resolved?.source === filters.source ||
-      (filters.source === 'paid' && (user.paidSubscriptions?.length ?? 0) > 0) ||
-      (filters.source === 'attached' && (user.attachedSubscriptions?.length ?? 0) > 0);
-    if (!hasSource) return false;
-  }
-
-  return true;
-}
-
 const handleStaffUsers = requireRole('staff', async (request) => {
   const params = new URL(request.url).searchParams;
 
@@ -79,57 +37,25 @@ const handleStaffUsers = requireRole('staff', async (request) => {
   }
   const role = (roleParam as UserRole | null) ?? undefined;
 
-  const tierParam = params.get('tier');
-  let tier: SubscriptionTier | undefined;
-  if (tierParam) {
-    if (!isSubscriptionTier(tierParam)) {
-      return json({ error: 'tier must be a valid subscription tier' }, 400);
-    }
-    tier = tierParam;
-  }
-
-  const sourceParam = params.get('source');
-  if (sourceParam && sourceParam !== 'paid' && sourceParam !== 'attached') {
-    return json({ error: 'source must be paid or attached' }, 400);
-  }
-  const source = (sourceParam as SubscriptionSource | null) ?? undefined;
-
-  const statusParam = params.get('status');
-  if (statusParam && statusParam !== 'active' && statusParam !== 'expired' && statusParam !== 'none') {
-    return json({ error: 'status must be active, expired or none' }, 400);
-  }
-  const status = (statusParam as SubscriptionState | null) ?? undefined;
-
   const page = parsePositiveInt(params.get('page'), 1);
   const pageSize = Math.min(parsePositiveInt(params.get('pageSize'), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE);
   const skip = (page - 1) * pageSize;
 
   const baseFilter = { search, role };
-  const hasSubscriptionFilter = Boolean(tier || source || status);
 
-  let pageUsers: User[];
-  let total: number;
-
-  if (hasSubscriptionFilter) {
-    const allMatching = await listUsers(baseFilter);
-    const filtered = allMatching.filter((user) => matchesSubscriptionFilters(user, { tier, source, status }));
-    total = filtered.length;
-    pageUsers = filtered.slice(skip, skip + pageSize);
-  } else {
-    const [users, count] = await Promise.all([
-      listUsers(baseFilter, { skip, limit: pageSize }),
-      countUsers(baseFilter),
-    ]);
-    pageUsers = users;
-    total = count;
-  }
+  const [users, count] = await Promise.all([
+    listUsers(baseFilter, { skip, limit: pageSize }),
+    countUsers(baseFilter),
+  ]);
+  const pageUsers = users;
+  const total = count;
 
   return json({
-    users: pageUsers.map(toPublicUser),
+    users: await Promise.all(pageUsers.map((u) => toPublicUser(u))),
     total,
     page,
     pageSize,
-    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    totalPages: Math.ceil(total / pageSize),
   });
 });
 
@@ -340,7 +266,7 @@ const handleStaffRoleUpdate = requireRole('staff', async (request, _user, params
     message: `Your account role is now ${body.role}.`,
   });
 
-  return json({ user: toPublicUser(updatedUser) });
+  return json({ user: await toPublicUser(updatedUser) });
 });
 
 const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUser, params) => {
@@ -384,180 +310,7 @@ const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUse
     link: '/dashboard?tab=account-settings',
   });
 
-  return json({ user: toPublicUser(targetUser) });
-});
-
-const handleStaffSubscriptionAttach = requireRole('staff', async (request, staffUser, params) => {
-  const targetUuid = params.uuid;
-  if (!targetUuid) {
-    return json({ error: 'user uuid is required' }, 400);
-  }
-
-  const body = await readJsonBody(request);
-  const tier = body?.tier;
-  if (!isSubscriptionTier(tier)) {
-    return json({ error: 'tier must be a valid subscription tier' }, 400);
-  }
-
-  const reason = typeof body?.reason === 'string' ? body.reason.trim() : undefined;
-  if (reason && reason.length > MAX_REASON_LENGTH) {
-    return json({ error: `reason must be at most ${MAX_REASON_LENGTH} characters` }, 400);
-  }
-
-  let expiresAt: Date | null = null;
-  if (body?.expiresAt !== undefined && body.expiresAt !== null) {
-    if (typeof body.expiresAt !== 'string') {
-      return json({ error: 'expiresAt must be an ISO 8601 date string or null' }, 400);
-    }
-    const parsed = new Date(body.expiresAt);
-    if (Number.isNaN(parsed.getTime())) {
-      return json({ error: 'expiresAt must be a valid ISO 8601 date string' }, 400);
-    }
-    if (parsed.getTime() <= Date.now()) {
-      return json({ error: 'expiresAt must be in the future' }, 400);
-    }
-    expiresAt = parsed;
-  }
-
-  const targetUser = await getUserFromUuid(targetUuid);
-  if (!targetUser) {
-    return json({ error: 'user not found' }, 404);
-  }
-
-  const subscription: AttachedSubscription = {
-    id: randomUUID(),
-    tier,
-    createdAt: new Date(),
-    expiresAt,
-    addedByUuid: staffUser.uuid,
-    addedByUsername: staffUser.username,
-    reason,
-  };
-
-  await addAttachedSubscription(targetUuid, subscription);
-
-  staffActionsTotal.inc({ action: 'subscription_attach' });
-
-  await notifyUser({
-    userUuid: targetUuid,
-    type: 'subscription',
-    title: 'A subscription was added to your account',
-    message: `A ${tier} subscription was added to your account${expiresAt ? ` until ${expiresAt.toUTCString()}` : ''}.`,
-    link: '/dashboard?tab=subscription',
-  });
-
-  return json({
-    user: toPublicUser({
-      ...targetUser,
-      attachedSubscriptions: [...(targetUser.attachedSubscriptions ?? []), subscription],
-    }),
-  }, 201);
-});
-
-const handleStaffSubscriptionDetach = requireRole('staff', async (_request, _staffUser, params) => {
-  const targetUuid = params.uuid;
-  const subscriptionId = params.id;
-
-  if (!targetUuid || !subscriptionId) {
-    return json({ error: 'user uuid and subscription id are required' }, 400);
-  }
-
-  const targetUser = await getUserFromUuid(targetUuid);
-  if (!targetUser) {
-    return json({ error: 'user not found' }, 404);
-  }
-
-  const existing = (targetUser.attachedSubscriptions ?? []).some((subscription) => subscription.id === subscriptionId);
-  if (!existing) {
-    return json({ error: 'subscription not found' }, 404);
-  }
-
-  await removeAttachedSubscription(targetUuid, subscriptionId);
-
-  staffActionsTotal.inc({ action: 'subscription_detach' });
-
-  await notifyUser({
-    userUuid: targetUuid,
-    type: 'subscription',
-    title: 'A subscription was removed from your account',
-    message: 'A subscription attached to your account was removed.',
-    link: '/dashboard?tab=subscription',
-  });
-
-  return json({
-    user: toPublicUser({
-      ...targetUser,
-      attachedSubscriptions: (targetUser.attachedSubscriptions ?? []).filter((subscription) => subscription.id !== subscriptionId),
-    }),
-  });
-});
-
-const handleStaffSubscriptionList = requireRole('staff', async (_request, _staffUser, params) => {
-  const targetUuid = params.uuid;
-  if (!targetUuid) {
-    return json({ error: 'user uuid is required' }, 400);
-  }
-
-  const subscriptions = await getAttachedSubscriptionsForUserUuid(targetUuid);
-  return json({ subscriptions });
-});
-
-const handleStaffSubscriptionUpdate = requireRole('staff', async (request, _staffUser, params) => {
-  const targetUuid = params.uuid;
-  const subscriptionId = params.id;
-
-  if (!targetUuid || !subscriptionId) {
-    return json({ error: 'user uuid and subscription id are required' }, 400);
-  }
-
-  const body = await readJsonBody(request);
-  if (!body) {
-    return json({ error: 'invalid request body' }, 400);
-  }
-
-  const subscriptions = await getAttachedSubscriptionsForUserUuid(targetUuid);
-  const existing = subscriptions.find((subscription) => subscription.id === subscriptionId);
-  if (!existing) {
-    return json({ error: 'subscription not found' }, 404);
-  }
-
-  if (body.tier !== undefined) {
-    if (!isSubscriptionTier(body.tier)) {
-      return json({ error: 'tier must be a valid subscription tier' }, 400);
-    }
-    existing.tier = body.tier;
-  }
-
-  if (body.reason !== undefined) {
-    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
-    if (reason.length > MAX_REASON_LENGTH) {
-      return json({ error: `reason must be at most ${MAX_REASON_LENGTH} characters` }, 400);
-    }
-    existing.reason = reason || undefined;
-  }
-
-  if (body.expiresAt !== undefined) {
-    if (body.expiresAt === null) {
-      existing.expiresAt = null;
-    } else if (typeof body.expiresAt === 'string') {
-      const parsed = new Date(body.expiresAt);
-      if (Number.isNaN(parsed.getTime())) {
-        return json({ error: 'expiresAt must be a valid ISO 8601 date string' }, 400);
-      }
-      existing.expiresAt = parsed;
-    } else {
-      return json({ error: 'expiresAt must be an ISO 8601 date string or null' }, 400);
-    }
-  }
-
-  const updated = await updateAttachedSubscription(targetUuid, existing);
-  if (!updated) {
-    return json({ error: 'subscription not found' }, 404);
-  }
-
-  staffActionsTotal.inc({ action: 'subscription_update' });
-
-  return json({ subscription: updated });
+  return json({ user: await toPublicUser(targetUser) });
 });
 
 export {
@@ -569,8 +322,4 @@ export {
   handleStaffAppealResolve,
   handleStaffRoleUpdate,
   handleStaffPasswordUpdate,
-  handleStaffSubscriptionAttach,
-  handleStaffSubscriptionDetach,
-  handleStaffSubscriptionList,
-  handleStaffSubscriptionUpdate,
 };

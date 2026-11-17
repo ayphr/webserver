@@ -17,8 +17,8 @@ type ProfileEditPayload = {
   socialLinks?: Record<string, string | undefined>;
 };
 
-const handleMe = requireAuth((_request, user) => {
-  return json({ user: toSelfUser(user) });
+const handleMe = requireAuth(async (_request, user) => {
+  return json({ user: await toSelfUser(user) });
 }, { allowSuspended: true });
 
 const handleCountries = requireAuth(() => {
@@ -48,7 +48,7 @@ const handleCountryUpdate = requireAuth(async (request, user) => {
 
   profileUpdatesTotal.inc({ field: 'country' });
 
-  return json({ user: toSelfUser(user) });
+  return json({ user: await toSelfUser(user) });
 }, { allowSuspended: true });
 
 const handleProfileEdit = requireAuth(async (request, user, params) => {
@@ -144,7 +144,7 @@ const handleProfileEdit = requireAuth(async (request, user, params) => {
     profileUpdatesTotal.inc({ field });
   }
 
-  return json({ user: toPublicUser(targetUser) });
+  return json({ user: await toPublicUser(targetUser) });
 }, { allowSuspended: true });
 
 

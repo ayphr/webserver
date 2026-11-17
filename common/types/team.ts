@@ -1,5 +1,6 @@
 import type { PlanTier } from './plans';
 import type { TeamCredits } from './credits';
+import type { BillingInterval, PaidSubscriptionStatus, SubscriptionPlan } from './subscription';
 
 export type TeamRole = 'member' | 'helper' | 'manager';
 
@@ -17,6 +18,18 @@ export type Team = {
   credits?: TeamCredits;
   createdAt: Date;
   updatedAt: Date;
+  billingInterval?: BillingInterval;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  seats?: number;
+  subscriptionStatus?: PaidSubscriptionStatus;
+  currentPeriodEnd?: Date;
+};
+
+export type TeamSubscriptionPayload = {
+  team: Team;
+  plans: SubscriptionPlan[];
+  trialDays: number;
 };
 
 export type TeamMember = {

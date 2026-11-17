@@ -442,7 +442,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
 
   const canManageAlerts = user ? !user.teamId || user.teamRole === 'manager' : false;
   const canOpenIntegrations = Boolean(
-    user && (user.teamId || (user.subscription?.tier ?? '').startsWith('team-')),
+    user && Boolean(user.teamId),
   );
 
   const deviceTotalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));

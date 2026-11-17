@@ -9,7 +9,7 @@ import { createStaffApi } from './staff';
 import { createUsersApi } from './users';
 import { createProfileApi } from './profile';
 import { createSessionsApi } from './sessions';
-import { createSubscriptionsApi } from './subscriptions';
+
 import { createCreditsApi } from './credits';
 import { createTeamsApi } from './teams';
 import { createNotificationsApi } from './notifications';
@@ -31,7 +31,6 @@ export type AyphrApiClient = RequestClient & {
   locations: ReturnType<typeof createLocationsApi>;
   staff: ReturnType<typeof createStaffApi>;
   sessions: ReturnType<typeof createSessionsApi>;
-  subscriptions: ReturnType<typeof createSubscriptionsApi>;
   credits: ReturnType<typeof createCreditsApi>;
   teams: ReturnType<typeof createTeamsApi>;
   notifications: ReturnType<typeof createNotificationsApi>;
@@ -66,7 +65,6 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
   games: createGamesApi(client),
     staff: createStaffApi(client),
     sessions: createSessionsApi(client),
-    subscriptions: createSubscriptionsApi(client),
     credits: createCreditsApi(client),
     teams: createTeamsApi(client),
     notifications: createNotificationsApi(client),

@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import type Stripe from 'stripe';
 import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUserCache } from './internal';
 import { isDuplicateKeyError } from '../http';
 import { invalidateAuthEntries } from '../authCache';
-import type { Team, TeamAuditLog, TeamRole, User, AttachedSubscription, TeamInvite, TeamCredits, SubscriptionTier } from '@common';
+import type { Team, TeamAuditLog, TeamRole, User, TeamInvite, TeamCredits, SubscriptionTier, BillingInterval, PaidSubscriptionStatus } from '@common';
 import { getCreditPeriodStart } from '@common';
-import { addAttachedSubscription, removeAttachedSubscription, getUserFromUuid, upsertPaidSubscription, removePaidSubscription } from './users';
-import { getActivePaidSubscription } from '@common';
-import { updateSubscriptionQuantity, cancelStripeSubscription } from '../stripe';
+import { resolveTierFromStripeSubscription } from '../stripe';
+import { getUserFromUuid } from './users';
+import { updateSubscriptionQuantity } from '../stripe';
 import { notifyUser } from '../notifications';
 
 const TEAMS_COLLECTION = 'teams';
@@ -15,17 +16,7 @@ const TEAM_AUDIT_LOGS_COLLECTION = 'team_audit_logs';
 export async function getTeamById(id: string): Promise<Team | null> {
   const teams = await getCollection('teams');
   trackMongoOperation('findOne', TEAMS_COLLECTION);
-  const team = await teams.findOne({ id });
-  if (!team) return null;
-  if (team.name) return team;
-  const manager = await getUserFromUuid(team.managerUuid);
-  if (manager?.username) {
-    const name = `${manager.username}'s Team`;
-    trackMongoOperation('updateOne', TEAMS_COLLECTION);
-    await teams.updateOne({ id }, { $set: { name, updatedAt: new Date() } });
-    return { ...team, name };
-  }
-  return team;
+  return teams.findOne({ id });
 }
 
 export async function updateTeamCredits(teamId: string, credits: TeamCredits): Promise<void> {
@@ -40,24 +31,12 @@ export async function getTeamByManagerUuid(managerUuid: string): Promise<Team | 
   return teams.findOne({ managerUuid });
 }
 
-export async function getTeamForUser(user: Pick<User, 'uuid' | 'teamId' | 'paidSubscriptions' | 'attachedSubscriptions'>): Promise<Team | null> {
+export async function getTeamForUser(user: Pick<User, 'uuid' | 'teamId'>): Promise<Team | null> {
   if (user.teamId) {
     return getTeamById(user.teamId);
   }
 
-  // Every user belongs to a team. The team's subscription tier determines the
-  // shared features and seat limit; fall back to 'free' when there is no paid
-  // or attached subscription.
-  const paid = getActivePaidSubscription(user as Pick<User, 'paidSubscriptions'>);
-  if (paid) {
-    return ensureTeamForManager(user.uuid, paid.tier);
-  }
-
-  const attached = (user.attachedSubscriptions ?? []).find((s) => s.expiresAt === null || new Date(s.expiresAt).getTime() > Date.now());
-  if (attached) {
-    return ensureTeamForManager(user.uuid, attached.tier);
-  }
-
+  // Legacy users without a team get a free personal team.
   return ensureTeamForManager(user.uuid, 'free');
 }
 
@@ -68,8 +47,7 @@ export async function ensureTeamForManager(managerUuid: string, tier?: string): 
   const user = await getUserFromUuid(managerUuid);
   if (!user) return null;
 
-  const paid = getActivePaidSubscription(user);
-  const resolvedTier = (tier ?? paid?.tier ?? 'free') as string;
+  const resolvedTier = (tier ?? 'free') as string;
 
   const now = new Date();
   const team: Team = {
@@ -100,6 +78,38 @@ export async function ensureTeamForManager(managerUuid: string, tier?: string): 
   }
 
   // Mark manager as team member/manager.
+  await setUserTeamMembership(managerUuid, team.id, 'manager');
+
+  return team;
+}
+
+export async function createTeamForUser(managerUuid: string, name?: string): Promise<Team | null> {
+  const user = await getUserFromUuid(managerUuid);
+  if (!user) return null;
+
+  const current = user.teamIds ?? (user.teamId ? [user.teamId] : []);
+  if (current.length >= 3) return null;
+
+  const now = new Date();
+  const team: Team = {
+    id: randomUUID(),
+    name: name?.trim() || `${user.username}'s Team`,
+    managerUuid,
+    tier: 'free',
+    credits: {
+      periodStart: getCreditPeriodStart(now),
+      monthlyUsed: 0,
+      additional: 0,
+      onHold: 0,
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const teams = await getCollection('teams');
+  trackMongoOperation('insertOne', TEAMS_COLLECTION);
+  await teams.insertOne(normalizeDateValues(team));
+
   await setUserTeamMembership(managerUuid, team.id, 'manager');
 
   return team;
@@ -143,11 +153,22 @@ export async function removeUserTeamMembership(userUuid: string, teamId: string)
 
 export async function setActiveTeam(userUuid: string, teamId: string): Promise<void> {
   const user = await getUserFromUuid(userUuid);
-  if (!user || !(user.teamIds ?? []).includes(teamId)) throw new Error('not a member of this team');
-  // Determine role? keep existing if active same; default member
+  const ids = user?.teamIds ?? (user?.teamId ? [user.teamId] : []);
+  if (!user || !ids.includes(teamId)) throw new Error('not a member of this team');
+
+  const team = await getTeamById(teamId);
+  const role: TeamRole = user.teamRoles?.[teamId]
+    ?? (team?.managerUuid === userUuid ? 'manager' : 'member');
+
   const users = await getCollection('users');
   trackMongoOperation('updateOne', 'users');
-  await users.updateOne({ uuid: userUuid }, { $set: { teamId, teamRole: user.teamRole } });
+  await users.updateOne(
+    { uuid: userUuid },
+    {
+      $set: { teamId, teamRole: role, [`teamRoles.${teamId}`]: role },
+      $addToSet: { teamIds: teamId },
+    },
+  );
   await invalidateUserCache(userUuid);
   await invalidateAuthEntries();
 }
@@ -157,31 +178,42 @@ export async function getTeamsForUser(user: Pick<User, 'teamIds' | 'teamId'>): P
   if (ids.length === 0) return [];
   const teams = await getCollection('teams');
   trackMongoOperation('find', 'teams');
-  const list = await teams.find({ id: { $in: ids } }).toArray();
-  // Backfill membership arrays and default names for pre-update records.
-  for (const team of list) {
-    if (!team.name) {
-      const manager = await getUserFromUuid(team.managerUuid);
-      if (manager?.username) team.name = `${manager.username}'s Team`;
-    }
-  }
-  return list;
+  return teams.find({ id: { $in: ids } }).toArray();
 }
 
-export async function clearUserTeamMembership(userUuid: string): Promise<void> {
+export async function clearUserTeamMembership(userUuid: string, teamId?: string): Promise<void> {
   const users = await getCollection('users');
+  const user = await getUserFromUuid(userUuid);
   trackMongoOperation('updateOne', 'users');
-  await users.updateOne({ uuid: userUuid }, { $unset: { teamId: '', teamRole: '' } });
+
+  const update: Record<string, unknown> = {};
+
+  if (teamId) {
+    update.$pull = { teamIds: teamId };
+    update.$unset = { [`teamRoles.${teamId}`]: '' };
+    if (user?.teamId === teamId) {
+      const remaining = (user.teamIds ?? []).filter((id) => id !== teamId);
+      const nextTeamId = remaining[0] ?? null;
+      update.$set = {
+        teamId: nextTeamId,
+        teamRole: nextTeamId ? user.teamRoles?.[nextTeamId] ?? 'member' : null,
+      };
+    }
+  } else {
+    update.$unset = { teamId: '', teamRole: '' };
+  }
+
+  await users.updateOne({ uuid: userUuid }, update);
   await invalidateUserCache(userUuid);
   await invalidateAuthEntries();
 }
 
-export async function getTeamScopeUuid(user: Pick<User, 'uuid' | 'teamId' | 'paidSubscriptions' | 'attachedSubscriptions'>): Promise<string> {
+export async function getTeamScopeUuid(user: Pick<User, 'uuid' | 'teamId'>): Promise<string> {
   const team = await getTeamForUser(user as User);
   return team ? team.id : user.uuid;
 }
 
-export async function getTeamScopeUsername(user: Pick<User, 'uuid' | 'teamId' | 'paidSubscriptions' | 'attachedSubscriptions'>): Promise<string> {
+export async function getTeamScopeUsername(user: Pick<User, 'uuid' | 'teamId'>): Promise<string> {
   const team = await getTeamForUser(user as User);
   if (!team) return (user as User).username;
   const manager = await getUserFromUuid(team.managerUuid);
@@ -194,14 +226,96 @@ export async function getTeamMembers(teamId: string): Promise<User[]> {
   return users.find({ $or: [{ teamId: teamId }, { teamIds: teamId }] }).toArray();
 }
 
-export function isTeamManager(user: Pick<User, 'uuid' | 'teamId' | 'teamRole' | 'paidSubscriptions' | 'attachedSubscriptions'>, team: Team | null): boolean {
+export function isTeamManager(user: Pick<User, 'uuid' | 'teamId' | 'teamRole'>, team: Team | null): boolean {
   if (!team) return false;
   if (team.managerUuid === user.uuid) return true;
   return user.teamRole === 'manager';
 }
 
-export function canManageTeam(user: Pick<User, 'uuid' | 'teamId' | 'teamRole' | 'paidSubscriptions' | 'attachedSubscriptions'>, team: Team | null): boolean {
+export function canManageTeam(user: Pick<User, 'uuid' | 'teamId' | 'teamRole'>, team: Team | null): boolean {
   return isTeamManager(user, team);
+}
+
+export async function getTeamByStripeCustomerId(customerId: string): Promise<Team | null> {
+  const teams = await getCollection('teams');
+  trackMongoOperation('findOne', TEAMS_COLLECTION);
+  return teams.findOne({ stripeCustomerId: customerId });
+}
+
+export async function setTeamStripeCustomerId(teamId: string, customerId: string): Promise<void> {
+  const teams = await getCollection('teams');
+  trackMongoOperation('updateOne', TEAMS_COLLECTION);
+  await teams.updateOne({ id: teamId }, { $set: { stripeCustomerId: customerId, updatedAt: new Date() } });
+}
+
+/** Applies a Stripe subscription to the team that owns it. */
+export async function syncTeamStripeSubscription(
+  teamId: string,
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  const teams = await getCollection('teams');
+  const tier = resolveTierFromStripeSubscription(subscription);
+  const item = subscription.items.data[0];
+  const interval: BillingInterval | undefined = item?.price?.recurring?.interval === 'year'
+    ? 'year'
+    : item?.price?.recurring?.interval === 'month'
+      ? 'month'
+      : undefined;
+  const now = new Date();
+  trackMongoOperation('updateOne', TEAMS_COLLECTION);
+  await teams.updateOne(
+    { id: teamId },
+    {
+      $set: {
+        ...(tier ? { tier } : {}),
+        subscriptionStatus: subscription.status as PaidSubscriptionStatus,
+        stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id,
+        stripeSubscriptionId: subscription.id,
+        seats: item?.quantity ?? 1,
+        ...(interval ? { billingInterval: interval } : {}),
+        ...(item?.current_period_end ? { currentPeriodEnd: new Date(item.current_period_end * 1000) } : {}),
+        updatedAt: now,
+      },
+    },
+  );
+
+  const updated = await getTeamById(teamId);
+  if (updated) await syncTeamMemberSubscriptions(updated);
+}
+
+/** Reverts a team to the free plan after its Stripe subscription ends. */
+export async function clearTeamStripeSubscription(teamId: string): Promise<void> {
+  const teams = await getCollection('teams');
+  trackMongoOperation('updateOne', TEAMS_COLLECTION);
+  await teams.updateOne(
+    { id: teamId },
+    {
+      $set: { tier: 'free', subscriptionStatus: 'canceled', updatedAt: new Date() },
+      $unset: { stripeSubscriptionId: '', seats: '', billingInterval: '', currentPeriodEnd: '' },
+    },
+  );
+
+  const updated = await getTeamById(teamId);
+  if (updated) await syncTeamMemberSubscriptions(updated);
+}
+
+/**
+ * Keeps the Stripe subscription quantity in sync with the team's member count.
+ */
+export async function syncTeamMemberSubscriptions(team: Team): Promise<void> {
+  const members = await getTeamMembers(team.id);
+  const seats = Math.max(1, members.length);
+
+  if (team.stripeSubscriptionId && team.seats !== seats) {
+    try {
+      await updateSubscriptionQuantity(team.stripeSubscriptionId, seats);
+      const teams = await getCollection('teams');
+      trackMongoOperation('updateOne', TEAMS_COLLECTION);
+      await teams.updateOne({ id: team.id }, { $set: { seats, updatedAt: new Date() } });
+    } catch {
+      // Best effort: billing quantity is reconciled by the next Stripe event.
+    }
+  }
 }
 
 export async function updateTeamName(team: Team, actor: User, name: string): Promise<Team> {
@@ -218,40 +332,7 @@ export async function updateTeamName(team: Team, actor: User, name: string): Pro
   });
   const updated = await getTeamById(team.id);
   return updated ?? { ...team, name, updatedAt: now };
-}
-
-
-export async function syncTeamSubscriptionQuantity(team: Team, manager: User): Promise<void> {
-  const paid = getActivePaidSubscription(manager);
-  if (!paid || paid.tier !== team.tier || !paid.stripeSubscriptionId) return;
-
-  const members = await getTeamMembers(team.id);
-  const quantity = Math.max(1, members.length);
-  if (paid.quantity === quantity) return;
-
-  try {
-    const updated = await updateSubscriptionQuantity(paid.stripeSubscriptionId, quantity);
-    if (updated) {
-      paid.quantity = quantity;
-      paid.updatedAt = new Date();
-      await upsertPaidSubscription(manager.uuid, paid);
-    }
-  } catch {
-    // best effort
-  }
-}
-
-
-export async function cancelUserPaidSubscriptions(user: User): Promise<void> {
-  for (const sub of user.paidSubscriptions ?? []) {
-    if (sub.stripeSubscriptionId) {
-      await cancelStripeSubscription(sub.stripeSubscriptionId);
-    }
-    await removePaidSubscription(user.uuid, sub.stripeSubscriptionId);
-  }
-}
-
-export function getTeamRole(user: Pick<User, 'teamRole'>): TeamRole {
+}export function getTeamRole(user: Pick<User, 'teamRole'>): TeamRole {
   return (user.teamRole as TeamRole) ?? 'member';
 }
 
@@ -263,9 +344,6 @@ export async function addTeamMember(params: {
 }): Promise<void> {
   const { team, manager, target, role } = params;
 
-  // Cancel the new member's own paid subscriptions (no refund).
-  await cancelUserPaidSubscriptions(target);
-
   if ((target.teamIds ?? (target.teamId ? [target.teamId] : [])).includes(team.id)) {
     throw new Error('user already belongs to this team');
   }
@@ -273,30 +351,8 @@ export async function addTeamMember(params: {
     throw new Error('user is already a member of 3 teams');
   }
 
-  // Attach team subscription to target if not already on this team.
-  const existingSub = (target.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === (team.tier as SubscriptionTier));
-  let subscriptionId: string;
-  if (existingSub) {
-    subscriptionId = existingSub.id;
-  } else {
-    const seats = manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.quantity ?? 1;
-    const subscription: AttachedSubscription = {
-      id: randomUUID(),
-      tier: team.tier as SubscriptionTier,
-      createdAt: new Date(),
-      expiresAt: manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.currentPeriodEnd ?? null,
-      addedByUuid: manager.uuid,
-      addedByUsername: manager.username,
-      reason: 'team membership',
-      seats,
-    };
-    await addAttachedSubscription(target.uuid, subscription);
-    subscriptionId = subscription.id;
-  }
-
   await addUserToTeam(target.uuid, team.id, role);
-
-  await syncTeamSubscriptionQuantity(team, manager);
+  await syncTeamMemberSubscriptions(team);
 
   await logTeamAudit({
     teamId: team.id,
@@ -305,7 +361,7 @@ export async function addTeamMember(params: {
     action: 'member.added',
     targetUuid: target.uuid,
     targetUsername: target.username,
-    details: { role, subscriptionId },
+    details: { role },
   });
 }
 
@@ -316,18 +372,7 @@ export async function removeTeamMember(params: {
 }): Promise<void> {
   const { team, actor, target } = params;
 
-  // Remove team attached subscriptions.
-  const subs = target.attachedSubscriptions ?? [];
-  for (const sub of subs) {
-    if (sub.reason === 'team membership' && sub.tier === team.tier) {
-      await removeAttachedSubscription(target.uuid, sub.id);
-    }
-  }
-
-  await clearUserTeamMembership(target.uuid);
-
-  const managerUser = await getUserFromUuid(team.managerUuid);
-  if (managerUser) await syncTeamSubscriptionQuantity(team, managerUser);
+  await clearUserTeamMembership(target.uuid, team.id);
 
   await logTeamAudit({
     teamId: team.id,
@@ -467,34 +512,13 @@ export async function acceptTeamInvite(params: {
   const manager = await getUserFromUuid(team.managerUuid);
   if (!manager) throw new Error('manager not found');
 
-  // Cancel the joining user's own paid subscriptions (no refund).
-  await cancelUserPaidSubscriptions(user);
-
-  // Attach subscription + membership.
-  const existingSub = (user.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === (team.tier as SubscriptionTier));
-  if (!existingSub) {
-    const seats = manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.quantity ?? 1;
-    const subscription: AttachedSubscription = {
-      id: randomUUID(),
-      tier: team.tier as SubscriptionTier,
-      createdAt: new Date(),
-      expiresAt: manager.paidSubscriptions?.find((s) => s.tier === (team.tier as SubscriptionTier))?.currentPeriodEnd ?? null,
-      addedByUuid: manager.uuid,
-      addedByUsername: manager.username,
-      reason: 'team membership',
-      seats,
-    };
-    await addAttachedSubscription(user.uuid, subscription);
-  }
-
   await addUserToTeam(user.uuid, team.id, invite.role);
   if (!user.teamId) await setUserTeamMembership(user.uuid, team.id, invite.role);
+  await syncTeamMemberSubscriptions(team);
 
   const invites = await getCollection('teamInvites');
   trackMongoOperation('updateOne', 'team_invites');
   await invites.updateOne({ id: invite.id }, { $set: { acceptedAt: new Date(), acceptedByUuid: user.uuid } });
-
-  await syncTeamSubscriptionQuantity(team, manager);
 
   await logTeamAudit({
     teamId: team.id,
@@ -517,25 +541,21 @@ export async function acceptTeamInvite(params: {
   }
 }
 
-export async function getTeamSeatLimit(team: Team, manager: User): Promise<number> {
-  const paid = getActivePaidSubscription(manager);
-  if (paid?.tier === team.tier) {
-    const seats = paid.quantity ?? 1;
-    const planMax = (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? seats;
-    return Math.min(seats, planMax);
+export async function getTeamSeatLimit(team: Team, _manager: User): Promise<number> {
+  const planMax = (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
+  if (team.seats && team.stripeSubscriptionId) {
+    return Math.min(team.seats, planMax);
   }
-  // Attached/granted team plans: no seat billing, use plan max.
-  return (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
+  return planMax;
 }
 
 /**
  * Seat count used for shared, per-seat limits (credits, data points, ...).
- * Paid teams use billed seats; granted teams use the actual member count.
+ * Paid teams use billed seats; other teams use the actual member count.
  */
-export async function getTeamSharedSeats(team: Team, manager: User): Promise<number> {
-  const paid = getActivePaidSubscription(manager);
-  if (paid?.tier === (team.tier as SubscriptionTier)) {
-    return Math.max(1, paid.quantity ?? 1);
+export async function getTeamSharedSeats(team: Team, _manager: User): Promise<number> {
+  if (team.seats && team.stripeSubscriptionId) {
+    return Math.max(1, team.seats);
   }
   const members = await getTeamMembers(team.id);
   return Math.max(1, members.length);

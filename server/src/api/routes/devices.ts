@@ -66,7 +66,7 @@ import {
   type DeviceQueryRequest,
   type DeviceSummary,
   type User,
-  getPlanFeaturesForUser,
+  getPlanFeatures,
 } from '@common';
 import { redisFixedWindow } from '../../lib/redis';
 import { evaluateAlertsForDevice } from '../../lib/alerts';
@@ -202,7 +202,7 @@ async function pruneOwnerDataPoints(
     const team = await getTeamForUser(owner);
     const manager = team ? await getUserFromUuid(team.managerUuid) : null;
     const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
-    const features = getPlanFeaturesForUser(owner, seats);
+    const features = getPlanFeatures(team?.tier ?? 'free', seats);
     const cutoff = new Date(now - features.dataRetentionDays * 86_400_000);
     const removed = await pruneDataPointsForSerials(
       ownerDevices.map((device) => device.serial),
@@ -338,7 +338,7 @@ const handleLink = requireAuth(async (request, user: User) => {
       }
     }
     const ownedDevices = await getDevicesForTeamId(scopeUuid);
-    const maxDevices = getPlanFeaturesForUser(user).maxDevices;
+    const maxDevices = getPlanFeatures(team?.tier ?? 'free').maxDevices;
     if (ownedDevices.length >= maxDevices) {
       return json({ error: 'device limit reached for your plan' }, 409);
     }
@@ -667,7 +667,7 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const team = await getTeamForUser(user);
   const manager = team ? await getUserFromUuid(team.managerUuid) : null;
   const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
-  const features = getPlanFeaturesForUser(user, seats);
+  const features = getPlanFeatures(team?.tier ?? 'free', seats);
 
   const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
     since,
@@ -838,7 +838,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   const team = await getTeamForUser(user);
   const manager = team ? await getUserFromUuid(team.managerUuid) : null;
   const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
-  const features = getPlanFeaturesForUser(user, seats);
+  const features = getPlanFeatures(team?.tier ?? 'free', seats);
 
   if (count < 1 || count > features.dataFillMaxPoints) {
     return json({ error: `requested range produces too many points (max ${features.dataFillMaxPoints.toLocaleString()})` }, 400);

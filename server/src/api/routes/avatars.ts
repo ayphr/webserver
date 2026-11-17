@@ -78,7 +78,7 @@ const handleAvatarUpload = requireAuth(async (request, user) => {
 
   avatarEventsTotal.inc({ event: 'uploaded' });
 
-  return json({ user: toPublicUser(target.user) });
+  return json({ user: await toPublicUser(target.user) });
 }, { allowSuspended: true });
 
 const handleAvatarDelete = requireAuth(async (request, user) => {
@@ -86,7 +86,7 @@ const handleAvatarDelete = requireAuth(async (request, user) => {
   if ('error' in target) return target.error;
 
   if (!target.user.avatar) {
-    return json({ user: toPublicUser(target.user) });
+    return json({ user: await toPublicUser(target.user) });
   }
 
   await deleteAvatar(target.user.uuid);
@@ -96,7 +96,7 @@ const handleAvatarDelete = requireAuth(async (request, user) => {
 
   avatarEventsTotal.inc({ event: 'deleted' });
 
-  return json({ user: toPublicUser(target.user) });
+  return json({ user: await toPublicUser(target.user) });
 }, { allowSuspended: true });
 
 const handleAvatarGet = async (_request: Request, params: RouteParams) => {

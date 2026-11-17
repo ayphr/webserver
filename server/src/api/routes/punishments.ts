@@ -18,7 +18,7 @@ const handleMe = requireAuth(async (_request, user) => {
   }) ?? null;
 
   return json({
-    user: toSelfUser(user),
+    user: await toSelfUser(user),
     activeSuspension,
     punishments,
   });

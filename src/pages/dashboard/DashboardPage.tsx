@@ -17,7 +17,6 @@ import { buildSettingsSections } from './dashboardSettings';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
-const SubscriptionPanel = lazy(() => import('../../components/subscriptions/SubscriptionPanel').then((m) => ({ default: m.SubscriptionPanel })));
 const NotificationsPanel = lazy(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
 const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
 const TeamPanel = lazy(() => import('../../components/team/TeamPanel').then((m) => ({ default: m.TeamPanel })));
@@ -26,7 +25,7 @@ const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ de
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'subscription', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
+const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
 
 function formatDisplayDate(date: Date | string): string {
   return toDate(date).toLocaleDateString('en-GB');
@@ -243,8 +242,8 @@ export const DashboardPage = () => {
     ? Math.min(100, Math.max(0, ((now - toDate(activeSuspension.issuedAt).getTime()) / (toDate(activeSuspension.endsAt).getTime() - toDate(activeSuspension.issuedAt).getTime())) * 100))
     : null;
   const isStaff = user?.role === 'staff';
-  const isTeamMember = Boolean(user?.teamId) || (user?.subscription?.tier ?? '').startsWith('team-');
-  const isTeamManager = user?.teamRole === 'manager' || ((user?.subscription?.tier ?? '').startsWith('team-') && !user?.teamId);
+  const isTeamMember = Boolean(user?.teamId);
+  const isTeamManager = user?.teamRole === 'manager';
 
   const handleSelfPunishment = async () => {
     // Refresh user data to get the updated suspension status.
@@ -557,17 +556,6 @@ export const DashboardPage = () => {
                 className="dashboard-panel--wide"
               >
                 <SettingsPanel sections={settingsSections} />
-              </DashboardPanel>
-            )}
-
-            {activePage === 'subscription' && (
-              <DashboardPanel
-                title="Subscription"
-                description="Manage your Ayphr subscription and billing"
-              >
-                <Suspense fallback={<DashboardContentSkeleton />}>
-                  <SubscriptionPanel />
-                </Suspense>
               </DashboardPanel>
             )}
 

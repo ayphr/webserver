@@ -119,7 +119,7 @@ async function getScopedDevice(user: User, params: Record<string, string>): Prom
 
 async function canManageAlerts(user: User): Promise<boolean> {
   const team = await getTeamForUser(user);
-  return !team || canManageTeam(user, team);
+  return Boolean(team && canManageTeam(user, team));
 }
 
 async function validateIntegrationIds(

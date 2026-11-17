@@ -1,10 +1,6 @@
 import type { BadgeId } from './badges';
 
-import type {
-  AttachedSubscription,
-  PaidSubscription,
-  PublicSubscription,
-} from './subscription';
+import type { PublicSubscription } from './subscription';
 
 export type UserRole = 'user' | 'staff';
 export type SocialLinkType = 'website' | 'youtube' | 'github' | 'bluesky' | 'reddit' | 'x' | 'facebook' | 'instagram' | 'tiktok';
@@ -56,9 +52,6 @@ export type User = {
   lastActive: Date;
   country?: string;
   gameBests?: GameBests;
-  stripeCustomerId?: string;
-  paidSubscriptions?: PaidSubscription[];
-  attachedSubscriptions?: AttachedSubscription[];
   teamId?: string;
   teamRole?: 'member' | 'helper' | 'manager';
   teamIds?: string[];
@@ -69,7 +62,7 @@ export type User = {
 
 export type PublicUser = Omit<
   User,
-  'auth' | 'stripeCustomerId' | 'paidSubscriptions' | 'attachedSubscriptions' | 'avatar' | 'gameBests' | 'email' | 'emailVerifiedAt' | 'trustedDevices'
+  'auth' | 'avatar' | 'gameBests' | 'email' | 'emailVerifiedAt' | 'trustedDevices'
 > & {
   badges: BadgeId[];
   avatarUrl?: string;

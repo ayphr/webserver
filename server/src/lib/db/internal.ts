@@ -234,7 +234,6 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [DATA_POINTS_COLLECTION, () => cols.dataPoints.createIndex({ timestamp: -1 })],
     [USERS_COLLECTION, () => cols.users.createIndex({ uuid: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ username: 1 }, { unique: true })],
-    [USERS_COLLECTION, () => cols.users.createIndex({ stripeCustomerId: 1 }, { sparse: true })],
     [AVATARS_COLLECTION, () => cols.avatars.createIndex({ userUuid: 1 }, { unique: true })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1 })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
@@ -251,7 +250,6 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ email: 1, purpose: 1, userUuid: 1 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ teamId: 1 })],
-    ['teams', () => cols.teams.createIndex({ managerUuid: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex(
       { teamId: 1, isDefault: 1 },
       { unique: true, partialFilterExpression: { isDefault: true } }
@@ -283,7 +281,36 @@ export async function setupCollections(db: Db): Promise<Collections> {
     log.warn({ error }, 'failed to ensure sessions indexes');
   }
 
+  try {
+    await ensureTeamIndexes(cols.teams);
+  } catch (error) {
+    log.warn({ error }, 'failed to ensure team indexes');
+  }
+
   return cols;
+}
+
+/**
+ * Older deployments enforced one team per manager with a unique index. Users
+ * can now belong to (and manage) several teams, so the stale unique index is
+ * dropped here before the non-unique one is created on startup.
+ */
+export async function ensureTeamIndexes(teams: Collection<Team>) {
+  trackMongoOperation('listIndexes', 'teams');
+  const existing = await teams.listIndexes().toArray();
+
+  for (const index of existing) {
+    const fields = Object.keys(index.key ?? {});
+    if (fields.length === 1 && fields[0] === 'managerUuid' && index.unique) {
+      trackMongoOperation('dropIndex', 'teams');
+      await teams.dropIndex(index.name);
+    }
+  }
+
+  trackMongoOperation('createIndex', 'teams');
+  await teams.createIndex({ managerUuid: 1 });
+  trackMongoOperation('createIndex', 'teams');
+  await teams.createIndex({ stripeCustomerId: 1 }, { sparse: true });
 }
 
 /**

@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
-import { randomUUID } from 'node:crypto';
-import type { BillingInterval, PaidSubscription, PaidSubscriptionStatus, SubscriptionPlan, SubscriptionTier } from '@common';
+import type { BillingInterval, SubscriptionPlan, SubscriptionTier } from '@common';
 import { isSubscriptionTier, BILLING_INTERVALS, PURCHASABLE_SUBSCRIPTION_TIERS } from '@common';
 import { STRIPE_PRICE_TIERS, STRIPE_SECRET_KEY, STRIPE_TRIAL_DAYS } from '../env';
 import { createLogger } from './logger';
@@ -90,68 +89,6 @@ export function resolveTierFromStripeSubscription(subscription: Stripe.Subscript
   return null;
 }
 
-function getBillingPeriod(subscription: Stripe.Subscription): { start: Date | null; end: Date | null } {
-  let start: number | null = null;
-  let end: number | null = null;
-
-  for (const item of subscription.items.data) {
-    const itemStart = item.current_period_start;
-    const itemEnd = item.current_period_end;
-
-    if (itemStart !== null && itemStart !== undefined && (start === null || itemStart < start)) {
-      start = itemStart;
-    }
-
-    if (itemEnd !== null && itemEnd !== undefined && (end === null || itemEnd > end)) {
-      end = itemEnd;
-    }
-  }
-
-  return {
-    start: start === null ? null : new Date(start * 1000),
-    end: end === null ? null : new Date(end * 1000),
-  };
-}
-
-function toStripeCustomerId(customer: Stripe.Subscription['customer']): string {
-  return typeof customer === 'string' ? customer : customer.id;
-}
-
-export function mapStripeSubscription(
-  subscription: Stripe.Subscription,
-  options: { id?: string; now?: Date } = {},
-): PaidSubscription | null {
-  const tier = resolveTierFromStripeSubscription(subscription);
-  if (!tier) {
-    log.warn({ stripeSubscriptionId: subscription.id }, 'could not resolve tier for Stripe subscription');
-    return null;
-  }
-
-  const now = options.now ?? new Date();
-  const period = getBillingPeriod(subscription);
-  const items = subscription.items.data;
-  const firstItem = items[0];
-
-  return {
-    id: options.id ?? randomUUID(),
-    stripeSubscriptionId: subscription.id,
-    stripeCustomerId: toStripeCustomerId(subscription.customer),
-    stripePriceId: firstItem?.price?.id,
-    stripeProductId:
-      typeof firstItem?.price?.product === 'string'
-        ? firstItem.price.product
-        : firstItem?.price?.product?.id,
-    tier,
-    status: subscription.status as PaidSubscriptionStatus,
-    currentPeriodStart: period.start,
-    currentPeriodEnd: period.end,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    quantity: firstItem?.quantity ?? 1,
-    createdAt: new Date(subscription.created * 1000),
-    updatedAt: now,
-  };
-}
-
 export async function constructStripeEvent(payload: string | Buffer, signature: string, secret: string): Promise<Stripe.Event> {
   const stripe = getStripe();
   if (!stripe) {
@@ -159,31 +96,26 @@ export async function constructStripeEvent(payload: string | Buffer, signature: 
   }
 
   return stripe.webhooks.constructEventAsync(payload, signature, secret);
-}
-
-export async function createStripeCustomer(params: {
-  userUuid: string;
-  username: string;
+}export async function createTeamStripeCustomer(params: {
+  teamId: string;
+  name: string;
 }): Promise<string | null> {
   const stripe = getStripe();
   if (!stripe) return null;
 
   const customer = await stripe.customers.create({
-    name: params.username,
-    metadata: { userUuid: params.userUuid },
+    name: params.name,
+    metadata: { teamId: params.teamId },
   });
 
   return customer.id;
-}
-
-export async function createCheckoutSession(params: {
+}export async function createTeamCheckoutSession(params: {
   customerId: string;
   priceId: string;
   tier: SubscriptionTier;
-  userUuid: string;
+  teamId: string;
   successUrl: string;
   cancelUrl: string;
-  quantity?: number;
 }): Promise<string | null> {
   const stripe = getStripe();
   if (!stripe) return null;
@@ -191,14 +123,14 @@ export async function createCheckoutSession(params: {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: params.customerId,
-    line_items: [{ price: params.priceId, quantity: params.quantity ?? 1 }],
+    line_items: [{ price: params.priceId, quantity: 1 }],
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
     allow_promotion_codes: true,
-    metadata: { userUuid: params.userUuid, tier: params.tier },
+    metadata: { teamId: params.teamId, tier: params.tier },
     subscription_data: {
       trial_period_days: STRIPE_TRIAL_DAYS,
-      metadata: { userUuid: params.userUuid, tier: params.tier },
+      metadata: { teamId: params.teamId, tier: params.tier },
     },
   });
 
@@ -241,29 +173,5 @@ export async function updateSubscriptionQuantity(
   return stripe.subscriptions.update(stripeSubscriptionId, {
     items: [{ id: item.id, quantity }],
     proration_behavior: 'none',
-  });
-}
-
-export async function cancelStripeSubscription(stripeSubscriptionId: string): Promise<boolean> {
-  const stripe = getStripe();
-  if (!stripe) return false;
-  try {
-    await stripe.subscriptions.cancel(stripeSubscriptionId);
-    return true;
-  } catch (error) {
-    log.warn({ error, stripeSubscriptionId }, 'failed to cancel Stripe subscription');
-    return false;
-  }
-}
-
-export async function setStripeSubscriptionAutoRenew(
-  stripeSubscriptionId: string,
-  autoRenew: boolean,
-): Promise<Stripe.Subscription | null> {
-  const stripe = getStripe();
-  if (!stripe) return null;
-
-  return stripe.subscriptions.update(stripeSubscriptionId, {
-    cancel_at_period_end: !autoRenew,
   });
 }
