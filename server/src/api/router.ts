@@ -97,6 +97,7 @@ import {
   handleCreateTeam,
   handleTeamSubscription,
   handleTeamSubscriptionCheckout,
+  handleTeamPlanFree,
   handleTeamSubscriptionPortal,
 } from './routes/teams';
 import { handleListMine as handleSessionsListMine, handleRevoke as handleSessionRevoke } from './routes/sessions';
