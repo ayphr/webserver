@@ -2,7 +2,7 @@
   padding: 1.5rem;
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border: none;
 }
 
 .profile-card--loading,
@@ -107,16 +107,16 @@
   width: 2.35rem;
   height: 2.35rem;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: none;
   background-color: transparent;
   color: hsl(0, 0%, 72%);
   text-decoration: none;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .profile-card__social-iconLink:hover {
-  border-color: var(--text-muted);
+  background-color: var(--bg-input);
   color: var(--text-primary);
 }
 
@@ -174,7 +174,7 @@
   font-family: var(--font-family-base);
   font-size: 0.95rem;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: background-color 0.2s;
 }
 
 .profile-card__form-select:disabled {
@@ -204,7 +204,7 @@
 
 .profile-card__socials-clearButton,
 .profile-card__socialRemoveButton {
-  border: 1px solid var(--border);
+  border: none;
   background: transparent;
   color: var(--text-muted);
   border-radius: 999px;
@@ -216,7 +216,7 @@
 .profile-card__socials-clearButton:hover,
 .profile-card__socialRemoveButton:hover {
   color: var(--text-primary);
-  border-color: var(--text-muted);
+  background-color: var(--bg-input);
 }
 
 .profile-card__socials-clearButton:disabled,
@@ -241,7 +241,7 @@
 .profile-card__socialTypeSelect,
 .profile-card__socialValueInput {
   background-color: var(--bg-base);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-md);
   padding: 0.45rem 0.6rem;
   color: var(--text-primary);
@@ -264,14 +264,12 @@
 
 .profile-card__socialTypeSelect:hover,
 .profile-card__socialValueInput:hover {
-  border-color: var(--text-muted);
+  background-color: var(--bg-input);
 }
 
 .profile-card__socialTypeSelect:focus,
 .profile-card__socialValueInput:focus {
-  border-color: var(--text-primary);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
 .profile-card__socialValueInput {
@@ -288,7 +286,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 999px;
   background: transparent;
   color: var(--text-muted);
@@ -300,7 +298,7 @@
 .profile-card__socialChip.is-active,
 .profile-card__socialChip:hover {
   color: var(--text-primary);
-  border-color: var(--text-muted);
+  background-color: var(--bg-input);
 }
 
 .profile-card__socialChipIcon {
@@ -340,6 +338,6 @@
   padding: 0.6rem 0.75rem;
   margin: 0;
   background: var(--bg-base);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-md);
 }
