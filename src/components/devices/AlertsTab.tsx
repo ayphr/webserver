@@ -440,10 +440,9 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
                     />
                     <span className="alerts-tab__integration-meta">
                       <span className="alerts-tab__integration-name">{integration.name}</span>
-                      <span className="alerts-tab__integration-provider">
-                        {integration.provider}
-                        {integration.enabled ? '' : ' · disabled'}
-                      </span>
+                      {!integration.enabled && (
+                        <span className="alerts-tab__integration-provider">disabled</span>
+                      )}
                     </span>
                   </label>
                 );
@@ -465,9 +464,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
             }
             fullWidth
           />
-          <span className="alerts-tab__field-hint">
-            The first notification is sent as soon as the rule starts firing. This controls reminders after that.
-          </span>
+
         </div>
 
         <div className="alerts-tab__enabled-row">
