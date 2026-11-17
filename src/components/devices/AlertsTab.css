@@ -69,8 +69,7 @@
 }
 
 .alerts-tab__summary-dot.is-firing {
-  background: var(--status-error);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  background: var(--text-primary);
 }
 
 .alerts-tab__summary-sep {
@@ -176,8 +175,7 @@
 }
 
 .alerts-tab__card.is-firing {
-  border-color: rgba(255, 107, 107, 0.45);
-  box-shadow: inset 3px 0 0 var(--status-error);
+  border-color: var(--border-focus);
 }
 
 .alerts-tab__card.is-disabled {
@@ -236,13 +234,9 @@
 }
 
 .alerts-tab__status.is-firing {
-  color: var(--status-error);
-  border-color: rgba(255, 107, 107, 0.45);
-  background: rgba(255, 107, 107, 0.1);
-}
-
-.alerts-tab__status.is-firing .alerts-tab__status-dot {
-  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.16);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+  background: var(--bg-input);
 }
 
 .alerts-tab__card-actions {
@@ -467,8 +461,8 @@
 }
 
 .alerts-tab__remove-condition:hover:not(:disabled) {
-  border-color: var(--status-error);
-  color: var(--status-error);
+  border-color: var(--border-focus);
+  color: var(--text-primary);
 }
 
 .alerts-tab__remove-condition:disabled {
