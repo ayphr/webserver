@@ -61,6 +61,8 @@ export type User = {
   attachedSubscriptions?: AttachedSubscription[];
   teamId?: string;
   teamRole?: 'member' | 'helper' | 'manager';
+  teamIds?: string[];
+  teamRoles?: Record<string, 'member' | 'helper' | 'manager'>;
   trustedDevices?: string[];
   usernameChangedAt?: Date;
 };

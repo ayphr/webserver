@@ -106,7 +106,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
             <div key={invite.id} className="overview__invite">
               <span>
                 Invited to join {invite.teamName ?? 'a team'} by {invite.invitedByUsername}
-                {invite.migrateData ? ' (will migrate your devices/locations)' : ''}
+                {' '}
               </span>
               <button type="button" onClick={() => handleAcceptInvite(invite.token)}>
                 Accept

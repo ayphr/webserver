@@ -3,6 +3,8 @@ import './Sidebar.css';
 import logo from '../../assets/logo.svg';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconCreditCard, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
+import type { Team } from '@common';
+import { api } from '../../lib/api';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
 import { isStoredAccountExpired, type StoredAccount } from '../../lib/accounts';
@@ -107,6 +109,8 @@ export const Sidebar: React.FC<Props> = ({
   ];
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
   const [accountToLogout, setAccountToLogout] = useState<StoredAccount | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { showTooltip, hideTooltip } = useTooltip();
@@ -143,6 +147,23 @@ export const Sidebar: React.FC<Props> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, [isAccountMenuOpen]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [list, me] = await Promise.all([api.teams.listMine(), api.teams.me()]);
+        if (cancelled) return;
+        setTeams(list);
+        setActiveTeamId(me.team.id);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleConfirmLogout = () => {
     const account = accountToLogout;
     setAccountToLogout(null);
@@ -160,6 +181,26 @@ export const Sidebar: React.FC<Props> = ({
         <img src={logo} alt="Ayphr" className="n-sidebar__logo" />
         <h1 className="n-sidebar__title">Ayphr</h1>
       </div>
+
+      {teams.length > 0 && (
+        <div className="n-sidebar__team-switcher">
+          <select
+            aria-label="Team switcher"
+            value={activeTeamId ?? teams[0]?.id ?? ''}
+            onChange={(event) => {
+              const id = event.target.value;
+              setActiveTeamId(id);
+              void api.teams.switchTeam(id).then(() => window.location.reload());
+            }}
+          >
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name ?? "Team"}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <nav className="n-sidebar__tabs" aria-label="Primary">
         {isSuspended ? (

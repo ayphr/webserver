@@ -51,6 +51,13 @@ export function createTeamsApi(client: RequestClient) {
     async revokeInvite(id: string) {
       await client.requestJson(`/api/team/invites/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
+    async listMine() {
+      const response = await client.requestJson<{ teams: Team[] }>('/api/teams/mine');
+      return response.teams;
+    },
+    async switchTeam(teamId: string) {
+      await client.requestJson('/api/teams/switch', { method: 'POST', body: { teamId } });
+    },
     async pendingInvites() {
       const response = await client.requestJson<{ invites: import('@common').TeamInvite[] }>('/api/team/invites/pending');
       return response.invites;

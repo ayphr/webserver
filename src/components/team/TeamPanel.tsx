@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Checkbox, Input, Modal, Select, ProgressBar } from '../common';
+import { Button, Input, Modal, Select, ProgressBar } from '../common';
 import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance } from '@common';
 import { getPlanFeatures } from '@common/utils/plans';
@@ -31,7 +31,6 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [editRole, setEditRole] = useState<TeamRole>('member');
   const [identifier, setIdentifier] = useState('');
   const [role, setRole] = useState<TeamRole>('member');
-  const [migrateData, setMigrateData] = useState(false);
   const [activeTab, setActiveTab] = useState<TeamTab>('members');
   const [teamName, setTeamName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
@@ -100,11 +99,9 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
         username: isEmail ? undefined : value,
         email: isEmail ? value : undefined,
         role,
-        migrateData,
       });
       setIdentifier('');
       setRole('member');
-      setMigrateData(false);
       setIsInviteOpen(false);
       await load();
     } catch (err) {
@@ -364,11 +361,6 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
             onChange={(e) => setRole(e.target.value as TeamRole)}
             options={ROLE_OPTIONS}
             fullWidth
-          />
-          <Checkbox
-            label="Migrate their existing devices and locations into the team"
-            checked={migrateData}
-            onChange={(e) => setMigrateData(e.target.checked)}
           />
         </div>
       </Modal>

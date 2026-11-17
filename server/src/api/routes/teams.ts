@@ -16,6 +16,8 @@ import {
   getTeamInviteByToken,
   acceptTeamInvite,
   getTeamSeatLimit,
+  getTeamsForUser,
+  setActiveTeam,
 } from '../../lib/db/teams';
 import {
   getUserFromUuid,
@@ -37,14 +39,14 @@ const handleTeamMe = requireAuth(async (_request, user: User) => {
   const mapped = members.map((m) => ({
     uuid: m.uuid,
     username: m.username,
-    role: (m.teamRole as TeamRole) ?? (m.uuid === team.managerUuid ? 'manager' : 'member'),
+    role: ((m.teamRoles?.[team.id] ?? m.teamRole) as TeamRole) ?? (m.uuid === team.managerUuid ? 'manager' : 'member'),
     joinedAt: m.createdAt,
   }));
 
   return json({
     team,
     members: mapped,
-    role: (user.teamRole as TeamRole) ?? (user.uuid === team.managerUuid ? 'manager' : 'member'),
+    role: ((user.teamRoles?.[team.id] ?? user.teamRole) as TeamRole) ?? (user.uuid === team.managerUuid ? 'manager' : 'member'),
   });
 });
 
@@ -56,7 +58,7 @@ const handleTeamMembersList = requireAuth(async (_request, user: User) => {
   const mapped = members.map((m) => ({
     uuid: m.uuid,
     username: m.username,
-    role: (m.teamRole as TeamRole) ?? (m.uuid === team.managerUuid ? 'manager' : 'member'),
+    role: ((m.teamRoles?.[team.id] ?? m.teamRole) as TeamRole) ?? (m.uuid === team.managerUuid ? 'manager' : 'member'),
     joinedAt: m.createdAt,
   }));
 
@@ -72,7 +74,6 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
   const username = typeof body?.username === 'string' ? body.username.trim() : '';
   const uuid = typeof body?.uuid === 'string' ? body.uuid.trim() : '';
   const email = typeof body?.email === 'string' ? body.email.trim() : '';
-  const migrateData = body?.migrateData === true;
   const roleRaw = body?.role;
   const role: TeamRole = isTeamRole(roleRaw) ? roleRaw : 'member';
 
@@ -88,7 +89,9 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
 
   if (target) {
     if (target.uuid === user.uuid) return json({ error: 'cannot add yourself' }, 400);
-    if (target.teamId) return json({ error: 'user already belongs to a team' }, 409);
+    const targetTeams = target.teamIds ?? (target.teamId ? [target.teamId] : []);
+    if (targetTeams.includes(team.id)) return json({ error: 'user already belongs to this team' }, 409);
+    if (targetTeams.length >= 3) return json({ error: 'user is already a member of 3 teams' }, 409);
   }
 
   const inviteEmail = target?.email ?? (email.includes('@') ? email : '');
@@ -102,7 +105,7 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
     return json({ error: 'team member limit reached' }, 409);
   }
 
-  const invite = await createTeamInvite({ team, actor: user, email: inviteEmail, role, migrateData });
+  const invite = await createTeamInvite({ team, actor: user, email: inviteEmail, role });
 
   // Send invite email (best effort).
   try {
@@ -116,7 +119,6 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
     const emailContent = buildTeamInviteEmail({
       inviterUsername: user.username,
       inviteUrl: link,
-      migrateData,
       teamName: team.name,
     });
     await sendEmail({
@@ -228,9 +230,10 @@ const handleTeamInviteAccept = requireAuth(async (request, user: User) => {
     return json({ error: 'invite email does not match your account' }, 403);
   }
 
-  // Ensure not already on another team.
-  if (user.teamId && user.teamId !== invite.teamId) {
-    return json({ error: 'already belongs to a team' }, 409);
+  // Ensure not already in 3 teams.
+  const currentTeams = user.teamIds ?? (user.teamId ? [user.teamId] : []);
+  if (currentTeams.length >= 3 && !currentTeams.includes(invite.teamId)) {
+    return json({ error: 'already a member of 3 teams' }, 409);
   }
 
   await acceptTeamInvite({ invite, user });
@@ -281,4 +284,24 @@ export {
   handleTeamInviteRevoke,
   handleTeamInviteAccept,
   handlePendingTeamInvites,
+  handleListMyTeams,
+  handleSwitchTeam,
 };
+
+const handleListMyTeams = requireAuth(async (_request, user: User) => {
+  const teams = await getTeamsForUser(user);
+  return json({ teams });
+});
+
+const handleSwitchTeam = requireAuth(async (request, user: User) => {
+  const body = await readJsonBody(request);
+  const teamId = typeof body?.teamId === 'string' ? body.teamId.trim() : '';
+  if (!teamId) return json({ error: 'team id is required' }, 400);
+  try {
+    await setActiveTeam(user.uuid, teamId);
+  } catch {
+    return json({ error: 'not a member of this team' }, 403);
+  }
+  const team = await getTeamById(teamId);
+  return json({ team });
+});

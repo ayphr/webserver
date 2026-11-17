@@ -64,6 +64,7 @@ export async function ensureTeamForManager(managerUuid: string, tier?: string): 
   const now = new Date();
   const team: Team = {
     id: randomUUID(),
+    name: `${user.username}'s Team`,
     managerUuid,
     tier: resolvedTier as Team['tier'],
     credits: {
@@ -97,9 +98,56 @@ export async function ensureTeamForManager(managerUuid: string, tier?: string): 
 export async function setUserTeamMembership(userUuid: string, teamId: string, role: TeamRole): Promise<void> {
   const users = await getCollection('users');
   trackMongoOperation('updateOne', 'users');
-  await users.updateOne({ uuid: userUuid }, { $set: { teamId, teamRole: role } });
+  await users.updateOne(
+    { uuid: userUuid },
+    {
+      $set: { teamId, teamRole: role, [`teamRoles.${teamId}`]: role },
+      $addToSet: { teamIds: teamId },
+    },
+  );
   await invalidateUserCache(userUuid);
   await invalidateAuthEntries();
+}
+
+export async function addUserToTeam(userUuid: string, teamId: string, role: TeamRole): Promise<void> {
+  const users = await getCollection('users');
+  trackMongoOperation('updateOne', 'users');
+  await users.updateOne(
+    { uuid: userUuid },
+    {
+      $addToSet: { teamIds: teamId },
+      $set: { [`teamRoles.${teamId}`]: role },
+    },
+  );
+  await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
+}
+
+export async function removeUserTeamMembership(userUuid: string, teamId: string): Promise<void> {
+  const users = await getCollection('users');
+  trackMongoOperation('updateOne', 'users');
+  await users.updateOne({ uuid: userUuid }, { $pull: { teamIds: teamId } });
+  await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
+}
+
+export async function setActiveTeam(userUuid: string, teamId: string): Promise<void> {
+  const user = await getUserFromUuid(userUuid);
+  if (!user || !(user.teamIds ?? []).includes(teamId)) throw new Error('not a member of this team');
+  // Determine role? keep existing if active same; default member
+  const users = await getCollection('users');
+  trackMongoOperation('updateOne', 'users');
+  await users.updateOne({ uuid: userUuid }, { $set: { teamId, teamRole: user.teamRole } });
+  await invalidateUserCache(userUuid);
+  await invalidateAuthEntries();
+}
+
+export async function getTeamsForUser(user: Pick<User, 'teamIds' | 'teamId'>): Promise<Team[]> {
+  const ids = user.teamIds && user.teamIds.length > 0 ? user.teamIds : user.teamId ? [user.teamId] : [];
+  if (ids.length === 0) return [];
+  const teams = await getCollection('teams');
+  trackMongoOperation('find', 'teams');
+  return teams.find({ id: { $in: ids } }).toArray();
 }
 
 export async function clearUserTeamMembership(userUuid: string): Promise<void> {
@@ -125,7 +173,7 @@ export async function getTeamScopeUsername(user: Pick<User, 'uuid' | 'teamId' | 
 export async function getTeamMembers(teamId: string): Promise<User[]> {
   const users = await getCollection('users');
   trackMongoOperation('find', 'users');
-  return users.find({ teamId }).toArray();
+  return users.find({ teamIds: teamId }).toArray();
 }
 
 export function isTeamManager(user: Pick<User, 'uuid' | 'teamId' | 'teamRole' | 'paidSubscriptions' | 'attachedSubscriptions'>, team: Team | null): boolean {
@@ -200,6 +248,13 @@ export async function addTeamMember(params: {
   // Cancel the new member's own paid subscriptions (no refund).
   await cancelUserPaidSubscriptions(target);
 
+  if ((target.teamIds ?? (target.teamId ? [target.teamId] : [])).includes(team.id)) {
+    throw new Error('user already belongs to this team');
+  }
+  if ((target.teamIds ?? (target.teamId ? [target.teamId] : [])).length >= 3) {
+    throw new Error('user is already a member of 3 teams');
+  }
+
   // Attach team subscription to target if not already on this team.
   const existingSub = (target.attachedSubscriptions ?? []).find((s) => s.reason === 'team membership' && s.tier === (team.tier as SubscriptionTier));
   let subscriptionId: string;
@@ -221,7 +276,7 @@ export async function addTeamMember(params: {
     subscriptionId = subscription.id;
   }
 
-  await setUserTeamMembership(target.uuid, team.id, role);
+  await addUserToTeam(target.uuid, team.id, role);
 
   await syncTeamSubscriptionQuantity(team, manager);
 
@@ -281,7 +336,9 @@ export async function updateTeamMemberRole(params: {
   role: TeamRole;
 }): Promise<void> {
   const { team, actor, target, role } = params;
-  await setUserTeamMembership(target.uuid, team.id, role);
+  const users = await getCollection('users');
+  await users.updateOne({ uuid: target.uuid }, { $set: { [`teamRoles.${team.id}`]: role } });
+  if (target.teamId === team.id) await setUserTeamMembership(target.uuid, team.id, role);
 
   await logTeamAudit({
     teamId: team.id,
@@ -328,13 +385,11 @@ export async function createTeamInvite(params: {
   actor: User;
   email: string;
   role: TeamRole;
-  migrateData?: boolean;
 }): Promise<TeamInvite> {
-  const { team, actor, email, role, migrateData } = params;
+  const { team, actor, email, role } = params;
   const now = new Date();
   const token = (await import('node:crypto')).randomBytes(32).toString('hex');
   const invite: TeamInvite = {
-    migrateData: migrateData ?? false,
     id: randomUUID(),
     teamId: team.id,
     email: email.toLowerCase().trim(),
@@ -382,27 +437,6 @@ export async function revokeTeamInvite(teamId: string, inviteId: string): Promis
 }
 
 
-async function migrateUserDataToTeam(userUuid: string, team: Team): Promise<void> {
-  const manager = await getUserFromUuid(team.managerUuid);
-  const scopeUuid = team.id;
-  const scopeUsername = manager?.username ?? '';
-
-  const devices = await getCollection('devices');
-  trackMongoOperation('updateMany', 'devices');
-  await devices.updateMany({ teamId: userUuid }, { $set: { teamId: scopeUuid, ownerUsername: scopeUsername } });
-
-  const locations = await getCollection('locations');
-  trackMongoOperation('updateMany', 'locations');
-  await locations.updateMany({ teamId: userUuid }, { $set: { teamId: scopeUuid, ownerUsername: scopeUsername } });
-
-  try {
-    const { invalidateDeviceCachesForOwner } = await import('./devices');
-    await invalidateDeviceCachesForOwner(userUuid);
-    await invalidateDeviceCachesForOwner(scopeUuid);
-  } catch {
-    // ignore
-  }
-}
 
 export async function acceptTeamInvite(params: {
   invite: TeamInvite;
@@ -435,11 +469,8 @@ export async function acceptTeamInvite(params: {
     await addAttachedSubscription(user.uuid, subscription);
   }
 
-  await setUserTeamMembership(user.uuid, team.id, invite.role);
-
-  if (invite.migrateData) {
-    await migrateUserDataToTeam(user.uuid, team);
-  }
+  await addUserToTeam(user.uuid, team.id, invite.role);
+  if (!user.teamId) await setUserTeamMembership(user.uuid, team.id, invite.role);
 
   const invites = await getCollection('teamInvites');
   trackMongoOperation('updateOne', 'team_invites');

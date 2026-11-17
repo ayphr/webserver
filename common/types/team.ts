@@ -56,7 +56,6 @@ export type TeamMemberAddRequest = {
   uuid?: string;
   email?: string;
   role?: TeamRole;
-  migrateData?: boolean;
 };
 
 export type TeamMemberRoleUpdateRequest = {
@@ -64,7 +63,6 @@ export type TeamMemberRoleUpdateRequest = {
 };
 
 export type TeamInvite = {
-  migrateData?: boolean;
   id: string;
   teamId: string;
   teamName?: string;
