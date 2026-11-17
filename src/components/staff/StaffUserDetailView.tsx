@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Select, Modal, PunishModal } from '../common';
+import { Button, Select, Modal, PunishModal, Checkbox } from '../common';
 import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
 import type { PublicUser, Team, CreditBalance } from '@common';
 import { PLAN_NAMES, SUBSCRIPTION_TIERS } from '@common';
@@ -193,10 +193,14 @@ export function StaffUserDetailView({ user, onBack }: Props) {
                 <ul>
                   {teams.map((entry) => (
                     <li key={entry.team.id} className="staff-user-detail__team-row">
-                      <div>
-                        <strong>{entry.team.name ?? entry.team.id}</strong>
-                        <span> — {PLAN_NAMES[entry.team.tier]} — {entry.role}</span>
-                        {entry.team.gifted ? <span> (Gifted)</span> : null}
+                      <div className="staff-user-detail__team-info">
+                        <strong>{entry.team.name ?? 'Unnamed team'}</strong>
+                        <div className="staff-user-detail__team-meta">
+                          <span><b>Plan</b>{PLAN_NAMES[entry.team.tier]}</span>
+                          <span><b>Role</b>{entry.role}</span>
+                          <span><b>Seats</b>{entry.team.seats ?? 'Member count'}</span>
+                          {entry.team.gifted ? <span className="staff-user-detail__gifted">Gifted</span> : null}
+                        </div>
                       </div>
                       <Button variant="secondary" onClick={() => openModal(entry)}>
                         <IconEye size={16} /> View
@@ -273,14 +277,11 @@ export function StaffUserDetailView({ user, onBack }: Props) {
               value={modalSeats}
               onChange={(e) => setModalSeats(Number(e.target.value))}
             />
-            <label>
-              <input
-                type="checkbox"
-                checked={modalGifted}
-                onChange={(e) => setModalGifted(e.target.checked)}
-              />{' '}
-              Gifted mode (not billed)
-            </label>
+            <Checkbox
+              label="Gifted mode (not billed)"
+              checked={modalGifted}
+              onChange={(e) => setModalGifted(e.target.checked)}
+            />
             {actionError && <p className="error">{actionError}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <Button onClick={saveModal} disabled={saving}>Save</Button>

@@ -298,6 +298,44 @@
   color: var(--text-muted);
 }
 
+.staff-user-detail__team-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.staff-user-detail__team-meta {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.staff-user-detail__team-meta span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.staff-user-detail__team-meta b {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-md);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-user-detail__team-meta .staff-user-detail__gifted {
+  align-self: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+}
+
 .staff-user-detail__action-row {
   display: flex;
   align-items: center;
