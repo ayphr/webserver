@@ -20,6 +20,19 @@ export function getStripe(): Stripe | null {
   return stripeClient;
 }
 
+/** Returns false instead of throwing when a stored customer was deleted in Stripe. */
+export async function stripeCustomerExists(customerId: string): Promise<boolean> {
+  const stripe = getStripe();
+  if (!stripe) return false;
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    return !('deleted' in customer && customer.deleted === true);
+  } catch (error) {
+    log.warn({ error, customerId }, 'stored Stripe customer is unavailable');
+    return false;
+  }
+}
+
 export function getPriceIdForTier(tier: SubscriptionTier, interval: BillingInterval): string | null {
   for (const [priceId, config] of Object.entries(STRIPE_PRICE_TIERS)) {
     if (config.tier === tier && config.interval === interval) return priceId;
