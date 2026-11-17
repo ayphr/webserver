@@ -88,6 +88,10 @@ export function createTeamsApi(client: RequestClient) {
       });
       return response.url;
     },
+    async setFreePlan() {
+      const response = await client.requestJson<{ team: Team }>('/api/team/subscription/free', { method: 'POST' });
+      return response.team;
+    },
     async pendingInvites() {
       const response = await client.requestJson<{ invites: import('@common').TeamInvite[] }>('/api/team/invites/pending');
       return response.invites;

@@ -14,7 +14,7 @@ const ROLE_OPTIONS = [
   { value: 'manager', label: 'Manager' },
 ];
 
-const TEAM_TIERS: SubscriptionTier[] = ['team-lite', 'team-plus', 'team-ultra'];
+const PAID_TIERS: SubscriptionTier[] = ['lite', 'plus', 'ultra', 'team-lite', 'team-plus', 'team-ultra'];
 const TEAM_LIMIT = 3;
 
 const INTERVAL_OPTIONS = [
@@ -68,6 +68,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [checkoutTier, setCheckoutTier] = useState<SubscriptionTier | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [showFreePlan, setShowFreePlan] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -264,6 +265,8 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   };
 
   const handleCheckout = async (tier: SubscriptionTier) => {
+    const features = getPlanFeatures(tier);
+    if (features.maxUsers < members.length && !window.confirm(`This plan allows ${features.maxUsers} member${features.maxUsers === 1 ? '' : 's'}, but this team has ${members.length}. Members over the limit will be removed. Continue?`)) return;
     setCheckoutTier(tier);
     setSubscriptionError(null);
     try {
@@ -272,6 +275,17 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
     } catch (err) {
       setSubscriptionError(err instanceof Error ? err.message : 'Failed to start checkout');
       setCheckoutTier(null);
+    }
+  };
+
+  const handleFreePlan = async () => {
+    if (members.length > 1 && !window.confirm(`The Free plan allows 1 member, but this team has ${members.length}. Members over the limit will be removed. Continue?`)) return;
+    setSubscriptionError(null);
+    try {
+      await api.teams.setFreePlan();
+      window.location.reload();
+    } catch (err) {
+      setSubscriptionError(err instanceof Error ? err.message : 'Failed to change plan');
     }
   };
 
@@ -296,7 +310,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const configuredPlans = subscription?.plans.filter((plan) => plan.interval === billingInterval) ?? [];
   const teamPlans: SubscriptionPlan[] = configuredPlans.length > 0
     ? configuredPlans
-    : TEAM_TIERS.map((tier) => ({
+    : PAID_TIERS.map((tier) => ({
         tier,
         interval: billingInterval,
         priceId: null,
@@ -569,6 +583,19 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
                   </div>
                 );
               })}
+            </div>
+            <div className="team-panel__free-plan">
+              <button type="button" className="team-panel__free-toggle" onClick={() => setShowFreePlan((value) => !value)}>
+                <span>Free plan</span><span>{showFreePlan ? 'Hide' : 'Show'}</span>
+              </button>
+              {showFreePlan && (
+                <div className="team-panel__free-content">
+                  <span>1 member · 2 devices · 7 days data retention</span>
+                  <Button variant={team.tier === 'free' ? 'secondary' : 'primary'} disabled={team.tier === 'free'} onClick={() => void handleFreePlan()}>
+                    {team.tier === 'free' ? 'Current plan' : 'Choose free plan'}
+                  </Button>
+                </div>
+              )}
             </div>
             {subscription && subscription.trialDays > 0 && (
               <p className="team-panel__subscription-note">

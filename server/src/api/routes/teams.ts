@@ -20,6 +20,7 @@ import {
   setActiveTeam,
   createTeamForUser,
   setTeamStripeCustomerId,
+  enforceTeamMemberLimit,
 } from '../../lib/db/teams';
 import {
   createBillingPortalSession,
@@ -331,7 +332,7 @@ const handleCreateTeam = requireAuth(async (request, user: User) => {
 const handleTeamSubscription = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
-  const plans = (await getSubscriptionPlans()).filter((plan) => plan.tier.startsWith('team-'));
+  const plans = await getSubscriptionPlans();
   return json({ team, plans, trialDays: STRIPE_TRIAL_DAYS });
 });
 
@@ -343,8 +344,8 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
   const body = await readJsonBody(request);
   const tier = body?.tier;
   const interval = body?.interval;
-  if (!isSubscriptionTier(tier) || !tier.startsWith('team-')) {
-    return json({ error: 'select a valid team plan' }, 400);
+  if (!isSubscriptionTier(tier)) {
+    return json({ error: 'select a valid plan' }, 400);
   }
   if (!isPurchasableTier(tier)) {
     return json({ error: 'This plan is not available for purchase' }, 400);
@@ -380,6 +381,20 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
   return json({ url });
 });
 
+const handleTeamPlanFree = requireAuth(async (_request, user: User) => {
+  const team = await getTeamForUser(user);
+  if (!team) return json({ error: 'No team found' }, 404);
+  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
+  await teams.updateOne(
+    { id: team.id },
+    { $set: { tier: 'free', updatedAt: new Date() }, $unset: { seats: '', billingInterval: '', currentPeriodEnd: '', stripeSubscriptionId: '', subscriptionStatus: '' } },
+  );
+  const updatedTeam = await getTeamById(team.id);
+  if (updatedTeam) await enforceTeamMemberLimit(updatedTeam);
+  return json({ team: updatedTeam ?? { ...team, tier: 'free' } });
+});
+
 const handleTeamSubscriptionPortal = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
@@ -413,5 +428,6 @@ export {
   handleCreateTeam,
   handleTeamSubscription,
   handleTeamSubscriptionCheckout,
+  handleTeamPlanFree,
   handleTeamSubscriptionPortal,
 };

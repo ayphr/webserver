@@ -167,6 +167,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/teams/create', handle: handleCreateTeam },
   { method: 'GET', path: '/api/team/subscription', handle: handleTeamSubscription },
   { method: 'POST', path: '/api/team/subscription/checkout', handle: handleTeamSubscriptionCheckout },
+  { method: 'POST', path: '/api/team/subscription/free', handle: handleTeamPlanFree },
   { method: 'POST', path: '/api/team/subscription/portal', handle: handleTeamSubscriptionPortal },
   { method: 'GET', path: '/api/teams/me', handle: handleTeamMe },
   { method: 'PATCH', path: '/api/team', handle: handleTeamUpdate },

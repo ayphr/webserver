@@ -4,7 +4,7 @@ import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUser
 import { isDuplicateKeyError } from '../http';
 import { invalidateAuthEntries } from '../authCache';
 import type { Team, TeamAuditLog, TeamRole, User, TeamInvite, TeamCredits, SubscriptionTier, BillingInterval, PaidSubscriptionStatus } from '@common';
-import { getCreditPeriodStart } from '@common';
+import { getCreditPeriodStart, PLAN_FEATURES } from '@common';
 import { resolveTierFromStripeSubscription } from '../stripe';
 import { getUserFromUuid } from './users';
 import { updateSubscriptionQuantity } from '../stripe';
@@ -280,7 +280,10 @@ export async function syncTeamStripeSubscription(
   );
 
   const updated = await getTeamById(teamId);
-  if (updated) await syncTeamMemberSubscriptions(updated);
+  if (updated) {
+    await enforceTeamMemberLimit(updated);
+    await syncTeamMemberSubscriptions(updated);
+  }
 }
 
 /** Reverts a team to the free plan after its Stripe subscription ends. */
@@ -296,7 +299,10 @@ export async function clearTeamStripeSubscription(teamId: string): Promise<void>
   );
 
   const updated = await getTeamById(teamId);
-  if (updated) await syncTeamMemberSubscriptions(updated);
+  if (updated) {
+    await enforceTeamMemberLimit(updated);
+    await syncTeamMemberSubscriptions(updated);
+  }
 }
 
 /**
@@ -315,6 +321,19 @@ export async function syncTeamMemberSubscriptions(team: Team): Promise<void> {
     } catch {
       // Best effort: billing quantity is reconciled by the next Stripe event.
     }
+  }
+}
+
+/** Removes the newest non-manager members when a plan cannot hold the team size. */
+export async function enforceTeamMemberLimit(team: Team): Promise<void> {
+  const members = await getTeamMembers(team.id);
+  const limit = PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
+  if (members.length <= limit) return;
+  const removable = members
+    .filter((member) => member.uuid !== team.managerUuid)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  for (const member of removable.slice(0, Math.max(0, members.length - limit))) {
+    await clearUserTeamMembership(member.uuid, team.id);
   }
 }
 

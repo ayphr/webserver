@@ -298,6 +298,37 @@
   border-color: var(--border-subtle);
 }
 
+.team-panel__free-plan {
+  margin-top: 0.75rem;
+}
+
+.team-panel__free-toggle {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.65rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.team-panel__free-toggle:hover {
+  color: var(--text-primary);
+}
+
+.team-panel__free-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .team-panel__plan-head {
   display: flex;
   flex-direction: column;
