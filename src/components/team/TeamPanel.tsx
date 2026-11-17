@@ -39,6 +39,8 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [usageLocations, setUsageLocations] = useState(0);
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameSuccess, setNameSuccess] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -63,6 +65,23 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [list, me] = await Promise.all([api.teams.listMine(), api.teams.me()]);
+        if (cancelled) return;
+        setTeams(list);
+        setActiveTeamId(me.team.id);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -175,6 +194,21 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
 
   return (
     <div className="team-panel">
+      {teams.length > 1 && (
+        <div className="team-panel__switcher">
+          <Select
+            label="Current team"
+            value={activeTeamId ?? teams[0]?.id ?? ''}
+            onChange={(event) => {
+              const id = event.target.value;
+              setActiveTeamId(id);
+              void api.teams.switchTeam(id).then(() => window.location.reload());
+            }}
+            options={teams.map((team) => ({ value: team.id, label: team.name ?? 'Team' }))}
+            fullWidth
+          />
+        </div>
+      )}
       <header className="team-panel__header">
         <h3 className="team-panel__title">{team.name ?? 'Team'}</h3>
         {activeTab === 'members' && (
