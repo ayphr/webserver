@@ -11,7 +11,8 @@ import {
   updateAlert,
 } from '../../lib/db';
 import type { DeviceDocument } from '../../lib/db';
-import { canManageTeam, getTeamForUser, getTeamScopeUuid } from '../../lib/db/teams';
+import { canManageTeam } from '../../lib/db/teams';
+import { getTeamContext } from '../../lib/teamContext';
 import {
   ALERT_LOGIC,
   ALERT_MAX_CONDITIONS,
@@ -111,14 +112,14 @@ async function getScopedDevice(user: User, params: Record<string, string>): Prom
   const device = await getDeviceBySerial(serial);
   if (!device) return json({ error: 'not found' }, 404);
 
-  const scopeUuid = await getTeamScopeUuid(user);
+  const { scopeUuid } = await getTeamContext(user);
   if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   return { device, scopeUuid, serial };
 }
 
 async function canManageAlerts(user: User): Promise<boolean> {
-  const team = await getTeamForUser(user);
+  const { team } = await getTeamContext(user);
   return Boolean(team && canManageTeam(user, team));
 }
 

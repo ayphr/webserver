@@ -19,21 +19,12 @@ import {
   getTeamsForUser,
   setActiveTeam,
   createTeamForUser,
-  setTeamStripeCustomerId,
   enforceTeamMemberLimit,
 } from '../../lib/db/teams';
 import {
-  createBillingPortalSession,
-  createTeamCheckoutSession,
-  createTeamStripeCustomer,
-  getPriceIdForTier,
-  getStripe,
   getSubscriptionPlans,
-  stripeCustomerExists,
-  cancelTeamStripeSubscription,
-  changeTeamStripeSubscription,
 } from '../../lib/stripe';
-import { CLIENT_URL, STRIPE_TRIAL_DAYS } from '../../env';
+import { STRIPE_TRIAL_DAYS } from '../../env';
 import {
   getUserFromUuid,
   getUserFromUsername,
@@ -42,6 +33,8 @@ import {
 import type { TeamRole, User } from '@common';
 import { isTeamRole, isSubscriptionTier, isPurchasableTier, isBillingInterval } from '@common';
 import { notifyUser } from '../../lib/notifications';
+import { createTeamBillingPortal, createTeamCheckout, downgradeTeamToFree } from '../../lib/subscriptions';
+import { getTeamMemberRole, toTeamMembers } from '../../lib/teamAccess';
 
 const handleTeamMe = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
@@ -51,17 +44,12 @@ const handleTeamMe = requireAuth(async (_request, user: User) => {
   }
 
   const members = await getTeamMembers(team.id);
-  const mapped = members.map((m) => ({
-    uuid: m.uuid,
-    username: m.username,
-    role: ((m.teamRoles?.[team.id] ?? m.teamRole) as TeamRole) ?? (m.uuid === team.managerUuid ? 'manager' : 'member'),
-    joinedAt: m.createdAt,
-  }));
+  const mapped = toTeamMembers(members, team);
 
   return json({
     team,
     members: mapped,
-    role: ((user.teamRoles?.[team.id] ?? user.teamRole) as TeamRole) ?? (user.uuid === team.managerUuid ? 'manager' : 'member'),
+    role: getTeamMemberRole(user, team),
   });
 });
 
@@ -70,12 +58,7 @@ const handleTeamMembersList = requireAuth(async (_request, user: User) => {
   if (!team) return json({ error: 'No team found' }, 404);
 
   const members = await getTeamMembers(team.id);
-  const mapped = members.map((m) => ({
-    uuid: m.uuid,
-    username: m.username,
-    role: ((m.teamRoles?.[team.id] ?? m.teamRole) as TeamRole) ?? (m.uuid === team.managerUuid ? 'manager' : 'member'),
-    joinedAt: m.createdAt,
-  }));
+  const mapped = toTeamMembers(members, team);
 
   return json({ members: mapped });
 });
@@ -295,12 +278,13 @@ const handleTeamDelete = requireAuth(async (_request, user: User) => {
   // Remove team from all members.
   const users = await (await import('../../lib/db/internal')).getCollection('users');
   await users.updateMany({ teamIds: team.id }, { $pull: { teamIds: team.id }, $unset: { [`teamRoles.${team.id}`]: '' } });
-  await users.updateMany({ teamId: team.id }, { $set: { teamId: null, teamRole: null } });
+  await users.updateMany({ teamId: team.id }, { $unset: { teamId: '', teamRole: '' } });
   const teams = await (await import('../../lib/db/internal')).getCollection('teams');
   await teams.deleteOne({ id: team.id });
   // switch user to another team if available
   const remaining = (user.teamIds ?? []).filter((id) => id !== team.id);
-  if (remaining.length > 0) await setActiveTeam(user.uuid, remaining[0]);
+  const nextTeamId = remaining[0];
+  if (nextTeamId) await setActiveTeam(user.uuid, nextTeamId);
   return json({ deleted: true });
 });
 
@@ -357,102 +341,18 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
     return json({ error: 'interval must be "month" or "year"' }, 400);
   }
 
-  const priceId = getPriceIdForTier(tier, interval);
-  if (!priceId) return json({ error: 'This plan is not available for purchase' }, 503);
-  if (!getStripe()) return json({ error: 'Stripe is not configured' }, 503);
-
-  // Change the existing subscription rather than creating a second one.
-  if (team.stripeSubscriptionId) {
-    try {
-      const updated = await changeTeamStripeSubscription(
-        team.stripeSubscriptionId,
-        priceId,
-        Math.max(1, (await getTeamMembers(team.id)).length),
-      );
-      if (updated) {
-        await syncTeamStripeSubscription(team.id, updated);
-        return json({ url: `${CLIENT_URL}/dashboard?tab=team&checkout=success` });
-      }
-    } catch {
-      // The stored subscription may have been deleted in Stripe. Continue by
-      // creating a fresh customer and Checkout subscription below.
-      const teams = await (await import('../../lib/db/internal')).getCollection('teams');
-      await teams.updateOne({ id: team.id }, { $unset: { stripeSubscriptionId: '', subscriptionStatus: '', seats: '', billingInterval: '', currentPeriodEnd: '' } });
-    }
-  }
-
-  let customerId = team.stripeCustomerId;
-  if (customerId && !(await stripeCustomerExists(customerId))) {
-    // The database can outlive a deleted Stripe customer. Replace the stale
-    // reference instead of sending an invalid customer id to Checkout.
-    customerId = undefined;
-    const teams = await (await import('../../lib/db/internal')).getCollection('teams');
-    await teams.updateOne(
-      { id: team.id },
-      { $unset: { stripeCustomerId: '', stripeSubscriptionId: '', subscriptionStatus: '', seats: '', billingInterval: '', currentPeriodEnd: '' }, $set: { updatedAt: new Date() } },
-    );
-  }
-  if (!customerId) {
-    customerId = await createTeamStripeCustomer({
-      teamId: team.id,
-      name: team.name ?? `${user.username}'s Team`,
-    }) ?? undefined;
-    if (!customerId) return json({ error: 'Failed to create billing customer' }, 502);
-    await setTeamStripeCustomerId(team.id, customerId);
-  }
-
-  let url: string | null = null;
-  try {
-    url = await createTeamCheckoutSession({
-      customerId,
-      priceId,
-      tier,
-      teamId: team.id,
-      quantity: Math.max(1, (await getTeamMembers(team.id)).length),
-      successUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=success`,
-      cancelUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=cancel`,
-    });
-  } catch (error) {
-    // Retry once with a fresh customer if Stripe rejected a customer that
-    // disappeared between validation and Checkout creation.
-    if (team.stripeCustomerId === customerId) {
-      const replacement = await createTeamStripeCustomer({ teamId: team.id, name: team.name ?? `${user.username}'s Team` });
-      if (replacement) {
-        customerId = replacement;
-        await setTeamStripeCustomerId(team.id, replacement);
-        url = await createTeamCheckoutSession({
-          customerId: replacement,
-          priceId,
-          tier,
-          teamId: team.id,
-          quantity: Math.max(1, (await getTeamMembers(team.id)).length),
-          successUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=success`,
-          cancelUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=cancel`,
-        });
-      }
-    } else {
-      throw error;
-    }
-  }
-
-  if (!url) return json({ error: 'Failed to create checkout session' }, 502);
-  return json({ url });
+  const result = await createTeamCheckout(team, user, tier, interval);
+  if (result.kind === 'unavailable') return json({ error: 'Stripe is not configured' }, 503);
+  if (result.kind === 'failed') return json({ error: 'Failed to create checkout session' }, 502);
+  return json({ url: result.url });
 });
 
 const handleTeamPlanFree = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
   if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
-  if (team.stripeSubscriptionId) {
-    const canceled = await cancelTeamStripeSubscription(team.stripeSubscriptionId);
-    if (!canceled) return json({ error: 'Unable to cancel the current Stripe subscription' }, 502);
-  }
-  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
-  await teams.updateOne(
-    { id: team.id },
-    { $set: { tier: 'free', updatedAt: new Date() }, $unset: { seats: '', billingInterval: '', currentPeriodEnd: '', stripeSubscriptionId: '', subscriptionStatus: '' } },
-  );
-  const updatedTeam = await getTeamById(team.id);
+  const updatedTeam = await downgradeTeamToFree(team);
+  if (!updatedTeam) return json({ error: 'Unable to cancel the current Stripe subscription' }, 502);
   if (updatedTeam) await enforceTeamMemberLimit(updatedTeam);
   return json({ team: updatedTeam ?? { ...team, tier: 'free' } });
 });
@@ -461,20 +361,11 @@ const handleTeamSubscriptionPortal = requireAuth(async (_request, user: User) =>
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
   if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
-  if (!team.stripeCustomerId) return json({ error: 'No billing account found' }, 404);
-  if (!(await stripeCustomerExists(team.stripeCustomerId))) {
-    const teams = await (await import('../../lib/db/internal')).getCollection('teams');
-    await teams.updateOne({ id: team.id }, { $unset: { stripeCustomerId: '' }, $set: { updatedAt: new Date() } });
-    return json({ error: 'The billing account is no longer available. Start checkout again to create a new one.' }, 404);
-  }
-
-  const url = await createBillingPortalSession({
-    customerId: team.stripeCustomerId,
-    returnUrl: `${CLIENT_URL}/dashboard?tab=team`,
-  });
-
-  if (!url) return json({ error: 'Stripe is not configured' }, 503);
-  return json({ url });
+  const result = await createTeamBillingPortal(team);
+  if (result.kind === 'missing') return json({ error: 'No billing account found' }, 404);
+  if (result.kind === 'unavailable') return json({ error: 'Stripe is not configured' }, 503);
+  if (result.kind === 'failed') return json({ error: 'Failed to create billing portal session' }, 502);
+  return json({ url: result.url });
 });
 
 export {

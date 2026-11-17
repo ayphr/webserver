@@ -1,0 +1,1 @@
+export const DATA_POINT_PRUNE_COOLDOWN_MS = 5 * 60 * 1000;

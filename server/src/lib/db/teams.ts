@@ -1,17 +1,34 @@
 import { randomUUID } from 'node:crypto';
-import type Stripe from 'stripe';
 import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUserCache } from './internal';
 import { isDuplicateKeyError } from '../http';
 import { invalidateAuthEntries } from '../authCache';
-import type { Team, TeamAuditLog, TeamRole, User, TeamInvite, TeamCredits, SubscriptionTier, BillingInterval, PaidSubscriptionStatus } from '@common';
-import { getCreditPeriodStart, PLAN_FEATURES } from '@common';
-import { resolveTierFromStripeSubscription } from '../stripe';
+import type { Team, TeamRole, User, TeamCredits } from '@common';
+import { getCreditPeriodStart } from '@common';
 import { getUserFromUuid } from './users';
-import { updateSubscriptionQuantity } from '../stripe';
 import { notifyUser } from '../notifications';
+import { logTeamAudit } from '../teamAuditService';
+import { getSharedSeatCount, getTeamSeatLimit as getPolicySeatLimit } from '../teamBillingPolicy';
+import {
+  syncTeamMemberSubscriptions,
+} from '../teamBillingSync';
+
+export { getTeamAuditLogs, logTeamAudit } from '../teamAuditService';
+export {
+  acceptTeamInvite,
+  createTeamInvite,
+  getPendingInvitesForEmail,
+  getTeamInviteByToken,
+  getTeamInvites,
+  revokeTeamInvite,
+} from '../teamInviteService';
+export {
+  clearTeamStripeSubscription,
+  enforceTeamMemberLimit,
+  syncTeamMemberSubscriptions,
+  syncTeamStripeSubscription,
+} from '../teamBillingSync';
 
 const TEAMS_COLLECTION = 'teams';
-const TEAM_AUDIT_LOGS_COLLECTION = 'team_audit_logs';
 
 export async function getTeamById(id: string): Promise<Team | null> {
   const teams = await getCollection('teams');
@@ -248,96 +265,6 @@ export async function setTeamStripeCustomerId(teamId: string, customerId: string
   await teams.updateOne({ id: teamId }, { $set: { stripeCustomerId: customerId, updatedAt: new Date() } });
 }
 
-/** Applies a Stripe subscription to the team that owns it. */
-export async function syncTeamStripeSubscription(
-  teamId: string,
-  subscription: Stripe.Subscription,
-): Promise<void> {
-  const teams = await getCollection('teams');
-  const tier = resolveTierFromStripeSubscription(subscription);
-  const item = subscription.items.data[0];
-  const interval: BillingInterval | undefined = item?.price?.recurring?.interval === 'year'
-    ? 'year'
-    : item?.price?.recurring?.interval === 'month'
-      ? 'month'
-      : undefined;
-  const now = new Date();
-  trackMongoOperation('updateOne', TEAMS_COLLECTION);
-  await teams.updateOne(
-    { id: teamId },
-    {
-      $set: {
-        ...(tier ? { tier } : {}),
-        subscriptionStatus: subscription.status as PaidSubscriptionStatus,
-        stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id,
-        stripeSubscriptionId: subscription.id,
-        seats: item?.quantity ?? 1,
-        ...(interval ? { billingInterval: interval } : {}),
-        ...(item?.current_period_end ? { currentPeriodEnd: new Date(item.current_period_end * 1000) } : {}),
-        updatedAt: now,
-      },
-    },
-  );
-
-  const updated = await getTeamById(teamId);
-  if (updated) {
-    await enforceTeamMemberLimit(updated);
-    await syncTeamMemberSubscriptions(updated);
-  }
-}
-
-/** Reverts a team to the free plan after its Stripe subscription ends. */
-export async function clearTeamStripeSubscription(teamId: string, stripeSubscriptionId?: string): Promise<void> {
-  const teams = await getCollection('teams');
-  const filter = stripeSubscriptionId ? { id: teamId, stripeSubscriptionId } : { id: teamId };
-  trackMongoOperation('updateOne', TEAMS_COLLECTION);
-  await teams.updateOne(
-    filter,
-    {
-      $set: { tier: 'free', subscriptionStatus: 'canceled', updatedAt: new Date() },
-      $unset: { stripeSubscriptionId: '', seats: '', billingInterval: '', currentPeriodEnd: '' },
-    },
-  );
-
-  const updated = await getTeamById(teamId);
-  if (updated) {
-    await enforceTeamMemberLimit(updated);
-    await syncTeamMemberSubscriptions(updated);
-  }
-}
-
-/**
- * Keeps the Stripe subscription quantity in sync with the team's member count.
- */
-export async function syncTeamMemberSubscriptions(team: Team): Promise<void> {
-  const members = await getTeamMembers(team.id);
-  const seats = Math.max(1, members.length);
-
-  if (team.stripeSubscriptionId && team.seats !== seats) {
-    try {
-      await updateSubscriptionQuantity(team.stripeSubscriptionId, seats);
-      const teams = await getCollection('teams');
-      trackMongoOperation('updateOne', TEAMS_COLLECTION);
-      await teams.updateOne({ id: team.id }, { $set: { seats, updatedAt: new Date() } });
-    } catch {
-      // Best effort: billing quantity is reconciled by the next Stripe event.
-    }
-  }
-}
-
-/** Removes the newest non-manager members when a plan cannot hold the team size. */
-export async function enforceTeamMemberLimit(team: Team): Promise<void> {
-  const members = await getTeamMembers(team.id);
-  const limit = PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
-  if (members.length <= limit) return;
-  const removable = members
-    .filter((member) => member.uuid !== team.managerUuid)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  for (const member of removable.slice(0, Math.max(0, members.length - limit))) {
-    await clearUserTeamMembership(member.uuid, team.id);
-  }
-}
-
 export async function updateTeamName(team: Team, actor: User, name: string): Promise<Team> {
   const teams = await getCollection('teams');
   trackMongoOperation('updateOne', TEAMS_COLLECTION);
@@ -443,131 +370,9 @@ export async function updateTeamMemberRole(params: {
   });
 }
 
-export async function logTeamAudit(entry: Omit<TeamAuditLog, 'id' | 'createdAt'>): Promise<TeamAuditLog> {
-  const log: TeamAuditLog = {
-    id: randomUUID(),
-    createdAt: new Date(),
-    ...entry,
-  };
-  const logs = await getCollection('teamAuditLogs');
-  trackMongoOperation('insertOne', TEAM_AUDIT_LOGS_COLLECTION);
-  await logs.insertOne(normalizeDateValues(log));
-  return log;
-}
-
-export async function getTeamAuditLogs(teamId: string, limit = 100): Promise<TeamAuditLog[]> {
-  const logs = await getCollection('teamAuditLogs');
-  trackMongoOperation('find', TEAM_AUDIT_LOGS_COLLECTION);
-  return logs.find({ teamId }).sort({ createdAt: -1 }).limit(limit).toArray();
-}
-
-
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-export async function createTeamInvite(params: {
-  team: Team;
-  actor: User;
-  email: string;
-  role: TeamRole;
-}): Promise<TeamInvite> {
-  const { team, actor, email, role } = params;
-  const now = new Date();
-  const token = (await import('node:crypto')).randomBytes(32).toString('hex');
-  const invite: TeamInvite = {
-    id: randomUUID(),
-    teamId: team.id,
-    email: email.toLowerCase().trim(),
-    role,
-    token,
-    invitedByUuid: actor.uuid,
-    invitedByUsername: actor.username,
-    createdAt: now,
-    expiresAt: new Date(now.getTime() + INVITE_TTL_MS),
-  };
-
-  const invites = await getCollection('teamInvites');
-  trackMongoOperation('insertOne', 'team_invites');
-  await invites.insertOne(normalizeDateValues(invite));
-  return invite;
-}
-
-
-export async function getPendingInvitesForEmail(email: string): Promise<TeamInvite[]> {
-  const invites = await getCollection('teamInvites');
-  trackMongoOperation('find', 'team_invites');
-  return invites
-    .find({ email: email.toLowerCase().trim(), acceptedAt: { $exists: false }, expiresAt: { $gt: new Date() } })
-    .sort({ createdAt: -1 })
-    .toArray();
-}
-
-export async function getTeamInvites(teamId: string): Promise<TeamInvite[]> {
-  const invites = await getCollection('teamInvites');
-  trackMongoOperation('find', 'team_invites');
-  return invites.find({ teamId, acceptedAt: { $exists: false } }).sort({ createdAt: -1 }).toArray();
-}
-
-export async function getTeamInviteByToken(token: string): Promise<TeamInvite | null> {
-  const invites = await getCollection('teamInvites');
-  trackMongoOperation('findOne', 'team_invites');
-  return invites.findOne({ token });
-}
-
-export async function revokeTeamInvite(teamId: string, inviteId: string): Promise<boolean> {
-  const invites = await getCollection('teamInvites');
-  trackMongoOperation('deleteOne', 'team_invites');
-  const result = await invites.deleteOne({ id: inviteId, teamId });
-  return result.deletedCount > 0;
-}
-
-
-
-export async function acceptTeamInvite(params: {
-  invite: TeamInvite;
-  user: User;
-}): Promise<void> {
-  const { invite, user } = params;
-  const team = await getTeamById(invite.teamId);
-  if (!team) throw new Error('team not found');
-
-  const manager = await getUserFromUuid(team.managerUuid);
-  if (!manager) throw new Error('manager not found');
-
-  await addUserToTeam(user.uuid, team.id, invite.role);
-  if (!user.teamId) await setUserTeamMembership(user.uuid, team.id, invite.role);
-  await syncTeamMemberSubscriptions(team);
-
-  const invites = await getCollection('teamInvites');
-  trackMongoOperation('updateOne', 'team_invites');
-  await invites.updateOne({ id: invite.id }, { $set: { acceptedAt: new Date(), acceptedByUuid: user.uuid } });
-
-  await logTeamAudit({
-    teamId: team.id,
-    actorUuid: user.uuid,
-    actorUsername: user.username,
-    action: 'invite.accepted',
-    targetUuid: user.uuid,
-    targetUsername: user.username,
-    details: { email: invite.email, role: invite.role },
-  });
-
-  if (team.managerUuid !== user.uuid) {
-    await notifyUser({
-      userUuid: team.managerUuid,
-      type: 'team',
-      title: `${user.username} joined ${team.name ?? 'your team'}`,
-      message: `${user.username} accepted your invitation and joined ${team.name ?? 'the team'}.`,
-      link: '/dashboard?tab=team',
-    });
-  }
-}
-
 export async function getTeamSeatLimit(team: Team, _manager: User): Promise<number> {
-  const planMax = (await import('@common')).PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
-  if (team.seats && team.stripeSubscriptionId) {
-    return Math.min(team.seats, planMax);
-  }
-  return planMax;
+  const members = await getTeamMembers(team.id);
+  return getPolicySeatLimit(team, members.length);
 }
 
 /**
@@ -575,9 +380,6 @@ export async function getTeamSeatLimit(team: Team, _manager: User): Promise<numb
  * Paid teams use billed seats; other teams use the actual member count.
  */
 export async function getTeamSharedSeats(team: Team, _manager: User): Promise<number> {
-  if (team.seats && team.stripeSubscriptionId) {
-    return Math.max(1, team.seats);
-  }
   const members = await getTeamMembers(team.id);
-  return Math.max(1, members.length);
+  return getSharedSeatCount(team, members.length);
 }

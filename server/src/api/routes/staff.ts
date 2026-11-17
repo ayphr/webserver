@@ -2,16 +2,17 @@ import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
 import { createPunishment, deleteSessionsForUserUuid, deletePunishmentsForUserUuid, deleteUser, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid } from '../../lib/db';
-import { getTeamsForUser, getTeamById, getTeamMembers } from '../../lib/db/teams';
+import { getTeamsForUser, getTeamById } from '../../lib/db/teams';
 import { getCreditBalance } from '../../lib/credits';
 import { getDevicesForTeamId } from '../../lib/db/devices';
 import { getLocationsForTeamId } from '../../lib/db/locations';
 import { getAppeals, getAppealById, resolveAppeal } from '../../lib/db/appeals';
-import type { Punishment, User, UserRole } from '@common';
+import { isTeamRole, type Punishment, type UserRole } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { toPublicUser } from '../../lib/user';
 import { punishmentsTotal, staffActionsTotal } from '../../lib/metrics';
 import { notifyUser } from '../../lib/notifications';
+import { getTeamMemberRole } from '../../lib/teamAccess';
 
 const MAX_REASON_LENGTH = 500;
 const MAX_DURATION_MINUTES = 5 * 365 * 24 * 60;
@@ -340,7 +341,7 @@ const handleStaffUserTeams = requireRole('staff', async (_request, _staffUser, p
   const teams = await getTeamsForUser(user);
   const result = teams.map((team) => ({
     team,
-    role: (user.teamRoles?.[team.id] ?? (team.managerUuid === user.uuid ? 'manager' : 'member')) as string,
+    role: getTeamMemberRole(user, team),
   }));
   return json({ teams: result });
 });
@@ -370,7 +371,7 @@ const handleStaffTeamDelete = requireRole('staff', async (_request, _staffUser, 
   const users = await (await import('../../lib/db/internal')).getCollection('users');
   await teams.deleteOne({ id });
   await users.updateMany({ teamIds: id }, { $pull: { teamIds: id }, $unset: { [`teamRoles.${id}`]: '' } });
-  await users.updateMany({ teamId: id }, { $set: { teamId: null, teamRole: null } });
+  await users.updateMany({ teamId: id }, { $unset: { teamId: '', teamRole: '' } });
   return json({ deleted: true });
 });
 
@@ -379,7 +380,7 @@ const handleStaffTeamMemberRole = requireRole('staff', async (request, _staffUse
   const uuid = params.uuid;
   if (!teamId || !uuid) return json({ error: 'team id and uuid are required' }, 400);
   const body = await request.json().catch(() => null) as { role?: string } | null;
-  if (!body?.role) return json({ error: 'role is required' }, 400);
+  if (!body?.role || !isTeamRole(body.role)) return json({ error: 'invalid role' }, 400);
   const users = await (await import('../../lib/db/internal')).getCollection('users');
   await users.updateOne({ uuid }, { $set: { [`teamRoles.${teamId}`]: body.role } });
   const user = await getUserFromUuid(uuid);
@@ -398,7 +399,17 @@ const handleStaffTeamMemberRemove = requireRole('staff', async (_request, _staff
   const user = await getUserFromUuid(uuid);
   if (user && user.teamId === teamId) {
     const remaining = (user.teamIds ?? []).filter((t) => t !== teamId);
-    await users.updateOne({ uuid }, { $set: { teamId: remaining[0] ?? null, teamRole: remaining[0] ? (user.teamRoles?.[remaining[0]] ?? 'member') : null } });
+    const nextTeamId = remaining[0];
+    if (nextTeamId) {
+      await users.updateOne({ uuid }, {
+        $set: {
+          teamId: nextTeamId,
+          teamRole: user.teamRoles?.[nextTeamId] ?? 'member',
+        },
+      });
+    } else {
+      await users.updateOne({ uuid }, { $unset: { teamId: '', teamRole: '' } });
+    }
   }
   return json({ removed: true });
 });

@@ -20,6 +20,10 @@ export async function toPublicUser(user: User, teamSeats?: number): Promise<Publ
   const resolvedSeats = seats ?? 1;
 
   const { auth, avatar, email, emailVerifiedAt, ...rest } = user;
+  void auth;
+  void avatar;
+  void email;
+  void emailVerifiedAt;
 
   return {
     ...rest,

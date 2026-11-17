@@ -299,42 +299,28 @@ function countParams(path: string): number {
 type CompiledRoute = RouteDefinition & {
   segments: readonly string[];
   params: number;
+  declarationOrder: number;
 };
 
-const COMPILED_ROUTES: readonly CompiledRoute[] = ROUTES.map((route) => ({
+const COMPILED_ROUTES: readonly CompiledRoute[] = ROUTES.map((route, declarationOrder) => ({
   ...route,
   segments: route.path.split('/'),
   params: countParams(route.path),
+  declarationOrder,
 }));
 
-const EXACT_ROUTES = new Map<string, CompiledRoute>();
-const PARAM_ROUTES = new Map<string, CompiledRoute[]>();
+// Dynamic routes are checked from most specific to least specific. This keeps
+// literal routes such as `/notifications/unread-count` ahead of parameterized
+// routes such as `/notifications/:id`, without maintaining separate indexes.
+const SORTED_ROUTES = [...COMPILED_ROUTES].sort((a, b) => {
+  if (a.params !== b.params) return a.params - b.params;
 
-for (const route of COMPILED_ROUTES) {
-  if (route.params === 0) {
-    EXACT_ROUTES.set(`${route.method} ${route.path}`, route);
-    continue;
-  }
+  const aLiterals = a.segments.filter((segment) => !segment.startsWith(':')).length;
+  const bLiterals = b.segments.filter((segment) => !segment.startsWith(':')).length;
+  if (aLiterals !== bLiterals) return bLiterals - aLiterals;
 
-  const list = PARAM_ROUTES.get(route.method);
-  if (list) {
-    list.push(route);
-  } else {
-    PARAM_ROUTES.set(route.method, [route]);
-  }
-}
-
-// Fewer parameters first, then more literal segments (more specific paths) first,
-// preserving the original declaration order for remaining ties.
-for (const list of PARAM_ROUTES.values()) {
-  list.sort((a, b) => {
-    if (a.params !== b.params) return a.params - b.params;
-    const aLiterals = a.segments.filter((segment) => !segment.startsWith(':')).length;
-    const bLiterals = b.segments.filter((segment) => !segment.startsWith(':')).length;
-    if (aLiterals !== bLiterals) return bLiterals - aLiterals;
-    return 0;
-  });
-}
+  return a.declarationOrder - b.declarationOrder;
+});
 
 function isApiPath(pathname: string): boolean {
   return pathname === '/api' || pathname.startsWith('/api/');
@@ -362,18 +348,10 @@ function matchPath(patternSegments: readonly string[], pathSegments: string[]): 
 
 export function matchRoute(method: string, pathname: string): RouteMatch | null {
   const normalized = cleanPathname(pathname);
-
-  const exact = EXACT_ROUTES.get(`${method} ${normalized}`);
-  if (exact) {
-    return { template: exact.path, params: {}, handle: exact.handle };
-  }
-
-  const candidates = PARAM_ROUTES.get(method);
-  if (!candidates) return null;
-
   const pathSegments = normalized.split('/');
 
-  for (const route of candidates) {
+  for (const route of SORTED_ROUTES) {
+    if (route.method !== method) continue;
     if (route.segments.length !== pathSegments.length) continue;
 
     const params = matchPath(route.segments, pathSegments);

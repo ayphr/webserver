@@ -7,7 +7,8 @@ import {
   getIntegrationsForTeamId,
   updateIntegration,
 } from '../../lib/db';
-import { getTeamScopeUuid, getTeamForUser, canManageTeam } from '../../lib/db/teams';
+import { canManageTeam } from '../../lib/db/teams';
+import { getTeamContext } from '../../lib/teamContext';
 import type { Integration, IntegrationProvider, User } from '@common';
 
 const MAX_NAME_LENGTH = 64;
@@ -42,13 +43,13 @@ function parseUrl(value: unknown): string | null {
 }
 
 const handleListMine = requireAuth(async (_request, user: User) => {
-  const scopeUuid = await getTeamScopeUuid(user);
+  const { scopeUuid } = await getTeamContext(user);
   const integrations = await getIntegrationsForTeamId(scopeUuid);
   return json({ integrations });
 });
 
 const handleCreate = requireAuth(async (request, user: User) => {
-  const team = await getTeamForUser(user);
+  const { team, scopeUuid } = await getTeamContext(user);
   if (team && !canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
 
   const body = await readJsonBody(request);
@@ -60,8 +61,6 @@ const handleCreate = requireAuth(async (request, user: User) => {
 
   const webhookUrl = parseUrl(body?.webhookUrl);
   if (!webhookUrl) return json({ error: 'invalid webhook url' }, 400);
-
-  const scopeUuid = await getTeamScopeUuid(user);
 
   const integration: Integration = {
     id: crypto.randomUUID(),
@@ -82,7 +81,7 @@ const handleGet = requireAuth(async (_request, user: User, params) => {
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
+  const { scopeUuid } = await getTeamContext(user);
   const integration = await getIntegrationById(id);
   if (!integration) return json({ error: 'not found' }, 404);
   if (integration.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
@@ -91,13 +90,12 @@ const handleGet = requireAuth(async (_request, user: User, params) => {
 });
 
 const handleUpdate = requireAuth(async (request, user: User, params) => {
-  const team = await getTeamForUser(user);
+  const { team, scopeUuid } = await getTeamContext(user);
   if (team && !canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
 
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
   const existing = await getIntegrationById(id);
   if (!existing) return json({ error: 'not found' }, 404);
   if (existing.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
@@ -131,13 +129,12 @@ const handleUpdate = requireAuth(async (request, user: User, params) => {
 });
 
 const handleDelete = requireAuth(async (_request, user: User, params) => {
-  const team = await getTeamForUser(user);
+  const { team, scopeUuid } = await getTeamContext(user);
   if (team && !canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
 
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
   const existing = await getIntegrationById(id);
   if (!existing) return json({ error: 'not found' }, 404);
   if (existing.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
@@ -151,7 +148,7 @@ const handleTest = requireAuth(async (_request, user: User, params) => {
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
+  const { scopeUuid } = await getTeamContext(user);
   const integration = await getIntegrationById(id);
   if (!integration) return json({ error: 'not found' }, 404);
   if (integration.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
