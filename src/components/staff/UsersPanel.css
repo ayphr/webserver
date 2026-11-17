@@ -225,16 +225,57 @@
 .staff-user-detail__usage,
 .staff-user-detail__actions,
 .staff-user-detail__teams {
-  padding: 1rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
+  padding: 0.25rem 0;
 }
 
 .staff-user-detail__overview p,
 .staff-user-detail__usage p {
   margin: 0.55rem 0;
   overflow-wrap: anywhere;
+}
+
+.staff-user-detail__hero {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.staff-user-detail__hero h3,
+.staff-user-detail__hero span {
+  display: block;
+  margin: 0;
+}
+
+.staff-user-detail__hero span,
+.staff-user-detail__facts span,
+.staff-user-detail__usage-list span,
+.staff-user-detail__action-row span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.staff-user-detail__facts,
+.staff-user-detail__usage-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+.staff-user-detail__facts div,
+.staff-user-detail__usage-list div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.staff-user-detail__mono {
+  overflow-wrap: anywhere;
+  font-family: var(--font-family-mono);
+  font-size: 0.78rem;
 }
 
 .staff-user-detail__teams ul {
@@ -251,13 +292,27 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .staff-user-detail__team-row span {
   color: var(--text-muted);
+}
+
+.staff-user-detail__action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.staff-user-detail__action-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .staff-team-modal {

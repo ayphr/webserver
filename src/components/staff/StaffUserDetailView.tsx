@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Select, Modal } from '../common';
-import { IconArrowLeft, IconEye, IconTrash } from '@tabler/icons-react';
+import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
 import type { PublicUser, Team, CreditBalance } from '@common';
 import { PLAN_NAMES, SUBSCRIPTION_TIERS } from '@common';
 
@@ -140,12 +140,12 @@ export function StaffUserDetailView({ user, onBack }: Props) {
         <h2>{user.username}</h2>
       </div>
 
-      <div className="staff-user-detail__tabs">
+      <div className="settings__tabs" role="tablist" aria-label="User sections">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={`staff-user-detail__tab${tab === t.id ? ' is-active' : ''}`}
+            className={`settings__tab${tab === t.id ? ' settings__tab--active' : ''}`}
             onClick={() => setTab(t.id)}
           >
             {t.label}
@@ -158,13 +158,15 @@ export function StaffUserDetailView({ user, onBack }: Props) {
       ) : (
         <>
           {tab === 'overview' && (
-            <div className="staff-user-detail__overview">
-              <p><strong>Username:</strong> {user.username}</p>
-              <p><strong>UUID:</strong> {user.uuid}</p>
-              <p><strong>Role:</strong> {user.role}</p>
-              <p><strong>Badges:</strong> {user.badges?.join(', ') || 'none'}</p>
-              <p><strong>Teams:</strong> {teams.length}</p>
-              <p><strong>Active team:</strong> {user.teamId ?? 'none'}</p>
+            <div className="staff-user-detail__overview settings__panel">
+              <div className="staff-user-detail__hero"><IconUser size={28} /><div><h3>{user.username}</h3><span>{user.role}</span></div></div>
+              <div className="staff-user-detail__facts">
+                <div><span>Username</span><strong>{user.username}</strong></div>
+                <div><span>User ID</span><strong className="staff-user-detail__mono">{user.uuid}</strong></div>
+                <div><span>Teams</span><strong>{teams.length}</strong></div>
+                <div><span>Active team</span><strong>{user.teamId ?? 'None selected'}</strong></div>
+                <div><span>Badges</span><strong>{user.badges?.join(', ') || 'None'}</strong></div>
+              </div>
             </div>
           )}
 
@@ -192,19 +194,20 @@ export function StaffUserDetailView({ user, onBack }: Props) {
           )}
 
           {tab === 'usage' && (
-            <div className="staff-user-detail__usage">
-              <p><strong>Plan:</strong> {credits?.plan ?? 'free'}</p>
-              <p><strong>Devices:</strong> {devices.count} ({devices.dataPoints} data points)</p>
-              <p><strong>Locations:</strong> {locations}</p>
-              {credits && (
-                <p><strong>Credits available:</strong> {credits.available}</p>
-              )}
+            <div className="staff-user-detail__usage settings__panel">
+              <div className="staff-user-detail__usage-list">
+                <div><span>Plan</span><strong>{credits?.plan ?? 'Free'}</strong></div>
+                <div><span>Devices</span><strong>{devices.count}</strong></div>
+                <div><span>Data points</span><strong>{devices.dataPoints.toLocaleString()}</strong></div>
+                <div><span>Locations</span><strong>{locations}</strong></div>
+                {credits && <div><span>Credits available</span><strong>{credits.available.toLocaleString()}</strong></div>}
+              </div>
             </div>
           )}
 
           {tab === 'actions' && (
-            <div className="staff-user-detail__actions">
-              <p>Change staff role:</p>
+            <div className="staff-user-detail__actions settings__panel">
+              <div className="staff-user-detail__action-row"><div><strong>Staff access</strong><span>Control whether this user can access staff tools.</span></div>
               <Select
                 value={user.role}
                 onChange={async (e) => {
@@ -219,8 +222,8 @@ export function StaffUserDetailView({ user, onBack }: Props) {
                   { value: 'user', label: 'User' },
                   { value: 'staff', label: 'Staff' },
                 ]}
-              />
-              <Button
+              /></div>
+              <div className="staff-user-detail__action-row"><div><strong>Punishment</strong><span>Restrict this user's access with a timed punishment.</span></div><Button
                 variant="danger"
                 onClick={async () => {
                   const reason = window.prompt('Reason for punishment?');
@@ -234,9 +237,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
                     setActionError(err instanceof Error ? err.message : 'Failed');
                   }
                 }}
-              >
-                Punish user
-              </Button>
+              >Punish user</Button></div>
               {actionError && <p className="error">{actionError}</p>}
             </div>
           )}
