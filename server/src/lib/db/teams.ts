@@ -15,7 +15,17 @@ const TEAM_AUDIT_LOGS_COLLECTION = 'team_audit_logs';
 export async function getTeamById(id: string): Promise<Team | null> {
   const teams = await getCollection('teams');
   trackMongoOperation('findOne', TEAMS_COLLECTION);
-  return teams.findOne({ id });
+  const team = await teams.findOne({ id });
+  if (!team) return null;
+  if (team.name) return team;
+  const manager = await getUserFromUuid(team.managerUuid);
+  if (manager?.username) {
+    const name = `${manager.username}'s Team`;
+    trackMongoOperation('updateOne', TEAMS_COLLECTION);
+    await teams.updateOne({ id }, { $set: { name, updatedAt: new Date() } });
+    return { ...team, name };
+  }
+  return team;
 }
 
 export async function updateTeamCredits(teamId: string, credits: TeamCredits): Promise<void> {
@@ -147,7 +157,15 @@ export async function getTeamsForUser(user: Pick<User, 'teamIds' | 'teamId'>): P
   if (ids.length === 0) return [];
   const teams = await getCollection('teams');
   trackMongoOperation('find', 'teams');
-  return teams.find({ id: { $in: ids } }).toArray();
+  const list = await teams.find({ id: { $in: ids } }).toArray();
+  // Backfill membership arrays and default names for pre-update records.
+  for (const team of list) {
+    if (!team.name) {
+      const manager = await getUserFromUuid(team.managerUuid);
+      if (manager?.username) team.name = `${manager.username}'s Team`;
+    }
+  }
+  return list;
 }
 
 export async function clearUserTeamMembership(userUuid: string): Promise<void> {
@@ -173,7 +191,7 @@ export async function getTeamScopeUsername(user: Pick<User, 'uuid' | 'teamId' | 
 export async function getTeamMembers(teamId: string): Promise<User[]> {
   const users = await getCollection('users');
   trackMongoOperation('find', 'users');
-  return users.find({ teamIds: teamId }).toArray();
+  return users.find({ $or: [{ teamId: teamId }, { teamIds: teamId }] }).toArray();
 }
 
 export function isTeamManager(user: Pick<User, 'uuid' | 'teamId' | 'teamRole' | 'paidSubscriptions' | 'attachedSubscriptions'>, team: Team | null): boolean {
