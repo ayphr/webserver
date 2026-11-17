@@ -343,27 +343,27 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
           fullWidth
         />
 
-        <div className="alerts-tab__field">
-          <span className="alerts-tab__field-label">Condition matching</span>
-          <div className="alerts-tab__logic-toggle" role="group" aria-label="Condition matching">
-            <button
-              type="button"
-              className={`alerts-tab__logic-btn ${draft.logic === 'and' ? 'is-active' : ''}`}
-              onClick={() => setDraft((current) => ({ ...current, logic: 'and' }))}
-            >
-              Match all
-              <span>AND</span>
-            </button>
-            <button
-              type="button"
-              className={`alerts-tab__logic-btn ${draft.logic === 'or' ? 'is-active' : ''}`}
-              onClick={() => setDraft((current) => ({ ...current, logic: 'or' }))}
-            >
-              Match any
-              <span>OR</span>
-            </button>
+        {draft.conditions.length > 1 && (
+          <div className="alerts-tab__field">
+            <span className="alerts-tab__field-label">Match</span>
+            <div className="alerts-tab__logic-toggle" role="group" aria-label="Condition matching">
+              <button
+                type="button"
+                className={`alerts-tab__logic-btn ${draft.logic === 'and' ? 'is-active' : ''}`}
+                onClick={() => setDraft((current) => ({ ...current, logic: 'and' }))}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={`alerts-tab__logic-btn ${draft.logic === 'or' ? 'is-active' : ''}`}
+                onClick={() => setDraft((current) => ({ ...current, logic: 'or' }))}
+              >
+                Any
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="alerts-tab__field">
           <span className="alerts-tab__field-label">Conditions</span>
@@ -422,7 +422,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
           <span className="alerts-tab__field-label">Send notifications to</span>
           {integrations.length === 0 ? (
             <p className="alerts-tab__field-empty">
-              No integrations yet. You can still save this alert to track when it fires.
+              No integrations yet — alert will still track firing.
             </p>
           ) : (
             <div className="alerts-tab__integration-grid">
@@ -467,22 +467,19 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
 
         </div>
 
-        <div className="alerts-tab__enabled-row">
-          <Checkbox
-            label="Alert is enabled"
-            checked={draft.enabled}
-            onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))}
-          />
-        </div>
-
         {formError && <p className="alerts-tab__error">{formError}</p>}
 
         <div className="alerts-tab__form-actions">
+          <Checkbox
+            label="Enabled"
+            checked={draft.enabled}
+            onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))}
+          />
           <Button variant="secondary" onClick={() => setShowForm(false)}>
             Cancel
           </Button>
           <Button variant="primary" onClick={() => void handleSave()} isLoading={isSaving}>
-            {editing ? 'Save alert' : 'Create alert'}
+            {editing ? 'Save' : 'Create'}
           </Button>
         </div>
       </div>
