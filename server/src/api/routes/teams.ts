@@ -181,11 +181,12 @@ const handleTeamMemberRoleUpdate = requireAuth(async (request, user: User, param
 const handleTeamMemberRemove = requireAuth(async (_request, user: User, params) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
-  if (team.managerUuid !== user.uuid) return json({ error: 'Forbidden' }, 403);
 
   const targetUuid = params.uuid;
   if (!targetUuid) return json({ error: 'user uuid is required' }, 400);
-  if (targetUuid === team.managerUuid) return json({ error: 'cannot remove the team manager' }, 400);
+  const isSelf = targetUuid === user.uuid;
+  if (team.managerUuid !== user.uuid && !isSelf) return json({ error: 'Forbidden' }, 403);
+  if (targetUuid === team.managerUuid) return json({ error: 'the team manager cannot leave the team' }, 400);
 
   const target = await getUserFromUuid(targetUuid);
   if (!target || target.teamId !== team.id) return json({ error: 'member not found' }, 404);
@@ -281,6 +282,22 @@ const handleTeamUpdate = requireAuth(async (request, user: User) => {
 
   const updated = await updateTeamName(team, user, name);
   return json({ team: updated });
+});
+
+const handleTeamDelete = requireAuth(async (_request, user: User) => {
+  const team = await getTeamForUser(user);
+  if (!team) return json({ error: 'No team found' }, 404);
+  if (team.managerUuid !== user.uuid) return json({ error: 'Forbidden' }, 403);
+  // Remove team from all members.
+  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  await users.updateMany({ teamIds: team.id }, { $pull: { teamIds: team.id }, $unset: { [`teamRoles.${team.id}`]: '' } });
+  await users.updateMany({ teamId: team.id }, { $set: { teamId: null, teamRole: null } });
+  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
+  await teams.deleteOne({ id: team.id });
+  // switch user to another team if available
+  const remaining = (user.teamIds ?? []).filter((id) => id !== team.id);
+  if (remaining.length > 0) await setActiveTeam(user.uuid, remaining[0]);
+  return json({ deleted: true });
 });
 
 const handleListMyTeams = requireAuth(async (_request, user: User) => {
@@ -381,6 +398,7 @@ const handleTeamSubscriptionPortal = requireAuth(async (_request, user: User) =>
 export {
   handleTeamMe,
   handleTeamUpdate,
+  handleTeamDelete,
   handleTeamMembersList,
   handleTeamMemberAdd,
   handleTeamMemberRoleUpdate,

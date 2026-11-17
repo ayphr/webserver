@@ -81,6 +81,7 @@ import { handleStripeWebhook } from './routes/subscriptions';
 import {
   handleTeamMe,
   handleTeamUpdate,
+  handleTeamDelete,
   handleTeamMembersList,
   handleTeamMemberAdd,
   handleTeamMemberRoleUpdate,
@@ -169,6 +170,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/teams/me', handle: handleTeamMe },
   { method: 'PATCH', path: '/api/team', handle: handleTeamUpdate },
   { method: 'PATCH', path: '/api/teams', handle: handleTeamUpdate },
+  { method: 'DELETE', path: '/api/teams', handle: handleTeamDelete },
   { method: 'GET', path: '/api/team/members', handle: handleTeamMembersList },
   { method: 'GET', path: '/api/teams/members', handle: handleTeamMembersList },
   { method: 'POST', path: '/api/team/members', handle: handleTeamMemberAdd },
