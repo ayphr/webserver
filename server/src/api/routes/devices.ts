@@ -2,22 +2,15 @@ import { json, readJsonBody } from '../../lib/http';
 import { randomBytes, randomInt } from 'node:crypto';
 import { requireAuth } from '../auth';
 import {
-  cacheDevice,
-  countDevices,
-  createDevice,
   createDevicePairing,
   createDeviceToken,
-  getDeviceTokenByHash,
+  ensureDefaultLocation,
   getDeviceTokenById,
   getDeviceTokensForSerial,
-  markDeviceTokensInactive,
   revokeDeviceToken,
-  updateDeviceTokenLastUsed,
-  ensureDefaultLocation,
   getDevicePairingByCode,
   getLocationById,
   markDevicePairingFetched,
-  markDevicePairingLinked,
   countDataPointsForDevice,
   getDataPointStats,
   getDataPointsForDevice,
@@ -25,29 +18,20 @@ import {
   deleteAllDataPointsForDevice,
   deleteDataPointsForDevice,
   getDeviceBySerial,
-  getDeviceByTokenHash,
   getDevicesForTeamId,
   getUserFromUuid,
   invalidateDeviceStatsForOwner,
-  pruneDataPointsForSerials,
   toPublicDevice,
   updateDevice,
-  updateDeviceLastUpload,
-  updateDeviceLocation,
-  updateDeviceToken,
   unlinkDevice,
   upsertDataPoints,
-  type DeviceDocument,
 } from '../../lib/db';
-import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSharedSeats, getTeamById } from '../../lib/db/teams';
+import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSharedSeats } from '../../lib/db/teams';
 import { hashToken } from '../../lib/tokens';
-import { resolveLocationFromClient } from '../../lib/session';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import {
   deviceClaimsTotal,
-  setTotalDevices,
-  devicesRegisteredTotal,
   observeTelemetryValues,
   telemetryRecordsAcceptedTotal,
   telemetryRecordsPersistedTotal,
@@ -58,173 +42,31 @@ import {
 import { consumeCredits, getCreditBalance } from '../../lib/credits';
 import { PAIRING_CODE_TTL_MS } from '../../env';
 import {
-  PAIRING_CODE_LENGTH,
   compileQuery,
-  estimateQueryComputeUnits,
   MAX_QUERY_POINTS,
-  type DataPoint,
   type DeviceQueryRequest,
   type DeviceSummary,
   type User,
   getPlanFeatures,
 } from '@common';
-import { redisFixedWindow } from '../../lib/redis';
-import { evaluateAlertsForDevice } from '../../lib/alerts';
-
-const MAX_SERIAL = 0xFFFFFFFF;
+import { parseDataPoints, parseName, parseSerial, parseTimestamp, getDeviceToken } from '../../lib/deviceValidation';
+import { pruneOwnerDataPoints } from './deviceRetention';
+import {
+  calculateDataFillCreditCost,
+  generateSyntheticDataPointBatches,
+  resolveDeviceTimeRange,
+} from '../../lib/deviceDataService';
+import { generateDevicePairingCode } from '../../lib/devicePairingService';
+import { toPresentedDeviceTokens } from '../../lib/deviceTokenService';
+import { createDeviceQueryPlan } from '../../lib/deviceQueryService';
+import { linkDevice } from '../../lib/deviceLinkService';
+import { uploadDeviceTelemetry } from '../../lib/deviceUploadService';
 
 const pairingRequestLimiter = createRateLimiter(15 * 60 * 1000, 20, 'pairing-request');
 const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
 const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
 const deviceQueryLimiter = createRateLimiter(60 * 1000, 60, 'device-query');
 const deviceUploadLimiter = createRateLimiter(60 * 1000, 120, 'device-upload');
-const MAX_NAME_LENGTH = 64;
-const MAX_POINTS_PER_UPLOAD = 2_000;
-const MAX_QUERY_LENGTH = 10_000;
-const DATA_POINT_PRUNE_COOLDOWN_MS = 5 * 60 * 1000;
-const DATA_POINT_PRUNE_KEY_PREFIX = 'ayphr:telemetry:prune:';
-const localDataPointPruneByOwner = new Map<string, number>();
-
-function parseSerial(value: unknown): number | null {
-  let serial: number;
-
-  if (typeof value === 'number') {
-    serial = value;
-  } else if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    serial = Number(value.trim());
-  } else {
-    return null;
-  }
-
-  if (!Number.isInteger(serial) || serial < 0 || serial > MAX_SERIAL) return null;
-
-  return serial;
-}
-
-function parseName(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const name = value.trim();
-  if (!name || name.length > MAX_NAME_LENGTH) return null;
-  return name;
-}
-
-function parseTimestamp(value: unknown): Date | null {
-  const ms = typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : Number.NaN;
-  if (!Number.isFinite(ms)) return null;
-  return new Date(Math.round(ms / 1000) * 1000);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function parseDataPoints(value: unknown): DataPoint[] | null {
-  if (!Array.isArray(value) || value.length > MAX_POINTS_PER_UPLOAD) return null;
-
-  const byTimestamp = new Map<number, DataPoint>();
-
-  for (const entry of value) {
-    if (!entry || typeof entry !== 'object') return null;
-
-    const item = entry as Record<string, unknown>;
-    const timestamp = parseTimestamp(item.timestamp);
-
-    if (
-      !timestamp ||
-      !isFiniteNumber(item.temperature) ||
-      !isFiniteNumber(item.humidity) ||
-      !isFiniteNumber(item.airPressure)
-    ) {
-      return null;
-    }
-
-    byTimestamp.set(timestamp.getTime(), {
-      timestamp,
-      temperature: item.temperature,
-      humidity: item.humidity,
-      airPressure: item.airPressure,
-    });
-  }
-
-  return [...byTimestamp.values()];
-}
-
-function getDeviceToken(body: Record<string, unknown> | null): string | null {
-  const fromBody = body?.token;
-  if (typeof fromBody === 'string' && fromBody.trim()) return fromBody.trim();
-  return null;
-}
-
-async function shouldPruneOwnerDataPoints(teamId: string): Promise<boolean> {
-  const now = Date.now();
-  try {
-    const { count } = await redisFixedWindow(
-      `${DATA_POINT_PRUNE_KEY_PREFIX}${teamId}`,
-      DATA_POINT_PRUNE_COOLDOWN_MS,
-    );
-    return count === 1;
-  } catch {
-    const lastPrunedAt = localDataPointPruneByOwner.get(teamId) ?? 0;
-    if (now - lastPrunedAt < DATA_POINT_PRUNE_COOLDOWN_MS) return false;
-
-    localDataPointPruneByOwner.set(teamId, now);
-    if (localDataPointPruneByOwner.size > 10_000) {
-      for (const [uuid, timestamp] of localDataPointPruneByOwner) {
-        if (now - timestamp >= DATA_POINT_PRUNE_COOLDOWN_MS) localDataPointPruneByOwner.delete(uuid);
-      }
-      while (localDataPointPruneByOwner.size > 10_000) {
-        const oldestUuid = localDataPointPruneByOwner.keys().next().value;
-        if (oldestUuid === undefined) break;
-        localDataPointPruneByOwner.delete(oldestUuid);
-      }
-    }
-    return true;
-  }
-}
-
-async function pruneOwnerDataPoints(
-  teamId: string,
-  user?: User,
-  devices?: DeviceDocument[],
-): Promise<boolean> {
-  if (!(await shouldPruneOwnerDataPoints(teamId))) return false;
-
-  try {
-    const now = Date.now();
-    let owner: User | undefined = user;
-    if (!owner) {
-      const team = await getTeamById(teamId);
-      owner = team ? (await getUserFromUuid(team.managerUuid)) ?? undefined : (await getUserFromUuid(teamId)) ?? undefined;
-    }
-    const ownerDevices = devices ?? await getDevicesForTeamId(teamId);
-    if (!owner) return false;
-
-    const team = await getTeamForUser(owner);
-    const manager = team ? await getUserFromUuid(team.managerUuid) : null;
-    const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
-    const features = getPlanFeatures(team?.tier ?? 'free', seats);
-    const cutoff = new Date(now - features.dataRetentionDays * 86_400_000);
-    const removed = await pruneDataPointsForSerials(
-      ownerDevices.map((device) => device.serial),
-      features.sharedMaxDataPointsPerUser,
-      cutoff,
-    );
-    return removed > 0;
-  } catch (error) {
-    console.error('Failed to prune data points:', error);
-    return false;
-  }
-}
-
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-function generatePairingCode(): string {
-  let code = '';
-  for (let i = 0; i < PAIRING_CODE_LENGTH; i += 1) {
-    code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
-  }
-  return code;
-}
 
 const handleRequestPairing = async (request: Request): Promise<Response> => {
   const ipCheck = await pairingRequestLimiter.check(`ip:${getClientIp(request)}`);
@@ -236,11 +78,11 @@ const handleRequestPairing = async (request: Request): Promise<Response> => {
 
   const name = parseName(body?.name) ?? `Device ${serial}`;
 
-  let code = generatePairingCode();
+  let code = generateDevicePairingCode(randomInt);
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const existing = await getDevicePairingByCode(code);
     if (!existing) break;
-    code = generatePairingCode();
+    code = generateDevicePairingCode(randomInt);
   }
 
   const token = randomBytes(32).toString('hex');
@@ -270,127 +112,22 @@ const handleLink = requireAuth(async (request, user: User) => {
   const userCheck = await linkCodeLimiter.check(`user:${user.uuid}`);
   if (!userCheck.allowed) return tooManyRequests(userCheck.retryAfterMs);
 
-  const scopeUuid = await getTeamScopeUuid(user);
-
   const body = await readJsonBody(request);
   const code = typeof body?.code === 'string' ? body.code.trim().toUpperCase() : '';
   if (!code) return json({ error: 'invalid code' }, 400);
 
   const requestedLocationId = typeof body?.locationId === 'string' ? body.locationId.trim() : null;
-
-  let resolvedLocationId: string | null = null;
-  if (requestedLocationId) {
-    const requestedLocation = await getLocationById(requestedLocationId);
-    if (requestedLocation?.teamId !== scopeUuid) {
-      return json({ error: 'invalid location' }, 400);
-    }
-    resolvedLocationId = requestedLocation.id;
-  }
-
-  const pairing = await getDevicePairingByCode(code);
-  const now = new Date();
-
-  if (!pairing || pairing.expiresAt.getTime() <= now.getTime()) {
-    return json({ error: 'invalid or expired code' }, 404);
-  }
-
-  if (pairing.linked) {
-    return json({ error: 'code already used' }, 409);
-  }
-
-  const serial = pairing.serial;
-  const name = pairing.name ?? `Device ${serial}`;
-  const tokenHash = pairing.tokenHash;
-
-  const existing = await getDeviceBySerial(serial);
-
-  let device: DeviceDocument;
-
-  if (existing) {
-    if (existing.teamId !== scopeUuid) {
-      return json({ error: 'forbidden' }, 403);
-    }
-
-    await updateDeviceToken(serial, tokenHash, pairing.createdAt);
-    // Rotate upload tokens: previous ones become inactive.
-    await markDeviceTokensInactive(serial, scopeUuid);
-    await createDeviceToken({
-      id: crypto.randomUUID(),
-      serial,
-      teamId: scopeUuid,
-      tokenHash,
-      createdAt: pairing.createdAt,
-      location: {},
-      active: true,
-      userAgent: undefined,
-    });
-    if (resolvedLocationId && existing.locationId !== resolvedLocationId) {
-      await updateDeviceLocation(serial, resolvedLocationId);
-      existing.locationId = resolvedLocationId;
-    }
-    device = { ...existing, tokenHash, tokenCreatedAt: pairing.createdAt };
-  } else {
-    const team = await getTeamForUser(user);
-    if (team) {
-      const role = getTeamRole(user);
-      if (role === 'member') {
-        return json({ error: 'Forbidden' }, 403);
-      }
-    }
-    const ownedDevices = await getDevicesForTeamId(scopeUuid);
-    const maxDevices = getPlanFeatures(team?.tier ?? 'free').maxDevices;
-    if (ownedDevices.length >= maxDevices) {
-      return json({ error: 'device limit reached for your plan' }, 409);
-    }
-
-    let locationId: string | undefined;
-    if (resolvedLocationId) {
-      locationId = resolvedLocationId;
-    } else {
-      const scopeUsername = await getTeamScopeUsername(user);
-      const defaultLocation = await ensureDefaultLocation(scopeUuid, scopeUsername);
-      locationId = defaultLocation.id;
-    }
-
-    const scopeUsername = await getTeamScopeUsername(user);
-    const newDevice: DeviceDocument = {
-      serial,
-      name,
-      teamId: scopeUuid,
-      ownerUsername: scopeUsername,
-      locationId,
-      registeredAt: now,
-      tokenHash,
-      tokenCreatedAt: pairing.createdAt,
-    };
-
-    await createDevice(newDevice);
-    await createDeviceToken({
-      id: crypto.randomUUID(),
-      serial,
-      teamId: scopeUuid,
-      tokenHash,
-      createdAt: pairing.createdAt,
-      location: {},
-      active: true,
-    });
-    device = newDevice;
-    devicesRegisteredTotal.inc();
-    try {
-      setTotalDevices(await countDevices());
-    } catch {
-      // best effort
-    }
-  }
-
-  const linked = await markDevicePairingLinked(code, user.uuid, user.username);
-  if (!linked) {
-    return json({ error: 'code already used' }, 409);
-  }
+  const result = await linkDevice({ user, code, locationId: requestedLocationId });
+  if (result.kind === 'invalid-location') return json({ error: 'invalid location' }, 400);
+  if (result.kind === 'invalid-or-expired-code') return json({ error: 'invalid or expired code' }, 404);
+  if (result.kind === 'code-used') return json({ error: 'code already used' }, 409);
+  if (result.kind === 'forbidden') return json({ error: 'forbidden' }, 403);
+  if (result.kind === 'member-forbidden') return json({ error: 'Forbidden' }, 403);
+  if (result.kind === 'device-limit') return json({ error: 'device limit reached for your plan' }, 409);
 
   deviceClaimsTotal.inc({ event: 'claimed' });
 
-  return json({ linked: true, device: toPublicDevice(device) }, 200);
+  return json({ linked: true, device: toPublicDevice(result.device) }, 200);
 });
 
 const handleFetchPairingToken = async (request: Request, params: { code?: string }): Promise<Response> => {
@@ -472,128 +209,31 @@ async function handleUpload(request: Request): Promise<Response> {
     if (!token) return json({ error: 'missing device token' }, 401);
     if (!points) return json({ error: 'invalid data' }, 400);
 
-    const tokenHash = hashToken(token);
-    const now = new Date();
-
-    // Prefer the dedicated device-token records; fall back to the legacy
-    // single-token field on the device document for older devices.
-    let tokenRecord = await getDeviceTokenByHash(tokenHash);
-    let device = tokenRecord
-      ? await getDeviceBySerial(tokenRecord.serial)
-      : await getDeviceByTokenHash(tokenHash);
-
-    if (!device) {
-      return json({ error: 'device not linked' }, 404);
-    }
-
-    const serial = device.serial;
-
-    if (!tokenRecord) {
-      // Backfill a token record so it shows up in the tokens tab.
-      tokenRecord = await createDeviceToken({
-        id: crypto.randomUUID(),
-        serial,
-        teamId: device.teamId,
-        tokenHash,
-        createdAt: device.tokenCreatedAt ?? now,
-        location: {},
-        active: true,
-      });
-    }
-
-    if (!tokenRecord.active) {
-      return json({ error: 'device token revoked' }, 401);
-    }
-
-    // Resolve an approximate location from client-provided metadata, mirroring
-    // sessions.
     const rawBody = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-    const meta = (rawBody.meta && typeof rawBody.meta === 'object' ? rawBody.meta : rawBody) as
-      | { timezone?: string; locale?: string; deviceType?: string }
-      | undefined;
-    const location = meta
-      ? resolveLocationFromClient({
-          timezone: typeof meta.timezone === 'string' ? meta.timezone : undefined,
-          locale: typeof meta.locale === 'string' ? meta.locale : undefined,
-        })
-      : undefined;
+    const meta = (rawBody.meta && typeof rawBody.meta === 'object' ? rawBody.meta : rawBody) as Record<string, unknown>;
+    const result = await uploadDeviceTelemetry({
+      token,
+      points,
+      metadata: meta,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+    });
 
-    const [accepted] = await Promise.all([
-      upsertDataPoints(serial, points),
-      updateDeviceLastUpload(serial, now),
-      updateDeviceTokenLastUsed(tokenRecord.id, now, location, request.headers.get('user-agent') ?? undefined),
-    ]);
+    if (result.kind === 'missing-token') return json({ error: 'missing device token' }, 401);
+    if (result.kind === 'invalid-device') return json({ error: 'invalid data' }, 400);
+    if (result.kind === 'device-not-linked') return json({ error: 'device not linked' }, 404);
+    if (result.kind === 'token-revoked') return json({ error: 'device token revoked' }, 401);
 
-    device.lastUploadAt = now;
-    await cacheDevice(device);
-
-    if (await pruneOwnerDataPoints(device.teamId)) {
-      await invalidateDeviceStatsForOwner(device.teamId);
-    }
-
-    telemetryRecordsAcceptedTotal.inc(points.length);
-    telemetryRecordsPersistedTotal.inc(accepted);
-    telemetryUploadBatchSize.observe(points.length);
+    telemetryRecordsAcceptedTotal.inc(result.pointCount);
+    telemetryRecordsPersistedTotal.inc(result.accepted);
+    telemetryUploadBatchSize.observe(result.pointCount);
     observeTelemetryValues(points);
-
-    if (points.length > 0) {
-      void evaluateAlertsForDevice(device, points).catch((error) => {
-        console.error('Failed to evaluate device alerts:', error);
-      });
-    }
-
-    return json({ device: toPublicDevice(device), accepted }, 200);
+    return json({ device: toPublicDevice(result.device), accepted: result.accepted }, 200);
   } catch (error) {
     telemetryUploadErrorsTotal.inc();
     throw error;
   } finally {
     endTimer();
   }
-}
-
-function resolveTimeRange(period: string, fromParam?: string | null, toParam?: string | null) {
-  let since: Date | undefined;
-  let until: Date | undefined;
-  const now = Date.now();
-
-  if (fromParam) {
-    const parsed = parseTimestamp(fromParam);
-    if (parsed) since = parsed;
-  } else {
-    switch (period) {
-      case '1h':
-        since = new Date(now - 60 * 60 * 1000);
-        break;
-      case '24h':
-        since = new Date(now - 24 * 60 * 60 * 1000);
-        break;
-      case '2d':
-        since = new Date(now - 2 * 24 * 60 * 60 * 1000);
-        break;
-      case '7d':
-        since = new Date(now - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '2w':
-        since = new Date(now - 14 * 24 * 60 * 60 * 1000);
-        break;
-      case '30d':
-        since = new Date(now - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case 'all':
-        since = undefined;
-        break;
-      default:
-        since = new Date(now - 24 * 60 * 60 * 1000);
-        break;
-    }
-  }
-
-  if (toParam) {
-    const parsed = parseTimestamp(toParam);
-    if (parsed) until = parsed;
-  }
-
-  return { since, until };
 }
 
 const handleGetData = requireAuth(async (request, user: User, params) => {
@@ -611,7 +251,7 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
   const toParam = url.searchParams.get('to');
   const countOnly = url.searchParams.get('countOnly') === 'true' || url.searchParams.get('countOnly') === '1';
 
-  const { since, until } = resolveTimeRange(period, fromParam, toParam);
+  const { since, until } = resolveDeviceTimeRange(period, fromParam, toParam);
 
   if (countOnly) {
     const totalCount = await countDataPointsForDevice(serial, { since, until });
@@ -648,10 +288,6 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const body = await readJsonBody<DeviceQueryRequest>(request);
   const query = typeof body?.query === 'string' ? body.query.trim() : '';
   if (!query) return json({ error: 'query is required' }, 400);
-  if (query.length > MAX_QUERY_LENGTH) {
-    return json({ error: `query must be ${MAX_QUERY_LENGTH.toLocaleString()} characters or fewer` }, 400);
-  }
-
   let executor: ReturnType<typeof compileQuery>;
   try {
     executor = compileQuery(query);
@@ -662,7 +298,7 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const period = typeof body?.period === 'string' && body.period ? body.period : '24h';
   const fromParam = typeof body?.from === 'string' ? body.from : null;
   const toParam = typeof body?.to === 'string' ? body.to : null;
-  const { since, until } = resolveTimeRange(period, fromParam, toParam);
+  const { since, until } = resolveDeviceTimeRange(period, fromParam, toParam);
 
   const team = await getTeamForUser(user);
   const manager = team ? await getUserFromUuid(team.managerUuid) : null;
@@ -675,12 +311,13 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
     maxPoints: MAX_QUERY_POINTS,
   });
 
-  const estimate = estimateQueryComputeUnits(query, points.length);
-  const computeUnits = estimate.units;
-  if (computeUnits > features.queryComputeUnitLimit) {
-    return json({ error: `query exceeds your plan's compute unit limit of ${features.queryComputeUnitLimit}` }, 400);
+  let queryPlan;
+  try {
+    queryPlan = createDeviceQueryPlan(query, points.length, features);
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : 'invalid query' }, 400);
   }
-  const creditCost = Math.max(0.1, computeUnits * features.queryCostCredits);
+  const creditCost = queryPlan.creditCost;
 
   if (creditCost > 0) {
     const balance = await getCreditBalance(user);
@@ -703,7 +340,7 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
 
   return json({
     serial,
-    query,
+    query: queryPlan.query,
     result,
     rowCount: Array.isArray(result) ? result.length : null,
     dataPointCount: points.length,
@@ -858,7 +495,7 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
     return json({ error: `requested range produces too many points for your plan (max ${features.sharedMaxDataPointsPerUser.toLocaleString()})` }, 400);
   }
 
-  const creditCost = Math.max(0.1, (count / 1000) * features.dataFillCreditCostPerThousandPoints);
+  const creditCost = calculateDataFillCreditCost(count, features);
   if (creditCost > 0) {
     const balance = await getCreditBalance(user);
     if (balance.available < creditCost) {
@@ -869,64 +506,10 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   // Replace existing data for this device.
   await deleteAllDataPointsForDevice(serial);
 
-  // Scale random-walk step size by interval so 1-min and 1-hr data drift at the same physical rate
-  const dtHours = intervalSeconds / 3600;
-  const walkScale = Math.sqrt(dtHours);
-
-  // Stateful weather baselines (slowly drifting fronts)
-  let tempBaseline = 19 + (Math.random() - 0.5) * 4;
-  let humidityBaseline = 58 + (Math.random() - 0.5) * 10;
-  let pressure = 1013 + (Math.random() - 0.5) * 12;
-  let pressureVelocity = 0;
-
-  // Sensor micro-noise state (autocorrelated so readings don't jump wildly sample-to-sample)
-  let tempNoise = 0;
-  let humidityNoise = 0;
-
   // Generate and persist in batches so peak memory stays bounded even for the
   // largest allowed ranges (up to 10M points).
-  const BATCH_SIZE = 5_000;
   let generated = 0;
-  for (let batchStart = 0; batchStart < count; batchStart += BATCH_SIZE) {
-    const batchEnd = Math.min(batchStart + BATCH_SIZE, count);
-    const points: DataPoint[] = [];
-    for (let i = batchStart; i < batchEnd; i += 1) {
-      const t = startMs + i * intervalMs;
-      const date = new Date(t);
-
-      // 1. True Diurnal (24-hour) Cycle: coolest around 5:00 AM, warmest around 3:00 PM (15:00)
-      const hourOfDay = date.getUTCHours() + date.getUTCMinutes() / 60;
-      const diurnalPhase = ((hourOfDay - 15) / 24) * 2 * Math.PI;
-      // Asymmetric warmth curve (sun heats faster than night cools)
-      const diurnalTemp = 3.8 * Math.cos(diurnalPhase) + 0.7 * Math.cos(2 * diurnalPhase);
-
-      // 2. Multi-day weather front drift (mean-reverting random walk)
-      tempBaseline += ((19 - tempBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 0.5 * walkScale;
-      humidityBaseline += ((58 - humidityBaseline) * 0.02 * dtHours) + (Math.random() - 0.5) * 1.8 * walkScale;
-
-      // 3. Smooth barometric pressure momentum (weather systems move slowly over days)
-      pressureVelocity = pressureVelocity * 0.96 + ((1013 - pressure) * 0.002 * dtHours) + (Math.random() - 0.5) * 0.25 * walkScale;
-      pressure = Math.max(980, Math.min(1042, pressure + pressureVelocity));
-
-      // 4. Autocorrelated sensor noise
-      tempNoise = tempNoise * 0.7 + (Math.random() - 0.5) * 0.18;
-      humidityNoise = humidityNoise * 0.7 + (Math.random() - 0.5) * 0.6;
-
-      // 5. Physical coupling:
-      // - Relative humidity drops as air warms (~2.2% per °C)
-      // - Low pressure systems bring higher humidity and slightly cooler daytime highs
-      const pressureAnomaly = pressure - 1013;
-      const rawTemp = tempBaseline + diurnalTemp + (pressureAnomaly * 0.08) + tempNoise;
-      const rawHumidity = humidityBaseline - (diurnalTemp * 2.2) - (pressureAnomaly * 0.45) + humidityNoise;
-
-      points.push({
-        timestamp: date,
-        temperature: Math.round(rawTemp * 10) / 10,
-        humidity: Math.round(Math.max(15, Math.min(99, rawHumidity)) * 10) / 10,
-        airPressure: Math.round(pressure * 10) / 10,
-      });
-    }
-
+  for (const points of generateSyntheticDataPointBatches(startMs, count, intervalSeconds)) {
     await upsertDataPoints(serial, points);
     generated += points.length;
   }
@@ -965,13 +548,7 @@ const handleListDeviceTokens = requireAuth(async (_request, user: User, params) 
   }
   const tokens = await getDeviceTokensForSerial(serial, scopeUuid);
   // Strip secret hash before returning; include a few aliases for compatibility.
-  const presented = tokens.map(({ tokenHash: _tokenHash, ...rest }) => ({
-    ...rest,
-    lastUsed: rest.lastUsedAt,
-    lastActive: rest.lastUsedAt,
-    isActive: rest.active,
-    status: rest.active ? 'active' : 'inactive',
-  }));
+  const presented = toPresentedDeviceTokens(tokens);
   return json({ tokens: presented });
 });
 

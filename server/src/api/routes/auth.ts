@@ -11,67 +11,29 @@ import {
   verifyPassword,
 } from '../auth';
 import {
-  createUser,
-  deleteAvatar,
-  deleteDevicesForTeamId,
-  deleteDomainVerificationsForUser,
-  deletePunishmentsForUserUuid,
-  deleteSessionsForUserUuid,
-  deleteUser,
-  deleteNotificationsForUserUuid,
   getActiveSuspensionForUserUuid,
-  getCollection,
-  getDevicesForTeamId,
   getUserFromUsername,
   updateUser,
  getUserByEmail } from '../../lib/db';
-import { type User, normalizeCountryCode, optionalBoolean, optionalString, requireJsonObject, type JsonObject } from '@common';
+import { type User, normalizeCountryCode } from '@common';
 import { toSelfUser } from '../../lib/user';
 import { DEFAULT_BIO } from '@common/utils/bio';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { normalizeEmail, getEmailValidationError } from '@common/utils/email';
-import { verifyEmailCode, sendEmailCode, buildNotificationEmail, sendEmail } from '../../lib/email';
-import { notifyLogin, notifyUser } from '../../lib/notifications';
+import { verifyEmailCode, sendEmailCode } from '../../lib/email';
+import { notifyLogin } from '../../lib/notifications';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { authEventsTotal, userRegistrationsByCountry , setTotalUsers } from '../../lib/metrics';
 import { getUserCount } from '../../lib/db/users';
 import { getPolicyStatus, getPolicyVersions } from '../../lib/policies';
-import { getTeamInviteByToken, acceptTeamInvite, ensureTeamForManager, getTeamForUser } from '../../lib/db/teams';
-
-type AuthPayload = JsonObject & {
-  username?: string;
-  password?: string;
-  email?: string;
-  code?: string;
-  currentPassword?: string;
-  newPassword?: string;
-  country?: string;
-  acceptPolicies?: boolean;
-  timezone?: string;
-  locale?: string;
-  deviceType?: string;
-};
-
-function validateAuthPayload(value: unknown): AuthPayload {
-  const body = requireJsonObject(value);
-  return {
-    ...body,
-    username: optionalString(body, 'username', { maxLength: 64 }),
-    password: optionalString(body, 'password', { maxLength: 256, trim: false }),
-    email: optionalString(body, 'email', { maxLength: 254 }),
-    code: optionalString(body, 'code', { maxLength: 32 }),
-    currentPassword: optionalString(body, 'currentPassword', { maxLength: 256, trim: false }),
-    newPassword: optionalString(body, 'newPassword', { maxLength: 256, trim: false }),
-    country: optionalString(body, 'country', { maxLength: 2 }),
-    acceptPolicies: optionalBoolean(body, 'acceptPolicies'),
-    timezone: optionalString(body, 'timezone', { maxLength: 64 }),
-    locale: optionalString(body, 'locale', { maxLength: 64 }),
-    deviceType: optionalString(body, 'deviceType', { maxLength: 32 }),
-  };
-}
+import { validateAuthPayload, type AuthPayload } from '../../lib/authValidation';
+import { provisionRegisteredUser } from '../../lib/authRegistrationService';
+import { findUserByLoginIdentifier, shouldVerifyNewDevice } from '../../lib/authIdentityService';
+import { deleteUserAccount } from '../../lib/authAccountService';
+import { changeUserPassword } from '../../lib/authPasswordService';
 
 const POLICY_FETCH_ERROR = 'Unable to load the latest policies, please try again later';
 
@@ -181,26 +143,8 @@ async function handleRegister(request: Request) {
   };
 
   try {
-    await createUser(user);
-
     const inviteToken = typeof body.inviteToken === 'string' ? body.inviteToken.trim() : '';
-    let inviteAccepted = false;
-    if (inviteToken) {
-      try {
-        const invite = await getTeamInviteByToken(inviteToken);
-        if (invite && !invite.acceptedAt && invite.expiresAt.getTime() > Date.now() && invite.email === user.email?.toLowerCase()) {
-          await acceptTeamInvite({ invite, user });
-          inviteAccepted = true;
-        }
-      } catch (inviteError) {
-        console.error('Failed to accept team invite during registration:', inviteError);
-      }
-    }
-
-    if (!inviteAccepted) {
-      // Every user belongs to a team (solo users get a free team).
-      await ensureTeamForManager(user.uuid, 'free');
-    }
+    await provisionRegisteredUser(user, inviteToken);
   } catch (error) {
     // The unique username/email indexes are the source of truth, closing the
     // check-then-insert race.
@@ -267,9 +211,7 @@ async function handleLogin(request: Request) {
     return tooManyRequests(userCheck.retryAfterMs);
   }
 
-  const user = loginIdentifier.includes('@')
-    ? await getUserByEmail(normalizeEmail(loginIdentifier))
-    : await getUserFromUsername(loginIdentifier);
+  const user = await findUserByLoginIdentifier(loginIdentifier);
   if (!user || !(await verifyPassword(password, user.auth.passwordHash))) {
     authEventsTotal.inc({ event: 'login', result: 'invalid_credentials' });
     return json({ error: 'invalid username or password' }, 401);
@@ -280,7 +222,7 @@ async function handleLogin(request: Request) {
   const fingerprint = deviceFingerprint(request);
   const trusted = user.trustedDevices ?? [];
   const fingerprintTrusted = Boolean(fingerprint) && trusted.includes(fingerprint!);
-  const isNewDevice = Boolean(fingerprint) && trusted.length > 0 && !fingerprintTrusted && Boolean(user.email && user.emailVerifiedAt);
+  const isNewDevice = shouldVerifyNewDevice(user, fingerprint);
 
   if (isNewDevice) {
     const result = await sendEmailCode({ email: user.email!, purpose: 'login', userUuid: user.uuid });
@@ -347,9 +289,7 @@ async function handleVerifyLogin(request: Request) {
     return tooManyRequests(userCheck.retryAfterMs);
   }
 
-  const user = username.includes('@')
-    ? await getUserByEmail(normalizeEmail(username))
-    : await getUserFromUsername(username);
+  const user = await findUserByLoginIdentifier(username);
   if (!user?.email || !user.emailVerifiedAt) {
     authEventsTotal.inc({ event: 'login_verify', result: 'invalid' });
     return json({ error: 'invalid or expired code' }, 400);
@@ -464,31 +404,8 @@ const handleChangePassword = requireAuth(async (request, user) => {
     return json({ error: passwordValidationErrors[0] }, 400);
   }
 
-  user.auth.passwordHash = await createPasswordHash(newPassword);
-  user.trustedDevices = [];
-  await updateUser(user);
-
-  // Changing the password signs out every device, including this one.
-  await endAllSessions(user);
+  await changeUserPassword(user, newPassword);
   authEventsTotal.inc({ event: 'password_change', result: 'success' });
-
-  await notifyUser({
-    userUuid: user.uuid,
-    type: 'security',
-    title: 'Your password was changed',
-    message: 'The password for your account was changed and all devices were signed out.',
-    link: '/dashboard?tab=account-settings',
-  });
-
-  if (user.email) {
-    const template = buildNotificationEmail({
-      subject: 'Your Ayphr password was changed',
-      heading: 'Password changed',
-      intro: 'The password for your Ayphr account was just changed.',
-      lines: ['If you made this change, no further action is needed.'],
-    });
-    void sendEmail({ to: user.email, subject: template.subject, html: template.html, text: template.text });
-  }
 
   return new Response(null, { status: 204 });
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
@@ -506,32 +423,7 @@ const handleDeleteAccount = requireAuth(async (request, user) => {
     return json({ error: 'invalid password' }, 401);
   }
 
-  // Cascade-delete all data owned by the account's team (if they are the manager).
-  const team = await getTeamForUser(user);
-  const scopeId = team && team.managerUuid === user.uuid ? team.id : null;
-
-  const devices = scopeId ? await getDevicesForTeamId(scopeId) : [];
-  const deviceSerials = devices.map((device) => device.serial);
-  const dataPoints = await getCollection('dataPoints');
-  if (deviceSerials.length > 0) {
-    await dataPoints.deleteMany({ deviceSerial: { $in: deviceSerials } });
-  }
-
-  await Promise.all([
-    deletePunishmentsForUserUuid(user.uuid),
-    scopeId ? deleteDevicesForTeamId(scopeId) : Promise.resolve(),
-    deleteSessionsForUserUuid(user.uuid),
-    deleteAvatar(user.uuid),
-    deleteDomainVerificationsForUser(user.uuid),
-    deleteNotificationsForUserUuid(user.uuid),
-  ]);
-
-  if (scopeId) {
-    const locations = await getCollection('locations');
-    await locations.deleteMany({ teamId: scopeId });
-  }
-
-  await deleteUser(user.uuid);
+  await deleteUserAccount(user);
   authEventsTotal.inc({ event: 'account_delete', result: 'success' });
 
   return new Response(null, { status: 204 });

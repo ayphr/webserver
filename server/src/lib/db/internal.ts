@@ -1,4 +1,4 @@
-import { Binary, Collection, Db, MongoClient } from 'mongodb';
+import { Binary, Collection, Db } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
@@ -19,16 +19,22 @@ import {
   ALERTS_COLLECTION,
   DEVICE_TOKENS_COLLECTION,
   EMAIL_CODES_COLLECTION,
-  NOTIFICATIONS_COLLECTION,
-  MONGO_URI,
-  MONGO_DB_NAME,
-  MONGO_MAX_POOL_SIZE
+  NOTIFICATIONS_COLLECTION
 } from '../../env';
-import { cacheDel } from '../cache';
+export * from './serialization';
+export * from './cacheKeys';
+export {
+  client,
+  database,
+  connectPromise,
+  collections,
+  connect,
+  disconnect,
+  getCols,
+  getCollection,
+} from './mongoLifecycle';
 
 export const log = createLogger('db');
-
-export const ISO_8601_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/;
 
 /** A data point as stored, keyed by device serial and timestamp. */
 export type DataPointDocument = DataPoint & {
@@ -80,10 +86,6 @@ export type DomainVerification = {
   verifiedAt?: Date;
 };
 
-export let client: MongoClient | null = null;
-export let database: Db | null = null;
-export let connectPromise: Promise<Db> | null = null;
-
 export interface Collections {
   dataPoints: Collection<DataPointDocument>;
   users: Collection<User>;
@@ -114,81 +116,8 @@ export interface StoredAvatar {
   data: Binary;
 }
 
-export let collections: Collections | null = null;
-
 export function trackMongoOperation(operation: string, collection: string) {
   recordMongoOperation(operation, collection);
-}
-
-// ---------------------------------------------------------------------------
-// Redis cache integration.
-//
-// Reads are cache-through: Redis first, MongoDB on a miss. Every write path in
-// this module invalidates or refreshes the keys it affects. All cache helpers
-// are fail-soft, so a Redis outage degrades to uncached MongoDB access.
-// ---------------------------------------------------------------------------
-
-// TTLs are a backstop, not the primary freshness mechanism: every write path
-// invalidates or refreshes the keys it affects. They need to outlive the gap
-// between consecutive requests from one client, otherwise the cache is always
-// cold when a client polls (the dashboard refreshes about once a minute).
-export const USER_CACHE = 'user';
-export const USER_CACHE_TTL_SECONDS = 60;
-
-export const SUSPENSION_CACHE = 'suspension';
-export const SUSPENSION_CACHE_TTL_SECONDS = 60;
-
-export const DEVICE_CACHE = 'device';
-export const DEVICE_CACHE_TTL_SECONDS = 60;
-export const DEVICE_NEGATIVE_TTL_SECONDS = 5;
-
-export const DEVICE_LIST_CACHE = 'device_list';
-export const DEVICE_LIST_CACHE_TTL_SECONDS = 60;
-
-export const DEVICE_STATS_CACHE = 'device_stats';
-export const DEVICE_STATS_CACHE_TTL_SECONDS = 60;
-
-/** Sentinel cached in place of a null result so negative lookups are cached too. */
-export const NONE = 'none';
-
-export const userCacheKey = (uuid: string) => `user:${uuid}`;
-export const suspensionCacheKey = (uuid: string) => `suspension:${uuid}`;
-export const deviceCacheKey = (serial: number) => `device:${serial}`;
-export const deviceListCacheKey = (teamId: string) => `device_list:${teamId}`;
-export const deviceStatsCacheKey = (teamId: string) => `device_stats:${teamId}`;
-
-export async function invalidateUserCache(uuid: string): Promise<void> {
-  await cacheDel(USER_CACHE, userCacheKey(uuid));
-}
-
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value == null || typeof value !== 'object') return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
-
-export function normalizeDateValues<T>(value: T): T {
-  if (value instanceof Date) return value;
-
-  if (typeof value === 'string') {
-    if (ISO_8601_REGEX.test(value)) {
-      const parsed = new Date(value);
-      if (!Number.isNaN(parsed.getTime())) return parsed as unknown as T;
-    }
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeDateValues(item)) as unknown as T;
-  }
-
-  if (isPlainObject(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, nestedValue]) => [key, normalizeDateValues(nestedValue)])
-    ) as unknown as T;
-  }
-
-  return value;
 }
 
 export async function setupCollections(db: Db): Promise<Collections> {
@@ -359,39 +288,4 @@ export async function ensureSessionIndexes(sessions: Collection<Session>) {
       return createIndex();
     })
   );
-}
-
-export async function connect(): Promise<Collections> {
-  if (collections) return collections;
-
-  connectPromise ??= (async () => {
-      client = new MongoClient(MONGO_URI, { maxPoolSize: MONGO_MAX_POOL_SIZE });
-      await client.connect();
-      database = client.db(MONGO_DB_NAME);
-      collections = await setupCollections(database);
-      return database;
-    })().finally(() => {
-      connectPromise = null;
-    });
-
-  await connectPromise;
-  return collections!;
-}
-
-export async function disconnect(): Promise<void> {
-  if (client) {
-    await client.close();
-    client = null;
-    database = null;
-    collections = null;
-  }
-}
-
-export async function getCols(): Promise<Collections> {
-  return collections ?? connect();
-}
-
-export async function getCollection<K extends keyof Collections>(name: K): Promise<Collections[K]> {
-  const cols = await getCols();
-  return cols[name];
 }

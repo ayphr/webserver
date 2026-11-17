@@ -1,24 +1,17 @@
 import Stripe from 'stripe';
-import type { BillingInterval, SubscriptionPlan, SubscriptionTier } from '@common';
-import { isSubscriptionTier, BILLING_INTERVALS, PURCHASABLE_SUBSCRIPTION_TIERS } from '@common';
-import { STRIPE_PRICE_TIERS, STRIPE_SECRET_KEY, STRIPE_TRIAL_DAYS } from '../env';
+import type { SubscriptionTier } from '@common';
+import { STRIPE_TRIAL_DAYS } from '../env';
 import { createLogger } from './logger';
+import { getStripe } from './stripeClient';
+export { getStripe } from './stripeClient';
+export {
+  getPriceIdForTier,
+  getBillingIntervalFromStripeSubscription,
+  getSubscriptionPlans,
+  resolveTierFromStripeSubscription,
+} from './stripeCatalog';
 
 const log = createLogger('stripe');
-
-let stripeClient: Stripe | null = null;
-
-export function getStripe(): Stripe | null {
-  if (stripeClient) return stripeClient;
-
-  if (!STRIPE_SECRET_KEY) {
-    log.warn('STRIPE_SECRET_KEY is not set; Stripe features are disabled');
-    return null;
-  }
-
-  stripeClient = new Stripe(STRIPE_SECRET_KEY);
-  return stripeClient;
-}
 
 /** Returns false instead of throwing when a stored customer was deleted in Stripe. */
 export async function stripeCustomerExists(customerId: string): Promise<boolean> {
@@ -31,75 +24,6 @@ export async function stripeCustomerExists(customerId: string): Promise<boolean>
     log.warn({ error, customerId }, 'stored Stripe customer is unavailable');
     return false;
   }
-}
-
-export function getPriceIdForTier(tier: SubscriptionTier, interval: BillingInterval): string | null {
-  for (const [priceId, config] of Object.entries(STRIPE_PRICE_TIERS)) {
-    if (config.tier === tier && config.interval === interval) return priceId;
-  }
-  return null;
-}
-
-let plansCache: { expiresAt: number; plans: SubscriptionPlan[] } | null = null;
-const PLANS_CACHE_MS = 5 * 60 * 1000;
-
-export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-  if (plansCache && plansCache.expiresAt > Date.now()) {
-    return plansCache.plans;
-  }
-
-  const stripe = getStripe();
-  const plans = await Promise.all(
-    PURCHASABLE_SUBSCRIPTION_TIERS.flatMap((tier) =>
-      BILLING_INTERVALS.map(async (interval): Promise<SubscriptionPlan> => {
-        const priceId = getPriceIdForTier(tier, interval);
-        const base: SubscriptionPlan = {
-          tier,
-          interval,
-          priceId,
-          amount: null,
-          currency: null,
-          trialDays: STRIPE_TRIAL_DAYS,
-        };
-
-        if (!priceId || !stripe) return base;
-
-        try {
-          const price = await stripe.prices.retrieve(priceId);
-          return {
-            ...base,
-            amount: price.unit_amount,
-            currency: price.currency,
-          };
-        } catch (error) {
-          log.warn({ error, priceId, tier, interval }, 'failed to retrieve Stripe price');
-          return base;
-        }
-      }),
-    ),
-  );
-
-  plansCache = { expiresAt: Date.now() + PLANS_CACHE_MS, plans };
-  return plans;
-}
-
-function toTier(value: unknown): SubscriptionTier | null {
-  return isSubscriptionTier(value) ? value : null;
-}
-
-export function resolveTierFromStripeSubscription(subscription: Stripe.Subscription): SubscriptionTier | null {
-  for (const item of subscription.items.data) {
-    const metadataTier = toTier(item.price?.metadata?.tier);
-    if (metadataTier) return metadataTier;
-
-    const priceId = item.price?.id;
-    if (priceId) {
-      const mapped = toTier(STRIPE_PRICE_TIERS[priceId]?.tier);
-      if (mapped) return mapped;
-    }
-  }
-
-  return null;
 }
 
 export async function constructStripeEvent(payload: string | Buffer, signature: string, secret: string): Promise<Stripe.Event> {

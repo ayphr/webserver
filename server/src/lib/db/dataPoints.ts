@@ -13,6 +13,8 @@ import type {
   DataPoint
 } from '@common';
 import { cacheGet, cacheSet } from '../cache';
+import { buildDataPointFilter } from './dataPointFilters';
+import { sampleDataPoints, sortDataPoints, toDataPoint } from './dataPointSampling';
 
 export async function upsertDataPoints(deviceSerial: number, points: DataPoint[]): Promise<number> {
   if (points.length === 0) return 0;
@@ -83,14 +85,7 @@ export async function getDataPointStats(
   for (const row of rows) {
     stats.set(row._id, {
       count: row.count,
-      latest: row.latest
-        ? {
-          timestamp: row.latest.timestamp,
-          temperature: row.latest.temperature,
-          humidity: row.latest.humidity,
-          airPressure: row.latest.airPressure,
-        }
-        : null,
+      latest: row.latest ? toDataPoint(row.latest) : null,
     });
   }
 
@@ -178,13 +173,7 @@ export async function countDataPointsForDevice(
   options?: { since?: Date; until?: Date },
 ): Promise<number> {
   const dataPoints = await getCollection('dataPoints');
-  const filter: Record<string, unknown> = { deviceSerial: serial };
-  if (options?.since || options?.until) {
-    const tsFilter: Record<string, unknown> = {};
-    if (options.since) tsFilter.$gte = options.since;
-    if (options.until) tsFilter.$lte = options.until;
-    filter.timestamp = tsFilter;
-  }
+  const filter = buildDataPointFilter(serial, options);
 
   trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
   return dataPoints.countDocuments(filter);
@@ -195,13 +184,7 @@ export async function getDataPointsForDevice(
   options?: { since?: Date; until?: Date; maxPoints?: number },
 ): Promise<{ points: DataPoint[]; totalCount: number }> {
   const dataPoints = await getCollection('dataPoints');
-  const filter: Record<string, unknown> = { deviceSerial: serial };
-  if (options?.since || options?.until) {
-    const tsFilter: Record<string, unknown> = {};
-    if (options.since) tsFilter.$gte = options.since;
-    if (options.until) tsFilter.$lte = options.until;
-    filter.timestamp = tsFilter;
-  }
+  const filter = buildDataPointFilter(serial, options);
 
   trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
   const totalCount = await dataPoints.countDocuments(filter);
@@ -221,12 +204,7 @@ export async function getDataPointsForDevice(
       .sort({ timestamp: 1 })
       .toArray();
     return {
-      points: docs.map((doc) => ({
-        timestamp: doc.timestamp,
-        temperature: doc.temperature,
-        humidity: doc.humidity,
-        airPressure: doc.airPressure,
-      })),
+      points: docs.map(toDataPoint),
       totalCount,
     };
   }
@@ -238,31 +216,7 @@ export async function getDataPointsForDevice(
       })
       .sort({ timestamp: 1 })
       .toArray();
-    const step = docs.length / max;
-    const sampled: DataPoint[] = [];
-    for (let i = 0; i < max; i++) {
-      const idx = Math.min(Math.floor(i * step), docs.length - 1);
-      const doc = docs[idx];
-      if (doc) {
-        sampled.push({
-          timestamp: doc.timestamp,
-          temperature: doc.temperature,
-          humidity: doc.humidity,
-          airPressure: doc.airPressure,
-        });
-      }
-    }
-    const lastDoc = docs[docs.length - 1];
-    const lastSampled = sampled[sampled.length - 1];
-    if (lastDoc && lastSampled && lastSampled.timestamp.getTime() !== lastDoc.timestamp.getTime()) {
-      sampled[sampled.length - 1] = {
-        timestamp: lastDoc.timestamp,
-        temperature: lastDoc.temperature,
-        humidity: lastDoc.humidity,
-        airPressure: lastDoc.airPressure,
-      };
-    }
-    return { points: sampled, totalCount };
+    return { points: sampleDataPoints(docs, max), totalCount };
   }
 
   // Very large histories: sample evenly across the entire range with
@@ -285,15 +239,9 @@ export async function getDataPointsForDevice(
   const sampled = buckets
     .map((bucket) => bucket.doc)
     .filter((doc): doc is DataPointDocument => Boolean(doc))
-    .map((doc) => ({
-      timestamp: doc.timestamp,
-      temperature: doc.temperature,
-      humidity: doc.humidity,
-      airPressure: doc.airPressure,
-    }))
-    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    .map(toDataPoint);
 
-  return { points: sampled, totalCount };
+  return { points: sortDataPoints(sampled), totalCount };
 }
 
 /** Removes every stored data point for a single device. */
@@ -314,13 +262,7 @@ export async function getDataPointsForQuery(
   options?: { since?: Date; until?: Date; maxPoints?: number },
 ): Promise<{ points: DataPoint[]; totalCount: number; truncated: boolean }> {
   const dataPoints = await getCollection('dataPoints');
-  const filter: Record<string, unknown> = { deviceSerial: serial };
-  if (options?.since || options?.until) {
-    const tsFilter: Record<string, unknown> = {};
-    if (options.since) tsFilter.$gte = options.since;
-    if (options.until) tsFilter.$lte = options.until;
-    filter.timestamp = tsFilter;
-  }
+  const filter = buildDataPointFilter(serial, options);
 
   trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
   const totalCount = await dataPoints.countDocuments(filter);
@@ -347,12 +289,7 @@ export async function getDataPointsForQuery(
   if (totalCount > max) docs.reverse();
 
   return {
-    points: docs.map((doc) => ({
-      timestamp: doc.timestamp,
-      temperature: doc.temperature,
-      humidity: doc.humidity,
-      airPressure: doc.airPressure,
-    })),
+    points: docs.map(toDataPoint),
     totalCount,
     truncated: totalCount > max,
   };

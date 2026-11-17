@@ -10,7 +10,7 @@ import {
   countLocations,
 } from '../../lib/db';
 import { getPlanFeatures } from '@common';
-import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole } from '../../lib/db/teams';
+import { getTeamContext } from '../../lib/teamContext';
 import type { Location, User } from '@common';
 
 const MAX_NAME_LENGTH = 64;
@@ -23,8 +23,7 @@ function parseName(value: unknown): string | null {
 }
 
 const handleListMine = requireAuth(async (_request, user: User) => {
-  const scopeUuid = await getTeamScopeUuid(user);
-  const scopeUsername = await getTeamScopeUsername(user);
+  const { scopeUuid, scopeUsername } = await getTeamContext(user);
   const defaultLocation = await ensureDefaultLocation(scopeUuid, scopeUsername);
   const locations = await getLocationsForTeamId(scopeUuid);
   if (!locations.some((location) => location.id === defaultLocation.id)) {
@@ -38,16 +37,8 @@ const handleCreate = requireAuth(async (request, user: User) => {
   const name = parseName(body?.name);
   if (!name) return json({ error: 'invalid name' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
-  const scopeUsername = await getTeamScopeUsername(user);
-
-  const team = await getTeamForUser(user);
-  if (team) {
-    const role = getTeamRole(user);
-    if (role === 'member') {
-      return json({ error: 'Forbidden' }, 403);
-    }
-  }
+  const { team, scopeUuid, scopeUsername, role } = await getTeamContext(user);
+  if (team && role === 'member') return json({ error: 'Forbidden' }, 403);
 
   await ensureDefaultLocation(scopeUuid, scopeUsername);
 
@@ -74,7 +65,7 @@ const handleGet = requireAuth(async (_request, user: User, params) => {
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
+  const { scopeUuid } = await getTeamContext(user);
 
   const location = await getLocationById(id);
   if (!location) return json({ error: 'not found' }, 404);
@@ -87,7 +78,7 @@ const handleUpdate = requireAuth(async (request, user: User, params) => {
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
+  const { scopeUuid } = await getTeamContext(user);
 
   const location = await getLocationById(id);
   if (!location) return json({ error: 'not found' }, 404);
@@ -109,20 +100,14 @@ const handleDelete = requireAuth(async (_request, user: User, params) => {
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
-  const scopeUuid = await getTeamScopeUuid(user);
-  const team = await getTeamForUser(user);
+  const { scopeUuid, team, role } = await getTeamContext(user);
 
   const location = await getLocationById(id);
   if (!location) return json({ error: 'not found' }, 404);
   if (location.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
   if (location.isDefault) return json({ error: 'cannot delete default location' }, 409);
 
-  if (team) {
-    const role = getTeamRole(user);
-    if (role !== 'manager') {
-      return json({ error: 'Forbidden' }, 403);
-    }
-  }
+  if (team && role !== 'manager') return json({ error: 'Forbidden' }, 403);
 
   const deleted = await deleteLocation(id, scopeUuid);
   if (!deleted) return json({ error: 'not found' }, 404);
