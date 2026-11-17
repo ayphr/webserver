@@ -58,7 +58,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const teamId = await resolveSubscriptionTarget(subscription);
   if (!teamId) return;
 
-  await clearTeamStripeSubscription(teamId);
+  await clearTeamStripeSubscription(teamId, subscription.id);
   log.info({ teamId, stripeSubscriptionId: subscription.id }, 'removed team Stripe subscription');
 }
 

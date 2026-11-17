@@ -129,6 +129,7 @@ export async function constructStripeEvent(payload: string | Buffer, signature: 
   teamId: string;
   successUrl: string;
   cancelUrl: string;
+  quantity?: number;
 }): Promise<string | null> {
   const stripe = getStripe();
   if (!stripe) return null;
@@ -136,7 +137,7 @@ export async function constructStripeEvent(payload: string | Buffer, signature: 
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: params.customerId,
-    line_items: [{ price: params.priceId, quantity: 1 }],
+    line_items: [{ price: params.priceId, quantity: Math.max(1, params.quantity ?? 1) }],
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
     allow_promotion_codes: true,
@@ -148,6 +149,34 @@ export async function constructStripeEvent(payload: string | Buffer, signature: 
   });
 
   return session.url;
+}
+
+export async function cancelTeamStripeSubscription(subscriptionId: string): Promise<boolean> {
+  const stripe = getStripe();
+  if (!stripe) return false;
+  try {
+    await stripe.subscriptions.cancel(subscriptionId);
+    return true;
+  } catch (error) {
+    log.warn({ error, subscriptionId }, 'failed to cancel team Stripe subscription');
+    return false;
+  }
+}
+
+export async function changeTeamStripeSubscription(
+  subscriptionId: string,
+  priceId: string,
+  quantity: number,
+): Promise<Stripe.Subscription | null> {
+  const stripe = getStripe();
+  if (!stripe) return null;
+  const current = await stripe.subscriptions.retrieve(subscriptionId);
+  const item = current.items.data[0];
+  if (!item) return null;
+  return stripe.subscriptions.update(subscriptionId, {
+    items: [{ id: item.id, price: priceId, quantity: Math.max(1, quantity) }],
+    proration_behavior: 'create_prorations',
+  });
 }
 
 export async function createBillingPortalSession(params: {

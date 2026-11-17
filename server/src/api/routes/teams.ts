@@ -30,6 +30,8 @@ import {
   getStripe,
   getSubscriptionPlans,
   stripeCustomerExists,
+  cancelTeamStripeSubscription,
+  changeTeamStripeSubscription,
 } from '../../lib/stripe';
 import { CLIENT_URL, STRIPE_TRIAL_DAYS } from '../../env';
 import {
@@ -359,6 +361,26 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
   if (!priceId) return json({ error: 'This plan is not available for purchase' }, 503);
   if (!getStripe()) return json({ error: 'Stripe is not configured' }, 503);
 
+  // Change the existing subscription rather than creating a second one.
+  if (team.stripeSubscriptionId) {
+    try {
+      const updated = await changeTeamStripeSubscription(
+        team.stripeSubscriptionId,
+        priceId,
+        Math.max(1, (await getTeamMembers(team.id)).length),
+      );
+      if (updated) {
+        await syncTeamStripeSubscription(team.id, updated);
+        return json({ url: `${CLIENT_URL}/dashboard?tab=team&checkout=success` });
+      }
+    } catch {
+      // The stored subscription may have been deleted in Stripe. Continue by
+      // creating a fresh customer and Checkout subscription below.
+      const teams = await (await import('../../lib/db/internal')).getCollection('teams');
+      await teams.updateOne({ id: team.id }, { $unset: { stripeSubscriptionId: '', subscriptionStatus: '', seats: '', billingInterval: '', currentPeriodEnd: '' } });
+    }
+  }
+
   let customerId = team.stripeCustomerId;
   if (customerId && !(await stripeCustomerExists(customerId))) {
     // The database can outlive a deleted Stripe customer. Replace the stale
@@ -373,6 +395,7 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
   if (!customerId) {
     customerId = await createTeamStripeCustomer({
       teamId: team.id,
+      quantity: Math.max(1, (await getTeamMembers(team.id)).length),
       name: team.name ?? `${user.username}'s Team`,
     }) ?? undefined;
     if (!customerId) return json({ error: 'Failed to create billing customer' }, 502);
@@ -402,6 +425,7 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
           priceId,
           tier,
           teamId: team.id,
+          quantity: Math.max(1, (await getTeamMembers(team.id)).length),
           successUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=success`,
           cancelUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=cancel`,
         });
@@ -419,6 +443,10 @@ const handleTeamPlanFree = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
   if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  if (team.stripeSubscriptionId) {
+    const canceled = await cancelTeamStripeSubscription(team.stripeSubscriptionId);
+    if (!canceled) return json({ error: 'Unable to cancel the current Stripe subscription' }, 502);
+  }
   const teams = await (await import('../../lib/db/internal')).getCollection('teams');
   await teams.updateOne(
     { id: team.id },

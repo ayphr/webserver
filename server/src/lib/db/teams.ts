@@ -287,11 +287,12 @@ export async function syncTeamStripeSubscription(
 }
 
 /** Reverts a team to the free plan after its Stripe subscription ends. */
-export async function clearTeamStripeSubscription(teamId: string): Promise<void> {
+export async function clearTeamStripeSubscription(teamId: string, stripeSubscriptionId?: string): Promise<void> {
   const teams = await getCollection('teams');
+  const filter = stripeSubscriptionId ? { id: teamId, stripeSubscriptionId } : { id: teamId };
   trackMongoOperation('updateOne', TEAMS_COLLECTION);
   await teams.updateOne(
-    { id: teamId },
+    filter,
     {
       $set: { tier: 'free', subscriptionStatus: 'canceled', updatedAt: new Date() },
       $unset: { stripeSubscriptionId: '', seats: '', billingInterval: '', currentPeriodEnd: '' },
@@ -392,6 +393,7 @@ export async function removeTeamMember(params: {
   const { team, actor, target } = params;
 
   await clearUserTeamMembership(target.uuid, team.id);
+  await syncTeamMemberSubscriptions(team);
 
   await logTeamAudit({
     teamId: team.id,
