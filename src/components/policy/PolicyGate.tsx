@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { ApiError } from '../../lib/api/client';
 import type { PolicyKey, PolicyStatus } from '@common';
 import { Button, Card, CardBody, CardHeader, ConfirmDialog, Input } from '../common';
 import './PolicyGate.css';
@@ -28,33 +29,70 @@ export const PolicyGate = ({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
 
     const load = async () => {
-      try {
-        const { policyStatus } = await api.users.me();
-        if (!active) return;
+      setLoadError(null);
+      setIsRetrying(false);
+      const MAX_ATTEMPTS = 3;
+      const DELAYS = [0, 700, 2000];
 
-        if (policyStatus && !policyStatus.upToDate) {
-          setStatus(policyStatus);
-          setState('required');
-        } else {
-          setState('ready');
+      for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        if (cancelled) return;
+        if (i > 0) {
+          setIsRetrying(true);
+          await new Promise<void>((resolve) => {
+            const t = setTimeout(resolve, DELAYS[i]);
+            // allow cleanup to cancel the pending retry
+            if (cancelled) clearTimeout(t);
+          });
+          if (cancelled) return;
         }
-      } catch {
-        if (!active) return;
-        await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
+        try {
+          const { policyStatus } = await api.users.me();
+          if (cancelled) return;
+          setIsRetrying(false);
+          if (policyStatus && !policyStatus.upToDate) {
+            setStatus(policyStatus);
+            setState('required');
+          } else {
+            setState('ready');
+          }
+          return;
+        } catch (err) {
+          if (cancelled) return;
+          if (err instanceof ApiError && err.status === 401) {
+            setIsRetrying(false);
+            await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
+            return;
+          }
+          // Transient failure: retry a few times before surfacing.
+          if (i === MAX_ATTEMPTS - 1) {
+            setIsRetrying(false);
+            setLoadError(err instanceof Error ? err.message : 'Failed to load your account. Please try again.');
+          }
+        }
       }
     };
 
     void load();
 
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, retryKey]);
+
+  // Auto-retry when the network comes back online.
+  useEffect(() => {
+    const handler = () => setRetryKey((k) => k + 1);
+    window.addEventListener('online', handler);
+    return () => window.removeEventListener('online', handler);
+  }, []);
 
   // Poll the session so this device is signed out shortly after another
   // device revokes it. A 401 triggers the global unauthorized handler.
@@ -126,6 +164,31 @@ export const PolicyGate = ({
     setIsConfirmOpen(false);
     setDeletePassword('');
   };
+
+  if (loadError) {
+    return (
+      <div className="policy-gate">
+        <div className="policy-gate__container">
+          <Card elevated className="policy-gate__card">
+            <CardHeader>
+              <h1>Couldn&apos;t load your account</h1>
+            </CardHeader>
+            <CardBody>
+              <p className="policy-gate__error">{loadError}</p>
+              <div className="policy-gate__actions">
+                <Button variant="primary" fullWidth isLoading={isRetrying} onClick={() => setRetryKey((k) => k + 1)}>
+                  {isRetrying ? 'Retrying...' : 'Try again'}
+                </Button>
+                <Button variant="secondary" fullWidth onClick={() => navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true })}>
+                  Back to sign in
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (state === 'loading') {
     if (loadingFallback) {

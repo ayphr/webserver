@@ -302,6 +302,7 @@ export const DashboardPage = () => {
 
   const handleSwitchAccount = async (token: string) => {
     setActiveToken(token);
+    api.users.invalidateMe();
     try {
       const userData = await api.users.me();
       setUser(userData.user);

@@ -3,8 +3,9 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay, CodeInput } from '../../components/common';
-import { getActiveToken, getStoredAccounts, isStoredAccountExpired, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { getActiveToken, getStoredAccounts, isStoredAccountExpired, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { api } from '../../lib/api';
+import { ApiError } from '../../lib/api/client';
 import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { getEmailValidationError } from '@common/utils/email';
@@ -51,9 +52,11 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     const refresh = () => setStoredAccounts(getStoredAccounts());
     window.addEventListener('storage', refresh);
     window.addEventListener('focus', refresh);
+    window.addEventListener('ayphr-accounts-changed', refresh);
     return () => {
       window.removeEventListener('storage', refresh);
       window.removeEventListener('focus', refresh);
+      window.removeEventListener('ayphr-accounts-changed', refresh);
     };
   }, []);
   const eligibleAccounts = storedAccounts.filter((account) => !isStoredAccountExpired(account));
@@ -87,8 +90,19 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     }
   };
 
-  const handleChooseAccount = (token: string) => {
+  const handleChooseAccount = async (token: string) => {
     setActiveToken(token);
+    api.users.invalidateMe();
+    try {
+      await api.users.me();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        removeStoredAccount(token);
+        setStoredAccounts(getStoredAccounts());
+        return;
+      }
+      // Transient failure: fall through and let the dashboard/gates retry.
+    }
     navigate(redirectTo);
   };
 

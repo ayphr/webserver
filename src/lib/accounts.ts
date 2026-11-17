@@ -47,6 +47,11 @@ export function getStoredAccounts(): StoredAccount[] {
 export function saveStoredAccounts(accounts: StoredAccount[]) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  try {
+    window.dispatchEvent(new CustomEvent('ayphr-accounts-changed'));
+  } catch {
+    // ignore
+  }
 }
 
 export function getActiveToken(): string | null {

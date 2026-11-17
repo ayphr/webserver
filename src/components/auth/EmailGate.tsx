@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { ApiError } from '../../lib/api/client';
 import { Button, Card, CardBody, CardHeader, CodeInput, Input } from '../common';
 import { EMAIL_CODE_LENGTH, getEmailValidationError, normalizeEmail } from '@common/utils/email';
 import './EmailGate.css';
@@ -24,6 +25,9 @@ export const EmailGate = ({
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
@@ -33,26 +37,58 @@ export const EmailGate = ({
   }, [resendCooldown]);
 
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
     const load = async () => {
-      try {
-        const { user } = await api.auth.me();
-        if (!active) return;
-        if (user.email) {
-          setState('ready');
-        } else {
-          setState('required');
+      setLoadError(null);
+      setIsRetrying(false);
+      const MAX_ATTEMPTS = 3;
+      const DELAYS = [0, 700, 2000];
+
+      for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        if (cancelled) return;
+        if (i > 0) {
+          setIsRetrying(true);
+          await new Promise<void>((resolve) => {
+            const t = setTimeout(resolve, DELAYS[i]);
+            if (cancelled) clearTimeout(t);
+          });
+          if (cancelled) return;
         }
-      } catch {
-        if (!active) return;
-        await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
+        try {
+          const { user } = await api.auth.me();
+          if (cancelled) return;
+          setIsRetrying(false);
+          if (user.email) {
+            setState('ready');
+          } else {
+            setState('required');
+          }
+          return;
+        } catch (err) {
+          if (cancelled) return;
+          if (err instanceof ApiError && err.status === 401) {
+            setIsRetrying(false);
+            await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
+            return;
+          }
+          if (i === MAX_ATTEMPTS - 1) {
+            setIsRetrying(false);
+            setLoadError(err instanceof Error ? err.message : 'Failed to load your account. Please try again.');
+          }
+        }
       }
     };
     void load();
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, retryKey]);
+
+  useEffect(() => {
+    const handler = () => setRetryKey((k) => k + 1);
+    window.addEventListener('online', handler);
+    return () => window.removeEventListener('online', handler);
+  }, []);
 
   const handleRequestCode = async () => {
     setError(null);
@@ -119,6 +155,31 @@ export const EmailGate = ({
     }
     await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
   };
+
+  if (loadError) {
+    return (
+      <div className="email-gate">
+        <div className="email-gate__container">
+          <Card elevated className="email-gate__card">
+            <CardHeader>
+              <h1>Couldn&apos;t load your account</h1>
+            </CardHeader>
+            <CardBody>
+              <p className="email-gate__error">{loadError}</p>
+              <div className="email-gate__actions">
+                <Button variant="primary" fullWidth isLoading={isRetrying} onClick={() => setRetryKey((k) => k + 1)}>
+                  {isRetrying ? 'Retrying...' : 'Try again'}
+                </Button>
+                <Button variant="secondary" fullWidth onClick={() => navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true })}>
+                  Back to sign in
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (state === 'loading') {
     if (loadingFallback) return <>{loadingFallback}</>;
