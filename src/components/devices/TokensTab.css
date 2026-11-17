@@ -1,5 +1,5 @@
 .tokens-tab__notice {
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   padding: 1rem 0;
 }
 
@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--danger, #ff5555);
+  color: var(--status-error);
   margin-bottom: 1rem;
 }
 
@@ -18,12 +18,12 @@
   gap: 0.5rem;
   padding: 2rem 1rem;
   text-align: center;
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
 }
 
 .tokens-tab__empty h3 {
   margin: 0;
-  color: var(--text, #fff);
+  color: var(--text-primary);
 }
 
 .tokens-tab__list {
@@ -46,7 +46,7 @@
 }
 
 .tokens-tab__icon {
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   margin-top: 0.15rem;
 }
 
@@ -67,7 +67,7 @@
 
 .tokens-tab__title {
   font-weight: 600;
-  color: var(--text, #fff);
+  color: var(--text-primary);
 }
 
 .tokens-tab__badge {
@@ -78,24 +78,12 @@
   border: 1px solid transparent;
 }
 
-.tokens-tab__badge.is-active {
-  color: #3ddc97;
-  border-color: rgba(61, 220, 151, 0.4);
-  background: rgba(61, 220, 151, 0.12);
-}
-
-.tokens-tab__badge.is-inactive {
-  color: var(--text-muted, #888);
-  border-color: var(--border, rgba(255, 255, 255, 0.1));
-  background: rgba(255, 255, 255, 0.04);
-}
-
 .tokens-tab__meta {
   display: flex;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
 }
 
 .tokens-tab__actions {
