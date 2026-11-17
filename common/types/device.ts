@@ -1,3 +1,5 @@
+import type { SessionLocation } from './session';
+
 export type Device = {
   serial: number;
   name?: string;
@@ -25,6 +27,25 @@ export type DeviceToken = {
   token: string;
   expiresAt: Date;
 };
+
+export type DeviceUploadToken = {
+  id: string;
+  serial: number;
+  teamId: string;
+  tokenHash: string;
+  createdAt: Date;
+  lastUsedAt?: Date;
+  location: SessionLocation;
+  active: boolean;
+  revokedAt?: Date;
+  userAgent?: string;
+};
+
+export type DeviceUploadTokenInfo = Omit<DeviceUploadToken, 'tokenHash'>;
+
+// Backwards/alternate names used by callers and tests.
+export type DeviceTokenInfo = DeviceUploadTokenInfo;
+export type DeviceTokenSummary = DeviceUploadTokenInfo;
 
 /**
  * A single measurement as uploaded by a device. The timestamp may be an ISO

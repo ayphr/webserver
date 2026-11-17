@@ -2,7 +2,7 @@ import { Binary, Collection, Db, MongoClient } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert } from '@common';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -17,6 +17,7 @@ import {
   LOCATIONS_COLLECTION,
   INTEGRATIONS_COLLECTION,
   ALERTS_COLLECTION,
+  DEVICE_TOKENS_COLLECTION,
   EMAIL_CODES_COLLECTION,
   NOTIFICATIONS_COLLECTION,
   MONGO_URI,
@@ -96,6 +97,7 @@ export interface Collections {
   locations: Collection<Location>;
   integrations: Collection<Integration>;
   alerts: Collection<DeviceAlert>;
+  deviceTokens: Collection<DeviceUploadToken>;
   emailCodes: Collection<EmailCode>;
   teams: Collection<Team>;
   teamAuditLogs: Collection<TeamAuditLog>;
@@ -217,6 +219,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     locations: db.collection<Location>(LOCATIONS_COLLECTION),
     integrations: db.collection<Integration>(INTEGRATIONS_COLLECTION),
     alerts: db.collection<DeviceAlert>(ALERTS_COLLECTION),
+    deviceTokens: db.collection<DeviceUploadToken>(DEVICE_TOKENS_COLLECTION),
     emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION),
     teams: db.collection<Team>('teams'),
     teamAuditLogs: db.collection<TeamAuditLog>('team_audit_logs'),
@@ -262,6 +265,9 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ id: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ serial: 1, teamId: 1 })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ teamId: 1 })],
+  [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ id: 1 }, { unique: true })],
+  [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ tokenHash: 1 }, { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } })],
+  [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ serial: 1, teamId: 1 })],
   ];
 
   await Promise.all(

@@ -9,6 +9,7 @@ import type {
   DevicePayload,
   DeviceQueryPayload,
   DeviceQueryRequest,
+  DeviceTokenListPayload,
   DeviceUnlinkPayload,
   DeviceUpdatePayload,
 } from '@common';
@@ -88,6 +89,13 @@ export function createDevicesApi(client: RequestClient) {
         method: 'GET',
         auth: false,
       });
+    },
+    async listTokens(serial: number) {
+      const response = await client.requestJson<DeviceTokenListPayload>(`/api/devices/${serial}/tokens`);
+      return response.tokens;
+    },
+    async revokeToken(serial: number, id: string) {
+      await client.requestJson<null>(`/api/devices/${serial}/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
   };
 }

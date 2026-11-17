@@ -35,6 +35,7 @@ import { DeviceExportModal } from './DeviceExportModal';
 import { DataFillModal } from './DataFillModal';
 import { ForecastTab } from './ForecastTab';
 import { AlertsTab } from './AlertsTab';
+import { TokensTab } from './TokensTab';
 import '../settings/SettingsPanel.css';
 import './DevicesPanel.css';
 
@@ -160,7 +161,7 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 
 type Period = DevicePeriod;
 type GraphMode = 'combined' | 'separate' | 'summary';
-type DetailTab = 'graphs' | 'forecasts' | 'alerts' | 'settings';
+type DetailTab = 'graphs' | 'forecasts' | 'alerts' | 'tokens' | 'settings';
 type Props = {
   initialDeviceSerial?: number | null;
   onNavigate?: (tab: string) => void;
@@ -930,7 +931,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
               </button>
             </Tooltip>
           )}
-          {detailTab !== 'forecasts' && detailTab !== 'settings' && detailTab !== 'alerts' && (
+          {detailTab !== 'forecasts' && detailTab !== 'settings' && detailTab !== 'alerts' && detailTab !== 'tokens' && (
             <>
               <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
                 <IconTerminal2 size={16} strokeWidth={1.75} />
@@ -942,7 +943,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
               </Button>
             </>
           )}
-          {detailTab !== 'alerts' && (
+          {detailTab !== 'alerts' && detailTab !== 'tokens' && (
             <Button
               variant="secondary"
               onClick={() => setIsExportOpen(true)}
@@ -1011,7 +1012,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
       </div>
 
       <div className="settings__tabs" role="tablist" aria-label="Device sections">
-        {(['graphs', 'forecasts', 'alerts', 'settings'] as const).map((tab) => (
+        {(['graphs', 'forecasts', 'alerts', 'tokens', 'settings'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -1026,7 +1027,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
                 ? 'Forecasts'
                 : tab === 'alerts'
                   ? 'Alerts'
-                  : 'Settings'}
+                  : tab === 'tokens'
+                    ? 'Tokens'
+                    : 'Settings'}
           </button>
         ))}
       </div>
@@ -1251,6 +1254,14 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
             deviceName={deviceLabel(selectedDevice)}
             canManage={canManageAlerts}
             onNavigate={canOpenIntegrations ? onNavigate : undefined}
+          />
+        )}
+
+        {/* TOKENS TAB */}
+        {detailTab === 'tokens' && selectedDevice && (
+          <TokensTab
+            serial={selectedDevice.serial}
+            deviceName={deviceLabel(selectedDevice)}
           />
         )}
 

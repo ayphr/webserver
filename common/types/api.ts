@@ -1,4 +1,4 @@
-import type { DataPoint, Device, DeviceSummary } from './device';
+import type { DataPoint, Device, DeviceSummary, DeviceUploadTokenInfo } from './device';
 import type { Location } from './location';
 import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
@@ -137,6 +137,14 @@ export type DeviceUnlinkPayload = {
   unlinked: boolean;
   serial: number;
 };
+
+export type DeviceTokenListPayload = {
+  tokens: DeviceUploadTokenInfo[];
+};
+
+// Aliases for alternate naming.
+export type DeviceTokensPayload = DeviceTokenListPayload;
+export type DeviceUploadTokensPayload = DeviceTokenListPayload;
 
 export type DeviceTokenPayload = {
   token: string;

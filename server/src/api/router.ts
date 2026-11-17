@@ -52,6 +52,8 @@ import {
   handleListMine,
   handleRequestPairing,
   handleUpload,
+  handleDeviceTokensList,
+  handleDeviceTokenRevoke,
 } from './routes/devices';
 import { handleLocationsListMine, handleLocationCreate, handleLocationGet, handleLocationUpdate, handleLocationDelete } from './routes/locations';
 import {
@@ -216,6 +218,10 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'PATCH', path: '/api/devices/:serial/alerts/:id', handle: handleAlertUpdate },
   { method: 'DELETE', path: '/api/devices/:serial/alerts/:id', handle: handleAlertDelete },
   { method: 'DELETE', path: '/api/devices/:serial/data', handle: handleDeviceDeleteDataPoints },
+  { method: 'GET', path: '/api/devices/:serial/tokens', handle: handleDeviceTokensList },
+  { method: 'GET', path: '/api/devices/:serial/upload-tokens', handle: handleDeviceTokensList },
+  { method: 'DELETE', path: '/api/devices/:serial/tokens/:id', handle: handleDeviceTokenRevoke },
+  { method: 'DELETE', path: '/api/devices/:serial/upload-tokens/:id', handle: handleDeviceTokenRevoke },
   { method: 'GET', path: '/api/devices/:serial', handle: handleGetBySerial },
   { method: 'PATCH', path: '/api/devices/:serial', handle: handleDeviceUpdate },
   { method: 'PUT', path: '/api/devices/:serial', handle: handleDeviceUpdate },

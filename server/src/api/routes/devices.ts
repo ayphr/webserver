@@ -6,6 +6,13 @@ import {
   countDevices,
   createDevice,
   createDevicePairing,
+  createDeviceToken,
+  getDeviceTokenByHash,
+  getDeviceTokenById,
+  getDeviceTokensForSerial,
+  markDeviceTokensInactive,
+  revokeDeviceToken,
+  updateDeviceTokenLastUsed,
   ensureDefaultLocation,
   getDevicePairingByCode,
   getLocationById,
@@ -34,6 +41,7 @@ import {
 } from '../../lib/db';
 import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSharedSeats, getTeamById } from '../../lib/db/teams';
 import { hashToken } from '../../lib/tokens';
+import { resolveLocationFromClient } from '../../lib/session';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import {
@@ -304,6 +312,18 @@ const handleLink = requireAuth(async (request, user: User) => {
     }
 
     await updateDeviceToken(serial, tokenHash, pairing.createdAt);
+    // Rotate upload tokens: previous ones become inactive.
+    await markDeviceTokensInactive(serial, scopeUuid);
+    await createDeviceToken({
+      id: crypto.randomUUID(),
+      serial,
+      teamId: scopeUuid,
+      tokenHash,
+      createdAt: pairing.createdAt,
+      location: {},
+      active: true,
+      userAgent: undefined,
+    });
     if (resolvedLocationId && existing.locationId !== resolvedLocationId) {
       await updateDeviceLocation(serial, resolvedLocationId);
       existing.locationId = resolvedLocationId;
@@ -345,6 +365,15 @@ const handleLink = requireAuth(async (request, user: User) => {
     };
 
     await createDevice(newDevice);
+    await createDeviceToken({
+      id: crypto.randomUUID(),
+      serial,
+      teamId: scopeUuid,
+      tokenHash,
+      createdAt: pairing.createdAt,
+      location: {},
+      active: true,
+    });
     device = newDevice;
     devicesRegisteredTotal.inc();
     try {
@@ -445,18 +474,54 @@ async function handleUpload(request: Request): Promise<Response> {
 
     const tokenHash = hashToken(token);
     const now = new Date();
-    const existing = await getDeviceByTokenHash(tokenHash);
 
-    if (!existing) {
+    // Prefer the dedicated device-token records; fall back to the legacy
+    // single-token field on the device document for older devices.
+    let tokenRecord = await getDeviceTokenByHash(tokenHash);
+    let device = tokenRecord
+      ? await getDeviceBySerial(tokenRecord.serial)
+      : await getDeviceByTokenHash(tokenHash);
+
+    if (!device) {
       return json({ error: 'device not linked' }, 404);
     }
 
-    const device = existing;
     const serial = device.serial;
+
+    if (!tokenRecord) {
+      // Backfill a token record so it shows up in the tokens tab.
+      tokenRecord = await createDeviceToken({
+        id: crypto.randomUUID(),
+        serial,
+        teamId: device.teamId,
+        tokenHash,
+        createdAt: device.tokenCreatedAt ?? now,
+        location: {},
+        active: true,
+      });
+    }
+
+    if (!tokenRecord.active) {
+      return json({ error: 'device token revoked' }, 401);
+    }
+
+    // Resolve an approximate location from client-provided metadata, mirroring
+    // sessions.
+    const rawBody = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    const meta = (rawBody.meta && typeof rawBody.meta === 'object' ? rawBody.meta : rawBody) as
+      | { timezone?: string; locale?: string; deviceType?: string }
+      | undefined;
+    const location = meta
+      ? resolveLocationFromClient({
+          timezone: typeof meta.timezone === 'string' ? meta.timezone : undefined,
+          locale: typeof meta.locale === 'string' ? meta.locale : undefined,
+        })
+      : undefined;
 
     const [accepted] = await Promise.all([
       upsertDataPoints(serial, points),
       updateDeviceLastUpload(serial, now),
+      updateDeviceTokenLastUsed(tokenRecord.id, now, location, request.headers.get('user-agent') ?? undefined),
     ]);
 
     device.lastUploadAt = now;
@@ -875,6 +940,64 @@ const handleDeviceDataFill = requireAuth(async (request, user: User, params) => 
   return json({ serial, count: generated });
 });
 
+const handleListDeviceTokens = requireAuth(async (_request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  // Backfill a token record for legacy devices that only store a single hash.
+  const existingTokens = await getDeviceTokensForSerial(serial, scopeUuid);
+  if (existingTokens.length === 0 && device.tokenHash) {
+    await createDeviceToken({
+      id: crypto.randomUUID(),
+      serial,
+      teamId: scopeUuid,
+      tokenHash: device.tokenHash,
+      createdAt: device.tokenCreatedAt ?? new Date(),
+      location: {},
+      active: true,
+    });
+  }
+  const tokens = await getDeviceTokensForSerial(serial, scopeUuid);
+  // Strip secret hash before returning; include a few aliases for compatibility.
+  const presented = tokens.map(({ tokenHash: _tokenHash, ...rest }) => ({
+    ...rest,
+    lastUsed: rest.lastUsedAt,
+    lastActive: rest.lastUsedAt,
+    isActive: rest.active,
+    status: rest.active ? 'active' : 'inactive',
+  }));
+  return json({ tokens: presented });
+});
+
+const handleRevokeDeviceToken = requireAuth(async (_request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  const id = typeof params.id === 'string' ? params.id : '';
+  if (!id) return json({ error: 'invalid id' }, 400);
+
+  const existing = await getDeviceTokenById(id);
+  if (!existing || existing.serial !== serial || existing.teamId !== scopeUuid) {
+    return json({ error: 'not found' }, 404);
+  }
+
+  const revoked = await revokeDeviceToken(id, scopeUuid, serial);
+  if (!revoked) return json({ error: 'not found' }, 404);
+  return new Response(null, { status: 204 });
+});
+
 export {
   handleDeviceDataFill,
   handleFetchPairingToken,
@@ -888,4 +1011,6 @@ export {
   handleUnlinkDevice as handleDeviceUnlink,
   handleRequestPairing,
   handleUpload,
+  handleListDeviceTokens as handleDeviceTokensList,
+  handleRevokeDeviceToken as handleDeviceTokenRevoke,
 };
