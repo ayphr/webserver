@@ -30,6 +30,9 @@ export function createStaffApi(client: RequestClient) {
       const search = params.toString();
       return client.requestJson<StaffUsersPayload>(`/api/staff/users${search ? `?${search}` : ''}`);
     },
+    async deleteUser(userUuid: string) {
+      await client.requestJson(`/api/staff/users/${encodeURIComponent(userUuid)}`, { method: 'DELETE' });
+    },
     async updateRole(userUuid: string, input: StaffRoleUpdateRequest) {
       const response = await client.requestJson<StaffRoleUpdatePayload>(`/api/staff/role/${userUuid}`, {
         method: 'POST',

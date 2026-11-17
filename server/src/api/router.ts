@@ -41,6 +41,7 @@ import {
   handleStaffUserDevices,
   handleStaffUserLocations,
   handleStaffUsers,
+  handleStaffUserDelete,
   handleUsersSummary,
 } from './routes/staff';
 import {
@@ -260,6 +261,7 @@ const ROUTES: readonly RouteDefinition[] = [
 
   { method: 'GET', path: '/api/staff/summary', handle: handleUsersSummary },
   { method: 'GET', path: '/api/staff/users', handle: handleStaffUsers },
+  { method: 'DELETE', path: '/api/staff/users/:uuid', handle: handleStaffUserDelete },
   { method: 'GET', path: '/api/staff/users/:uuid/teams', handle: handleStaffUserTeams },
   { method: 'GET', path: '/api/staff/users/:uuid/credits', handle: handleStaffUserCredits },
   { method: 'GET', path: '/api/staff/users/:uuid/devices', handle: handleStaffUserDevices },

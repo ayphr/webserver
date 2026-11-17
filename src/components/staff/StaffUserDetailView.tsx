@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Select, Modal } from '../common';
+import { Button, Select, Modal, PunishModal } from '../common';
 import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
 import type { PublicUser, Team, CreditBalance } from '@common';
 import { PLAN_NAMES, SUBSCRIPTION_TIERS } from '@common';
@@ -28,6 +28,8 @@ export function StaffUserDetailView({ user, onBack }: Props) {
   const [modalGifted, setModalGifted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isPunishOpen, setIsPunishOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -121,6 +123,20 @@ export function StaffUserDetailView({ user, onBack }: Props) {
       setActionError(err instanceof Error ? err.message : 'Failed to delete');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    setSaving(true);
+    setActionError(null);
+    try {
+      await api.staff.deleteUser(user.uuid);
+      onBack();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to delete user');
+    } finally {
+      setSaving(false);
+      setIsDeleteOpen(false);
     }
   };
 
@@ -223,21 +239,8 @@ export function StaffUserDetailView({ user, onBack }: Props) {
                   { value: 'staff', label: 'Staff' },
                 ]}
               /></div>
-              <div className="staff-user-detail__action-row"><div><strong>Punishment</strong><span>Restrict this user's access with a timed punishment.</span></div><Button
-                variant="danger"
-                onClick={async () => {
-                  const reason = window.prompt('Reason for punishment?');
-                  if (!reason) return;
-                  const minutesStr = window.prompt('Duration in minutes (e.g. 1440 for 1 day)?', '1440');
-                  const minutes = minutesStr ? Number(minutesStr) : 1440;
-                  try {
-                    await api.staff.punishments.issue({ userUuid: user.uuid, reason, durationMinutes: minutes });
-                    alert('Punishment issued');
-                  } catch (err) {
-                    setActionError(err instanceof Error ? err.message : 'Failed');
-                  }
-                }}
-              >Punish user</Button></div>
+              <div className="staff-user-detail__action-row"><div><strong>Punishment</strong><span>Restrict this user's access with a timed punishment.</span></div><Button variant="danger" onClick={() => setIsPunishOpen(true)}>Punish user</Button></div>
+              <div className="staff-user-detail__action-row staff-user-detail__action-row--danger"><div><strong>Delete user</strong><span>Permanently remove this user and their account data.</span></div><Button variant="danger" onClick={() => setIsDeleteOpen(true)}>Delete user</Button></div>
               {actionError && <p className="error">{actionError}</p>}
             </div>
           )}
@@ -289,6 +292,24 @@ export function StaffUserDetailView({ user, onBack }: Props) {
             </div>
           </div>
         )}
+      </Modal>
+      <PunishModal
+        isOpen={isPunishOpen}
+        userUuid={user.uuid}
+        username={user.username}
+        onClose={() => setIsPunishOpen(false)}
+        onPunish={() => setIsPunishOpen(false)}
+      />
+      <Modal
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={() => void deleteUser()}
+        title="Delete user?"
+        confirmText="Delete user"
+        cancelText="Cancel"
+        isDangerous
+      >
+        <p>This permanently deletes <strong>{user.username}</strong> and cannot be undone.</p>
       </Modal>
     </div>
   );

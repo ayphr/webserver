@@ -1,7 +1,7 @@
 import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
-import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid } from '../../lib/db';
+import { createPunishment, deleteSessionsForUserUuid, deletePunishmentsForUserUuid, deleteUser, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid } from '../../lib/db';
 import { getTeamsForUser, getTeamById, getTeamMembers } from '../../lib/db/teams';
 import { getCreditBalance } from '../../lib/credits';
 import { getDevicesForTeamId } from '../../lib/db/devices';
@@ -61,6 +61,20 @@ const handleStaffUsers = requireRole('staff', async (request) => {
     pageSize,
     totalPages: Math.ceil(total / pageSize),
   });
+});
+
+const handleStaffUserDelete = requireRole('staff', async (_request, staffUser, params) => {
+  const uuid = params.uuid;
+  if (!uuid) return json({ error: 'uuid is required' }, 400);
+  if (uuid === staffUser.uuid) return json({ error: 'you cannot delete your own account here' }, 400);
+  const target = await getUserFromUuid(uuid);
+  if (!target) return json({ error: 'user not found' }, 404);
+  await Promise.all([
+    deleteSessionsForUserUuid(uuid),
+    deletePunishmentsForUserUuid(uuid),
+    deleteUser(uuid),
+  ]);
+  return new Response(null, { status: 204 });
 });
 
 const handleStaffPunishments = requireRole('staff', async (request, staffUser) => {
@@ -423,6 +437,7 @@ const handleStaffUserLocations = requireRole('staff', async (_request, _staffUse
 export {
   handleUsersSummary,
   handleStaffUsers,
+  handleStaffUserDelete,
   handleStaffUserTeams,
   handleStaffTeamUpdate,
   handleStaffTeamDelete,

@@ -89,8 +89,8 @@
   gap: 1rem;
   padding: 0.85rem 1rem;
   background-color: var(--bg-base);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border: none;
+  border-radius: 0;
 }
 
 .users-panel__identity {
@@ -190,7 +190,6 @@
   align-items: center;
   gap: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .staff-user-detail__header h2 {
@@ -293,7 +292,6 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.9rem 0;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .staff-user-detail__team-row span {
@@ -306,7 +304,6 @@
   justify-content: space-between;
   gap: 1.5rem;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .staff-user-detail__action-row > div {
