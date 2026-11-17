@@ -564,7 +564,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
                       <span className="team-panel__plan-name">{PLAN_NAMES[plan.tier]}</span>
                       <span className="team-panel__plan-price">
                         {formatPlanPrice(plan)}
-                        {plan.amount != null && <span>/{plan.interval === 'year' ? 'yr' : 'mo'}</span>}
+                        {plan.amount != null && <span>/{plan.interval === 'year' ? 'yr' : 'mo'}/seat</span>}
                       </span>
                     </div>
                     <ul className="team-panel__plan-features">
