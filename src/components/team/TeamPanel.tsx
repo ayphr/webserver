@@ -23,7 +23,7 @@ const INTERVAL_OPTIONS = [
 ];
 
 function formatPlanPrice(plan: SubscriptionPlan): string {
-  if (plan.amount == null) return 'Unavailable';
+  if (plan.amount == null) return 'Pricing unavailable';
   const amount = plan.amount / 100;
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
@@ -550,7 +550,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
                       <span className="team-panel__plan-name">{PLAN_NAMES[plan.tier]}</span>
                       <span className="team-panel__plan-price">
                         {formatPlanPrice(plan)}
-                        <span>/{plan.interval === 'year' ? 'yr' : 'mo'}</span>
+                        {plan.amount != null && <span>/{plan.interval === 'year' ? 'yr' : 'mo'}</span>}
                       </span>
                     </div>
                     <ul className="team-panel__plan-features">
@@ -560,7 +560,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
                     </ul>
                     <Button
                       variant={isCurrent ? 'secondary' : 'primary'}
-                      disabled={isCurrent || checkoutTier !== null}
+                      disabled={isCurrent || checkoutTier !== null || !plan.priceId}
                       isLoading={checkoutTier === plan.tier}
                       onClick={() => void handleCheckout(plan.tier)}
                     >
