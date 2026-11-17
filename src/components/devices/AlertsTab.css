@@ -124,7 +124,7 @@
 }
 
 .alerts-tab__link:hover {
-  color: var(--accent-aqua);
+  color: var(--text-primary);
 }
 
 .alerts-tab__empty {
@@ -525,8 +525,8 @@
 }
 
 .alerts-tab__integration.is-selected {
-  border-color: var(--accent-aqua);
-  background: var(--bg-input);
+  border-color: var(--border-focus);
+  background: var(--bg-elevated);
 }
 
 .alerts-tab__integration.is-disabled {
@@ -537,7 +537,7 @@
   width: 0.95rem;
   height: 0.95rem;
   flex: 0 0 auto;
-  accent-color: var(--accent-aqua-solid);
+  accent-color: var(--text-primary);
   cursor: pointer;
 }
 

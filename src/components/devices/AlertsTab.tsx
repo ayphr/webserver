@@ -1,17 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  IconBell,
-  IconBrandDiscord,
-  IconBrandSlack,
-  IconClock,
-  IconDroplet,
-  IconEdit,
-  IconGauge,
-  IconPlugConnected,
-  IconPlus,
-  IconThermometer,
-  IconTrash,
-} from '@tabler/icons-react';
+import { IconClock, IconEdit, IconTrash } from '@tabler/icons-react';
 import type {
   AlertCondition,
   AlertLogic,
@@ -54,28 +42,6 @@ const METRIC_META: Record<AlertMetric, { label: string; unit: string }> = {
   humidity: { label: 'Humidity', unit: '%' },
   airPressure: { label: 'Pressure', unit: 'hPa' },
 };
-
-function metricIcon(metric: AlertMetric) {
-  switch (metric) {
-    case 'temperature':
-      return <IconThermometer size={15} strokeWidth={1.9} />;
-    case 'humidity':
-      return <IconDroplet size={15} strokeWidth={1.9} />;
-    default:
-      return <IconGauge size={15} strokeWidth={1.9} />;
-  }
-}
-
-function providerIcon(provider: Integration['provider']) {
-  switch (provider) {
-    case 'discord':
-      return <IconBrandDiscord size={16} />;
-    case 'slack':
-      return <IconBrandSlack size={16} />;
-    default:
-      return <IconPlugConnected size={16} />;
-  }
-}
 
 function repeatLabel(minutes: number): string {
   if (minutes < 60) return `Every ${minutes} min while firing`;
@@ -358,9 +324,6 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
     <div className="alerts-tab__form-view">
       <div className="alerts-tab__header">
         <div className="alerts-tab__heading">
-          <span className="alerts-tab__heading-icon">
-            <IconBell size={20} strokeWidth={1.8} />
-          </span>
           <div>
             <h4 className="alerts-tab__title">{editing ? 'Edit alert' : 'New alert'}</h4>
             <p className="alerts-tab__subtitle">
@@ -451,7 +414,6 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
             onClick={addCondition}
             disabled={draft.conditions.length >= 6}
           >
-            <IconPlus size={14} strokeWidth={2} />
             Add condition
           </button>
         </div>
@@ -476,9 +438,6 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
                       checked={selected}
                       onChange={(event) => toggleIntegration(integration.id, event.target.checked)}
                     />
-                    <span className="alerts-tab__integration-icon">
-                      {providerIcon(integration.provider)}
-                    </span>
                     <span className="alerts-tab__integration-meta">
                       <span className="alerts-tab__integration-name">{integration.name}</span>
                       <span className="alerts-tab__integration-provider">
@@ -541,9 +500,6 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
         <>
           <div className="alerts-tab__header">
             <div className="alerts-tab__heading">
-              <span className="alerts-tab__heading-icon">
-                <IconBell size={20} strokeWidth={1.8} />
-              </span>
               <div>
                 <h4 className="alerts-tab__title">Alerts</h4>
                 <p className="alerts-tab__subtitle">
@@ -553,7 +509,6 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
             </div>
             {canManage && (
               <Button variant="secondary" onClick={openCreate}>
-                <IconPlus size={16} strokeWidth={2} />
                 New alert
               </Button>
             )}
@@ -563,7 +518,6 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
 
           {integrations.length === 0 && (
             <div className="alerts-tab__banner">
-              <IconPlugConnected size={18} strokeWidth={1.8} />
               <div>
                 <strong>No integrations configured.</strong>{' '}
                 Alerts will still track their firing state, but notifications need a destination.
@@ -578,14 +532,12 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
 
           {alerts.length === 0 ? (
             <div className="alerts-tab__empty">
-              <IconBell size={28} strokeWidth={1.5} />
               <h5>No alerts yet</h5>
               <p>
                 Create a rule to get notified when temperature, humidity or pressure goes above or below a value.
               </p>
               {canManage && (
                 <Button variant="primary" onClick={openCreate}>
-                  <IconPlus size={16} strokeWidth={2} />
                   Create your first alert
                 </Button>
               )}
@@ -639,7 +591,6 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
                     <div className="alerts-tab__conditions">
                       {alert.conditions.map((condition, index) => (
                         <span key={`${condition.metric}-${index}`} className="alerts-tab__condition">
-                          {metricIcon(condition.metric)}
                           {conditionText(condition)}
                         </span>
                       ))}
@@ -655,7 +606,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
                           <div className="alerts-tab__destinations">
                             {destinations.map((integration) => (
                               <span key={integration.id} className="alerts-tab__destination">
-                                {providerIcon(integration.provider)}
+                                
                                 {integration.name}
                               </span>
                             ))}
