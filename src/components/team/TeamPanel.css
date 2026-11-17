@@ -26,15 +26,22 @@
   display: flex;
   align-items: flex-end;
   gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--bg-elevated);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .team-panel__switcher-field {
   flex: 1;
   min-width: 0;
+}
+
+.team-panel__danger-actions,
+.team-panel__leave {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
 }
 
 .team-panel__team-count {
@@ -288,7 +295,7 @@
 }
 
 .team-panel__plan--current {
-  border-color: var(--accent, #19c233);
+  border-color: var(--border-subtle);
 }
 
 .team-panel__plan-head {

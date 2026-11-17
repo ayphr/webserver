@@ -24,6 +24,7 @@ export type Team = {
   seats?: number;
   subscriptionStatus?: PaidSubscriptionStatus;
   currentPeriodEnd?: Date;
+  gifted?: boolean;
 };
 
 export type TeamSubscriptionPayload = {

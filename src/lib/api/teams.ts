@@ -47,6 +47,9 @@ export function createTeamsApi(client: RequestClient) {
         method: 'DELETE',
       });
     },
+    async deleteTeam() {
+      await client.requestJson('/api/teams', { method: 'DELETE' });
+    },
     async listInvites() {
       const response = await client.requestJson<{ invites: import('@common').TeamInvite[] }>('/api/team/invites');
       return response.invites;

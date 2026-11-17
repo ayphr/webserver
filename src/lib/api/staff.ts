@@ -75,5 +75,44 @@ export function createStaffApi(client: RequestClient) {
       });
     },
   },
+  users: {
+    async teams(userUuid: string) {
+      const response = await client.requestJson<{ teams: { team: import('@common').Team; role: string }[] }>(`/api/staff/users/${userUuid}/teams`);
+      return response.teams;
+    },
+    async credits(userUuid: string) {
+      const response = await client.requestJson<{ credits: import('@common').CreditBalance }>(`/api/staff/users/${userUuid}/credits`);
+      return response.credits;
+    },
+    async devices(userUuid: string) {
+      const response = await client.requestJson<{ devices: import('@common').DeviceSummary[] }>(`/api/staff/users/${userUuid}/devices`);
+      return response.devices;
+    },
+    async locations(userUuid: string) {
+      const response = await client.requestJson<{ locations: import('@common').Location[] }>(`/api/staff/users/${userUuid}/locations`);
+      return response.locations;
+    },
+  },
+  teams: {
+    async update(teamId: string, input: { tier?: string; seats?: number; gifted?: boolean }) {
+      const response = await client.requestJson<{ team: import('@common').Team }>(`/api/staff/teams/${teamId}`, {
+        method: 'PATCH',
+        body: input,
+      });
+      return response.team;
+    },
+    async delete(teamId: string) {
+      await client.requestJson(`/api/staff/teams/${teamId}`, { method: 'DELETE' });
+    },
+    async updateMemberRole(teamId: string, userUuid: string, role: string) {
+      await client.requestJson(`/api/staff/teams/${teamId}/members/${userUuid}/role`, {
+        method: 'PATCH',
+        body: { role },
+      });
+    },
+    async removeMember(teamId: string, userUuid: string) {
+      await client.requestJson(`/api/staff/teams/${teamId}/members/${userUuid}`, { method: 'DELETE' });
+    },
+  },
 };
 }

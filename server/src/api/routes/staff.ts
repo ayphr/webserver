@@ -2,6 +2,10 @@ import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
 import { createPunishment, deleteSessionsForUserUuid, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid } from '../../lib/db';
+import { getTeamsForUser, getTeamById, getTeamMembers } from '../../lib/db/teams';
+import { getCreditBalance } from '../../lib/credits';
+import { getDevicesForTeamId } from '../../lib/db/devices';
+import { getLocationsForTeamId } from '../../lib/db/locations';
 import { getAppeals, getAppealById, resolveAppeal } from '../../lib/db/appeals';
 import type { Punishment, User, UserRole } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';
@@ -313,9 +317,120 @@ const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUse
   return json({ user: await toPublicUser(targetUser) });
 });
 
+
+const handleStaffUserTeams = requireRole('staff', async (_request, _staffUser, params) => {
+  const uuid = params.uuid;
+  if (!uuid) return json({ error: 'uuid is required' }, 400);
+  const user = await getUserFromUuid(uuid);
+  if (!user) return json({ error: 'user not found' }, 404);
+  const teams = await getTeamsForUser(user);
+  const result = teams.map((team) => ({
+    team,
+    role: (user.teamRoles?.[team.id] ?? (team.managerUuid === user.uuid ? 'manager' : 'member')) as string,
+  }));
+  return json({ teams: result });
+});
+
+const handleStaffTeamUpdate = requireRole('staff', async (request, _staffUser, params) => {
+  const id = params.id;
+  if (!id) return json({ error: 'team id is required' }, 400);
+  const team = await getTeamById(id);
+  if (!team) return json({ error: 'team not found' }, 404);
+  const body = await request.json().catch(() => null) as { tier?: string; seats?: number; gifted?: boolean } | null;
+  const $set: Record<string, unknown> = { updatedAt: new Date() };
+  if (body?.tier) $set.tier = body.tier;
+  if (typeof body?.seats === 'number') $set.seats = body.seats;
+  if (typeof body?.gifted === 'boolean') $set.gifted = body.gifted;
+  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
+  const { trackMongoOperation } = await import('../../lib/db/internal');
+  trackMongoOperation('updateOne', 'teams');
+  await teams.updateOne({ id }, { $set });
+  const updated = await getTeamById(id);
+  return json({ team: updated });
+});
+
+const handleStaffTeamDelete = requireRole('staff', async (_request, _staffUser, params) => {
+  const id = params.id;
+  if (!id) return json({ error: 'team id is required' }, 400);
+  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
+  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  await teams.deleteOne({ id });
+  await users.updateMany({ teamIds: id }, { $pull: { teamIds: id }, $unset: { [`teamRoles.${id}`]: '' } });
+  await users.updateMany({ teamId: id }, { $set: { teamId: null, teamRole: null } });
+  return json({ deleted: true });
+});
+
+const handleStaffTeamMemberRole = requireRole('staff', async (request, _staffUser, params) => {
+  const teamId = params.id;
+  const uuid = params.uuid;
+  if (!teamId || !uuid) return json({ error: 'team id and uuid are required' }, 400);
+  const body = await request.json().catch(() => null) as { role?: string } | null;
+  if (!body?.role) return json({ error: 'role is required' }, 400);
+  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  await users.updateOne({ uuid }, { $set: { [`teamRoles.${teamId}`]: body.role } });
+  const user = await getUserFromUuid(uuid);
+  if (user && user.teamId === teamId) {
+    await users.updateOne({ uuid }, { $set: { teamRole: body.role } });
+  }
+  return json({ updated: true });
+});
+
+const handleStaffTeamMemberRemove = requireRole('staff', async (_request, _staffUser, params) => {
+  const teamId = params.id;
+  const uuid = params.uuid;
+  if (!teamId || !uuid) return json({ error: 'team id and uuid are required' }, 400);
+  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  await users.updateOne({ uuid }, { $pull: { teamIds: teamId }, $unset: { [`teamRoles.${teamId}`]: '' } });
+  const user = await getUserFromUuid(uuid);
+  if (user && user.teamId === teamId) {
+    const remaining = (user.teamIds ?? []).filter((t) => t !== teamId);
+    await users.updateOne({ uuid }, { $set: { teamId: remaining[0] ?? null, teamRole: remaining[0] ? (user.teamRoles?.[remaining[0]] ?? 'member') : null } });
+  }
+  return json({ removed: true });
+});
+
+const handleStaffUserCredits = requireRole('staff', async (_request, _staffUser, params) => {
+  const uuid = params.uuid;
+  if (!uuid) return json({ error: 'uuid is required' }, 400);
+  const user = await getUserFromUuid(uuid);
+  if (!user) return json({ error: 'user not found' }, 404);
+  const credits = await getCreditBalance(user);
+  return json({ credits });
+});
+
+const handleStaffUserDevices = requireRole('staff', async (_request, _staffUser, params) => {
+  const uuid = params.uuid;
+  if (!uuid) return json({ error: 'uuid is required' }, 400);
+  const user = await getUserFromUuid(uuid);
+  if (!user) return json({ error: 'user not found' }, 404);
+  const team = await getTeamsForUser(user);
+  const active = team.find((t) => t.id === user.teamId) ?? team[0];
+  const devices = active ? await getDevicesForTeamId(active.id) : [];
+  return json({ devices });
+});
+
+const handleStaffUserLocations = requireRole('staff', async (_request, _staffUser, params) => {
+  const uuid = params.uuid;
+  if (!uuid) return json({ error: 'uuid is required' }, 400);
+  const user = await getUserFromUuid(uuid);
+  if (!user) return json({ error: 'user not found' }, 404);
+  const team = await getTeamsForUser(user);
+  const active = team.find((t) => t.id === user.teamId) ?? team[0];
+  const locations = active ? await getLocationsForTeamId(active.id) : [];
+  return json({ locations });
+});
+
 export {
   handleUsersSummary,
   handleStaffUsers,
+  handleStaffUserTeams,
+  handleStaffTeamUpdate,
+  handleStaffTeamDelete,
+  handleStaffTeamMemberRole,
+  handleStaffTeamMemberRemove,
+  handleStaffUserCredits,
+  handleStaffUserDevices,
+  handleStaffUserLocations,
   handleStaffPunishments,
   handleStaffPunishmentLift,
   handleStaffAppeals,

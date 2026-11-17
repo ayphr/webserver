@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconEdit, IconFilter, IconKey, IconSearch } from '@tabler/icons-react';
+import { IconEye, IconFilter, IconSearch, IconUser } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import type {
   PublicUser,
@@ -10,6 +10,7 @@ import type {
 } from '@common';
 import { BADGES, SUBSCRIPTION_TIERS } from '@common';
 import { Button, Input, Pagination, PunishModal, Select, UsernameDisplay } from '../common';
+import { StaffUserDetailView } from './StaffUserDetailView';
 import { SetPasswordModal } from './SetPasswordModal';
 import { getBadgeIcon } from '../../lib/badges';
 import './UsersPanel.css';
@@ -63,9 +64,8 @@ export const UsersPanel = () => {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [punishTarget, setPunishTarget] = useState<PublicUser | null>(null);
+  const [viewedUser, setViewedUser] = useState<PublicUser | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<PublicUser | null>(null);
-  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
-
   useEffect(() => {
     const handle = setTimeout(() => {
       setDebouncedSearch(filters.search.trim());
@@ -131,21 +131,9 @@ export const UsersPanel = () => {
     }));
   };
 
-  const handleRoleChange = async (user: PublicUser, role: UserRole) => {
-    if (role === user.role) return;
-
-    setRoleUpdating(user.uuid);
-    setError(null);
-
-    try {
-      const updated = await api.staff.updateRole(user.uuid, { role });
-      replaceUser(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update role');
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
+  if (viewedUser) {
+    return <StaffUserDetailView user={viewedUser} onBack={() => setViewedUser(null)} />;
+  }
 
   return (
     <div className="users-panel">
@@ -231,29 +219,17 @@ export const UsersPanel = () => {
               </div>
 
               <div className="users-panel__actions">
-                <Select
-                  className="users-panel__roleSelect"
-                  aria-label={`Role for ${user.username}`}
-                  value={user.role}
-                  onChange={(event) => handleRoleChange(user, event.target.value as UserRole)}
-                  disabled={roleUpdating === user.uuid}
-                  options={[
-                    { value: 'user', label: 'User' },
-                    { value: 'staff', label: 'Staff' },
-                  ]}
-                />
                 <Button
                   variant="secondary"
                   onClick={() => navigate(`/dashboard/profile/${user.uuid}`)}
                 >
-                  <IconEdit size={16} /> Edit
+                  <IconUser size={16} /> Profile
                 </Button>
-
-                <Button variant="secondary" onClick={() => setPasswordTarget(user)}>
-                  <IconKey size={16} /> Password
-                </Button>
-                <Button variant="danger" onClick={() => setPunishTarget(user)}>
-                  Punish
+                <Button
+                  variant="secondary"
+                  onClick={() => setViewedUser(user)}
+                >
+                  <IconEye size={16} /> View
                 </Button>
               </div>
             </li>

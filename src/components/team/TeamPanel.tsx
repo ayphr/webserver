@@ -196,6 +196,26 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
     }
   };
 
+  const handleDeleteTeam = async () => {
+    if (!team || !window.confirm(`Delete ${team.name ?? 'this team'}? This cannot be undone.`)) return;
+    try {
+      await api.teams.deleteTeam();
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete team');
+    }
+  };
+
+  const handleLeaveTeam = async () => {
+    if (!team || !window.confirm(`Leave ${team.name ?? 'this team'}?`)) return;
+    try {
+      await api.teams.removeMember(userUuid ?? '');
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to leave team');
+    }
+  };
+
   const handleRevokeInvite = async (id: string) => {
     try {
       await api.teams.revokeInvite(id);
@@ -555,8 +575,19 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
                 New subscriptions include a {subscription.trialDays}-day free trial.
               </p>
             )}
+            <div className="team-panel__danger-actions">
+              <Button variant="danger" onClick={() => void handleDeleteTeam()}>
+                Delete team
+              </Button>
+            </div>
           </section>
         </>
+      )}
+
+      {activeTab !== 'settings' && !isManager && (
+        <section className="team-panel__leave">
+          <Button variant="danger" onClick={() => void handleLeaveTeam()}>Leave team</Button>
+        </section>
       )}
 
       <Modal
