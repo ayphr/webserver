@@ -395,7 +395,6 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
   if (!customerId) {
     customerId = await createTeamStripeCustomer({
       teamId: team.id,
-      quantity: Math.max(1, (await getTeamMembers(team.id)).length),
       name: team.name ?? `${user.username}'s Team`,
     }) ?? undefined;
     if (!customerId) return json({ error: 'Failed to create billing customer' }, 502);
@@ -409,6 +408,7 @@ const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) =
       priceId,
       tier,
       teamId: team.id,
+      quantity: Math.max(1, (await getTeamMembers(team.id)).length),
       successUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=success`,
       cancelUrl: `${CLIENT_URL}/dashboard?tab=team&checkout=cancel`,
     });
