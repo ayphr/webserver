@@ -44,6 +44,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
   const [formError, setFormError] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, string>>({});
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -123,7 +124,6 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this integration?')) return;
     try {
       await api.integrations.remove(id);
       setIntegrations((prev) => prev.filter((item) => item.id !== id));
@@ -205,7 +205,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
                       <Button variant="secondary" onClick={() => openEdit(item)}>
                         <IconEdit size={14} />
                       </Button>
-                      <Button variant="danger" onClick={() => void handleDelete(item.id)}>
+                      <Button variant="danger" onClick={() => setDeleteTarget(item.id)}>
                         <IconTrash size={14} />
                       </Button>
                     </>
@@ -251,6 +251,20 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
           />
           {formError && <p className="integrations-panel__error">{formError}</p>}
         </div>
+      </Modal>
+      <Modal
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) void handleDelete(deleteTarget);
+          setDeleteTarget(null);
+        }}
+        title="Delete integration?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDangerous
+      >
+        <p>This integration will stop sending notifications and cannot be recovered.</p>
       </Modal>
     </div>
   );

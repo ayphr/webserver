@@ -30,6 +30,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPunishOpen, setIsPunishOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [teamConfirmation, setTeamConfirmation] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -98,7 +99,6 @@ export function StaffUserDetailView({ user, onBack }: Props) {
 
   const removeMember = async () => {
     if (!modalTeam) return;
-    if (!confirm('Remove this user from the team?')) return;
     setSaving(true);
     try {
       await api.staff.teams.removeMember(modalTeam.team.id, user.uuid);
@@ -113,7 +113,6 @@ export function StaffUserDetailView({ user, onBack }: Props) {
 
   const deleteTeam = async () => {
     if (!modalTeam) return;
-    if (!confirm('Delete this team entirely?')) return;
     setSaving(true);
     try {
       await api.staff.teams.delete(modalTeam.team.id);
@@ -285,8 +284,8 @@ export function StaffUserDetailView({ user, onBack }: Props) {
             {actionError && <p className="error">{actionError}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <Button onClick={saveModal} disabled={saving}>Save</Button>
-              <Button variant="secondary" onClick={removeMember} disabled={saving}>Remove from team</Button>
-              <Button variant="danger" onClick={deleteTeam} disabled={saving}>
+              <Button variant="secondary" onClick={() => setTeamConfirmation({ title: 'Remove from team?', message: 'This user will lose access to this team.', action: () => void removeMember() })} disabled={saving}>Remove from team</Button>
+              <Button variant="danger" onClick={() => setTeamConfirmation({ title: 'Delete team?', message: 'This permanently deletes the entire team.', action: () => void deleteTeam() })} disabled={saving}>
                 <IconTrash size={16} /> Delete team
               </Button>
             </div>
@@ -310,6 +309,21 @@ export function StaffUserDetailView({ user, onBack }: Props) {
         isDangerous
       >
         <p>This permanently deletes <strong>{user.username}</strong> and cannot be undone.</p>
+      </Modal>
+      <Modal
+        isOpen={teamConfirmation !== null}
+        onClose={() => setTeamConfirmation(null)}
+        onConfirm={() => {
+          const action = teamConfirmation?.action;
+          setTeamConfirmation(null);
+          action?.();
+        }}
+        title={teamConfirmation?.title}
+        confirmText="Continue"
+        cancelText="Cancel"
+        isDangerous
+      >
+        <p>{teamConfirmation?.message}</p>
       </Modal>
     </div>
   );

@@ -69,6 +69,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [checkoutTier, setCheckoutTier] = useState<SubscriptionTier | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [showFreePlan, setShowFreePlan] = useState(false);
+  const [confirmation, setConfirmation] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
   const load = async () => {
     setIsLoading(true);
@@ -198,7 +199,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   };
 
   const handleDeleteTeam = async () => {
-    if (!team || !window.confirm(`Delete ${team.name ?? 'this team'}? This cannot be undone.`)) return;
+    if (!team) return;
     try {
       await api.teams.deleteTeam();
       window.location.reload();
@@ -208,7 +209,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   };
 
   const handleLeaveTeam = async () => {
-    if (!team || !window.confirm(`Leave ${team.name ?? 'this team'}?`)) return;
+    if (!team) return;
     try {
       await api.teams.removeMember(userUuid ?? '');
       window.location.reload();
@@ -266,7 +267,18 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
 
   const handleCheckout = async (tier: SubscriptionTier) => {
     const features = getPlanFeatures(tier);
-    if (features.maxUsers < members.length && !window.confirm(`This plan allows ${features.maxUsers} member${features.maxUsers === 1 ? '' : 's'}, but this team has ${members.length}. Members over the limit will be removed. Continue?`)) return;
+    if (features.maxUsers < members.length) {
+      setConfirmation({
+        title: 'Reduce team size?',
+        message: `This plan allows ${features.maxUsers} member${features.maxUsers === 1 ? '' : 's'}, but this team has ${members.length}. Members over the limit will be removed. Continue?`,
+        action: () => void handleCheckoutConfirmed(tier),
+      });
+      return;
+    }
+    await handleCheckoutConfirmed(tier);
+  };
+
+  const handleCheckoutConfirmed = async (tier: SubscriptionTier) => {
     setCheckoutTier(tier);
     setSubscriptionError(null);
     try {
@@ -279,7 +291,14 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   };
 
   const handleFreePlan = async () => {
-    if (members.length > 1 && !window.confirm(`The Free plan allows 1 member, but this team has ${members.length}. Members over the limit will be removed. Continue?`)) return;
+    if (members.length > 1) {
+      setConfirmation({ title: 'Reduce team size?', message: `The Free plan allows 1 member, but this team has ${members.length}. Members over the limit will be removed. Continue?`, action: () => void handleFreePlanConfirmed() });
+      return;
+    }
+    await handleFreePlanConfirmed();
+  };
+
+  const handleFreePlanConfirmed = async () => {
     setSubscriptionError(null);
     try {
       await api.teams.setFreePlan();
@@ -603,7 +622,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
               </p>
             )}
             <div className="team-panel__danger-actions">
-              <Button variant="danger" onClick={() => void handleDeleteTeam()}>
+              <Button variant="danger" onClick={() => setConfirmation({ title: 'Delete team?', message: `Delete ${team.name ?? 'this team'}? This cannot be undone.`, action: () => void handleDeleteTeam() })}>
                 Delete team
               </Button>
             </div>
@@ -613,7 +632,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
 
       {activeTab !== 'settings' && !isManager && (
         <section className="team-panel__leave">
-          <Button variant="danger" onClick={() => void handleLeaveTeam()}>Leave team</Button>
+          <Button variant="danger" onClick={() => setConfirmation({ title: 'Leave team?', message: `Leave ${team.name ?? 'this team'}?`, action: () => void handleLeaveTeam() })}>Leave team</Button>
         </section>
       )}
 
@@ -686,6 +705,21 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
             <Button onClick={handleEditSave}>Save</Button>
           </div>
         </div>
+      </Modal>
+      <Modal
+        isOpen={confirmation !== null}
+        onClose={() => setConfirmation(null)}
+        onConfirm={() => {
+          const action = confirmation?.action;
+          setConfirmation(null);
+          action?.();
+        }}
+        title={confirmation?.title}
+        confirmText="Continue"
+        cancelText="Cancel"
+        isDangerous
+      >
+        <p>{confirmation?.message}</p>
       </Modal>
     </div>
   );
