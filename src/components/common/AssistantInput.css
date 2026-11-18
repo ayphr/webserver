@@ -136,9 +136,5 @@
       var(--accent-pink),
       var(--accent-purple)
     ) border-box;
-  background-size:
-    100% 100%,
-    200% 200%;
-  background-repeat: repeat;
-  animation: turbo-input-border 2.8s linear infinite;
+  animation: turbo-rocket-gradient 1.2s linear infinite;
 }
