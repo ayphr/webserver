@@ -17,13 +17,32 @@ export const AssistantInput = ({
   availableVariants = ASSISTANT_VARIANTS,
 }: AssistantInputProps) => {
   const [value, setValue] = useState('');
-  const [variant, setVariant] = useState<AssistantVariant>('standard');
+  const fallbackVariant = availableVariants.includes('standard')
+    ? 'standard'
+    : (availableVariants[0] ?? 'nano');
+  const [variant, setVariant] = useState<AssistantVariant>(fallbackVariant);
   const [multiline, setMultiline] = useState(false);
+
+  useEffect(() => {
+    if (!availableVariants.includes(variant)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVariant(fallbackVariant);
+    }
+  }, [availableVariants, fallbackVariant, variant]);
   const canUseTurbo = availableVariants.includes('turbo');
   const [turboNotice, setTurboNotice] = useState<'open' | 'closing' | 'closed'>(
     canUseTurbo ? 'open' : 'closed',
   );
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (noticeTimerRef.current) {
+      clearTimeout(noticeTimerRef.current);
+      noticeTimerRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTurboNotice(canUseTurbo ? 'open' : 'closed');
+  }, [canUseTurbo]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => () => {
