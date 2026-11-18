@@ -189,7 +189,7 @@ export const Sidebar: React.FC<Props> = ({
           visibleTabs.map((t) => (
             <button
               key={t.id}
-              className={`n-sidebar__tab ${activeTab === t.id ? 'active' : ''}`}
+              className={`n-sidebar__tab ${activeTab === t.id ? 'active' : ''} ${t.id === 'assistant' ? 'n-sidebar__tab--iris' : ''}`}
               onClick={() => onChange(t.id)}
               type="button"
               aria-label={t.name}

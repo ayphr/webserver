@@ -127,3 +127,36 @@ body::-webkit-scrollbar-thumb:hover {
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+
+.turbo-gradient-stop--a {
+  stop-color: var(--accent-purple);
+}
+
+.turbo-gradient-stop--b {
+  stop-color: var(--accent-indigo);
+}
+
+.turbo-gradient-stop--c {
+  stop-color: var(--accent-pink);
+}
+
+@keyframes turbo-rocket-gradient {
+  0%, 100% {
+    filter: hue-rotate(0deg) brightness(1.08);
+  }
+  50% {
+    filter: hue-rotate(55deg) brightness(1.18);
+  }
+}
+
+@keyframes turbo-gradient-colors {
+  0%, 100% {
+    stop-color: var(--accent-purple);
+  }
+  33% {
+    stop-color: var(--accent-indigo);
+  }
+  66% {
+    stop-color: var(--accent-pink);
+  }
+}

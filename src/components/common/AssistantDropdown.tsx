@@ -93,15 +93,6 @@ export const AssistantDropdown = ({
 
   return (
     <div className={`assistant-dropdown ${className}`} ref={containerRef}>
-      <svg className="assistant-dropdown__gradient-defs" aria-hidden="true" width="0" height="0">
-        <defs>
-          <linearGradient id="turbo-rocket-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop className="turbo-gradient-stop turbo-gradient-stop--a" offset="0%" />
-            <stop className="turbo-gradient-stop turbo-gradient-stop--b" offset="50%" />
-            <stop className="turbo-gradient-stop turbo-gradient-stop--c" offset="100%" />
-          </linearGradient>
-        </defs>
-      </svg>
       {label && <label className="assistant-dropdown__label">{label}</label>}
       <button
         type="button"
