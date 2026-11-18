@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Select, Modal, PunishModal, Checkbox } from '../common';
 import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
@@ -32,7 +32,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [teamConfirmation, setTeamConfirmation] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const t = await api.staff.users.teams(user.uuid);
@@ -63,11 +63,12 @@ export function StaffUserDetailView({ user, onBack }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user.uuid]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [user.uuid]);
+  }, [load]);
 
   const openModal = (entry: TeamEntry) => {
     setModalTeam(entry);
