@@ -41,7 +41,7 @@ const PLACEHOLDER_TEXTS = [
 ];
 
 export const AssistantInput = ({
-  placeholder,
+  placeholder = 'Ask Iris',
   className = '',
   availableVariants = ASSISTANT_VARIANTS,
   username,

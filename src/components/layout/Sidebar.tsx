@@ -16,7 +16,7 @@ const tabs: Tab[] = [
   { id: 'devices', name: 'Devices' },
   { id: 'locations', name: 'Locations' },
   { id: 'games', name: 'Games' },
-  { id: 'assistant', name: 'Assistant' },
+  { id: 'assistant', name: 'Iris' },
 ];
 
 const staffTabs: Tab[] = [
