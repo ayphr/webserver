@@ -68,6 +68,21 @@
   font-size: 0.88rem;
 }
 
+.assistant-chat__queued-badge {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background-color: hsl(0, 0%, 100%, 0.08);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 0.05rem;
+}
+
 .assistant-chat__message--assistant {
   justify-content: flex-start;
 }

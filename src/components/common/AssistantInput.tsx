@@ -86,6 +86,8 @@ type Message = {
   feedback?: 'like' | 'dislike' | null;
   variant?: AssistantVariant;
   durationMs?: number;
+  liveDurationMs?: number;
+  liveTokensPerSecond?: number;
 };
 
 const formatDuration = (ms?: number) => {
@@ -150,6 +152,7 @@ export const AssistantInput = ({
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
   const [subtitleIndex, setSubtitleIndex] = useState(0);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -245,6 +248,7 @@ export const AssistantInput = ({
     streamIndexRef.current = 0;
     streamMessageIdRef.current = null;
     streamStartRef.current = null;
+    setStreamingMessageId(null);
     setIsGenerating(false);
   };
 
@@ -335,7 +339,15 @@ export const AssistantInput = ({
     streamMessageIdRef.current = messageId;
     // eslint-disable-next-line react-hooks/purity
     streamStartRef.current = Date.now();
+    setStreamingMessageId(messageId);
     setIsGenerating(true);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? { ...m, liveDurationMs: 0, liveTokensPerSecond: 0 }
+          : m,
+      ),
+    );
 
     const tick = () => {
       if (streamIndexRef.current >= streamTokensRef.current.length) {
@@ -344,10 +356,16 @@ export const AssistantInput = ({
         streamTokensRef.current = [];
         streamIndexRef.current = 0;
         streamMessageIdRef.current = null;
+        setStreamingMessageId(null);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === messageId && m.role === 'assistant'
-              ? { ...m, durationMs: m.durationMs ?? durationMs }
+              ? {
+                  ...m,
+                  durationMs: m.durationMs ?? durationMs,
+                  liveDurationMs: undefined,
+                  liveTokensPerSecond: undefined,
+                }
               : m,
           ),
         );
@@ -357,8 +375,19 @@ export const AssistantInput = ({
       }
       streamIndexRef.current += 1;
       const partial = streamTokensRef.current.slice(0, streamIndexRef.current).join(' ');
+      const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
+      const tokenCount = partial.split(' ').filter(Boolean).length;
       setMessages((prev) =>
-        prev.map((m) => (m.id === messageId ? { ...m, content: partial } : m)),
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                content: partial,
+                liveDurationMs: elapsedMs,
+                liveTokensPerSecond: tokenCount / (elapsedMs / 1000),
+              }
+            : m,
+        ),
       );
       streamRef.current = setTimeout(tick, 70 + Math.random() * 50);
     };
@@ -448,7 +477,15 @@ export const AssistantInput = ({
         )}
         {isChat && (
           <div className="assistant-chat__messages">
-            {messages.map((message) => (
+            {messages.map((message) => {
+              const isStreaming = streamingMessageId === message.id;
+              const displayedDurationMs = isStreaming ? message.liveDurationMs : message.durationMs;
+              const tokensPerSecond = isStreaming
+                ? message.liveTokensPerSecond
+                : message.durationMs
+                  ? message.content.split(' ').filter(Boolean).length / (message.durationMs / 1000)
+                  : undefined;
+              return (
               <div
                 key={message.id}
                 className={`assistant-chat__message assistant-chat__message--${message.role}`}
@@ -558,25 +595,29 @@ export const AssistantInput = ({
                       </button>
                       <span className="assistant-chat__meta">
                         <span>{ASSISTANT_DATA[message.variant ?? variant].variantLabel}</span>
-                        <span>{formatDuration(message.durationMs)}</span>
+                        <span>{formatDuration(displayedDurationMs)}</span>
                         <span>
-                          {message.durationMs
-                            ? `${(message.content.split(' ').filter(Boolean).length / (message.durationMs / 1000)).toFixed(1)} tok/s`
-                            : '— tok/s'}
+                          {tokensPerSecond == null
+                            ? '— tok/s'
+                            : `${tokensPerSecond.toFixed(1)} tok/s`}
                         </span>
                       </span>
                     </div>
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
             {queuedMessages.map((text, index) => (
               <div
                 key={`queued-${index}`}
                 className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
               >
                 <div className="assistant-chat__user-wrap">
-                  <div className="assistant-chat__bubble">{text}</div>
+                  <div className="assistant-chat__bubble">
+                    <span className="assistant-chat__queued-badge">Queued</span>
+                    {text}
+                  </div>
                 </div>
               </div>
             ))}
