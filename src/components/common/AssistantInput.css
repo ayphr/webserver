@@ -50,6 +50,40 @@
   padding-bottom: 5.5rem;
 }
 
+.assistant-chat__back {
+  position: absolute;
+  left: 50%;
+  bottom: 5.5rem;
+  transform: translateX(-50%);
+  background: transparent;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+  animation: assistant-back-in 0.4s ease;
+  z-index: 2;
+}
+
+.assistant-chat__back:hover {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+@keyframes assistant-back-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 .assistant-chat__message {
   display: flex;
 }

@@ -220,6 +220,18 @@ export const AssistantInput = ({
             ))}
           </div>
         )}
+        {isChat && (
+          <button
+            type="button"
+            className="assistant-chat__back"
+            onClick={() => {
+              stopGeneration();
+              setMessages([]);
+            }}
+          >
+            Back to home
+          </button>
+        )}
         <div className="assistant-input__box assistant-input__box--multiline">
           <textarea
             ref={textareaRef}
