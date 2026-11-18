@@ -1,6 +1,7 @@
-import { IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconTrash, IconUser } from '@tabler/icons-react';
+import { IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconSparkle2, IconTrash, IconUser } from '@tabler/icons-react';
 import type { SettingsSection } from '../../lib/settings';
-import type { SelfUser , CreditBalance } from '@common';
+import type { SelfUser , CreditBalance, AssistantVariant } from '@common';
+import { ASSISTANT_DATA } from '@common';
 import type { NavigateFunction } from 'react-router-dom';
 
 export interface SettingsSectionsParams {
@@ -10,6 +11,9 @@ export interface SettingsSectionsParams {
   setDefaultTabPref: (value: string) => void;
   sidebarPinned: boolean;
   setSidebarPinnedPref: (checked: boolean) => void;
+  assistantVariant: AssistantVariant;
+  setAssistantVariantPref: (value: AssistantVariant) => void;
+  availableAssistantVariants: readonly AssistantVariant[];
   isStaff: boolean;
   now: number;
   navigate: NavigateFunction;
@@ -26,6 +30,9 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
     setDefaultTabPref,
     sidebarPinned,
     setSidebarPinnedPref,
+    assistantVariant,
+    setAssistantVariantPref,
+    availableAssistantVariants,
     isStaff,
     now,
     navigate,
@@ -212,6 +219,25 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
           description: 'Always show the full sidebar instead of collapsing it to icons.',
           checked: sidebarPinned,
           onChange: setSidebarPinnedPref,
+        },
+      ],
+    },
+    {
+      id: 'iris',
+      title: 'Iris',
+      options: [
+        {
+          id: 'default-assistant-variant',
+          optionType: 'select',
+          icon: <IconSparkle2 size={18} strokeWidth={1.75} />,
+          title: 'Default assistant variant',
+          description: 'Choose which Iris variant is selected when you open the assistant.',
+          value: assistantVariant,
+          options: availableAssistantVariants.map((variant) => ({
+            value: variant,
+            label: ASSISTANT_DATA[variant].variantLabel,
+          })),
+          onChange: (value) => setAssistantVariantPref(value as AssistantVariant),
         },
       ],
     },

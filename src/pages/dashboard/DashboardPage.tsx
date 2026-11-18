@@ -4,8 +4,8 @@ import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, 
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
-import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
-import { getPlanFeaturesForUser } from '@common';
+import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant } from '@common';
+import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
 import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
 import { Sidebar } from '../../components/layout';
@@ -78,6 +78,13 @@ function getStoredDefaultTab(): string {
   return stored === 'overview' || stored === 'devices' || stored === 'users' ? stored : 'overview';
 }
 
+function getStoredAssistantVariant(): AssistantVariant {
+  const stored = localStorage.getItem('ayphr-pref-assistant-variant');
+  return stored && ASSISTANT_VARIANTS.includes(stored as AssistantVariant)
+    ? (stored as AssistantVariant)
+    : 'standard';
+}
+
 type DashboardPanelProps = {
   title: string;
   description?: string;
@@ -125,6 +132,7 @@ export const DashboardPage = () => {
   const [sidebarPinned, setSidebarPinned] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
+  const [assistantVariant, setAssistantVariant] = useState<AssistantVariant>(getStoredAssistantVariant);
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
@@ -387,6 +395,22 @@ export const DashboardPage = () => {
     localStorage.setItem('ayphr-pref-sidebar-pinned', checked ? '1' : '0');
   };
 
+  const setAssistantVariantPref = (value: AssistantVariant) => {
+    setAssistantVariant(value);
+    localStorage.setItem('ayphr-pref-assistant-variant', value);
+  };
+
+  const availableAssistantVariants = useMemo(
+    () => (user ? getPlanFeaturesForUser(user).availableAssistantVariants : ASSISTANT_VARIANTS),
+    [user],
+  );
+
+  const effectiveAssistantVariant = availableAssistantVariants.includes(assistantVariant)
+    ? assistantVariant
+    : availableAssistantVariants.includes('standard')
+      ? 'standard'
+      : (availableAssistantVariants[0] ?? 'nano');
+
   const settingsSections = useMemo(
     () =>
       buildSettingsSections({
@@ -396,6 +420,9 @@ export const DashboardPage = () => {
         setDefaultTabPref,
         sidebarPinned,
         setSidebarPinnedPref,
+        assistantVariant: effectiveAssistantVariant,
+        setAssistantVariantPref,
+        availableAssistantVariants,
         isStaff,
         now,
         navigate,
@@ -404,7 +431,7 @@ export const DashboardPage = () => {
         setIsChangeEmailOpen,
         setIsChangeUsernameOpen,
       }),
-    [credits, defaultTab, sidebarPinned, navigate, isStaff, user, now],
+    [credits, defaultTab, sidebarPinned, effectiveAssistantVariant, availableAssistantVariants, navigate, isStaff, user, now],
   );
 
   if (isLoading) {
@@ -495,8 +522,9 @@ export const DashboardPage = () => {
           <>
             {activePage === 'assistant' && (
               <AssistantInput
-                availableVariants={getPlanFeaturesForUser(user).availableAssistantVariants}
+                availableVariants={availableAssistantVariants}
                 username={user.username}
+                defaultVariant={effectiveAssistantVariant}
               />
             )}
 

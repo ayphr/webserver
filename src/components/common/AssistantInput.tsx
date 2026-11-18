@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { IconArrowUp, IconPlayerStop } from '@tabler/icons-react';
+import { IconArrowUp, IconPlayerStop, IconChevronDown, IconArrowBackUp, IconCopy } from '@tabler/icons-react';
 import { ASSISTANT_VARIANTS } from '@common';
 import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariant } from '@common';
@@ -10,6 +10,7 @@ export interface AssistantInputProps {
   className?: string;
   availableVariants?: AssistantVariant[];
   username?: string;
+  defaultVariant?: AssistantVariant;
 }
 
 const GIBBERISH_WORDS = [
@@ -30,10 +31,36 @@ const generateGibberish = () => {
   return sentence.charAt(0).toUpperCase() + sentence.slice(1) + '.';
 };
 
+const formatMessageTime = (timestamp: number) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const time = date.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(' ', '');
+  const sameDay =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+  if (sameDay) return `Today, ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+  if (isYesterday) return `Yesterday, ${time}`;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${day}/${month} ${time}`;
+  }
+  const year = String(date.getFullYear()).slice(-2);
+  return `${day}/${month}/${year} ${time}`;
+};
+
 type Message = {
   id: number;
   role: 'user' | 'assistant';
   content: string;
+  createdAt: number;
 };
 
 export const AssistantInput = ({
@@ -41,6 +68,7 @@ export const AssistantInput = ({
   className = '',
   availableVariants = ASSISTANT_VARIANTS,
   username,
+  defaultVariant,
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
   const SUBTITLE_TEXTS = [
@@ -84,11 +112,14 @@ export const AssistantInput = ({
   const fallbackVariant = availableVariants.includes('standard')
     ? 'standard'
     : (availableVariants[0] ?? 'nano');
-  const [variant, setVariant] = useState<AssistantVariant>(fallbackVariant);
+  const initialVariant =
+    defaultVariant && availableVariants.includes(defaultVariant) ? defaultVariant : fallbackVariant;
+  const [variant, setVariant] = useState<AssistantVariant>(initialVariant);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [subtitleIndex, setSubtitleIndex] = useState(0);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,6 +154,20 @@ export const AssistantInput = ({
     }, 4000);
     return () => clearInterval(id);
   }, [SUBTITLE_TEXTS.length]);
+
+  useEffect(() => {
+    if (openMenuId === null) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const menu = document.querySelector('.assistant-chat__menu');
+      const chevron = document.querySelector(`[data-menu-id="${openMenuId}"]`);
+      if (menu && !menu.contains(target) && !(chevron && chevron.contains(target))) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [openMenuId]);
 
   const isChat = messages.length > 0;
 
@@ -172,12 +217,13 @@ export const AssistantInput = ({
     const trimmed = currentValue.trim();
     if (!trimmed) return;
 
-    const userMessage: Message = { id: nextIdRef.current++, role: 'user', content: trimmed };
+    const now = Date.now();
+    const userMessage: Message = { id: nextIdRef.current++, role: 'user', content: trimmed, createdAt: now };
     const assistantId = nextIdRef.current++;
     setMessages((prev) => [
       ...prev,
       userMessage,
-      { id: assistantId, role: 'assistant', content: '' },
+      { id: assistantId, role: 'assistant', content: '', createdAt: now },
     ]);
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
@@ -207,15 +253,75 @@ export const AssistantInput = ({
                 key={message.id}
                 className={`assistant-chat__message assistant-chat__message--${message.role}`}
               >
-                <div className="assistant-chat__bubble">
-                  {message.role === 'assistant'
-                    ? message.content.split(' ').filter(Boolean).map((word, i) => (
-                        <span key={i} className="assistant-chat__token">
-                          {word}{' '}
-                        </span>
-                      ))
-                    : message.content}
-                </div>
+                {message.role === 'user' ? (
+                  <div className="assistant-chat__user-wrap">
+                    <div className="assistant-chat__bubble">{message.content}</div>
+                    <button
+                      type="button"
+                      data-menu-id={message.id}
+                      className={`assistant-chat__chevron ${openMenuId === message.id ? 'assistant-chat__chevron--open' : ''}`}
+                      onClick={() =>
+                        setOpenMenuId((prev) => (prev === message.id ? null : message.id))
+                      }
+                      aria-label="Message options"
+                    >
+                      <IconChevronDown size={14} strokeWidth={2} />
+                    </button>
+                    {openMenuId === message.id && (
+                      <div className="assistant-chat__menu">
+                        <div className="assistant-chat__menu-time">
+                          {formatMessageTime(message.createdAt)}
+                        </div>
+                        <button
+                          type="button"
+                          className="assistant-chat__menu-item"
+                          onClick={() => {
+                            // Undo: remove this user message and the following assistant message.
+                            setMessages((prev) => {
+                              const index = prev.findIndex((m) => m.id === message.id);
+                              if (index === -1) return prev;
+                              const next = [...prev];
+                              // remove user message
+                              next.splice(index, 1);
+                              // remove following assistant message if present
+                              if (index < next.length && next[index]?.role === 'assistant') {
+                                next.splice(index, 1);
+                              }
+                              return next;
+                            });
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <IconArrowBackUp size={14} strokeWidth={2} />
+                          <span>Undo</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="assistant-chat__menu-item"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(message.content);
+                            } catch {
+                              // ignore
+                            }
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <IconCopy size={14} strokeWidth={2} />
+                          <span>Copy message</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="assistant-chat__bubble">
+                    {message.content.split(' ').filter(Boolean).map((word, i) => (
+                      <span key={i} className="assistant-chat__token">
+                        {word}{' '}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -251,7 +357,7 @@ export const AssistantInput = ({
             />
             <button
               type="button"
-              className={`assistant-input__send ${variant === 'turbo' ? 'assistant-input__send--turbo' : ''} ${isGenerating ? 'assistant-input__send--stop' : ''}`}
+              className={`assistant-input__send ${isGenerating ? 'assistant-input__send--stop' : ''}`}
               aria-label={isGenerating ? 'Stop' : 'Send'}
               onClick={handleSend}
             >

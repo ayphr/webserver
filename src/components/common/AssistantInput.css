@@ -35,11 +35,11 @@
 @keyframes assistant-subtitle-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translate(-50%, -300%) translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, -300%) translateY(0);
   }
 }
 
@@ -47,17 +47,16 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding-bottom: 5.5rem;
+  padding-bottom: 10rem;
 }
 
 .assistant-chat__back {
   position: absolute;
-  left: 50%;
-  bottom: 5.5rem;
-  transform: translateX(-50%);
+  left: 0;
+  bottom: 6.5rem;
   background: transparent;
   border: none;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 0;
   color: var(--text-muted);
   font-family: var(--font-family-base);
   font-size: 0.9rem;
@@ -76,11 +75,11 @@
 @keyframes assistant-back-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(6px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 
@@ -109,7 +108,87 @@
 .assistant-chat__message--user .assistant-chat__bubble {
   background-color: var(--bg-elevated);
   color: var(--text-primary);
-  border-bottom-right-radius: 0.25rem;
+  border-radius: 0.875rem;
+}
+
+.assistant-chat__user-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.assistant-chat__chevron {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: none;
+  border-radius: 0.35rem;
+  background-color: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  box-shadow: 0 0 0.5rem 0.35rem var(--bg-elevated);
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  z-index: 3;
+}
+
+.assistant-chat__message--user:hover .assistant-chat__chevron {
+  opacity: 1;
+}
+
+.assistant-chat__chevron:hover {
+  color: var(--text-primary);
+}
+
+.assistant-chat__menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 180px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.35rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.assistant-chat__menu-time {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 0.25rem;
+}
+
+.assistant-chat__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.85rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.assistant-chat__menu-item:hover {
+  background-color: hsl(0, 0%, 22%);
+  color: var(--text-primary);
 }
 
 .assistant-chat__message--assistant .assistant-chat__bubble {
@@ -247,6 +326,7 @@
 }
 
 .assistant-input__send {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -261,6 +341,37 @@
   transition: background-color 0.15s ease;
 }
 
+.assistant-input__send::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    var(--accent-purple),
+    var(--accent-indigo),
+    var(--accent-pink),
+    var(--accent-purple)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  animation: turbo-send-gradient 1.2s linear infinite;
+}
+
+.assistant-input__send:hover::before {
+  opacity: 1;
+}
+
 .assistant-input__send:hover {
   background-color: hsl(0, 0%, 24%);
 }
@@ -269,38 +380,11 @@
   background-color: hsl(0, 0%, 22%);
 }
 
-.assistant-input__send--turbo {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(hsl(0, 0%, 18%), hsl(0, 0%, 18%)) padding-box,
-    linear-gradient(
-      135deg,
-      var(--accent-purple),
-      var(--accent-indigo),
-      var(--accent-pink),
-      var(--accent-purple)
-    ) border-box;
-  animation: turbo-send-gradient 1.2s linear infinite;
-}
-
 @keyframes turbo-send-gradient {
   0%, 100% {
     filter: hue-rotate(0deg);
   }
   50% {
     filter: hue-rotate(55deg);
-  }
-}
-
-@keyframes turbo-input-border {
-  0% {
-    background-position:
-      0 0,
-      0% 50%;
-  }
-  100% {
-    background-position:
-      0 0,
-      200% 50%;
   }
 }

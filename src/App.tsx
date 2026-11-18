@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { PolicyGate } from './components/policy';
 import { EmailGate } from './components/auth/EmailGate';
 import { ModalProvider, TooltipProvider, useTooltip } from './context';
-import { Sidebar } from './components/layout';
 import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
 
 const AuthPage = lazy(() => import('./pages/auth/AuthPage').then((m) => ({ default: m.AuthPage })));
@@ -54,7 +53,6 @@ function App() {
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/test-sidebar" element={<div style={{display:'flex',height:'100vh'}}><Sidebar activeTab="assistant" onChange={()=>{}} username="Alex" badges={[]} country="US" avatarUrl="" isSuspended={false} isStaff={false} isTeamMember={false} isTeamManager={false} pinned={false} credits={null} accounts={[]} activeToken="" unreadNotifications={0} /></div>} />
               <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
               <Route path="/auth/login" element={<AuthPage initialMode="login" />} />
               <Route path="/auth/register" element={<AuthPage initialMode="signup" />} />
