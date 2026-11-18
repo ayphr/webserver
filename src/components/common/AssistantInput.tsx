@@ -23,6 +23,21 @@ const PLACEHOLDER_TEXTS = [
   'Ready when you are.',
   'Let’s tackle a hard problem.',
   'Type your request here.',
+  'What would you like to know?',
+  'Help me understand your data.',
+  'Let’s analyze something.',
+  'Got a question? Ask away.',
+  'What are we working on?',
+  'Need insights? Just ask.',
+  'Let’s dig into the details.',
+  'What can I help you with?',
+  'Start typing to begin.',
+  'Your assistant is ready.',
+  'Let’s make sense of it all.',
+  'Ask about trends, devices, or credits.',
+  'What’s the next step?',
+  'Let’s find the answer.',
+  'How can I support you today?',
 ];
 
 export const AssistantInput = ({
@@ -38,6 +53,15 @@ export const AssistantInput = ({
     'Ready when you are.',
     'Let’s get to work.',
     'Ask me anything.',
+    'What’s the plan today?',
+    'Let’s make progress.',
+    'How can I support you?',
+    'What are we solving?',
+    'Let’s get started.',
+    'What’s on your agenda?',
+    'Need a hand with something?',
+    'Let’s dive in.',
+    'What would you like to explore?',
   ];
 
   const [value, setValue] = useState('');
