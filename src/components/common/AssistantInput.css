@@ -19,11 +19,11 @@
 }
 
 .assistant-input__subtitle {
-  margin: 0 0 0.75rem;
+  margin: 0 0 1.5rem;
   text-align: center;
-  color: var(--text-muted);
-  font-size: 1.05rem;
-  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 600;
   animation: assistant-subtitle-in 0.45s ease;
 }
 
