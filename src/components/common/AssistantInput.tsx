@@ -170,7 +170,7 @@ export const AssistantInput = ({
     <div className={`assistant-input ${className}`}>
       <div className="assistant-input__stack">
         <p key={subtitleIndex} className="assistant-input__subtitle">{SUBTITLE_TEXTS[subtitleIndex]}</p>
-        <div className={`assistant-input__box ${multiline ? 'assistant-input__box--multiline' : ''} ${variant === 'turbo' ? 'assistant-input__box--turbo' : ''}`}>
+        <div className={`assistant-input__box ${multiline ? 'assistant-input__box--multiline' : ''}`}>
           <textarea
             ref={textareaRef}
             className="assistant-input__textarea"
@@ -187,7 +187,7 @@ export const AssistantInput = ({
             />
             <button
               type="button"
-              className="assistant-input__send"
+              className={`assistant-input__send ${variant === 'turbo' ? 'assistant-input__send--turbo' : ''}`}
               aria-label="Send"
             // Intentionally does nothing for now.
             >

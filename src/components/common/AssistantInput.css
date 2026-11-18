@@ -50,10 +50,10 @@
   padding: 0.5rem 0.75rem;
 }
 
-.assistant-input__box--turbo {
+.assistant-input__send--turbo {
   border: 1px solid transparent;
   background:
-    linear-gradient(hsl(0, 0%, 10%), hsl(0, 0%, 10%)) padding-box,
+    linear-gradient(hsl(0, 0%, 18%), hsl(0, 0%, 18%)) padding-box,
     linear-gradient(
       135deg,
       var(--accent-purple),
