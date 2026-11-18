@@ -122,7 +122,6 @@ export const AssistantDropdown = ({
           />
           <span className="assistant-dropdown__name">{ASSISTANT_DATA[current].variantLabel}</span>
         </span>
-        <span className="select__chevron" aria-hidden="true">▾</span>
       </button>
       {open && (
         <div className="select__menu assistant-dropdown__menu" role="listbox">
@@ -135,7 +134,7 @@ export const AssistantDropdown = ({
                   type="button"
                   role="option"
                   aria-selected={active}
-                  className={`select__item assistant-dropdown__item ${active ? 'select__item--active' : ''}`}
+                  className={`select__item assistant-dropdown__item ${active ? 'select__item--active' : ''} ${variant === 'turbo' ? 'assistant-dropdown__item--turbo' : ''}`}
                   onClick={() => handleSelect(variant)}
                   disabled={disabled}
                 >

@@ -30,6 +30,8 @@
   cursor: pointer;
   transition: background-color 0.15s ease;
   border-radius: 0.5rem;
+  min-height: 2rem;
+  box-sizing: border-box;
 }
 
 .assistant-dropdown__toggle--turbo {
@@ -93,6 +95,15 @@
 .assistant-dropdown__toggle:hover .assistant-dropdown__icon--turbo,
 .assistant-dropdown__item:hover .assistant-dropdown__icon--turbo {
   stroke: url(#turbo-rocket-gradient);
+  animation: turbo-rocket-gradient 1.2s linear infinite;
+}
+
+.assistant-dropdown__toggle--turbo:hover:not(:disabled) .assistant-dropdown__name,
+.assistant-dropdown__item--turbo:hover .assistant-dropdown__item-name {
+  background: linear-gradient(135deg, var(--accent-purple-solid), var(--accent-indigo-solid), var(--accent-pink-solid));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   animation: turbo-rocket-gradient 1.2s linear infinite;
 }
 
