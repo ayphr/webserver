@@ -47,40 +47,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding-bottom: 10rem;
-}
-
-.assistant-chat__back {
-  position: absolute;
-  left: 0;
-  bottom: 6.5rem;
-  background: transparent;
-  border: none;
-  padding: 0.25rem 0;
-  color: var(--text-muted);
-  font-family: var(--font-family-base);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 0.2s ease, font-weight 0.2s ease;
-  animation: assistant-back-in 0.4s ease;
-  z-index: 2;
-}
-
-.assistant-chat__back:hover {
-  color: var(--text-primary);
-  font-weight: 700;
-}
-
-@keyframes assistant-back-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  padding-bottom: 7rem;
 }
 
 .assistant-chat__message {
@@ -244,7 +211,49 @@
 }
 
 .assistant-chat__tool--active {
-  color: var(--accent-purple-solid, var(--text-primary));
+  color: var(--text-primary);
+}
+
+.assistant-chat__copy-icons {
+  position: relative;
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+}
+
+.assistant-chat__copy-icons svg {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.2s ease;
+}
+
+.assistant-chat__copied-icon {
+  opacity: 0;
+}
+
+.assistant-chat__tool--copied .assistant-chat__copy-icon {
+  opacity: 0;
+}
+
+.assistant-chat__tool--copied .assistant-chat__copied-icon {
+  opacity: 1;
+}
+
+.assistant-chat__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.assistant-chat__assistant-wrap:hover .assistant-chat__meta {
+  opacity: 1;
 }
 
 .assistant-chat__token {
@@ -371,6 +380,39 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.assistant-input__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin-right: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  animation: assistant-back-in 0.4s ease;
+}
+
+.assistant-input__back:hover {
+  color: var(--text-primary);
+  background-color: hsl(0, 0%, 18%);
+}
+
+@keyframes assistant-back-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .assistant-input__send {

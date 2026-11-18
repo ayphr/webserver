@@ -5,14 +5,16 @@ import {
   IconPlayerStop,
   IconChevronDown,
   IconArrowBackUp,
+  IconHome,
   IconCopy,
+  IconCopyCheck,
   IconThumbUp,
   IconThumbUpFilled,
   IconThumbDown,
   IconThumbDownFilled,
   IconRefresh,
 } from '@tabler/icons-react';
-import { ASSISTANT_VARIANTS } from '@common';
+import { ASSISTANT_DATA, ASSISTANT_VARIANTS } from '@common';
 import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariant } from '@common';
 import './AssistantInput.css';
@@ -76,6 +78,13 @@ type Message = {
   createdAt: number;
   interrupted?: boolean;
   feedback?: 'like' | 'dislike' | null;
+  variant?: AssistantVariant;
+  durationMs?: number;
+};
+
+const formatDuration = (ms?: number) => {
+  if (ms == null) return '—';
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 };
 
 export const AssistantInput = ({
@@ -136,12 +145,15 @@ export const AssistantInput = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [subtitleIndex, setSubtitleIndex] = useState(0);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamTokensRef = useRef<string[]>([]);
   const streamIndexRef = useRef(0);
   const streamMessageIdRef = useRef<number | null>(null);
+  const streamStartRef = useRef<number | null>(null);
   const nextIdRef = useRef(1);
 
   useEffect(() => {
@@ -150,6 +162,13 @@ export const AssistantInput = ({
       setVariant(fallbackVariant);
     }
   }, [availableVariants, fallbackVariant, variant]);
+
+  useEffect(
+    () => () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -187,6 +206,12 @@ export const AssistantInput = ({
 
   const isChat = messages.length > 0;
 
+  const takeStreamDuration = () => {
+    const started = streamStartRef.current;
+    streamStartRef.current = null;
+    return started === null ? undefined : Math.max(1, Date.now() - started);
+  };
+
   const cancelStream = () => {
     if (streamRef.current) {
       clearTimeout(streamRef.current);
@@ -195,16 +220,20 @@ export const AssistantInput = ({
     streamTokensRef.current = [];
     streamIndexRef.current = 0;
     streamMessageIdRef.current = null;
+    streamStartRef.current = null;
     setIsGenerating(false);
   };
 
   const stopGeneration = () => {
     const messageId = streamMessageIdRef.current;
+    const durationMs = takeStreamDuration();
     cancelStream();
     if (messageId !== null) {
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === messageId && m.role === 'assistant' ? { ...m, interrupted: true } : m,
+          m.id === messageId && m.role === 'assistant'
+            ? { ...m, interrupted: true, durationMs: m.durationMs ?? durationMs }
+            : m,
         ),
       );
     }
@@ -225,16 +254,19 @@ export const AssistantInput = ({
     setMessages((prev) =>
       prev.map((m) =>
         m.id === messageId && m.role === 'assistant'
-          ? { ...m, content: '', interrupted: false, feedback: null }
+          ? { ...m, content: '', interrupted: false, feedback: null, durationMs: undefined, variant }
           : m,
       ),
     );
     startStreaming(messageId, generateGibberish());
   };
 
-  const copyMessage = async (content: string) => {
+  const copyMessage = async (messageId: number, content: string) => {
     try {
       await navigator.clipboard.writeText(content);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      setCopiedId(messageId);
+      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 1600);
     } catch {
       // Clipboard access can be unavailable; ignore.
     }
@@ -245,15 +277,24 @@ export const AssistantInput = ({
     streamTokensRef.current = tokens;
     streamIndexRef.current = 0;
     streamMessageIdRef.current = messageId;
+    streamStartRef.current = Date.now();
     setIsGenerating(true);
 
     const tick = () => {
       if (streamIndexRef.current >= streamTokensRef.current.length) {
+        const durationMs = takeStreamDuration();
         streamRef.current = null;
         streamTokensRef.current = [];
         streamIndexRef.current = 0;
         streamMessageIdRef.current = null;
         setIsGenerating(false);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId && m.role === 'assistant'
+              ? { ...m, durationMs: m.durationMs ?? durationMs }
+              : m,
+          ),
+        );
         return;
       }
       streamIndexRef.current += 1;
@@ -281,7 +322,15 @@ export const AssistantInput = ({
     setMessages((prev) => [
       ...prev,
       userMessage,
-      { id: assistantId, role: 'assistant', content: '', createdAt: now, interrupted: false, feedback: null },
+      {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        createdAt: now,
+        interrupted: false,
+        feedback: null,
+        variant,
+      },
     ]);
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
@@ -420,30 +469,30 @@ export const AssistantInput = ({
                       </button>
                       <button
                         type="button"
-                        className="assistant-chat__tool"
-                        onClick={() => copyMessage(message.content)}
-                        aria-label="Copy response"
+                        className={`assistant-chat__tool assistant-chat__tool--copy ${copiedId === message.id ? 'assistant-chat__tool--copied' : ''}`}
+                        onClick={() => copyMessage(message.id, message.content)}
+                        aria-label={copiedId === message.id ? 'Copied' : 'Copy response'}
                       >
-                        <IconCopy size={15} strokeWidth={1.75} />
+                        <span className="assistant-chat__copy-icons">
+                          <IconCopy size={15} strokeWidth={1.75} className="assistant-chat__copy-icon" />
+                          <IconCopyCheck size={15} strokeWidth={1.75} className="assistant-chat__copied-icon" />
+                        </span>
                       </button>
+                      <span className="assistant-chat__meta">
+                        <span>{ASSISTANT_DATA[message.variant ?? variant].variantLabel}</span>
+                        <span>{formatDuration(message.durationMs)}</span>
+                        <span>
+                          {message.durationMs
+                            ? `${(message.content.split(' ').filter(Boolean).length / (message.durationMs / 1000)).toFixed(1)} tok/s`
+                            : '— tok/s'}
+                        </span>
+                      </span>
                     </div>
                   </div>
                 )}
               </div>
             ))}
           </div>
-        )}
-        {isChat && (
-          <button
-            type="button"
-            className="assistant-chat__back"
-            onClick={() => {
-              stopGeneration();
-              setMessages([]);
-            }}
-          >
-            Back to home
-          </button>
         )}
         <div className="assistant-input__box assistant-input__box--multiline">
           <textarea
@@ -457,6 +506,19 @@ export const AssistantInput = ({
             disabled={isGenerating}
           />
           <div className="assistant-input__footer">
+            {isChat && (
+              <button
+                type="button"
+                className="assistant-input__back"
+                onClick={() => {
+                  stopGeneration();
+                  setMessages([]);
+                }}
+                aria-label="Back to home"
+              >
+                <IconHome size={17} strokeWidth={1.75} />
+              </button>
+            )}
             <AssistantDropdown
               value={variant}
               onChange={setVariant}
