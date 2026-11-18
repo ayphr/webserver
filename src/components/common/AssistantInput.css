@@ -56,6 +56,16 @@
 
 .assistant-chat__message--user {
   justify-content: flex-end;
+  margin-bottom: 0.4rem;
+}
+
+.assistant-chat__message--queued {
+  opacity: 0.45;
+}
+
+.assistant-chat__message--queued .assistant-chat__bubble {
+  color: var(--text-muted);
+  font-size: 0.88rem;
 }
 
 .assistant-chat__message--assistant {
@@ -103,7 +113,6 @@
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0;
-  box-shadow: 0 0 0.5rem 0.35rem var(--bg-elevated);
   transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
   z-index: 3;
 }
@@ -388,7 +397,6 @@
   justify-content: center;
   width: 2rem;
   height: 2rem;
-  margin-right: auto;
   padding: 0;
   border: none;
   border-radius: 0.45rem;
@@ -402,6 +410,26 @@
 .assistant-input__back:hover {
   color: var(--text-primary);
   background-color: hsl(0, 0%, 18%);
+}
+
+.assistant-input__footer .assistant-dropdown {
+  margin-right: auto;
+}
+
+.assistant-input__queue-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  animation: assistant-queue-hint-in 0.15s ease;
+}
+
+@keyframes assistant-queue-hint-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes assistant-back-in {

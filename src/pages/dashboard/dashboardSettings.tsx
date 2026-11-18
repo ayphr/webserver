@@ -1,4 +1,5 @@
-import { IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconSparkle2, IconTrash, IconUser } from '@tabler/icons-react';
+import { IconKeyboard, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconSparkle2, IconTrash, IconUser } from '@tabler/icons-react';
+import type { AssistantSendShortcut } from '../../components/common';
 import type { SettingsSection } from '../../lib/settings';
 import type { SelfUser , CreditBalance, AssistantVariant } from '@common';
 import { ASSISTANT_DATA } from '@common';
@@ -14,6 +15,8 @@ export interface SettingsSectionsParams {
   assistantVariant: AssistantVariant;
   setAssistantVariantPref: (value: AssistantVariant) => void;
   availableAssistantVariants: readonly AssistantVariant[];
+  assistantSendShortcut: AssistantSendShortcut;
+  setAssistantSendShortcutPref: (value: AssistantSendShortcut) => void;
   isStaff: boolean;
   now: number;
   navigate: NavigateFunction;
@@ -33,6 +36,8 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
     assistantVariant,
     setAssistantVariantPref,
     availableAssistantVariants,
+    assistantSendShortcut,
+    setAssistantSendShortcutPref,
     isStaff,
     now,
     navigate,
@@ -238,6 +243,19 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
             label: ASSISTANT_DATA[variant].variantLabel,
           })),
           onChange: (value) => setAssistantVariantPref(value as AssistantVariant),
+        },
+        {
+          id: 'assistant-send-shortcut',
+          optionType: 'select',
+          icon: <IconKeyboard size={18} strokeWidth={1.75} />,
+          title: 'Send messages with',
+          description: 'Choose which key combination sends a message. The other adds a new line.',
+          value: assistantSendShortcut,
+          options: [
+            { value: 'enter', label: 'Enter' },
+            { value: 'shift-enter', label: 'Shift + Enter' },
+          ],
+          onChange: (value) => setAssistantSendShortcutPref(value as AssistantSendShortcut),
         },
       ],
     },

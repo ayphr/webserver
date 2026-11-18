@@ -7,7 +7,7 @@ import { toDate } from '../../lib/date';
 import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant } from '@common';
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
-import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
+import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar, type AssistantSendShortcut } from '../../components/common';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -85,6 +85,12 @@ function getStoredAssistantVariant(): AssistantVariant {
     : 'standard';
 }
 
+function getStoredAssistantSendShortcut(): AssistantSendShortcut {
+  return localStorage.getItem('ayphr-pref-assistant-send-shortcut') === 'shift-enter'
+    ? 'shift-enter'
+    : 'enter';
+}
+
 type DashboardPanelProps = {
   title: string;
   description?: string;
@@ -133,6 +139,9 @@ export const DashboardPage = () => {
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
   const [assistantVariant, setAssistantVariant] = useState<AssistantVariant>(getStoredAssistantVariant);
+  const [assistantSendShortcut, setAssistantSendShortcut] = useState<AssistantSendShortcut>(
+    getStoredAssistantSendShortcut,
+  );
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
@@ -400,6 +409,11 @@ export const DashboardPage = () => {
     localStorage.setItem('ayphr-pref-assistant-variant', value);
   };
 
+  const setAssistantSendShortcutPref = (value: AssistantSendShortcut) => {
+    setAssistantSendShortcut(value);
+    localStorage.setItem('ayphr-pref-assistant-send-shortcut', value);
+  };
+
   const availableAssistantVariants = useMemo(
     () => (user ? getPlanFeaturesForUser(user).availableAssistantVariants : ASSISTANT_VARIANTS),
     [user],
@@ -423,6 +437,8 @@ export const DashboardPage = () => {
         assistantVariant: effectiveAssistantVariant,
         setAssistantVariantPref,
         availableAssistantVariants,
+        assistantSendShortcut,
+        setAssistantSendShortcutPref,
         isStaff,
         now,
         navigate,
@@ -431,7 +447,7 @@ export const DashboardPage = () => {
         setIsChangeEmailOpen,
         setIsChangeUsernameOpen,
       }),
-    [credits, defaultTab, sidebarPinned, effectiveAssistantVariant, availableAssistantVariants, navigate, isStaff, user, now],
+    [credits, defaultTab, sidebarPinned, effectiveAssistantVariant, availableAssistantVariants, assistantSendShortcut, navigate, isStaff, user, now],
   );
 
   if (isLoading) {
@@ -526,6 +542,7 @@ export const DashboardPage = () => {
                 username={user.username}
                 defaultVariant={effectiveAssistantVariant}
                 dataShared={getPlanFeaturesForUser(user).dataShared}
+                sendShortcut={assistantSendShortcut}
               />
             )}
 

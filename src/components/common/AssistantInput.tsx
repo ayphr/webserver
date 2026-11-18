@@ -19,6 +19,8 @@ import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariant } from '@common';
 import './AssistantInput.css';
 
+export type AssistantSendShortcut = 'enter' | 'shift-enter';
+
 export interface AssistantInputProps {
   placeholder?: string;
   className?: string;
@@ -26,6 +28,7 @@ export interface AssistantInputProps {
   username?: string;
   defaultVariant?: AssistantVariant;
   dataShared?: boolean;
+  sendShortcut?: AssistantSendShortcut;
 }
 
 const GIBBERISH_WORDS = [
@@ -94,6 +97,7 @@ export const AssistantInput = ({
   username,
   defaultVariant,
   dataShared = true,
+  sendShortcut = 'enter',
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
   const SUBTITLE_TEXTS = [
@@ -146,8 +150,12 @@ export const AssistantInput = ({
   const [subtitleIndex, setSubtitleIndex] = useState(0);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+
+  const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const queuedMessagesRef = useRef<string[]>([]);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamTokensRef = useRef<string[]>([]);
@@ -206,9 +214,22 @@ export const AssistantInput = ({
 
   const isChat = messages.length > 0;
 
+  const enqueueMessage = (text: string) => {
+    queuedMessagesRef.current = [...queuedMessagesRef.current, text];
+    setQueuedMessages(queuedMessagesRef.current);
+  };
+
+  const dequeueMessage = () => {
+    const [next, ...rest] = queuedMessagesRef.current;
+    queuedMessagesRef.current = rest;
+    setQueuedMessages(rest);
+    return next;
+  };
+
   const takeStreamDuration = () => {
     const started = streamStartRef.current;
     streamStartRef.current = null;
+    // eslint-disable-next-line react-hooks/purity
     return started === null ? undefined : Math.max(1, Date.now() - started);
   };
 
@@ -249,6 +270,38 @@ export const AssistantInput = ({
     );
   };
 
+  const handleUndo = (messageId: number) => {
+    const index = messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return;
+    const userMessage = messages[index];
+    const assistantMessage =
+      index + 1 < messages.length && messages[index + 1].role === 'assistant'
+        ? messages[index + 1]
+        : undefined;
+
+    if (assistantMessage && streamMessageIdRef.current === assistantMessage.id) {
+      cancelStream();
+    }
+    if (assistantMessage?.variant) {
+      setVariant(assistantMessage.variant);
+    }
+    setValue(userMessage.content);
+    if (textareaRef.current) textareaRef.current.value = userMessage.content;
+
+    setMessages((prev) => {
+      const i = prev.findIndex((m) => m.id === messageId);
+      if (i === -1) return prev;
+      const next = [...prev];
+      next.splice(i, 1);
+      if (i < next.length && next[i]?.role === 'assistant') {
+        next.splice(i, 1);
+      }
+      return next;
+    });
+    setOpenMenuId(null);
+    textareaRef.current?.focus();
+  };
+
   const handleRegenerate = (messageId: number) => {
     cancelStream();
     setMessages((prev) =>
@@ -258,7 +311,7 @@ export const AssistantInput = ({
           : m,
       ),
     );
-    startStreaming(messageId, generateGibberish());
+    startStreaming(messageId, generateGibberish(), processQueue);
   };
 
   const copyMessage = async (messageId: number, content: string) => {
@@ -272,11 +325,12 @@ export const AssistantInput = ({
     }
   };
 
-  const startStreaming = (messageId: number, text: string) => {
+  const startStreaming = (messageId: number, text: string, onComplete?: () => void) => {
     const tokens = text.split(' ');
     streamTokensRef.current = tokens;
     streamIndexRef.current = 0;
     streamMessageIdRef.current = messageId;
+    // eslint-disable-next-line react-hooks/purity
     streamStartRef.current = Date.now();
     setIsGenerating(true);
 
@@ -287,7 +341,6 @@ export const AssistantInput = ({
         streamTokensRef.current = [];
         streamIndexRef.current = 0;
         streamMessageIdRef.current = null;
-        setIsGenerating(false);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === messageId && m.role === 'assistant'
@@ -295,6 +348,8 @@ export const AssistantInput = ({
               : m,
           ),
         );
+        if (onComplete) onComplete();
+        else setIsGenerating(false);
         return;
       }
       streamIndexRef.current += 1;
@@ -307,15 +362,11 @@ export const AssistantInput = ({
     streamRef.current = setTimeout(tick, 300);
   };
 
-  const handleSend = () => {
-    if (isGenerating) {
-      stopGeneration();
-      return;
-    }
-    const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
-    const trimmed = currentValue.trim();
-    if (!trimmed) return;
+  const appendAndStream = (text: string, onComplete?: () => void) => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
 
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const userMessage: Message = { id: nextIdRef.current++, role: 'user', content: trimmed, createdAt: now };
     const assistantId = nextIdRef.current++;
@@ -335,14 +386,53 @@ export const AssistantInput = ({
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
 
-    startStreaming(assistantId, generateGibberish());
+    startStreaming(assistantId, generateGibberish(), onComplete);
+    return true;
+  };
+
+  const processQueue = () => {
+    const next = dequeueMessage();
+    if (next) appendAndStream(next, processQueue);
+    else setIsGenerating(false);
+  };
+
+  const sendMessageText = (text: string) => {
+    if (appendAndStream(text, processQueue)) {
+      textareaRef.current?.focus();
+    }
+  };
+
+  const handleSend = () => {
+    if (isGenerating) {
+      stopGeneration();
+      return;
+    }
+    const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
+    sendMessageText(currentValue);
+  };
+
+  const queueCurrentMessage = () => {
+    const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
+    const trimmed = currentValue.trim();
+    if (!trimmed) return;
+    enqueueMessage(trimmed);
+    setValue('');
+    if (textareaRef.current) textareaRef.current.value = '';
+    if (!isGenerating) processQueue();
+    textareaRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && e.shiftKey) {
+    if (e.key !== 'Enter') return;
+    if (e.metaKey || e.ctrlKey) {
       e.preventDefault();
-      handleSend();
+      queueCurrentMessage();
+      return;
     }
+    const shouldSend = sendShortcut === 'enter' ? !e.shiftKey : e.shiftKey;
+    if (!shouldSend) return;
+    e.preventDefault();
+    handleSend();
   };
 
   return (
@@ -382,22 +472,7 @@ export const AssistantInput = ({
                         <button
                           type="button"
                           className="assistant-chat__menu-item"
-                          onClick={() => {
-                            // Undo: remove this user message and the following assistant message.
-                            setMessages((prev) => {
-                              const index = prev.findIndex((m) => m.id === message.id);
-                              if (index === -1) return prev;
-                              const next = [...prev];
-                              // remove user message
-                              next.splice(index, 1);
-                              // remove following assistant message if present
-                              if (index < next.length && next[index]?.role === 'assistant') {
-                                next.splice(index, 1);
-                              }
-                              return next;
-                            });
-                            setOpenMenuId(null);
-                          }}
+                          onClick={() => handleUndo(message.id)}
                         >
                           <IconArrowBackUp size={14} strokeWidth={2} />
                           <span>Undo</span>
@@ -492,6 +567,16 @@ export const AssistantInput = ({
                 )}
               </div>
             ))}
+            {queuedMessages.map((text, index) => (
+              <div
+                key={`queued-${index}`}
+                className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
+              >
+                <div className="assistant-chat__user-wrap">
+                  <div className="assistant-chat__bubble">{text}</div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
         <div className="assistant-input__box assistant-input__box--multiline">
@@ -503,7 +588,6 @@ export const AssistantInput = ({
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
-            disabled={isGenerating}
           />
           <div className="assistant-input__footer">
             {isChat && (
@@ -524,6 +608,11 @@ export const AssistantInput = ({
               onChange={setVariant}
               availableVariants={availableVariants}
             />
+            {isChat && value.trim() && (
+              <span className="assistant-input__queue-hint">
+                Queue {isMac ? '⌘⏎' : 'Ctrl⏎'}
+              </span>
+            )}
             <button
               type="button"
               className={`assistant-input__send ${isGenerating ? 'assistant-input__send--stop' : ''}`}

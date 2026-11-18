@@ -3,7 +3,7 @@ export { Card, CardHeader, CardBody, CardFooter, type CardProps, type CardHeader
 export { Input, type InputProps } from './Input';
 export { Select, type SelectProps, type SelectOption } from './Select';
 export { AssistantDropdown, type AssistantDropdownProps } from './AssistantDropdown';
-export { AssistantInput, type AssistantInputProps } from './AssistantInput';
+export { AssistantInput, type AssistantInputProps, type AssistantSendShortcut } from './AssistantInput';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Modal, type ModalProps } from './Modal';
 export { DnsChallengeModal, type DnsChallengeModalProps } from './DnsChallengeModal';
