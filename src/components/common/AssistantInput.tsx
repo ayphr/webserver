@@ -85,14 +85,16 @@ export const AssistantInput = ({
     ? 'standard'
     : (availableVariants[0] ?? 'nano');
   const [variant, setVariant] = useState<AssistantVariant>(fallbackVariant);
-  const [multiline, setMultiline] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [subtitleIndex, setSubtitleIndex] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamTokensRef = useRef<string[]>([]);
+  const streamIndexRef = useRef(0);
+  const streamMessageIdRef = useRef<number | null>(null);
   const nextIdRef = useRef(1);
 
   useEffect(() => {
@@ -113,7 +115,6 @@ export const AssistantInput = ({
     void el.offsetHeight;
     el.style.transition = 'height 0.2s ease';
     el.style.height = `${nextHeight}px`;
-    setMultiline(nextHeight > 40);
   }, [value]);
 
   useEffect(() => {
@@ -123,21 +124,43 @@ export const AssistantInput = ({
     return () => clearInterval(id);
   }, [SUBTITLE_TEXTS.length]);
 
-  const isChat = true;
+  const isChat = messages.length > 0;
 
   const stopGeneration = () => {
-    if (abortRef.current) {
-      clearTimeout(abortRef.current);
-      abortRef.current = null;
+    if (streamRef.current) {
+      clearTimeout(streamRef.current);
+      streamRef.current = null;
     }
+    streamTokensRef.current = [];
+    streamIndexRef.current = 0;
+    streamMessageIdRef.current = null;
     setIsGenerating(false);
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last && last.role === 'assistant' && !last.content.trim()) {
-        return prev.slice(0, -1);
+  };
+
+  const startStreaming = (messageId: number, text: string) => {
+    const tokens = text.split(' ');
+    streamTokensRef.current = tokens;
+    streamIndexRef.current = 0;
+    streamMessageIdRef.current = messageId;
+    setIsGenerating(true);
+
+    const tick = () => {
+      if (streamIndexRef.current >= streamTokensRef.current.length) {
+        streamRef.current = null;
+        streamTokensRef.current = [];
+        streamIndexRef.current = 0;
+        streamMessageIdRef.current = null;
+        setIsGenerating(false);
+        return;
       }
-      return prev;
-    });
+      streamIndexRef.current += 1;
+      const partial = streamTokensRef.current.slice(0, streamIndexRef.current).join(' ');
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, content: partial } : m)),
+      );
+      streamRef.current = setTimeout(tick, 70 + Math.random() * 50);
+    };
+    streamRef.current = setTimeout(tick, 300);
   };
 
   const handleSend = () => {
@@ -150,36 +173,16 @@ export const AssistantInput = ({
     if (!trimmed) return;
 
     const userMessage: Message = { id: nextIdRef.current++, role: 'user', content: trimmed };
-    setMessages((prev) => [...prev, userMessage]);
+    const assistantId = nextIdRef.current++;
+    setMessages((prev) => [
+      ...prev,
+      userMessage,
+      { id: assistantId, role: 'assistant', content: '' },
+    ]);
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
 
-    setIsGenerating(true);
-    const assistantId = nextIdRef.current++;
-    setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
-
-    const full = generateGibberish();
-    const tokens = full.split(' ');
-    let index = 0;
-
-    const streamNext = () => {
-      if (index >= tokens.length) {
-        setIsGenerating(false);
-        abortRef.current = null;
-        return;
-      }
-      const token = tokens[index++];
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: m.content ? `${m.content} ${token}` : token }
-            : m,
-        ),
-      );
-      abortRef.current = setTimeout(streamNext, 60 + Math.random() * 60);
-    };
-
-    abortRef.current = setTimeout(streamNext, 250);
+    startStreaming(assistantId, generateGibberish());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -192,26 +195,24 @@ export const AssistantInput = ({
   return (
     <div className={`assistant-input ${isChat ? 'assistant-input--chat' : ''} ${className}`}>
       <div className="assistant-input__stack">
-        <p key={subtitleIndex} className="assistant-input__subtitle">
-          {SUBTITLE_TEXTS[subtitleIndex]}
-        </p>
-        <div className="assistant-chat__messages">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`assistant-chat__message assistant-chat__message--${message.role}`}
-            >
-              {message.role === 'assistant' ? (
-                <div className="assistant-chat__text">{message.content}</div>
-              ) : (
+        {!isChat && (
+          <p key={subtitleIndex} className="assistant-input__subtitle">
+            {SUBTITLE_TEXTS[subtitleIndex]}
+          </p>
+        )}
+        {isChat && (
+          <div className="assistant-chat__messages">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`assistant-chat__message assistant-chat__message--${message.role}`}
+              >
                 <div className="assistant-chat__bubble">{message.content}</div>
-              )}
-            </div>
-          ))}
-        </div>
-        <div
-          className={`assistant-input__box ${multiline ? 'assistant-input__box--multiline' : ''}`}
-        >
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="assistant-input__box assistant-input__box--multiline">
           <textarea
             ref={textareaRef}
             className="assistant-input__textarea"
