@@ -310,6 +310,7 @@ export const AssistantInput = ({
   };
 
   const handleRegenerate = (messageId: number) => {
+    if (messages[messages.length - 1]?.id !== messageId) return;
     cancelStream();
     setMessages((prev) =>
       prev.map((m) =>
@@ -479,6 +480,8 @@ export const AssistantInput = ({
           <div className="assistant-chat__messages">
             {messages.map((message) => {
               const isStreaming = streamingMessageId === message.id;
+              const isLatestAssistant =
+                message.role === 'assistant' && messages[messages.length - 1]?.id === message.id;
               const displayedDurationMs = isStreaming ? message.liveDurationMs : message.durationMs;
               const tokensPerSecond = isStreaming
                 ? message.liveTokensPerSecond
@@ -574,14 +577,16 @@ export const AssistantInput = ({
                           <IconThumbDown size={15} strokeWidth={1.75} />
                         )}
                       </button>
-                      <button
-                        type="button"
-                        className="assistant-chat__tool"
-                        onClick={() => handleRegenerate(message.id)}
-                        aria-label="Regenerate response"
-                      >
-                        <IconRefresh size={15} strokeWidth={1.75} />
-                      </button>
+                      {isLatestAssistant && (
+                        <button
+                          type="button"
+                          className="assistant-chat__tool"
+                          onClick={() => handleRegenerate(message.id)}
+                          aria-label="Regenerate response"
+                        >
+                          <IconRefresh size={15} strokeWidth={1.75} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={`assistant-chat__tool assistant-chat__tool--copy ${copiedId === message.id ? 'assistant-chat__tool--copied' : ''}`}
