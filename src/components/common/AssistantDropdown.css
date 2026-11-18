@@ -33,20 +33,11 @@
 }
 
 .assistant-dropdown__toggle--turbo {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--bg-surface), var(--bg-surface)) padding-box,
-    linear-gradient(135deg, var(--accent-purple), var(--accent-indigo), var(--accent-pink)) border-box;
-  transition:
-    background 0.15s ease,
-    filter 0.15s ease;
+  border: 1px solid hsl(0, 0%, 16%);
 }
 
 .assistant-dropdown__toggle--turbo:hover:not(:disabled) {
-  filter: brightness(1.12);
-  background:
-    linear-gradient(var(--bg-elevated), var(--bg-elevated)) padding-box,
-    linear-gradient(135deg, var(--accent-purple), var(--accent-indigo), var(--accent-pink)) border-box;
+  background-color: var(--bg-elevated);
 }
 
 .assistant-dropdown__toggle:hover:not(:disabled) {
@@ -73,6 +64,71 @@
 .assistant-dropdown__icon {
   flex: 0 0 auto;
   color: var(--text-primary);
+}
+
+.assistant-dropdown__gradient-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.turbo-gradient-stop--a {
+  stop-color: var(--accent-purple);
+}
+
+.turbo-gradient-stop--b {
+  stop-color: var(--accent-indigo);
+}
+
+.turbo-gradient-stop--c {
+  stop-color: var(--accent-pink);
+}
+
+.assistant-dropdown__icon--turbo {
+  stroke: url(#turbo-rocket-gradient);
+}
+
+.assistant-dropdown__toggle:hover .assistant-dropdown__icon--turbo,
+.assistant-dropdown__item:hover .assistant-dropdown__icon--turbo {
+  animation: turbo-rocket-gradient 1.2s linear infinite;
+}
+
+.assistant-dropdown__toggle:hover .turbo-gradient-stop,
+.assistant-dropdown__item:hover .turbo-gradient-stop {
+  animation: turbo-gradient-colors 1.2s linear infinite;
+}
+
+.assistant-dropdown__toggle:hover .turbo-gradient-stop--a,
+.assistant-dropdown__item:hover .turbo-gradient-stop--a {
+  animation-delay: -0.4s;
+}
+
+.assistant-dropdown__toggle:hover .turbo-gradient-stop--b,
+.assistant-dropdown__item:hover .turbo-gradient-stop--b {
+  animation-delay: -0.8s;
+}
+
+@keyframes turbo-rocket-gradient {
+  0%, 100% {
+    filter: hue-rotate(0deg) brightness(1.08);
+  }
+  50% {
+    filter: hue-rotate(55deg) brightness(1.18);
+  }
+}
+
+@keyframes turbo-gradient-colors {
+  0%, 100% {
+    stop-color: var(--accent-purple);
+  }
+  33% {
+    stop-color: var(--accent-indigo);
+  }
+  66% {
+    stop-color: var(--accent-pink);
+  }
 }
 
 .assistant-dropdown__name {
