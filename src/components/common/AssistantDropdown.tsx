@@ -93,6 +93,15 @@ export const AssistantDropdown = ({
 
   return (
     <div className={`assistant-dropdown ${className}`} ref={containerRef}>
+      <svg className="assistant-dropdown__gradient-defs" aria-hidden="true" width="0" height="0">
+        <defs>
+          <linearGradient id="turbo-rocket-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop className="turbo-gradient-stop turbo-gradient-stop--a" offset="0%" />
+            <stop className="turbo-gradient-stop turbo-gradient-stop--b" offset="50%" />
+            <stop className="turbo-gradient-stop turbo-gradient-stop--c" offset="100%" />
+          </linearGradient>
+        </defs>
+      </svg>
       {label && <label className="assistant-dropdown__label">{label}</label>}
       <button
         type="button"
@@ -107,7 +116,10 @@ export const AssistantDropdown = ({
         }}
       >
         <span className="assistant-dropdown__value">
-          <CurrentIcon size={16} className="assistant-dropdown__icon" />
+          <CurrentIcon
+            size={16}
+            className={`assistant-dropdown__icon ${current === 'turbo' ? 'assistant-dropdown__icon--turbo' : ''}`}
+          />
           <span className="assistant-dropdown__name">{ASSISTANT_DATA[current].variantLabel}</span>
         </span>
         <span className="select__chevron" aria-hidden="true">▾</span>
@@ -127,7 +139,10 @@ export const AssistantDropdown = ({
                   onClick={() => handleSelect(variant)}
                   disabled={disabled}
                 >
-                  <Icon size={16} className="assistant-dropdown__icon" />
+                  <Icon
+                    size={16}
+                    className={`assistant-dropdown__icon ${variant === 'turbo' ? 'assistant-dropdown__icon--turbo' : ''}`}
+                  />
                   <span className="assistant-dropdown__item-name">{ASSISTANT_DATA[variant].variantLabel}</span>
                 </button>
               </Tooltip>
