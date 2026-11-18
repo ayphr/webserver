@@ -525,6 +525,7 @@ export const DashboardPage = () => {
                 availableVariants={availableAssistantVariants}
                 username={user.username}
                 defaultVariant={effectiveAssistantVariant}
+                dataShared={getPlanFeaturesForUser(user).dataShared}
               />
             )}
 

@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { IconArrowUp, IconPlayerStop, IconChevronDown, IconArrowBackUp, IconCopy } from '@tabler/icons-react';
+import { Link } from 'react-router-dom';
+import {
+  IconArrowUp,
+  IconPlayerStop,
+  IconChevronDown,
+  IconArrowBackUp,
+  IconCopy,
+  IconThumbUp,
+  IconThumbUpFilled,
+  IconThumbDown,
+  IconThumbDownFilled,
+  IconRefresh,
+} from '@tabler/icons-react';
 import { ASSISTANT_VARIANTS } from '@common';
 import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariant } from '@common';
@@ -11,6 +23,7 @@ export interface AssistantInputProps {
   availableVariants?: AssistantVariant[];
   username?: string;
   defaultVariant?: AssistantVariant;
+  dataShared?: boolean;
 }
 
 const GIBBERISH_WORDS = [
@@ -61,6 +74,8 @@ type Message = {
   role: 'user' | 'assistant';
   content: string;
   createdAt: number;
+  interrupted?: boolean;
+  feedback?: 'like' | 'dislike' | null;
 };
 
 export const AssistantInput = ({
@@ -69,6 +84,7 @@ export const AssistantInput = ({
   availableVariants = ASSISTANT_VARIANTS,
   username,
   defaultVariant,
+  dataShared = true,
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
   const SUBTITLE_TEXTS = [
@@ -171,7 +187,7 @@ export const AssistantInput = ({
 
   const isChat = messages.length > 0;
 
-  const stopGeneration = () => {
+  const cancelStream = () => {
     if (streamRef.current) {
       clearTimeout(streamRef.current);
       streamRef.current = null;
@@ -180,6 +196,48 @@ export const AssistantInput = ({
     streamIndexRef.current = 0;
     streamMessageIdRef.current = null;
     setIsGenerating(false);
+  };
+
+  const stopGeneration = () => {
+    const messageId = streamMessageIdRef.current;
+    cancelStream();
+    if (messageId !== null) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId && m.role === 'assistant' ? { ...m, interrupted: true } : m,
+        ),
+      );
+    }
+  };
+
+  const handleFeedback = (messageId: number, feedback: 'like' | 'dislike') => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? { ...m, feedback: m.feedback === feedback ? null : feedback }
+          : m,
+      ),
+    );
+  };
+
+  const handleRegenerate = (messageId: number) => {
+    cancelStream();
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? { ...m, content: '', interrupted: false, feedback: null }
+          : m,
+      ),
+    );
+    startStreaming(messageId, generateGibberish());
+  };
+
+  const copyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch {
+      // Clipboard access can be unavailable; ignore.
+    }
   };
 
   const startStreaming = (messageId: number, text: string) => {
@@ -223,7 +281,7 @@ export const AssistantInput = ({
     setMessages((prev) => [
       ...prev,
       userMessage,
-      { id: assistantId, role: 'assistant', content: '', createdAt: now },
+      { id: assistantId, role: 'assistant', content: '', createdAt: now, interrupted: false, feedback: null },
     ]);
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
@@ -314,12 +372,61 @@ export const AssistantInput = ({
                     )}
                   </div>
                 ) : (
-                  <div className="assistant-chat__bubble">
-                    {message.content.split(' ').filter(Boolean).map((word, i) => (
-                      <span key={i} className="assistant-chat__token">
-                        {word}{' '}
-                      </span>
-                    ))}
+                  <div className="assistant-chat__assistant-wrap">
+                    <div className="assistant-chat__bubble">
+                      {message.content.split(' ').filter(Boolean).map((word, i) => (
+                        <span key={i} className="assistant-chat__token">
+                          {word}{' '}
+                        </span>
+                      ))}
+                    </div>
+                    {message.interrupted && (
+                      <p className="assistant-chat__interrupted">You interrupted this response.</p>
+                    )}
+                    <div className="assistant-chat__toolbar">
+                      <button
+                        type="button"
+                        className={`assistant-chat__tool ${message.feedback === 'like' ? 'assistant-chat__tool--active' : ''}`}
+                        onClick={() => handleFeedback(message.id, 'like')}
+                        aria-label="Like response"
+                        aria-pressed={message.feedback === 'like'}
+                      >
+                        {message.feedback === 'like' ? (
+                          <IconThumbUpFilled size={15} strokeWidth={1.75} />
+                        ) : (
+                          <IconThumbUp size={15} strokeWidth={1.75} />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className={`assistant-chat__tool ${message.feedback === 'dislike' ? 'assistant-chat__tool--active' : ''}`}
+                        onClick={() => handleFeedback(message.id, 'dislike')}
+                        aria-label="Dislike response"
+                        aria-pressed={message.feedback === 'dislike'}
+                      >
+                        {message.feedback === 'dislike' ? (
+                          <IconThumbDownFilled size={15} strokeWidth={1.75} />
+                        ) : (
+                          <IconThumbDown size={15} strokeWidth={1.75} />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="assistant-chat__tool"
+                        onClick={() => handleRegenerate(message.id)}
+                        aria-label="Regenerate response"
+                      >
+                        <IconRefresh size={15} strokeWidth={1.75} />
+                      </button>
+                      <button
+                        type="button"
+                        className="assistant-chat__tool"
+                        onClick={() => copyMessage(message.content)}
+                        aria-label="Copy response"
+                      >
+                        <IconCopy size={15} strokeWidth={1.75} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -368,6 +475,14 @@ export const AssistantInput = ({
               )}
             </button>
           </div>
+          <p className="assistant-input__disclaimer">
+            Iris is AI. By using it, you agree to our{' '}
+            <Link to="/policies/terms">Terms</Link> &amp;{' '}
+            <Link to="/policies/privacy">Privacy Policy</Link>.{' '}
+            {dataShared
+              ? 'Chats may be reviewed and used to improve our AI models and enforce the Terms.'
+              : 'Chats may be reviewed to enforce the Terms.'}
+          </p>
         </div>
       </div>
     </div>
