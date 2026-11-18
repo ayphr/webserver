@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { IconArrowUp } from '@tabler/icons-react';
+import { IconArrowUp, IconX } from '@tabler/icons-react';
+import { ASSISTANT_VARIANTS } from '@common';
 import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariant } from '@common';
 import './AssistantInput.css';
@@ -7,16 +8,52 @@ import './AssistantInput.css';
 export interface AssistantInputProps {
   placeholder?: string;
   className?: string;
+  availableVariants?: AssistantVariant[];
 }
 
 export const AssistantInput = ({
   placeholder = 'Ask the assistant anything...',
   className = '',
+  availableVariants = ASSISTANT_VARIANTS,
 }: AssistantInputProps) => {
   const [value, setValue] = useState('');
   const [variant, setVariant] = useState<AssistantVariant>('standard');
   const [multiline, setMultiline] = useState(false);
+  const canUseTurbo = availableVariants.includes('turbo');
+  const [turboNotice, setTurboNotice] = useState<'open' | 'closing' | 'closed'>(
+    canUseTurbo ? 'open' : 'closed',
+  );
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (variant === 'turbo' && turboNotice === 'open') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTurboNotice('closing');
+      noticeTimerRef.current = setTimeout(() => setTurboNotice('closed'), 220);
+    }
+  }, [variant, turboNotice]);
+
+  const closeTurboNotice = () => {
+    if (turboNotice !== 'open') return;
+    setTurboNotice('closing');
+    noticeTimerRef.current = setTimeout(() => setTurboNotice('closed'), 220);
+  };
+
+  const handleVariantChange = (nextVariant: AssistantVariant) => {
+    if (nextVariant === 'turbo' && turboNotice === 'open') {
+      setTurboNotice('closing');
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+      noticeTimerRef.current = setTimeout(() => setTurboNotice('closed'), 220);
+    }
+    setVariant(nextVariant);
+  };
+
+  const tryTurbo = () => handleVariantChange('turbo');
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -34,25 +71,57 @@ export const AssistantInput = ({
 
   return (
     <div className={`assistant-input ${className}`}>
-      <div className={`assistant-input__box ${multiline ? 'assistant-input__box--multiline' : ''}`}>
-        <textarea
-          ref={textareaRef}
-          className="assistant-input__textarea"
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          rows={1}
-        />
-        <div className="assistant-input__footer">
-          <AssistantDropdown value={variant} onChange={setVariant} />
-          <button
-            type="button"
-            className="assistant-input__send"
-            aria-label="Send"
-          // Intentionally does nothing for now.
+      <div className="assistant-input__stack">
+        {turboNotice !== 'closed' && canUseTurbo && (
+          <div
+            className={`assistant-input__turbo-notice ${turboNotice === 'closing' ? 'assistant-input__turbo-notice--closing' : ''}`}
+            role="status"
           >
-            <IconArrowUp size={18} strokeWidth={2} />
-          </button>
+            <button
+              type="button"
+              className="assistant-input__turbo-close"
+              aria-label="Dismiss Turbo announcement"
+              onClick={closeTurboNotice}
+            >
+              <IconX size={16} strokeWidth={2} />
+            </button>
+            <div className="assistant-input__turbo-copy">
+              <strong>Turbo is now available</strong>
+              <span>Turbo is for your hardest tasks which require the most powerful models</span>
+            </div>
+            <button
+              type="button"
+              className="assistant-input__turbo-try"
+              onClick={tryTurbo}
+            >
+              Try it out
+            </button>
+          </div>
+        )}
+        <div className={`assistant-input__box ${multiline ? 'assistant-input__box--multiline' : ''}`}>
+          <textarea
+            ref={textareaRef}
+            className="assistant-input__textarea"
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            rows={1}
+          />
+          <div className="assistant-input__footer">
+            <AssistantDropdown
+              value={variant}
+              onChange={handleVariantChange}
+              availableVariants={availableVariants}
+            />
+            <button
+              type="button"
+              className="assistant-input__send"
+              aria-label="Send"
+            // Intentionally does nothing for now.
+            >
+              <IconArrowUp size={18} strokeWidth={2} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

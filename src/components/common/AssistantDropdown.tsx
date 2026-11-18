@@ -18,6 +18,7 @@ export interface AssistantDropdownProps {
   className?: string;
   disabled?: boolean;
   defaultVariant?: AssistantVariant;
+  availableVariants?: AssistantVariant[];
 }
 
 const VARIANT_ICONS: Record<AssistantVariant, typeof IconCircle> = {
@@ -35,6 +36,7 @@ export const AssistantDropdown = ({
   className = '',
   disabled = false,
   defaultVariant = 'standard',
+  availableVariants = ASSISTANT_VARIANTS,
 }: AssistantDropdownProps) => {
   const [internal, setInternal] = useState<AssistantVariant>(value ?? defaultVariant ?? 'standard');
   const [open, setOpen] = useState(false);
@@ -94,7 +96,7 @@ export const AssistantDropdown = ({
       {label && <label className="assistant-dropdown__label">{label}</label>}
       <button
         type="button"
-        className="assistant-dropdown__toggle"
+        className={`assistant-dropdown__toggle ${current === 'turbo' ? 'assistant-dropdown__toggle--turbo' : ''}`}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -112,7 +114,7 @@ export const AssistantDropdown = ({
       </button>
       {open && (
         <div className="select__menu assistant-dropdown__menu" role="listbox">
-          {ASSISTANT_VARIANTS.map((variant) => {
+          {ASSISTANT_VARIANTS.filter((variant) => availableVariants.includes(variant)).map((variant) => {
             const Icon = VARIANT_ICONS[variant];
             const active = variant === current;
             return (

@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
 import type { Punishment, SelfUser, CreditBalance, Appeal } from '@common';
+import { getPlanFeaturesForUser } from '@common';
 
 import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
 import { Sidebar } from '../../components/layout';
@@ -492,7 +493,11 @@ export const DashboardPage = () => {
           </DashboardPanel>
         ) : (
           <>
-            {activePage === 'assistant' && <AssistantInput />}
+            {activePage === 'assistant' && (
+              <AssistantInput
+                availableVariants={getPlanFeaturesForUser(user).availableAssistantVariants}
+              />
+            )}
 
             {activePage === 'overview' && (
               <DashboardPanel
