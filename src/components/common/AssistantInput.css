@@ -417,8 +417,11 @@
 }
 
 .assistant-input__queue-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  line-height: 0;
   white-space: nowrap;
   animation: assistant-queue-hint-in 0.15s ease;
 }

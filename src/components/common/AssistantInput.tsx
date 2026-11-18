@@ -13,6 +13,9 @@ import {
   IconThumbDown,
   IconThumbDownFilled,
   IconRefresh,
+  IconCommand,
+  IconKey,
+  IconCornerDownLeft,
 } from '@tabler/icons-react';
 import { ASSISTANT_DATA, ASSISTANT_VARIANTS } from '@common';
 import { AssistantDropdown } from './AssistantDropdown';
@@ -608,9 +611,18 @@ export const AssistantInput = ({
               onChange={setVariant}
               availableVariants={availableVariants}
             />
-            {isChat && value.trim() && (
-              <span className="assistant-input__queue-hint">
-                Queue {isMac ? '⌘⏎' : 'Ctrl⏎'}
+            {isChat && isGenerating && value.trim() && (
+              <span
+                className="assistant-input__queue-hint"
+                title={isMac ? 'Queue with ⌘ + Enter' : 'Queue with Ctrl + Enter'}
+                aria-label={isMac ? 'Queue with Command Enter' : 'Queue with Control Enter'}
+              >
+                {isMac ? (
+                  <IconCommand size={13} strokeWidth={1.75} />
+                ) : (
+                  <IconKey size={13} strokeWidth={1.75} />
+                )}
+                <IconCornerDownLeft size={13} strokeWidth={1.75} />
               </span>
             )}
             <button

@@ -85,3 +85,8 @@
 .assistant-dropdown__menu {
   min-width: 220px;
 }
+
+.assistant-input--chat .assistant-dropdown__menu {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
+}
