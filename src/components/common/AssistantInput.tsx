@@ -286,7 +286,8 @@ export const AssistantInput = ({
         ? messages[index + 1]
         : undefined;
 
-    if (assistantMessage && streamMessageIdRef.current === assistantMessage.id) {
+    const removedIds = new Set(messages.slice(index).map((m) => m.id));
+    if (streamMessageIdRef.current !== null && removedIds.has(streamMessageIdRef.current)) {
       cancelStream();
     }
     if (assistantMessage?.variant) {
@@ -294,16 +295,12 @@ export const AssistantInput = ({
     }
     setValue(userMessage.content);
     if (textareaRef.current) textareaRef.current.value = userMessage.content;
+    queuedMessagesRef.current = [];
+    setQueuedMessages([]);
 
     setMessages((prev) => {
       const i = prev.findIndex((m) => m.id === messageId);
-      if (i === -1) return prev;
-      const next = [...prev];
-      next.splice(i, 1);
-      if (i < next.length && next[i]?.role === 'assistant') {
-        next.splice(i, 1);
-      }
-      return next;
+      return i === -1 ? prev : prev.slice(0, i);
     });
     setOpenMenuId(null);
     textareaRef.current?.focus();
