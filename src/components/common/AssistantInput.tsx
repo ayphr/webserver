@@ -207,7 +207,15 @@ export const AssistantInput = ({
                 key={message.id}
                 className={`assistant-chat__message assistant-chat__message--${message.role}`}
               >
-                <div className="assistant-chat__bubble">{message.content}</div>
+                <div className="assistant-chat__bubble">
+                  {message.role === 'assistant'
+                    ? message.content.split(' ').filter(Boolean).map((word, i) => (
+                        <span key={i} className="assistant-chat__token">
+                          {word}{' '}
+                        </span>
+                      ))
+                    : message.content}
+                </div>
               </div>
             ))}
           </div>

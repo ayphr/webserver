@@ -21,7 +21,7 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -230%);
+  transform: translate(-50%, -300%);
   margin: 0;
   text-align: center;
   color: var(--text-primary);
@@ -84,6 +84,23 @@
   border: none;
   padding: 0;
   max-width: 100%;
+}
+
+.assistant-chat__token {
+  display: inline;
+  opacity: 0;
+  animation: assistant-token-in 0.35s ease forwards;
+}
+
+@keyframes assistant-token-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .assistant-chat__bubble--typing {
