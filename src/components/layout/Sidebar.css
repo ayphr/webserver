@@ -520,35 +520,4 @@
   }
 }
 
-.n-sidebar__tab--iris:hover .n-sidebar__icon svg {
-  stroke: url(#turbo-rocket-gradient);
-  animation: turbo-rocket-gradient 1.2s linear infinite;
-}
 
-.n-sidebar__tab--iris:hover .turbo-gradient-stop {
-  animation: turbo-gradient-colors 1.2s linear infinite;
-}
-
-.n-sidebar__tab--iris:hover .turbo-gradient-stop--a {
-  animation-delay: -0.4s;
-}
-
-.n-sidebar__tab--iris:hover .turbo-gradient-stop--b {
-  animation-delay: -0.8s;
-}
-
-.n-sidebar__tab--iris .n-sidebar__label {
-  display: inline-block;
-  vertical-align: middle;
-  line-height: 1;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-}
-
-.n-sidebar__tab--iris:hover .n-sidebar__label {
-  background: linear-gradient(135deg, var(--accent-purple-solid), var(--accent-indigo-solid), var(--accent-pink-solid));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  transition: -webkit-text-fill-color 0.2s ease, background 0.2s ease;
-}

@@ -136,5 +136,14 @@
       var(--accent-pink),
       var(--accent-purple)
     ) border-box;
-  animation: turbo-rocket-gradient 1.2s linear infinite;
+  animation: turbo-send-gradient 1.2s linear infinite;
+}
+
+@keyframes turbo-send-gradient {
+  0%, 100% {
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    filter: hue-rotate(55deg);
+  }
 }
