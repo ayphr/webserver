@@ -85,6 +85,15 @@
   border-bottom-left-radius: 0.25rem;
 }
 
+.assistant-chat__text {
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-width: 100%;
+}
+
 .assistant-chat__bubble--typing {
   display: inline-flex;
   align-items: center;

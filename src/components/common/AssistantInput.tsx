@@ -123,7 +123,7 @@ export const AssistantInput = ({
     return () => clearInterval(id);
   }, [SUBTITLE_TEXTS.length]);
 
-  const isChat = messages.length > 0;
+  const isChat = true;
 
   const stopGeneration = () => {
     if (abortRef.current) {
@@ -131,6 +131,13 @@ export const AssistantInput = ({
       abortRef.current = null;
     }
     setIsGenerating(false);
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === 'assistant' && !last.content.trim()) {
+        return prev.slice(0, -1);
+      }
+      return prev;
+    });
   };
 
   const handleSend = () => {
@@ -148,16 +155,31 @@ export const AssistantInput = ({
     if (textareaRef.current) textareaRef.current.value = '';
 
     setIsGenerating(true);
-    abortRef.current = setTimeout(() => {
-      const assistantMessage: Message = {
-        id: nextIdRef.current++,
-        role: 'assistant',
-        content: generateGibberish(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsGenerating(false);
-      abortRef.current = null;
-    }, 900 + Math.random() * 700);
+    const assistantId = nextIdRef.current++;
+    setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+
+    const full = generateGibberish();
+    const tokens = full.split(' ');
+    let index = 0;
+
+    const streamNext = () => {
+      if (index >= tokens.length) {
+        setIsGenerating(false);
+        abortRef.current = null;
+        return;
+      }
+      const token = tokens[index++];
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: m.content ? `${m.content} ${token}` : token }
+            : m,
+        ),
+      );
+      abortRef.current = setTimeout(streamNext, 60 + Math.random() * 60);
+    };
+
+    abortRef.current = setTimeout(streamNext, 250);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -170,32 +192,23 @@ export const AssistantInput = ({
   return (
     <div className={`assistant-input ${isChat ? 'assistant-input--chat' : ''} ${className}`}>
       <div className="assistant-input__stack">
-        {!isChat && (
-          <p key={subtitleIndex} className="assistant-input__subtitle">
-            {SUBTITLE_TEXTS[subtitleIndex]}
-          </p>
-        )}
-        {isChat && (
-          <div className="assistant-chat__messages">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`assistant-chat__message assistant-chat__message--${message.role}`}
-              >
+        <p key={subtitleIndex} className="assistant-input__subtitle">
+          {SUBTITLE_TEXTS[subtitleIndex]}
+        </p>
+        <div className="assistant-chat__messages">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`assistant-chat__message assistant-chat__message--${message.role}`}
+            >
+              {message.role === 'assistant' ? (
+                <div className="assistant-chat__text">{message.content}</div>
+              ) : (
                 <div className="assistant-chat__bubble">{message.content}</div>
-              </div>
-            ))}
-            {isGenerating && (
-              <div className="assistant-chat__message assistant-chat__message--assistant">
-                <div className="assistant-chat__bubble assistant-chat__bubble--typing">
-                  <span className="assistant-chat__dot" />
-                  <span className="assistant-chat__dot" />
-                  <span className="assistant-chat__dot" />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          ))}
+        </div>
         <div
           className={`assistant-input__box ${multiline ? 'assistant-input__box--multiline' : ''}`}
         >
