@@ -15,6 +15,7 @@ const PrivacyPage = lazy(() => import('./pages/policies/PrivacyPage').then((m) =
 const RefundPage = lazy(() => import('./pages/policies/RefundPage').then((m) => ({ default: m.RefundPage })));
 const LandingPage = lazy(() => import('./pages/landing/LandingPage').then((m) => ({ default: m.LandingPage })));
 const LinkPage = lazy(() => import('./pages/link/LinkPage').then((m) => ({ default: m.LinkPage })));
+const NotFoundPage = lazy(() => import('./pages/notFound/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 function TooltipRouteWatcher() {
   const location = useLocation();
@@ -63,6 +64,7 @@ function App() {
               <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
               <Route path="/dashboard" element={<PolicyGate loadingFallback={<DashboardLoadingSkeleton />}><EmailGate loadingFallback={<DashboardLoadingSkeleton />}><DashboardPage /></EmailGate></PolicyGate>} />
               <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><EmailGate><ProfilePage /></EmailGate></PolicyGate>} />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
         </BrowserRouter>

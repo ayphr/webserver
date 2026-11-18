@@ -1,0 +1,28 @@
+.not-found-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+}
+
+.not-found-page__container {
+  width: 100%;
+  max-width: 480px;
+}
+
+.not-found-page__card {
+  text-align: center;
+}
+
+.not-found-page__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  margin: 1rem 0 1.5rem;
+}

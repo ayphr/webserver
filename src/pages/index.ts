@@ -4,3 +4,4 @@ export { ProfilePage } from './dashboard/ProfilePage';
 export { PoliciesPage, TermsPage, PrivacyPage, RefundPage } from './policies';
 export { LandingPage } from './landing';
 export { LinkPage } from './link/LinkPage';
+export { NotFoundPage } from './notFound';
