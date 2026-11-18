@@ -496,6 +496,7 @@ export const DashboardPage = () => {
             {activePage === 'assistant' && (
               <AssistantInput
                 availableVariants={getPlanFeaturesForUser(user).availableAssistantVariants}
+                username={user.username}
               />
             )}
 

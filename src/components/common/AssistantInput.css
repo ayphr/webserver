@@ -13,6 +13,29 @@
   position: relative;
   width: 100%;
   max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.assistant-input__subtitle {
+  margin: 0 0 0.75rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  font-weight: 500;
+  animation: assistant-subtitle-in 0.45s ease;
+}
+
+@keyframes assistant-subtitle-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .assistant-input__box {
