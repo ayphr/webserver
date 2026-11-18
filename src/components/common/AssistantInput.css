@@ -50,23 +50,6 @@
   padding: 0.5rem 0.75rem;
 }
 
-.assistant-input__send--turbo {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(hsl(0, 0%, 18%), hsl(0, 0%, 18%)) padding-box,
-    linear-gradient(
-      135deg,
-      var(--accent-purple),
-      var(--accent-indigo),
-      var(--accent-pink),
-      var(--accent-purple)
-    ) border-box;
-  background-size:
-    100% 100%,
-    300% 300%;
-  animation: turbo-input-border 2.8s linear infinite;
-}
-
 .assistant-input__box--multiline {
   flex-direction: column;
   align-items: stretch;
@@ -112,7 +95,7 @@
   100% {
     background-position:
       0 0,
-      300% 50%;
+      200% 50%;
   }
 }
 
@@ -140,4 +123,22 @@
   &:hover {
     background-color: hsl(0, 0%, 24%);
   }
+}
+
+.assistant-input__send--turbo {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(hsl(0, 0%, 18%), hsl(0, 0%, 18%)) padding-box,
+    linear-gradient(
+      135deg,
+      var(--accent-purple),
+      var(--accent-indigo),
+      var(--accent-pink),
+      var(--accent-purple)
+    ) border-box;
+  background-size:
+    100% 100%,
+    200% 200%;
+  background-repeat: repeat;
+  animation: turbo-input-border 2.8s linear infinite;
 }

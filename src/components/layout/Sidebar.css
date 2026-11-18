@@ -537,10 +537,13 @@
   animation-delay: -0.8s;
 }
 
-.n-sidebar__tab--iris:hover .n-sidebar__label {
+.n-sidebar__tab--iris .n-sidebar__label {
   display: inline-block;
   vertical-align: middle;
   line-height: 1;
+}
+
+.n-sidebar__tab--iris:hover .n-sidebar__label {
   background: linear-gradient(135deg, var(--accent-purple-solid), var(--accent-indigo-solid), var(--accent-pink-solid));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

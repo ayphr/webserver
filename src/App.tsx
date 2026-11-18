@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { PolicyGate } from './components/policy';
 import { EmailGate } from './components/auth/EmailGate';
 import { ModalProvider, TooltipProvider, useTooltip } from './context';
-import { AssistantInput } from './components/common';
 import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
 
 const AuthPage = lazy(() => import('./pages/auth/AuthPage').then((m) => ({ default: m.AuthPage })));
@@ -54,7 +53,6 @@ function App() {
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/test-assistant" element={<div style={{padding:'2rem'}}><AssistantInput availableVariants={['nano','lite','standard','plus','turbo']} username="Alex" /></div>} />
               <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
               <Route path="/auth/login" element={<AuthPage initialMode="login" />} />
               <Route path="/auth/register" element={<AuthPage initialMode="signup" />} />
