@@ -32,6 +32,23 @@
   border-radius: 0.5rem;
 }
 
+.assistant-dropdown__toggle--turbo {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--bg-surface), var(--bg-surface)) padding-box,
+    linear-gradient(135deg, var(--accent-purple), var(--accent-indigo), var(--accent-pink)) border-box;
+  transition:
+    background 0.15s ease,
+    filter 0.15s ease;
+}
+
+.assistant-dropdown__toggle--turbo:hover:not(:disabled) {
+  filter: brightness(1.12);
+  background:
+    linear-gradient(var(--bg-elevated), var(--bg-elevated)) padding-box,
+    linear-gradient(135deg, var(--accent-purple), var(--accent-indigo), var(--accent-pink)) border-box;
+}
+
 .assistant-dropdown__toggle:hover:not(:disabled) {
   background-color: var(--bg-elevated);
 }

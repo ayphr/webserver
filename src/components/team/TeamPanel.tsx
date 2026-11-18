@@ -130,7 +130,7 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, team?.id, team?.managerUuid, userUuid]);
+  }, [activeTab, team, userUuid]);
 
   useEffect(() => {
     if (activeTab !== 'usage') return;
