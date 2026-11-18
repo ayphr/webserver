@@ -39,7 +39,7 @@ const GIBBERISH_WORDS = [
 ];
 
 const generateGibberish = () => {
-  const length = 8 + Math.floor(Math.random() * 12);
+  const length = (8 + Math.floor(Math.random() * 12)) * 5;
   const words: string[] = [];
   for (let i = 0; i < length; i++) {
     words.push(GIBBERISH_WORDS[Math.floor(Math.random() * GIBBERISH_WORDS.length)]);
