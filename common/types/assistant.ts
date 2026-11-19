@@ -1,7 +1,7 @@
 export const ASSISTANT_VARIANTS: AssistantVariant[] = ['nano', 'lite', 'standard', 'plus', 'turbo'];
 export type AssistantVariant = 'nano' | 'lite' | 'standard' | 'plus' | 'turbo';
 
-export type AssistantThinkingLevel = 'low' | 'medium' | 'high' | 'xhigh';
+export type AssistantThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export type AssistantData = {
   model: string;
@@ -14,8 +14,9 @@ export type AssistantData = {
 export const ASSISTANT_DATA: Record<AssistantVariant, AssistantData> = {
   nano: {
     model: 'gemini-3.5-flash-lite',
-    modelLabel: 'Gemini 3.5 Flash Lite',
+    modelLabel: 'Gemini 3.5 Flash Lite (minimal)',
     variantLabel: 'Nano',
+    thinkingLevel: 'minimal',
     usageRateMultiplierFromBaseline: 1,
   },
   lite: {
@@ -33,11 +34,11 @@ export const ASSISTANT_DATA: Record<AssistantVariant, AssistantData> = {
     usageRateMultiplierFromBaseline: 6,
   },
   plus: {
-    model: 'gemini-4-hydrogen',
-    modelLabel: 'Gemini 4 Hydrogen (xhigh)',
+    model: 'gemini-4-neon',
+    modelLabel: 'Gemini 4 Neon (high)',
     variantLabel: 'Plus',
-    thinkingLevel: 'xhigh',
-    usageRateMultiplierFromBaseline: 15,
+    thinkingLevel: 'high',
+    usageRateMultiplierFromBaseline: 25,
   },
   turbo: {
     model: 'gemini-4-carbon',
