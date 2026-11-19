@@ -17,6 +17,19 @@
   flex: 1 1 auto;
 }
 
+.assistant-input__animation {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(100px, 14vh, 150px);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  transform: translate(-50%, calc(-100% - 6.7rem));
+  pointer-events: none;
+  z-index: 1;
+}
+
 .assistant-input__subtitle {
   position: absolute;
   left: 50%;

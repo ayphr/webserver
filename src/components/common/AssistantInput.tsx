@@ -18,6 +18,7 @@ import {
   IconCornerDownLeft,
 } from '@tabler/icons-react';
 import { ASSISTANT_DATA, ASSISTANT_VARIANTS } from '@common';
+import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantDropdown } from './AssistantDropdown';
 import type { AssistantVariant } from '@common';
 import './AssistantInput.css';
@@ -161,6 +162,7 @@ export const AssistantInput = ({
   const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const queuedMessagesRef = useRef<string[]>([]);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -219,6 +221,16 @@ export const AssistantInput = ({
   }, [openMenuId]);
 
   const isChat = messages.length > 0;
+
+  useEffect(() => {
+    if (isChat) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    void video.play().catch(() => {
+      // Autoplay can be blocked; the muted video element will still display its first frame.
+    });
+  }, [isChat]);
 
   const enqueueMessage = (text: string) => {
     queuedMessagesRef.current = [...queuedMessagesRef.current, text];
@@ -469,9 +481,21 @@ export const AssistantInput = ({
     <div className={`assistant-input ${isChat ? 'assistant-input--chat' : ''} ${className}`}>
       <div className="assistant-input__stack">
         {!isChat && (
-          <p key={subtitleIndex} className="assistant-input__subtitle">
-            {SUBTITLE_TEXTS[subtitleIndex]}
-          </p>
+          <div className="assistant-input__intro">
+            <video
+              ref={videoRef}
+              className="assistant-input__animation"
+              src={irisAnimation}
+              autoPlay
+              muted
+              playsInline
+              preload="auto"
+              aria-hidden="true"
+            />
+            <p key={subtitleIndex} className="assistant-input__subtitle">
+              {SUBTITLE_TEXTS[subtitleIndex]}
+            </p>
+          </div>
         )}
         {isChat && (
           <div className="assistant-chat__messages">
