@@ -7,20 +7,28 @@ import {
   generateAssistantResponse,
   splitAssistantResponseIntoTokens,
 } from '../lib/assistantStream';
+import { getUserFromToken } from './auth';
 
-export type AssistantSocketData = { userUuid: string };
+export type AssistantSocketData = { userUuid: string | null };
 type AssistantWebSocket = ServerWebSocket<AssistantSocketData>;
 type ActiveStreams = Map<string, ReturnType<typeof setTimeout>>;
 
 const MAX_CONCURRENT_STREAMS = 8;
+const AUTH_TIMEOUT_MS = 10_000;
 const FIRST_TOKEN_DELAY_MS = 300;
 const TOKEN_DELAY_MIN_MS = 70;
 const TOKEN_DELAY_VARY_MS = 50;
 
 const activeStreams = new Map<AssistantWebSocket, ActiveStreams>();
+const authTimers = new Map<AssistantWebSocket, ReturnType<typeof setTimeout>>();
 
 const send = (ws: AssistantWebSocket, message: AssistantStreamServerMessage) => {
   ws.send(JSON.stringify(message));
+};
+
+const rejectUnauthenticated = (ws: AssistantWebSocket, error: string) => {
+  send(ws, { type: 'auth_error', error });
+  ws.close();
 };
 
 const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
@@ -70,10 +78,16 @@ const startStream = (ws: AssistantWebSocket, requestId: string) => {
 const isClientMessage = (value: unknown): value is AssistantStreamClientMessage => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const message = value as Record<string, unknown>;
-  if (typeof message.requestId !== 'string' || !message.requestId || message.requestId.length > 200) {
-    return false;
+
+  if (message.type === 'auth') {
+    return typeof message.token === 'string' && message.token.length <= 512;
   }
-  return message.type === 'stream' || message.type === 'cancel';
+  if (message.type !== 'stream' && message.type !== 'cancel') return false;
+  return (
+    typeof message.requestId === 'string' &&
+    Boolean(message.requestId) &&
+    message.requestId.length <= 200
+  );
 };
 
 export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
@@ -81,9 +95,13 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
 
   open(ws) {
     activeStreams.set(ws, new Map());
+    authTimers.set(
+      ws,
+      setTimeout(() => rejectUnauthenticated(ws, 'Authentication timed out'), AUTH_TIMEOUT_MS),
+    );
   },
 
-  message(ws, raw) {
+  async message(ws, raw) {
     const text = typeof raw === 'string' ? raw : raw.toString();
     let parsed: unknown;
     try {
@@ -93,14 +111,38 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
     }
     if (!isClientMessage(parsed)) return;
 
+    if (parsed.type === 'auth') {
+      if (ws.data.userUuid) return;
+      const timer = authTimers.get(ws);
+      if (timer) clearTimeout(timer);
+      authTimers.delete(ws);
+
+      const user = await getUserFromToken(parsed.token);
+      if (!user) {
+        rejectUnauthenticated(ws, 'Unauthorized');
+        return;
+      }
+      ws.data.userUuid = user.uuid;
+      return;
+    }
+
+    if (!ws.data.userUuid) {
+      rejectUnauthenticated(ws, 'Authentication required');
+      return;
+    }
+
     if (parsed.type === 'stream') startStream(ws, parsed.requestId);
     else cancelStream(ws, parsed.requestId);
   },
 
   close(ws) {
+    const timer = authTimers.get(ws);
+    if (timer) clearTimeout(timer);
+    authTimers.delete(ws);
+
     const streams = activeStreams.get(ws);
     if (streams) {
-      for (const timer of streams.values()) clearTimeout(timer);
+      for (const streamTimer of streams.values()) clearTimeout(streamTimer);
       activeStreams.delete(ws);
     }
   },

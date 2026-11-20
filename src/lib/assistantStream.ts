@@ -10,6 +10,7 @@ export type AssistantStreamHandlers = {
 const isServerMessage = (value: unknown): value is AssistantStreamServerMessage => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const message = value as Record<string, unknown>;
+  if (message.type === 'auth_error') return typeof message.error === 'string';
   if (typeof message.requestId !== 'string') return false;
   if (message.type === 'token') return typeof message.token === 'string';
   if (message.type === 'done') return true;
@@ -26,7 +27,7 @@ export class AssistantStreamClient {
   constructor(handlers: AssistantStreamHandlers) {
     this.handlers = handlers;
     const base = API_BASE_URL.replace(/^http/, 'ws');
-    this.url = `${base}/ws/assistant?token=${encodeURIComponent(api.getAuthToken() ?? '')}`;
+    this.url = `${base}/ws/assistant`;
   }
 
   private connect() {
@@ -41,6 +42,7 @@ export class AssistantStreamClient {
     this.socket = socket;
 
     socket.onopen = () => {
+      socket.send(JSON.stringify({ type: 'auth', token: api.getAuthToken() ?? '' }));
       const queued = this.pending;
       this.pending = [];
       for (const message of queued) socket.send(JSON.stringify(message));
@@ -55,6 +57,16 @@ export class AssistantStreamClient {
         return;
       }
       if (!isServerMessage(parsed)) return;
+
+      if (parsed.type === 'auth_error') {
+        this.close();
+        const requestIds = [...this.active];
+        this.active.clear();
+        for (const requestId of requestIds) {
+          this.handlers.onError?.(requestId, parsed.error);
+        }
+        return;
+      }
 
       if (parsed.type === 'token') {
         this.handlers.onToken(parsed.requestId, parsed.token);

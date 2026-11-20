@@ -153,9 +153,7 @@ export function getBearerToken(request: Request): string | null {
   return authHeader.substring(7).trim();
 }
 
-export async function getUserFromRequest(request: Request): Promise<User | null> {
-  const token = getBearerToken(request);
-
+export async function getUserFromToken(token: string): Promise<User | null> {
   if (!token) return null;
 
   const tokenHash = hashToken(token);
@@ -206,6 +204,12 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
   if (cacheDirty) await setAuthEntry(tokenHash, { session, user });
 
   return user;
+}
+
+export async function getUserFromRequest(request: Request): Promise<User | null> {
+  const token = getBearerToken(request);
+  if (!token) return null;
+  return getUserFromToken(token);
 }
 
 const roleRank: Record<UserRole, number> = {

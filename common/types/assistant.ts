@@ -8,10 +8,12 @@ export type AssistantMode = 'chat' | 'task';
 export const ASSISTANT_STREAM_PATH = '/ws/assistant';
 
 export type AssistantStreamClientMessage =
+  | { type: 'auth'; token: string }
   | { type: 'stream'; requestId: string }
   | { type: 'cancel'; requestId: string };
 
 export type AssistantStreamServerMessage =
+  | { type: 'auth_error'; error: string }
   | { type: 'token'; requestId: string; token: string }
   | { type: 'done'; requestId: string }
   | { type: 'error'; requestId: string; error: string };

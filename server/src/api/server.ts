@@ -1,6 +1,5 @@
 import type { Server } from 'bun';
 import { ASSISTANT_STREAM_PATH } from '@common';
-import { getAuthError, getUserFromRequest } from './auth';
 import { resolveRoute } from './router';
 import { assistantWebSocket, type AssistantSocketData } from './websocket';
 import { addCorsHeaders, SECURITY_HEADERS } from './routes/util';
@@ -80,14 +79,7 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
         url.pathname === ASSISTANT_STREAM_PATH &&
         request.headers.get('upgrade')?.toLowerCase() === 'websocket'
       ) {
-        const token = url.searchParams.get('token');
-        const authRequest = token
-          ? new Request(request.url, { headers: { authorization: `Bearer ${token}` } })
-          : null;
-        const user = authRequest ? await getUserFromRequest(authRequest) : null;
-        if (!user) return addCorsHeaders(getAuthError('Unauthorized'), request);
-
-        if (!server.upgrade(request, { data: { userUuid: user.uuid } })) {
+        if (!server.upgrade(request, { data: { userUuid: null } })) {
           const response = Response.json(
             { error: 'WebSocket upgrade failed' },
             { status: 500, headers: SECURITY_HEADERS },
