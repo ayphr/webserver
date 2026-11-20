@@ -1,10 +1,10 @@
 .assistant-sidebar {
-  width: 280px;
+  width: 240px;
   flex-shrink: 0;
   height: 100vh;
   box-sizing: border-box;
-  margin-left: 1.5rem;
-  padding: 4.5rem 1.5rem 2rem 1.5rem;
+  margin-left: 8rem;
+  padding: 12rem 1.5rem 2rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
