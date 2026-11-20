@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ASSISTANT_VARIANTS,
-  CHAT_PROMPT_SUGGESTIONS,
-  TASK_PROMPT_SUGGESTIONS,
-  type AssistantChat,
-  type AssistantMode,
-  type AssistantVariant,
-} from '@common';
+import { ASSISTANT_VARIANTS, type AssistantChat, type AssistantVariant } from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantStreamClient } from '../../lib/assistantStream';
 import { AssistantComposer } from './AssistantComposer';
@@ -103,15 +96,6 @@ const TASK_SUBTITLE_TEXTS = (displayName: string) => [
   'What’s the long game?',
 ];
 
-const mergeById = <T extends { id: string }>(items: T[] | undefined, incoming: T): T[] => {
-  const list = items ?? [];
-  const index = list.findIndex((item) => item.id === incoming.id);
-  if (index === -1) return [...list, incoming];
-  const next = [...list];
-  next[index] = { ...next[index], ...incoming };
-  return next;
-};
-
 export const AssistantInput = ({
   placeholder = 'Ask Iris',
   className = '',
@@ -129,8 +113,6 @@ export const AssistantInput = ({
     state.activeMode === 'task'
       ? TASK_SUBTITLE_TEXTS(displayName)
       : CHAT_SUBTITLE_TEXTS(displayName);
-  const suggestions =
-    state.activeMode === 'task' ? TASK_PROMPT_SUGGESTIONS : CHAT_PROMPT_SUGGESTIONS;
   const updateAssistant = assistant.update;
 
   const [value, setValue] = useState('');
@@ -161,54 +143,12 @@ export const AssistantInput = ({
   const streamRequestIdRef = useRef<string | null>(null);
   const streamCompleteRef = useRef<(() => void) | null>(null);
   const streamMessageIdRef = useRef<number | null>(null);
-  const streamTokensRef = useRef<string[]>([]);
   const streamStartRef = useRef<number | null>(null);
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
-  const typewriterRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const typewriterExpectedRef = useRef('');
 
   const isChat = messages.length > 0;
 
   const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
-
-  const cancelTypewriter = useCallback(() => {
-    if (typewriterRef.current !== null) {
-      clearInterval(typewriterRef.current);
-      typewriterRef.current = null;
-    }
-  }, []);
-
-  const handleValueChange = (next: string) => {
-    if (typewriterRef.current !== null && next !== typewriterExpectedRef.current) cancelTypewriter();
-    setValue(next);
-  };
-
-  const startSuggestionTypewriter = (prompt: string) => {
-    cancelTypewriter();
-    setValue('');
-    if (textareaRef.current) textareaRef.current.value = '';
-    textareaRef.current?.focus();
-
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) {
-      typewriterExpectedRef.current = prompt;
-      setValue(prompt);
-      return;
-    }
-
-    let index = 0;
-    typewriterExpectedRef.current = '';
-    typewriterRef.current = setInterval(() => {
-      index += 1;
-      const next = prompt.slice(0, index);
-      typewriterExpectedRef.current = next;
-      setValue(next);
-      if (index >= prompt.length) cancelTypewriter();
-    }, 14);
-  };
 
   useEffect(() => {
     if (!availableVariants.includes(variant)) {
@@ -216,30 +156,6 @@ export const AssistantInput = ({
       setVariant(fallbackVariant);
     }
   }, [availableVariants, fallbackVariant, variant]);
-
-  useEffect(
-    () => () => {
-      cancelTypewriter();
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-      streamClientRef.current?.close();
-    },
-    [cancelTypewriter],
-  );
-
-  useEffect(() => {
-    cancelTypewriter();
-  }, [cancelTypewriter, state.activeMode]);
-
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (['Tab', 'Shift', 'Control', 'Meta', 'Alt', 'CapsLock'].includes(event.key)) return;
-      cancelTypewriter();
-    };
-    textarea.addEventListener('keydown', handleKeyDown, true);
-    return () => textarea.removeEventListener('keydown', handleKeyDown, true);
-  }, [cancelTypewriter]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -311,22 +227,40 @@ export const AssistantInput = ({
     streamRequestIdRef.current = null;
     streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
-    streamTokensRef.current = [];
     streamStartRef.current = null;
     setStreamingMessageId(null);
     setIsGenerating(false);
   };
 
-  const finishStream = (requestId: string, error?: string, durationMs?: number) => {
+  const handleStreamToken = (requestId: string, token: string) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
-    const elapsedMs = takeStreamDuration();
-    const finalDurationMs = durationMs ?? elapsedMs;
+    if (messageId === null) return;
+
+    const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const content = m.content + token;
+        const tokenCount = content.split(/\s+/).filter(Boolean).length;
+        return {
+          ...m,
+          content,
+          liveDurationMs: elapsedMs,
+          liveTokensPerSecond: tokenCount / (elapsedMs / 1000),
+        };
+      }),
+    );
+  };
+
+  const finishStream = (requestId: string, error?: string) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    const durationMs = takeStreamDuration();
     const complete = streamCompleteRef.current;
     streamRequestIdRef.current = null;
     streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
-    streamTokensRef.current = [];
     setStreamingMessageId(null);
 
     if (messageId !== null) {
@@ -335,7 +269,7 @@ export const AssistantInput = ({
           m.id === messageId
             ? {
                 ...m,
-                durationMs: m.durationMs ?? finalDurationMs,
+                durationMs: m.durationMs ?? durationMs,
                 liveDurationMs: undefined,
                 liveTokensPerSecond: undefined,
                 ...(error ? { error } : {}),
@@ -349,74 +283,20 @@ export const AssistantInput = ({
     else setIsGenerating(false);
   };
 
+  const handleStreamDone = (requestId: string) => {
+    finishStream(requestId);
+  };
+
+  const handleStreamError = (requestId: string, error: string) => {
+    finishStream(requestId, error);
+  };
+
   const getStreamClient = () => {
     if (!streamClientRef.current) {
       streamClientRef.current = new AssistantStreamClient({
-        onToken: (requestId, token, index) => {
-          if (requestId !== streamRequestIdRef.current) return;
-          const messageId = streamMessageIdRef.current;
-          if (messageId === null) return;
-          const tokens = streamTokensRef.current;
-          tokens[index] = token;
-          const content = tokens.join('');
-          const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
-          const wordCount = content.split(/\s+/).filter(Boolean).length;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId && m.role === 'assistant'
-                ? {
-                    ...m,
-                    content,
-                    liveDurationMs: elapsedMs,
-                    liveTokensPerSecond: wordCount / (elapsedMs / 1000),
-                  }
-                : m,
-            ),
-          );
-        },
-        onDone: (requestId, durationMs) => finishStream(requestId, undefined, durationMs),
-        onError: (requestId, error, _code, retryAfterMs) => {
-          const detail =
-            retryAfterMs && retryAfterMs > 0
-              ? `${error} Try again in ${Math.ceil(retryAfterMs / 1000)}s.`
-              : error;
-          finishStream(requestId, detail);
-        },
-        onThinking: (requestId, step) => {
-          if (requestId !== streamRequestIdRef.current) return;
-          const messageId = streamMessageIdRef.current;
-          if (messageId === null) return;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId && m.role === 'assistant'
-                ? { ...m, thinking: mergeById(m.thinking, step) }
-                : m,
-            ),
-          );
-        },
-        onTool: (requestId, tool) => {
-          if (requestId !== streamRequestIdRef.current) return;
-          const messageId = streamMessageIdRef.current;
-          if (messageId === null) return;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === messageId && m.role === 'assistant'
-                ? { ...m, tools: mergeById(m.tools, tool) }
-                : m,
-            ),
-          );
-        },
-        onResumed: (requestId, nextIndex) => {
-          if (requestId !== streamRequestIdRef.current) return;
-          const messageId = streamMessageIdRef.current;
-          if (messageId === null) return;
-          const tokens = streamTokensRef.current.slice(0, Math.max(0, nextIndex));
-          streamTokensRef.current = tokens;
-          const content = tokens.join('');
-          setMessages((prev) =>
-            prev.map((m) => (m.id === messageId && m.role === 'assistant' ? { ...m, content } : m)),
-          );
-        },
+        onToken: handleStreamToken,
+        onDone: handleStreamDone,
+        onError: handleStreamError,
       });
     }
     return streamClientRef.current;
@@ -443,8 +323,6 @@ export const AssistantInput = ({
       id: createId(),
       title: mode === 'task' ? 'New task' : 'New chat',
       folderId,
-      pinned: false,
-      order: 0,
       mode,
       messages: [],
       createdAt: now,
@@ -460,7 +338,6 @@ export const AssistantInput = ({
 
   const handleNewChat = () => {
     cancelStream();
-    cancelTypewriter();
     queuedMessagesRef.current = [];
     setQueuedMessages([]);
     setMessages([]);
@@ -474,7 +351,6 @@ export const AssistantInput = ({
     const chat = state.chats.find((item) => item.id === id);
     if (!chat) return;
     cancelStream();
-    cancelTypewriter();
     queuedMessagesRef.current = [];
     setQueuedMessages([]);
     setValue('');
@@ -531,7 +407,6 @@ export const AssistantInput = ({
     if (assistantMessage?.variant) {
       setVariant(assistantMessage.variant);
     }
-    cancelTypewriter();
     setValue(userMessage.content);
     if (textareaRef.current) textareaRef.current.value = userMessage.content;
     queuedMessagesRef.current = [];
@@ -558,42 +433,12 @@ export const AssistantInput = ({
               error: undefined,
               feedback: null,
               durationMs: undefined,
-              thinking: undefined,
-              tools: undefined,
               variant,
             }
           : m,
       ),
     );
-    startStreaming(messageId, { variant }, processQueue);
-  };
-
-  const handleRetry = (messageId: number) => {
-    const target = messages.find((m) => m.id === messageId && m.role === 'assistant');
-    if (!target) return;
-    cancelStream();
-    const retryVariant =
-      target.variant && availableVariants.includes(target.variant) ? target.variant : variant;
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId && m.role === 'assistant'
-          ? {
-              ...m,
-              content: '',
-              error: undefined,
-              interrupted: false,
-              feedback: null,
-              durationMs: undefined,
-              liveDurationMs: undefined,
-              liveTokensPerSecond: undefined,
-              thinking: undefined,
-              tools: undefined,
-              variant: retryVariant,
-            }
-          : m,
-      ),
-    );
-    startStreaming(messageId, { variant: retryVariant }, processQueue);
+    startStreaming(messageId, processQueue);
   };
 
   const copyMessage = async (messageId: number, content: string) => {
@@ -607,16 +452,11 @@ export const AssistantInput = ({
     }
   };
 
-  const startStreaming = (
-    messageId: number,
-    options?: { mode?: AssistantMode; variant?: AssistantVariant },
-    onComplete?: () => void,
-  ) => {
+  const startStreaming = (messageId: number, onComplete?: () => void) => {
     const requestId = createId();
     streamRequestIdRef.current = requestId;
     streamCompleteRef.current = onComplete ?? null;
     streamMessageIdRef.current = messageId;
-    streamTokensRef.current = [];
     streamStartRef.current = Date.now();
     setStreamingMessageId(messageId);
     setIsGenerating(true);
@@ -627,10 +467,7 @@ export const AssistantInput = ({
           : m,
       ),
     );
-    getStreamClient().stream(requestId, {
-      mode: options?.mode ?? state.activeMode,
-      variant: options?.variant ?? variant,
-    });
+    getStreamClient().stream(requestId);
   };
 
   const appendAndStream = (text: string, onComplete?: () => void) => {
@@ -663,7 +500,7 @@ export const AssistantInput = ({
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
 
-    startStreaming(assistantId, undefined, onComplete);
+    startStreaming(assistantId, onComplete);
     return true;
   };
 
@@ -680,7 +517,6 @@ export const AssistantInput = ({
   };
 
   const handleSend = () => {
-    cancelTypewriter();
     if (isGenerating) {
       stopGeneration();
       return;
@@ -690,7 +526,6 @@ export const AssistantInput = ({
   };
 
   const queueCurrentMessage = () => {
-    cancelTypewriter();
     const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
     const trimmed = currentValue.trim();
     if (!trimmed) return;
@@ -703,14 +538,6 @@ export const AssistantInput = ({
 
   return (
     <div className={`assistant-input ${isChat ? 'assistant-input--chat' : ''} ${className}`}>
-      <div
-        className="assistant-input__sr-only"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {streamingMessageId !== null ? 'Assistant is responding.' : ''}
-      </div>
       <div className="assistant-input__stack">
         {!isChat && (
           <div className="assistant-input__intro">
@@ -730,20 +557,6 @@ export const AssistantInput = ({
             >
               {subtitles[subtitleIndex % subtitles.length]}
             </p>
-            <div className="assistant-input__suggestions" aria-label="Suggested prompts">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion.id}
-                  type="button"
-                  className="assistant-input__suggestion"
-                  onClick={() => startSuggestionTypewriter(suggestion.prompt)}
-                  aria-label={`Type prompt: ${suggestion.label}`}
-                  title={suggestion.prompt}
-                >
-                  {suggestion.label}
-                </button>
-              ))}
-            </div>
           </div>
         )}
         {isChat && (
@@ -759,7 +572,6 @@ export const AssistantInput = ({
             onFeedback={handleFeedback}
             onRegenerate={handleRegenerate}
             onCopy={copyMessage}
-            onRetry={handleRetry}
           />
         )}
         <div className="assistant-input__composer">
@@ -776,7 +588,7 @@ export const AssistantInput = ({
           <AssistantComposer
             placeholder={placeholder}
             value={value}
-            onValueChange={handleValueChange}
+            onValueChange={setValue}
             variant={variant}
             onVariantChange={setVariant}
             availableVariants={availableVariants}

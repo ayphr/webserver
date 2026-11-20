@@ -78,12 +78,7 @@ import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './route
 import { handleUserByUuid, handleMe as handleUsersMe, handleUsernameChange } from './routes/users';
 import { handleCreditsMe } from './routes/credits';
 import { handleGetBests as handleGamesBestsGet, handleUpdateBest as handleGamesBestsUpdate } from './routes/games';
-import {
-  handleGetMetrics as handleAssistantGetMetrics,
-  handleGetStaffAssistantMetrics,
-  handleGetState as handleAssistantGetState,
-  handleSaveState as handleAssistantSaveState,
-} from './routes/assistant';
+import { handleGetState as handleAssistantGetState, handleSaveState as handleAssistantSaveState } from './routes/assistant';
 import { handleStripeWebhook } from './routes/subscriptions';
 import {
   handleTeamMe,
@@ -161,7 +156,6 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/games/bests', handle: handleGamesBestsUpdate },
   { method: 'GET', path: '/api/assistant', handle: handleAssistantGetState },
   { method: 'PUT', path: '/api/assistant', handle: handleAssistantSaveState },
-  { method: 'GET', path: '/api/assistant/metrics', handle: handleAssistantGetMetrics },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
   { method: 'PATCH', path: '/api/users/me/username', handle: handleUsernameChange },
 
@@ -271,7 +265,6 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'POST', path: '/api/profile/domain-reverify', handle: handleDomainReverify },
 
   { method: 'GET', path: '/api/staff/summary', handle: handleUsersSummary },
-  { method: 'GET', path: '/api/staff/assistant/metrics', handle: handleGetStaffAssistantMetrics },
   { method: 'GET', path: '/api/staff/users', handle: handleStaffUsers },
   { method: 'DELETE', path: '/api/staff/users/:uuid', handle: handleStaffUserDelete },
   { method: 'GET', path: '/api/staff/users/:uuid/teams', handle: handleStaffUserTeams },

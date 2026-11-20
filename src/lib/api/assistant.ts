@@ -1,4 +1,4 @@
-import type { AssistantMetricsPayload, AssistantState, AssistantStatePayload } from '@common';
+import type { AssistantState, AssistantStatePayload } from '@common';
 import type { RequestClient } from './client';
 
 export function createAssistantApi(client: RequestClient) {
@@ -13,11 +13,6 @@ export function createAssistantApi(client: RequestClient) {
         body: { state },
       });
       return response.state;
-    },
-    async getMetrics(periodDays = 30, signal?: AbortSignal): Promise<AssistantMetricsPayload> {
-      return client.requestJson<AssistantMetricsPayload>(`/api/assistant/metrics?days=${periodDays}`, {
-        signal,
-      });
     },
   };
 }

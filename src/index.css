@@ -107,11 +107,8 @@ select {
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible,
-summary:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--accent-blue-solid);
-  outline-offset: 2px;
+select:focus-visible {
+  outline: none;
 }
 
 body::-webkit-scrollbar {
@@ -161,34 +158,5 @@ body::-webkit-scrollbar-thumb:hover {
   }
   66% {
     stop-color: var(--accent-pink);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .assistant-chat__token,
-  .assistant-chat__dot,
-  .assistant-chat__activity-item--running .assistant-chat__status-dot,
-  .assistant-input__subtitle,
-  .assistant-input__queue-hint,
-  .assistant-toolbar .assistant-menu {
-    animation: none !important;
-  }
-
-  .assistant-chat__token {
-    opacity: 1;
-    transform: none;
-  }
-
-  .assistant-input__composer,
-  .assistant-chat__chevron,
-  .assistant-chat__tool,
-  .assistant-chat__code-copy,
-  .assistant-chat__retry,
-  .assistant-input__suggestion,
-  .assistant-toolbar__item,
-  .assistant-toolbar__mode-button,
-  .assistant-menu__item,
-  .assistant-chat__activity-chevron {
-    transition: none !important;
   }
 }
