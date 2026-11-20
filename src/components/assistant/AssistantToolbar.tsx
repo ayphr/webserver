@@ -112,7 +112,6 @@ export const AssistantToolbar = ({
                 </button>
               );
             })}
-            <div className="assistant-menu__divider" />
             {creatingFolder ? (
               <div className="assistant-menu__create">
                 <IconPlus size={14} strokeWidth={2} className="assistant-menu__icon" />

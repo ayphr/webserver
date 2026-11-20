@@ -87,17 +87,23 @@
 }
 
 .assistant-sidebar__actions {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 0.1rem;
   flex-shrink: 0;
   padding-right: 0.35rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
 }
 
 .assistant-sidebar__row:hover .assistant-sidebar__actions,
 .assistant-sidebar__row:focus-within .assistant-sidebar__actions,
 .assistant-sidebar__row--confirming .assistant-sidebar__actions {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .assistant-sidebar__action {

@@ -118,7 +118,6 @@
   height: 1.6rem;
   padding: 0;
   border: none;
-  border-bottom: 1px solid var(--border-subtle);
   border-radius: 0;
   background-color: transparent;
   color: var(--text-primary);
@@ -130,16 +129,6 @@
 
 .assistant-menu__create-input::placeholder {
   color: var(--text-muted);
-}
-
-.assistant-menu__create-input:focus {
-  border-bottom-color: var(--border-focus);
-}
-
-.assistant-menu__divider {
-  height: 1px;
-  margin: 0.2rem 0.25rem;
-  background-color: var(--border-subtle);
 }
 
 @keyframes assistant-toolbar-menu-in {
