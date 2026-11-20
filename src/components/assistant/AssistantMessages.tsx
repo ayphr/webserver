@@ -196,10 +196,8 @@ export const AssistantMessages = ({
           className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
         >
           <div className="assistant-chat__user-wrap">
-            <div className="assistant-chat__bubble">
-              <span className="assistant-chat__queued-badge">Queued</span>
-              {text}
-            </div>
+            <div className="assistant-chat__bubble">{text}</div>
+            <span className="assistant-chat__queued-label">Queued</span>
           </div>
         </div>
       ))}
