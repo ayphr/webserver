@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
 import { api } from '../../lib/api';
@@ -8,7 +8,7 @@ import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, Ass
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
 import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
-import { useAssistantState } from '../../components/assistant';
+import { AssistantSidebar, useAssistantState, type AssistantChatAction } from '../../components/assistant';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -127,6 +127,8 @@ export const DashboardPage = () => {
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
   const assistant = useAssistantState();
+  const [chatAction, setChatAction] = useState<AssistantChatAction | null>(null);
+  const chatActionTokenRef = useRef(0);
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
@@ -360,6 +362,29 @@ export const DashboardPage = () => {
     }, { replace: true });
   };
 
+  const handleSidebarNewChat = () => {
+    assistant.update((current) => ({ ...current, activeChatId: null }));
+    chatActionTokenRef.current += 1;
+    setChatAction({ type: 'new', token: chatActionTokenRef.current });
+    changeTab('assistant');
+  };
+
+  const handleSidebarOpenChat = (id: string) => {
+    assistant.update((current) => ({ ...current, activeChatId: id }));
+    chatActionTokenRef.current += 1;
+    setChatAction({ type: 'open', token: chatActionTokenRef.current, chatId: id });
+    changeTab('assistant');
+  };
+
+  const handleSidebarDeleteChat = (id: string) => {
+    const wasActive = assistant.state.activeChatId === id;
+    assistant.deleteChat(id);
+    if (wasActive) {
+      chatActionTokenRef.current += 1;
+      setChatAction({ type: 'new', token: chatActionTokenRef.current });
+    }
+  };
+
   const openDevice = (serial: number) => {
     setDeviceToOpen(serial);
     changeTab('devices');
@@ -459,6 +484,20 @@ export const DashboardPage = () => {
   return (
     <div className={`dashboard-layout`}>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
+      {activePage === 'assistant' && (
+        <AssistantSidebar
+          folders={assistant.state.folders}
+          chats={assistant.state.chats}
+          activeChatId={assistant.state.activeChatId}
+          isAssistantView
+          onNewChat={handleSidebarNewChat}
+          onOpenChat={handleSidebarOpenChat}
+          onRenameFolder={assistant.renameFolder}
+          onDeleteFolder={assistant.deleteFolder}
+          onRenameChat={assistant.renameChat}
+          onDeleteChat={handleSidebarDeleteChat}
+        />
+      )}
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
@@ -533,6 +572,7 @@ export const DashboardPage = () => {
                 dataShared={getPlanFeaturesForUser(user).dataShared}
                 sendShortcut={assistantSendShortcut}
                 assistant={assistant}
+                chatAction={chatAction}
               />
             )}
 

@@ -60,10 +60,6 @@
   animation: assistant-toolbar-menu-in 0.14s ease;
 }
 
-.assistant-menu--chats {
-  min-width: 220px;
-}
-
 .assistant-menu__item {
   display: flex;
   align-items: center;
@@ -91,20 +87,15 @@
   color: var(--text-primary);
 }
 
+.assistant-menu__icon {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
 .assistant-menu__text {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.assistant-menu__hint {
-  flex: 0 0 auto;
-  max-width: 6rem;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -123,12 +114,6 @@
   height: 1px;
   margin: 0.2rem 0.25rem;
   background-color: var(--border-subtle);
-}
-
-.assistant-menu__empty {
-  padding: 0.4rem 0.5rem;
-  color: var(--text-muted);
-  font-size: 0.78rem;
 }
 
 @keyframes assistant-toolbar-menu-in {

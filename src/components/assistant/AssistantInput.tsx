@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ASSISTANT_VARIANTS,
-  type AssistantChat,
-  type AssistantFolder,
-  type AssistantVariant,
-} from '@common';
+import { ASSISTANT_VARIANTS, type AssistantChat, type AssistantVariant } from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantComposer } from './AssistantComposer';
 import { AssistantMessages } from './AssistantMessages';
 import { AssistantToolbar } from './AssistantToolbar';
-import type { LiveAssistantMessage } from './types';
+import type { AssistantChatAction, LiveAssistantMessage } from './types';
 import type { AssistantController } from './useAssistantState';
-import { generateGibberish, toPersistableMessage } from './utils';
+import { createId, generateGibberish, toPersistableMessage } from './utils';
 import './AssistantInput.css';
 
 export interface AssistantInputProps {
@@ -23,6 +18,7 @@ export interface AssistantInputProps {
   dataShared?: boolean;
   sendShortcut?: 'enter' | 'shift-enter';
   assistant: AssistantController;
+  chatAction?: AssistantChatAction | null;
 }
 
 const SUBTITLE_TEXTS = (displayName: string) => [
@@ -62,11 +58,6 @@ const SUBTITLE_TEXTS = (displayName: string) => [
   'Let’s start something new.',
 ];
 
-const createId = () =>
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
 export const AssistantInput = ({
   placeholder = 'Ask Iris',
   className = '',
@@ -76,6 +67,7 @@ export const AssistantInput = ({
   dataShared = true,
   sendShortcut = 'enter',
   assistant,
+  chatAction = null,
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
   const subtitles = SUBTITLE_TEXTS(displayName);
@@ -114,8 +106,6 @@ export const AssistantInput = ({
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
 
   const isChat = messages.length > 0;
-  const activeChat = state.chats.find((chat) => chat.id === state.activeChatId);
-  const currentChatTitle = activeChat?.title ?? 'New chat';
 
   const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
 
@@ -264,11 +254,7 @@ export const AssistantInput = ({
     setValue('');
     setMessages(chat.messages);
     nextIdRef.current = chat.messages.reduce((max, message) => Math.max(max, message.id), 0) + 1;
-    assistant.update((current) => ({
-      ...current,
-      activeChatId: chat.id,
-      activeFolderId: chat.folderId,
-    }));
+    assistant.update((current) => ({ ...current, activeChatId: chat.id }));
     setOpenMenuId(null);
 
     const lastVariant = [...chat.messages]
@@ -279,51 +265,19 @@ export const AssistantInput = ({
     textareaRef.current?.focus();
   };
 
-  const handleSelectFolder = (folderId: string | null) => {
-    assistant.update((current) => ({
-      ...current,
-      activeFolderId: folderId,
-      chats: current.activeChatId
-        ? current.chats.map((chat) =>
-            chat.id === current.activeChatId
-              ? { ...chat, folderId, updatedAt: Date.now() }
-              : chat,
-          )
-        : current.chats,
-    }));
-  };
+  const lastChatActionTokenRef = useRef(chatAction?.token);
 
-  const handleCreateFolder = (name: string) => {
-    const folder: AssistantFolder = {
-      id: createId(),
-      name,
-        createdAt: Date.now(),
-    };
-    assistant.update((current) => ({
-      ...current,
-      folders: [folder, ...current.folders],
-      activeFolderId: folder.id,
-      chats: current.activeChatId
-        ? current.chats.map((chat) =>
-            chat.id === current.activeChatId
-              ? { ...chat, folderId: folder.id, updatedAt: Date.now() }
-              : chat,
-          )
-        : current.chats,
-    }));
-  };
-
-  const handleRenameChat = (title: string) => {
-    if (!state.activeChatId) return;
-    assistant.update((current) => ({
-      ...current,
-      chats: current.chats.map((chat) =>
-        chat.id === current.activeChatId
-          ? { ...chat, title, updatedAt: Date.now() }
-          : chat,
-      ),
-    }));
-  };
+  useEffect(() => {
+    if (!chatAction || chatAction.token === lastChatActionTokenRef.current) return;
+    lastChatActionTokenRef.current = chatAction.token;
+    if (chatAction.type === 'new') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleNewChat();
+    } else {
+      handleOpenChat(chatAction.chatId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatAction]);
 
   const handleFeedback = (messageId: number, feedback: 'like' | 'dislike') => {
     setMessages((prev) =>
@@ -551,19 +505,14 @@ export const AssistantInput = ({
           />
         )}
         <div className="assistant-input__composer">
-          <AssistantToolbar
-            isChat={isChat}
-            folders={state.folders}
-            chats={state.chats}
-            activeFolderId={state.activeFolderId}
-            activeChatId={state.activeChatId}
-            currentChatTitle={currentChatTitle}
-            onNewChat={handleNewChat}
-            onOpenChat={handleOpenChat}
-            onSelectFolder={handleSelectFolder}
-            onCreateFolder={handleCreateFolder}
-            onRenameChat={handleRenameChat}
-          />
+          {!state.activeChatId && (
+            <AssistantToolbar
+              folders={state.folders}
+              activeFolderId={state.activeFolderId}
+              onSelectFolder={assistant.selectFolder}
+              onCreateFolder={assistant.createFolder}
+            />
+          )}
           <AssistantComposer
             placeholder={placeholder}
             value={value}

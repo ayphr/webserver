@@ -5,7 +5,7 @@ import {
   type AssistantState,
 } from '@common';
 import { api } from '../../lib/api';
-import { toPersistableMessage } from './utils';
+import { createId, toPersistableMessage } from './utils';
 
 export type AssistantController = {
   state: AssistantState;
@@ -13,6 +13,12 @@ export type AssistantController = {
   isLoading: boolean;
   update: (updater: (current: AssistantState) => AssistantState) => void;
   updatePreferences: (patch: Partial<AssistantPreferences>) => void;
+  selectFolder: (folderId: string | null) => void;
+  createFolder: (name: string) => void;
+  renameFolder: (id: string, name: string) => void;
+  deleteFolder: (id: string) => void;
+  renameChat: (id: string, title: string) => void;
+  deleteChat: (id: string) => void;
 };
 
 const SAVE_DELAY_MS = 500;
@@ -85,6 +91,80 @@ export const useAssistantState = (): AssistantController => {
     [update],
   );
 
+  const selectFolder = useCallback(
+    (folderId: string | null) => {
+      update((current) => ({ ...current, activeFolderId: folderId }));
+    },
+    [update],
+  );
+
+  const createFolder = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const folder = { id: createId(), name: trimmed, createdAt: Date.now() };
+      update((current) => ({
+        ...current,
+        folders: [folder, ...current.folders],
+        activeFolderId: folder.id,
+      }));
+    },
+    [update],
+  );
+
+  const renameFolder = useCallback(
+    (id: string, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      update((current) => ({
+        ...current,
+        folders: current.folders.map((folder) =>
+          folder.id === id ? { ...folder, name: trimmed } : folder,
+        ),
+      }));
+    },
+    [update],
+  );
+
+  const deleteFolder = useCallback(
+    (id: string) => {
+      update((current) => ({
+        ...current,
+        folders: current.folders.filter((folder) => folder.id !== id),
+        chats: current.chats.map((chat) =>
+          chat.folderId === id ? { ...chat, folderId: null, updatedAt: Date.now() } : chat,
+        ),
+        activeFolderId: current.activeFolderId === id ? null : current.activeFolderId,
+      }));
+    },
+    [update],
+  );
+
+  const renameChat = useCallback(
+    (id: string, title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      update((current) => ({
+        ...current,
+        chats: current.chats.map((chat) =>
+          chat.id === id ? { ...chat, title: trimmed, updatedAt: Date.now() } : chat,
+        ),
+      }));
+    },
+    [update],
+  );
+
+  const deleteChat = useCallback(
+    (id: string) => {
+      update((current) => ({
+        ...current,
+        chats: current.chats.filter((chat) => chat.id !== id),
+        activeChatId: current.activeChatId === id ? null : current.activeChatId,
+      }));
+    },
+    [update],
+  );
+
   useEffect(() => {
     for (const key of LEGACY_ASSISTANT_STORAGE_KEYS) localStorage.removeItem(key);
 
@@ -122,7 +202,24 @@ export const useAssistantState = (): AssistantController => {
       isLoading,
       update,
       updatePreferences,
+      selectFolder,
+      createFolder,
+      renameFolder,
+      deleteFolder,
+      renameChat,
+      deleteChat,
     }),
-    [state, isLoading, update, updatePreferences],
+    [
+      state,
+      isLoading,
+      update,
+      updatePreferences,
+      selectFolder,
+      createFolder,
+      renameFolder,
+      deleteFolder,
+      renameChat,
+      deleteChat,
+    ],
   );
 };
