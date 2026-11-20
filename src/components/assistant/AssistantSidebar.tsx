@@ -5,6 +5,7 @@ import {
   IconFolderOpen,
   IconFolders,
   IconMessageCircle,
+  IconMessageCircleFilled,
   IconPencil,
   IconPlus,
   IconTrash,
@@ -164,9 +165,10 @@ export const AssistantSidebar = ({
     if (deleteState?.kind === kind && deleteState.id === id) {
       return (
         <>
+          <span className="assistant-sidebar__confirm-hint">Confirm?</span>
           <button
             type="button"
-            className="assistant-sidebar__action assistant-sidebar__action--confirm"
+            className="assistant-sidebar__action"
             aria-label={`Confirm delete ${name}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -226,7 +228,13 @@ export const AssistantSidebar = ({
     return (
       <Row
         key={chat.id}
-        icon={<IconMessageCircle size={15} strokeWidth={1.75} />}
+        icon={
+          chat.id === activeChatId ? (
+            <IconMessageCircleFilled size={15} strokeWidth={1.75} />
+          ) : (
+            <IconMessageCircle size={15} strokeWidth={1.75} />
+          )
+        }
         label={chat.title}
         active={chat.id === activeChatId}
         indented

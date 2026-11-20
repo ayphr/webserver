@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { IconCheck, IconFolder, IconFolders, IconPlus } from '@tabler/icons-react';
+import {
+  IconFolder,
+  IconFolderFilled,
+  IconFolders,
+  IconFoldersFilled,
+  IconPlus,
+} from '@tabler/icons-react';
 import type { AssistantFolder } from '@common';
 import './AssistantToolbar.css';
 
@@ -79,9 +85,12 @@ export const AssistantToolbar = ({
               className={`assistant-menu__item ${activeFolderId === null ? 'assistant-menu__item--selected' : ''}`}
               onClick={() => handleSelectFolder(null)}
             >
-              <IconFolders size={15} strokeWidth={1.75} className="assistant-menu__icon" />
+              {activeFolderId === null ? (
+                <IconFoldersFilled size={15} strokeWidth={1.75} className="assistant-menu__icon" />
+              ) : (
+                <IconFolders size={15} strokeWidth={1.75} className="assistant-menu__icon" />
+              )}
               <span className="assistant-menu__text">Uncategorised</span>
-              {activeFolderId === null && <IconCheck size={14} strokeWidth={2} className="assistant-menu__check" />}
             </button>
             {folders.map((folder) => {
               const selected = activeFolderId === folder.id;
@@ -94,9 +103,12 @@ export const AssistantToolbar = ({
                   className={`assistant-menu__item ${selected ? 'assistant-menu__item--selected' : ''}`}
                   onClick={() => handleSelectFolder(folder.id)}
                 >
-                  <IconFolder size={15} strokeWidth={1.75} className="assistant-menu__icon" />
+                  {selected ? (
+                    <IconFolderFilled size={15} strokeWidth={1.75} className="assistant-menu__icon" />
+                  ) : (
+                    <IconFolder size={15} strokeWidth={1.75} className="assistant-menu__icon" />
+                  )}
                   <span className="assistant-menu__text">{folder.name}</span>
-                  {selected && <IconCheck size={14} strokeWidth={2} className="assistant-menu__check" />}
                 </button>
               );
             })}

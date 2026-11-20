@@ -118,6 +118,9 @@
   color: var(--text-primary);
 }
 
-.assistant-sidebar__action--confirm:hover {
-  color: var(--status-success);
+.assistant-sidebar__confirm-hint {
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+  font-size: 0.72rem;
+  white-space: nowrap;
 }

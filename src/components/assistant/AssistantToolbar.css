@@ -100,12 +100,6 @@
   white-space: nowrap;
 }
 
-.assistant-menu__check {
-  flex: 0 0 auto;
-  margin-left: 0.1rem;
-  color: var(--text-primary);
-}
-
 .assistant-menu__item--action {
   color: var(--text-muted);
 }
