@@ -209,7 +209,7 @@ export const AssistantInput = ({
     void video.play().catch(() => {
       // Autoplay can be blocked; the muted video element will still display its first frame.
     });
-  }, [isChat]);
+  }, [isChat, state.activeMode]);
 
   const enqueueMessage = (text: string) => {
     queuedMessagesRef.current = [...queuedMessagesRef.current, text];
