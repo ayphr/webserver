@@ -42,6 +42,43 @@
   border-color: var(--border-focus);
 }
 
+.radio__styles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.radio__style {
+  appearance: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-md);
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.radio__style:hover {
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+}
+
+.radio__style--active {
+  border-color: var(--border-focus);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.radio__style:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 .radio__volume {
   width: min(100%, 22rem);
 }

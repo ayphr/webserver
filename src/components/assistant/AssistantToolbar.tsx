@@ -11,6 +11,7 @@ import {
   IconPlus,
 } from '@tabler/icons-react';
 import type { AssistantFolder, AssistantMode } from '@common';
+import { Tooltip } from '../common/Tooltip';
 import { useRadio } from '../../context';
 import './AssistantToolbar.css';
 
@@ -187,18 +188,21 @@ export const AssistantToolbar = ({
           <span>Task</span>
         </button>
       </div>
-      <button
-        type="button"
-        className={`assistant-toolbar__mode-button assistant-toolbar__radio ${isRadioPlaying ? 'assistant-toolbar__mode-button--active' : ''}`}
-        onClick={() => { void toggleRadio(); }}
-        title={isRadioPlaying ? 'Pause radio' : 'Play radio'}
-        aria-label={isRadioPlaying ? 'Pause radio' : 'Play radio'}
-        aria-pressed={isRadioPlaying}
-      >
-        {isRadioPlaying
-          ? <IconPlayerPause size={16} strokeWidth={1.75} />
-          : <IconPlayerPlay size={16} strokeWidth={1.75} />}
-      </button>
+      <div className="assistant-toolbar__radio">
+        <Tooltip content={isRadioPlaying ? 'Pause radio' : 'Play radio'}>
+          <button
+            type="button"
+            className={`assistant-toolbar__mode-button ${isRadioPlaying ? 'assistant-toolbar__mode-button--active' : ''}`}
+            onClick={() => { void toggleRadio(); }}
+            aria-label={isRadioPlaying ? 'Pause radio' : 'Play radio'}
+            aria-pressed={isRadioPlaying}
+          >
+            {isRadioPlaying
+              ? <IconPlayerPause size={16} strokeWidth={1.75} />
+              : <IconPlayerPlay size={16} strokeWidth={1.75} />}
+          </button>
+        </Tooltip>
+      </div>
     </div>
   );
 };

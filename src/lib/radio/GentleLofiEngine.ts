@@ -6,6 +6,9 @@
  * that lives above the router, so it keeps playing while the dashboard changes tabs.
  */
 
+export const RADIO_STYLES = ['gentle', 'jazzy', 'rainy'] as const;
+export type RadioStyle = (typeof RADIO_STYLES)[number];
+
 function midiToFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
@@ -17,8 +20,20 @@ function clampVolume(value: number): number {
 
 type Chord = { root: number; notes: number[] };
 
+type StylePreset = {
+  bpm: number;
+  swing: number;
+  progressions: Chord[][];
+  melodyPool: number[];
+  melodyChance: number;
+  brushVelocity: number;
+  filterHz: number;
+  reverbWet: number;
+  ambienceLevel: number;
+};
+
 // Curated warm Neo-Soul / lofi progressions in a low-mid register.
-const PROGRESSIONS: Chord[][] = [
+const GENTLE_PROGRESSIONS: Chord[][] = [
   [
     { root: 41, notes: [53, 57, 60, 64, 67] }, // Fmaj9
     { root: 40, notes: [52, 55, 59, 62, 67] }, // Em7
@@ -39,7 +54,71 @@ const PROGRESSIONS: Chord[][] = [
   ],
 ];
 
-const MELODY_POOL = [64, 67, 69, 72, 74, 76, 79, 81];
+const JAZZY_PROGRESSIONS: Chord[][] = [
+  [
+    { root: 38, notes: [50, 53, 57, 60, 64] }, // Dm9
+    { root: 43, notes: [50, 55, 59, 64, 69] }, // G13
+    { root: 36, notes: [48, 52, 55, 59, 62] }, // Cmaj9
+    { root: 45, notes: [52, 55, 61, 64, 68] }, // A7b9
+  ],
+  [
+    { root: 41, notes: [53, 57, 60, 64, 67] }, // Fmaj9
+    { root: 44, notes: [51, 56, 60, 63, 67] }, // Abmaj9
+    { root: 38, notes: [50, 53, 57, 60, 64] }, // Dm9
+    { root: 43, notes: [50, 55, 59, 64, 69] }, // G13
+  ],
+];
+
+const RAINY_PROGRESSIONS: Chord[][] = [
+  [
+    { root: 45, notes: [57, 60, 64, 67] }, // Am7
+    { root: 41, notes: [53, 57, 60, 64] }, // Fmaj7
+    { root: 36, notes: [48, 52, 55, 59] }, // Cmaj7
+    { root: 43, notes: [50, 55, 57, 62] }, // Gsus
+  ],
+  [
+    { root: 44, notes: [56, 60, 63, 67] }, // Abmaj7
+    { root: 39, notes: [51, 55, 58, 65] }, // Ebmaj7
+    { root: 46, notes: [58, 62, 65, 69] }, // Bbmaj7
+    { root: 43, notes: [50, 55, 59, 62] }, // G7sus
+  ],
+];
+
+const STYLE_PRESETS: Record<RadioStyle, StylePreset> = {
+  gentle: {
+    bpm: 69,
+    swing: 0.18,
+    progressions: GENTLE_PROGRESSIONS,
+    melodyPool: [64, 67, 69, 72, 74, 76, 79, 81],
+    melodyChance: 0.24,
+    brushVelocity: 0.85,
+    filterHz: 2100,
+    reverbWet: 0.42,
+    ambienceLevel: 0.16,
+  },
+  jazzy: {
+    bpm: 82,
+    swing: 0.22,
+    progressions: JAZZY_PROGRESSIONS,
+    melodyPool: [64, 67, 69, 71, 72, 74, 76, 77, 79, 81],
+    melodyChance: 0.34,
+    brushVelocity: 1,
+    filterHz: 2700,
+    reverbWet: 0.32,
+    ambienceLevel: 0.12,
+  },
+  rainy: {
+    bpm: 62,
+    swing: 0.14,
+    progressions: RAINY_PROGRESSIONS,
+    melodyPool: [60, 62, 64, 67, 69, 72, 74],
+    melodyChance: 0.12,
+    brushVelocity: 0.5,
+    filterHz: 1550,
+    reverbWet: 0.52,
+    ambienceLevel: 0.24,
+  },
+};
 
 const MASTER_PEAK = 0.24;
 const MIN_GAIN = 0.0001;
@@ -65,16 +144,22 @@ export class GentleLofiEngine {
   private isInitialized = false;
   private isPlaying = false;
   private volume: number;
-  private bpm = 69;
+  private style: RadioStyle;
   private step = 0;
   private nextNoteTime = 0;
   private schedulerTimer: ReturnType<typeof setInterval> | null = null;
   private progressionIndex = 0;
   private barCounter = 0;
   private ambienceSource: AudioBufferSourceNode | null = null;
+  private ambienceGain: GainNode | null = null;
 
-  constructor(volume: number) {
+  constructor(volume: number, style: RadioStyle = 'gentle') {
     this.volume = clampVolume(volume);
+    this.style = style;
+  }
+
+  private get preset(): StylePreset {
+    return STYLE_PRESETS[this.style];
   }
 
   private targetGain(): number {
@@ -94,7 +179,7 @@ export class GentleLofiEngine {
 
     this.masterFilter = this.ctx.createBiquadFilter();
     this.masterFilter.type = 'lowpass';
-    this.masterFilter.frequency.value = 2100;
+    this.masterFilter.frequency.value = this.preset.filterHz;
     this.masterFilter.Q.value = 0.5;
 
     this.compressor = this.ctx.createDynamicsCompressor();
@@ -107,7 +192,7 @@ export class GentleLofiEngine {
     this.reverb = this.ctx.createConvolver();
     this.reverb.buffer = this.createDarkReverbImpulse(3.4, 3.2);
     this.reverbWet = this.ctx.createGain();
-    this.reverbWet.gain.value = 0.42;
+    this.reverbWet.gain.value = this.preset.reverbWet;
 
     this.delayL = this.ctx.createDelay(1.5);
     this.delayR = this.ctx.createDelay(1.5);
@@ -201,13 +286,14 @@ export class GentleLofiEngine {
     lp.frequency.value = 1150;
 
     const bedGain = this.ctx.createGain();
-    bedGain.gain.value = 0.16;
+    bedGain.gain.value = this.preset.ambienceLevel;
 
     src.connect(lp);
     lp.connect(bedGain);
     bedGain.connect(this.masterFilter);
     src.start();
     this.ambienceSource = src;
+    this.ambienceGain = bedGain;
   }
 
   /** Gentle tape pitch drift. */
@@ -383,21 +469,22 @@ export class GentleLofiEngine {
   }
 
   private scheduleStep(stepIdx: number, baseTime: number): void {
-    const sixteenth = 60 / this.bpm / 4;
-    const swingOffset = stepIdx % 2 === 1 ? 0.18 * sixteenth : 0;
+    const preset = this.preset;
+    const sixteenth = 60 / preset.bpm / 4;
+    const swingOffset = stepIdx % 2 === 1 ? preset.swing * sixteenth : 0;
     const t = baseTime + swingOffset;
 
     const barInProg = Math.floor(stepIdx / 16) % 4;
     const stepInBar = stepIdx % 16;
 
     if (stepIdx === 0 && this.barCounter > 0 && this.barCounter % 8 === 0) {
-      this.progressionIndex = (this.progressionIndex + 1) % PROGRESSIONS.length;
+      this.progressionIndex = (this.progressionIndex + 1) % preset.progressions.length;
     }
     if (stepInBar === 0) {
       this.barCounter++;
     }
 
-    const chord = PROGRESSIONS[this.progressionIndex][barInProg];
+    const chord = preset.progressions[this.progressionIndex % preset.progressions.length][barInProg];
 
     if (stepInBar === 0) {
       this.playChord(chord.notes, t, sixteenth * 15);
@@ -414,20 +501,20 @@ export class GentleLofiEngine {
     }
 
     if (stepInBar === 4 || stepInBar === 12) {
-      this.playSoftBrush(t, 0.85);
+      this.playSoftBrush(t, preset.brushVelocity);
     } else if (stepInBar % 2 === 0 && Math.random() > 0.55) {
-      this.playSoftBrush(t, 0.25);
+      this.playSoftBrush(t, preset.brushVelocity * 0.3);
     }
 
-    if (stepInBar % 2 === 0 && Math.random() < 0.24) {
-      const note = MELODY_POOL[Math.floor(Math.random() * MELODY_POOL.length)];
+    if (stepInBar % 2 === 0 && Math.random() < preset.melodyChance) {
+      const note = preset.melodyPool[Math.floor(Math.random() * preset.melodyPool.length)];
       const dur = sixteenth * (4 + Math.floor(Math.random() * 5));
       this.playFeltNote(note, t, dur, 0.45 + Math.random() * 0.35);
     }
   }
 
   private scheduler(): void {
-    const sixteenth = 60 / this.bpm / 4;
+    const sixteenth = 60 / this.preset.bpm / 4;
     while (this.nextNoteTime < this.ctx.currentTime + SCHEDULER_LOOKAHEAD_SECONDS) {
       this.scheduleStep(this.step, this.nextNoteTime);
       this.nextNoteTime += sixteenth;
@@ -447,6 +534,23 @@ export class GentleLofiEngine {
     this.volume = clampVolume(value);
     if (!this.isInitialized || !this.isPlaying) return;
     this.rampGain(this.targetGain(), VOLUME_RAMP_SECONDS, this.ctx.currentTime);
+  }
+
+  /** Switch the progression, tempo, and texture. Safe to call while playing. */
+  setStyle(style: RadioStyle): void {
+    this.style = style;
+    if (!this.isInitialized) return;
+
+    const now = this.ctx.currentTime;
+    this.masterFilter.frequency.cancelScheduledValues(now);
+    this.masterFilter.frequency.setTargetAtTime(this.preset.filterHz, now, 0.25);
+    this.reverbWet.gain.cancelScheduledValues(now);
+    this.reverbWet.gain.setTargetAtTime(this.preset.reverbWet, now, 0.25);
+
+    if (this.ambienceGain) {
+      this.ambienceGain.gain.cancelScheduledValues(now);
+      this.ambienceGain.gain.setTargetAtTime(this.preset.ambienceLevel, now, 0.25);
+    }
   }
 
   async toggle(): Promise<boolean> {
