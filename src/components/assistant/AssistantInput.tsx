@@ -1,0 +1,587 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ASSISTANT_VARIANTS,
+  type AssistantChat,
+  type AssistantFolder,
+  type AssistantVariant,
+} from '@common';
+import irisAnimation from '../../assets/animations/iris.webm';
+import { AssistantComposer } from './AssistantComposer';
+import { AssistantMessages } from './AssistantMessages';
+import { AssistantToolbar } from './AssistantToolbar';
+import type { LiveAssistantMessage } from './types';
+import type { AssistantController } from './useAssistantState';
+import { generateGibberish, toPersistableMessage } from './utils';
+import './AssistantInput.css';
+
+export interface AssistantInputProps {
+  placeholder?: string;
+  className?: string;
+  availableVariants?: AssistantVariant[];
+  username?: string;
+  defaultVariant?: AssistantVariant;
+  dataShared?: boolean;
+  sendShortcut?: 'enter' | 'shift-enter';
+  assistant: AssistantController;
+}
+
+const SUBTITLE_TEXTS = (displayName: string) => [
+  `What should we tackle, ${displayName}?`,
+  'How can I help?',
+  'Ready when you are.',
+  'Let’s get to work.',
+  'Ask me anything.',
+  'What’s the plan today?',
+  'Let’s make progress.',
+  'How can I support you?',
+  'What are we solving?',
+  'Let’s get started.',
+  'What’s on your agenda?',
+  'Need a hand with something?',
+  'Let’s dive in.',
+  'What would you like to explore?',
+  'Let’s turn data into answers.',
+  'What can Iris do for you?',
+  'Where should we begin?',
+  'Let’s make today productive.',
+  'What’s the next big question?',
+  'I’m here to help.',
+  'Let’s uncover some insights.',
+  'What would you like to learn?',
+  'Ready to explore your data?',
+  'Let’s get things done.',
+  'What’s on your mind?',
+  'How can Iris assist?',
+  'Let’s find the answer together.',
+  'What should we focus on?',
+  'Let’s take a look.',
+  'What’s the challenge today?',
+  'Let’s get to the bottom of it.',
+  'How can I make things easier?',
+  'What are we curious about?',
+  'Let’s start something new.',
+];
+
+const createId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+export const AssistantInput = ({
+  placeholder = 'Ask Iris',
+  className = '',
+  availableVariants = ASSISTANT_VARIANTS,
+  username,
+  defaultVariant,
+  dataShared = true,
+  sendShortcut = 'enter',
+  assistant,
+}: AssistantInputProps) => {
+  const displayName = username?.trim() || 'there';
+  const subtitles = SUBTITLE_TEXTS(displayName);
+  const { state } = assistant;
+  const updateAssistant = assistant.update;
+
+  const [value, setValue] = useState('');
+  const fallbackVariant = availableVariants.includes('standard')
+    ? 'standard'
+    : (availableVariants[0] ?? 'nano');
+  const initialVariant =
+    defaultVariant && availableVariants.includes(defaultVariant) ? defaultVariant : fallbackVariant;
+  const [variant, setVariant] = useState<AssistantVariant>(initialVariant);
+  const [messages, setMessages] = useState<LiveAssistantMessage[]>(() => {
+    const chat = state.chats.find((item) => item.id === state.activeChatId);
+    return chat?.messages ?? [];
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
+  const [subtitleIndex, setSubtitleIndex] = useState(0);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+
+  const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const queuedMessagesRef = useRef<string[]>([]);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamTokensRef = useRef<string[]>([]);
+  const streamIndexRef = useRef(0);
+  const streamMessageIdRef = useRef<number | null>(null);
+  const streamStartRef = useRef<number | null>(null);
+  const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
+
+  const isChat = messages.length > 0;
+  const activeChat = state.chats.find((chat) => chat.id === state.activeChatId);
+  const currentChatTitle = activeChat?.title ?? 'New chat';
+
+  const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
+
+  useEffect(() => {
+    if (!availableVariants.includes(variant)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVariant(fallbackVariant);
+    }
+  }, [availableVariants, fallbackVariant, variant]);
+
+  useEffect(
+    () => () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (streamRef.current) clearTimeout(streamRef.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSubtitleIndex((i) => (i + 1) % subtitles.length);
+    }, 4000);
+    return () => clearInterval(id);
+  }, [subtitles.length]);
+
+  useEffect(() => {
+    if (isGenerating) return;
+    const chat = state.chats.find((item) => item.id === state.activeChatId);
+    nextIdRef.current = Math.max(
+      nextIdRef.current,
+      (chat?.messages ?? []).reduce((max, message) => Math.max(max, message.id), 0) + 1,
+    );
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessages(chat?.messages ?? []);
+    // Sync only when opening or leaving a chat; local message changes are persisted below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.activeChatId]);
+
+  useEffect(() => {
+    if (!state.activeChatId || isGenerating) return;
+    updateAssistant((current) => ({
+      ...current,
+      chats: current.chats.map((chat) =>
+        chat.id === state.activeChatId
+          ? {
+              ...chat,
+              messages: messages.map(toPersistableMessage),
+              updatedAt: Date.now(),
+            }
+          : chat,
+      ),
+    }));
+  }, [updateAssistant, isGenerating, messages, state.activeChatId]);
+
+  useEffect(() => {
+    if (isChat) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    void video.play().catch(() => {
+      // Autoplay can be blocked; the muted video element will still display its first frame.
+    });
+  }, [isChat]);
+
+  const enqueueMessage = (text: string) => {
+    queuedMessagesRef.current = [...queuedMessagesRef.current, text];
+    setQueuedMessages(queuedMessagesRef.current);
+  };
+
+  const dequeueMessage = () => {
+    const [next, ...rest] = queuedMessagesRef.current;
+    queuedMessagesRef.current = rest;
+    setQueuedMessages(rest);
+    return next;
+  };
+
+  const takeStreamDuration = () => {
+    const started = streamStartRef.current;
+    streamStartRef.current = null;
+    return started === null ? undefined : Math.max(1, Date.now() - started);
+  };
+
+  const cancelStream = () => {
+    if (streamRef.current) {
+      clearTimeout(streamRef.current);
+      streamRef.current = null;
+    }
+    streamTokensRef.current = [];
+    streamIndexRef.current = 0;
+    streamMessageIdRef.current = null;
+    streamStartRef.current = null;
+    setStreamingMessageId(null);
+    setIsGenerating(false);
+  };
+
+  const stopGeneration = () => {
+    const messageId = streamMessageIdRef.current;
+    const durationMs = takeStreamDuration();
+    cancelStream();
+    if (messageId !== null) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId && m.role === 'assistant'
+            ? { ...m, interrupted: true, durationMs: m.durationMs ?? durationMs }
+            : m,
+        ),
+      );
+    }
+  };
+
+  const createChat = (folderId: string | null) => {
+    const now = Date.now();
+    const chat: AssistantChat = {
+      id: createId(),
+      title: 'New chat',
+      folderId,
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    assistant.update((current) => ({
+      ...current,
+      chats: [chat, ...current.chats],
+      activeChatId: chat.id,
+    }));
+    return chat;
+  };
+
+  const handleNewChat = () => {
+    cancelStream();
+    queuedMessagesRef.current = [];
+    setQueuedMessages([]);
+    setMessages([]);
+    setValue('');
+    setOpenMenuId(null);
+    assistant.update((current) => ({ ...current, activeChatId: null }));
+    textareaRef.current?.focus();
+  };
+
+  const handleOpenChat = (id: string) => {
+    const chat = state.chats.find((item) => item.id === id);
+    if (!chat) return;
+    cancelStream();
+    queuedMessagesRef.current = [];
+    setQueuedMessages([]);
+    setValue('');
+    setMessages(chat.messages);
+    nextIdRef.current = chat.messages.reduce((max, message) => Math.max(max, message.id), 0) + 1;
+    assistant.update((current) => ({
+      ...current,
+      activeChatId: chat.id,
+      activeFolderId: chat.folderId,
+    }));
+    setOpenMenuId(null);
+
+    const lastVariant = [...chat.messages]
+      .reverse()
+      .find((message) => message.role === 'assistant' && message.variant)?.variant;
+    if (lastVariant && availableVariants.includes(lastVariant)) setVariant(lastVariant);
+
+    textareaRef.current?.focus();
+  };
+
+  const handleSelectFolder = (folderId: string | null) => {
+    assistant.update((current) => ({
+      ...current,
+      activeFolderId: folderId,
+      chats: current.activeChatId
+        ? current.chats.map((chat) =>
+            chat.id === current.activeChatId
+              ? { ...chat, folderId, updatedAt: Date.now() }
+              : chat,
+          )
+        : current.chats,
+    }));
+  };
+
+  const handleCreateFolder = (name: string) => {
+    const folder: AssistantFolder = {
+      id: createId(),
+      name,
+        createdAt: Date.now(),
+    };
+    assistant.update((current) => ({
+      ...current,
+      folders: [folder, ...current.folders],
+      activeFolderId: folder.id,
+      chats: current.activeChatId
+        ? current.chats.map((chat) =>
+            chat.id === current.activeChatId
+              ? { ...chat, folderId: folder.id, updatedAt: Date.now() }
+              : chat,
+          )
+        : current.chats,
+    }));
+  };
+
+  const handleRenameChat = (title: string) => {
+    if (!state.activeChatId) return;
+    assistant.update((current) => ({
+      ...current,
+      chats: current.chats.map((chat) =>
+        chat.id === current.activeChatId
+          ? { ...chat, title, updatedAt: Date.now() }
+          : chat,
+      ),
+    }));
+  };
+
+  const handleFeedback = (messageId: number, feedback: 'like' | 'dislike') => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? { ...m, feedback: m.feedback === feedback ? null : feedback }
+          : m,
+      ),
+    );
+  };
+
+  const handleUndo = (messageId: number) => {
+    const index = messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return;
+    const userMessage = messages[index];
+    const assistantMessage =
+      index + 1 < messages.length && messages[index + 1].role === 'assistant'
+        ? messages[index + 1]
+        : undefined;
+
+    const removedIds = new Set(messages.slice(index).map((m) => m.id));
+    if (streamMessageIdRef.current !== null && removedIds.has(streamMessageIdRef.current)) {
+      cancelStream();
+    }
+    if (assistantMessage?.variant) {
+      setVariant(assistantMessage.variant);
+    }
+    setValue(userMessage.content);
+    if (textareaRef.current) textareaRef.current.value = userMessage.content;
+    queuedMessagesRef.current = [];
+    setQueuedMessages([]);
+
+    setMessages((prev) => {
+      const i = prev.findIndex((m) => m.id === messageId);
+      return i === -1 ? prev : prev.slice(0, i);
+    });
+    setOpenMenuId(null);
+    textareaRef.current?.focus();
+  };
+
+  const handleRegenerate = (messageId: number) => {
+    if (messages[messages.length - 1]?.id !== messageId) return;
+    cancelStream();
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? { ...m, content: '', interrupted: false, feedback: null, durationMs: undefined, variant }
+          : m,
+      ),
+    );
+    startStreaming(messageId, generateGibberish(), processQueue);
+  };
+
+  const copyMessage = async (messageId: number, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      setCopiedId(messageId);
+      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 1600);
+    } catch {
+      // Clipboard access can be unavailable; ignore.
+    }
+  };
+
+  const startStreaming = (messageId: number, text: string, onComplete?: () => void) => {
+    const tokens = text.split(' ');
+    streamTokensRef.current = tokens;
+    streamIndexRef.current = 0;
+    streamMessageIdRef.current = messageId;
+    streamStartRef.current = Date.now();
+    setStreamingMessageId(messageId);
+    setIsGenerating(true);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? { ...m, liveDurationMs: 0, liveTokensPerSecond: 0 }
+          : m,
+      ),
+    );
+
+    const tick = () => {
+      if (streamIndexRef.current >= streamTokensRef.current.length) {
+        const durationMs = takeStreamDuration();
+        streamRef.current = null;
+        streamTokensRef.current = [];
+        streamIndexRef.current = 0;
+        streamMessageIdRef.current = null;
+        setStreamingMessageId(null);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId && m.role === 'assistant'
+              ? {
+                  ...m,
+                  durationMs: m.durationMs ?? durationMs,
+                  liveDurationMs: undefined,
+                  liveTokensPerSecond: undefined,
+                }
+              : m,
+          ),
+        );
+        if (onComplete) onComplete();
+        else setIsGenerating(false);
+        return;
+      }
+      streamIndexRef.current += 1;
+      const partial = streamTokensRef.current.slice(0, streamIndexRef.current).join(' ');
+      const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
+      const tokenCount = partial.split(' ').filter(Boolean).length;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                content: partial,
+                liveDurationMs: elapsedMs,
+                liveTokensPerSecond: tokenCount / (elapsedMs / 1000),
+              }
+            : m,
+        ),
+      );
+      streamRef.current = setTimeout(tick, 70 + Math.random() * 50);
+    };
+    streamRef.current = setTimeout(tick, 300);
+  };
+
+  const appendAndStream = (text: string, onComplete?: () => void) => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+
+    if (!state.activeChatId) createChat(state.activeFolderId);
+
+    const now = Date.now();
+    const userMessage: LiveAssistantMessage = {
+      id: nextIdRef.current++,
+      role: 'user',
+      content: trimmed,
+      createdAt: now,
+    };
+    const assistantId = nextIdRef.current++;
+    setMessages((prev) => [
+      ...prev,
+      userMessage,
+      {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        createdAt: now,
+        interrupted: false,
+        feedback: null,
+        variant,
+      },
+    ]);
+    setValue('');
+    if (textareaRef.current) textareaRef.current.value = '';
+
+    startStreaming(assistantId, generateGibberish(), onComplete);
+    return true;
+  };
+
+  const processQueue = () => {
+    const next = dequeueMessage();
+    if (next) appendAndStream(next, processQueue);
+    else setIsGenerating(false);
+  };
+
+  const sendMessageText = (text: string) => {
+    if (appendAndStream(text, processQueue)) {
+      textareaRef.current?.focus();
+    }
+  };
+
+  const handleSend = () => {
+    if (isGenerating) {
+      stopGeneration();
+      return;
+    }
+    const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
+    sendMessageText(currentValue);
+  };
+
+  const queueCurrentMessage = () => {
+    const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
+    const trimmed = currentValue.trim();
+    if (!trimmed) return;
+    enqueueMessage(trimmed);
+    setValue('');
+    if (textareaRef.current) textareaRef.current.value = '';
+    if (!isGenerating) processQueue();
+    textareaRef.current?.focus();
+  };
+
+  return (
+    <div className={`assistant-input ${isChat ? 'assistant-input--chat' : ''} ${className}`}>
+      <div className="assistant-input__stack">
+        {!isChat && (
+          <div className="assistant-input__intro">
+            <video
+              ref={videoRef}
+              className="assistant-input__animation"
+              src={irisAnimation}
+              autoPlay
+              muted
+              playsInline
+              preload="auto"
+              aria-hidden="true"
+            />
+            <p key={subtitleIndex} className="assistant-input__subtitle">
+              {subtitles[subtitleIndex]}
+            </p>
+          </div>
+        )}
+        {isChat && (
+          <AssistantMessages
+            messages={messages}
+            queuedMessages={queuedMessages}
+            streamingMessageId={streamingMessageId}
+            openMenuId={openMenuId}
+            onOpenMenuChange={handleOpenMenuChange}
+            copiedId={copiedId}
+            fallbackVariant={variant}
+            onUndo={handleUndo}
+            onFeedback={handleFeedback}
+            onRegenerate={handleRegenerate}
+            onCopy={copyMessage}
+          />
+        )}
+        <div className="assistant-input__composer">
+          <AssistantToolbar
+            isChat={isChat}
+            folders={state.folders}
+            chats={state.chats}
+            activeFolderId={state.activeFolderId}
+            activeChatId={state.activeChatId}
+            currentChatTitle={currentChatTitle}
+            onNewChat={handleNewChat}
+            onOpenChat={handleOpenChat}
+            onSelectFolder={handleSelectFolder}
+            onCreateFolder={handleCreateFolder}
+            onRenameChat={handleRenameChat}
+          />
+          <AssistantComposer
+            placeholder={placeholder}
+            value={value}
+            onValueChange={setValue}
+            variant={variant}
+            onVariantChange={setVariant}
+            availableVariants={availableVariants}
+            isChat={isChat}
+            isGenerating={isGenerating}
+            sendShortcut={sendShortcut}
+            isMac={isMac}
+            textareaRef={textareaRef}
+            dataShared={dataShared}
+            onSend={handleSend}
+            onQueue={queueCurrentMessage}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};

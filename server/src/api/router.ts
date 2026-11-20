@@ -78,6 +78,7 @@ import { handleAvatarDelete, handleAvatarGet, handleAvatarUpload } from './route
 import { handleUserByUuid, handleMe as handleUsersMe, handleUsernameChange } from './routes/users';
 import { handleCreditsMe } from './routes/credits';
 import { handleGetBests as handleGamesBestsGet, handleUpdateBest as handleGamesBestsUpdate } from './routes/games';
+import { handleGetState as handleAssistantGetState, handleSaveState as handleAssistantSaveState } from './routes/assistant';
 import { handleStripeWebhook } from './routes/subscriptions';
 import {
   handleTeamMe,
@@ -153,6 +154,8 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/credits/me', handle: handleCreditsMe },
   { method: 'GET', path: '/api/games/bests', handle: handleGamesBestsGet },
   { method: 'POST', path: '/api/games/bests', handle: handleGamesBestsUpdate },
+  { method: 'GET', path: '/api/assistant', handle: handleAssistantGetState },
+  { method: 'PUT', path: '/api/assistant', handle: handleAssistantSaveState },
   { method: 'GET', path: '/api/users/:uuid', handle: handleUserByUuid },
   { method: 'PATCH', path: '/api/users/me/username', handle: handleUsernameChange },
 

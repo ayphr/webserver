@@ -29,6 +29,7 @@ export const INTEGRATIONS_COLLECTION = 'integrations';
 export const ALERTS_COLLECTION = 'device_alerts';
 export const DEVICE_TOKENS_COLLECTION = 'device_tokens';
 export const NOTIFICATIONS_COLLECTION = 'notifications';
+export const ASSISTANT_STATES_COLLECTION = 'assistant_states';
 
 export const API_PORT = envNumber('API_PORT', 7233);
 export const METRICS_PORT = envNumber('METRICS_PORT', 7234);

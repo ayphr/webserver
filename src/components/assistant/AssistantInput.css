@@ -1,0 +1,77 @@
+.assistant-input {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 50vh;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.assistant-input__stack {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: 100%;
+  flex: 1 1 auto;
+}
+
+.assistant-input__animation {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(50px, 7vh, 75px);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  transform: translate(-50%, calc(-100% - 7.5rem));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.assistant-input__subtitle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -300%);
+  margin: 0;
+  text-align: center;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: assistant-subtitle-in 0.45s ease;
+  z-index: 2;
+}
+
+@keyframes assistant-subtitle-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -300%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -300%) translateY(0);
+  }
+}
+.assistant-input__composer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, calc(-50% + 1.2rem));
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: top 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 2;
+}
+
+.assistant-input--chat .assistant-input__composer {
+  top: 100%;
+  transform: translate(-50%, -100%);
+  margin-bottom: 0.5rem;
+}

@@ -14,6 +14,7 @@ import { createCreditsApi } from './credits';
 import { createTeamsApi } from './teams';
 import { createNotificationsApi } from './notifications';
 import { createIntegrationsApi } from './integrations';
+import { createAssistantApi } from './assistant';
 
 export const API_BASE_URL = import.meta.env.DEV
   ? 'http://localhost:7233'
@@ -35,6 +36,7 @@ export type AyphrApiClient = RequestClient & {
   teams: ReturnType<typeof createTeamsApi>;
   notifications: ReturnType<typeof createNotificationsApi>;
   integrations: ReturnType<typeof createIntegrationsApi>;
+  assistant: ReturnType<typeof createAssistantApi>;
 };
 
 export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
@@ -69,6 +71,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     teams: createTeamsApi(client),
     notifications: createNotificationsApi(client),
     integrations: createIntegrationsApi(client),
+    assistant: createAssistantApi(client),
   };
 }
 

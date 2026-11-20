@@ -1,13 +1,14 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { toDate } from '../../lib/date';
-import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant } from '@common';
+import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, AssistantSendShortcut } from '@common';
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
-import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar, type AssistantSendShortcut } from '../../components/common';
+import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
+import { useAssistantState } from '../../components/assistant';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -78,19 +79,6 @@ function getStoredDefaultTab(): string {
   return stored === 'overview' || stored === 'devices' || stored === 'users' ? stored : 'overview';
 }
 
-function getStoredAssistantVariant(): AssistantVariant {
-  const stored = localStorage.getItem('ayphr-pref-assistant-variant');
-  return stored && ASSISTANT_VARIANTS.includes(stored as AssistantVariant)
-    ? (stored as AssistantVariant)
-    : 'standard';
-}
-
-function getStoredAssistantSendShortcut(): AssistantSendShortcut {
-  return localStorage.getItem('ayphr-pref-assistant-send-shortcut') === 'shift-enter'
-    ? 'shift-enter'
-    : 'enter';
-}
-
 type DashboardPanelProps = {
   title: string;
   description?: string;
@@ -138,10 +126,7 @@ export const DashboardPage = () => {
   const [sidebarPinned, setSidebarPinned] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
-  const [assistantVariant, setAssistantVariant] = useState<AssistantVariant>(getStoredAssistantVariant);
-  const [assistantSendShortcut, setAssistantSendShortcut] = useState<AssistantSendShortcut>(
-    getStoredAssistantSendShortcut,
-  );
+  const assistant = useAssistantState();
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
@@ -404,15 +389,19 @@ export const DashboardPage = () => {
     localStorage.setItem('ayphr-pref-sidebar-pinned', checked ? '1' : '0');
   };
 
-  const setAssistantVariantPref = (value: AssistantVariant) => {
-    setAssistantVariant(value);
-    localStorage.setItem('ayphr-pref-assistant-variant', value);
-  };
+  const assistantVariant = assistant.preferences.defaultVariant;
+  const assistantSendShortcut = assistant.preferences.sendShortcut;
 
-  const setAssistantSendShortcutPref = (value: AssistantSendShortcut) => {
-    setAssistantSendShortcut(value);
-    localStorage.setItem('ayphr-pref-assistant-send-shortcut', value);
-  };
+  const updateAssistantPreferences = assistant.updatePreferences;
+  const setAssistantVariantPref = useCallback(
+    (value: AssistantVariant) => updateAssistantPreferences({ defaultVariant: value }),
+    [updateAssistantPreferences],
+  );
+
+  const setAssistantSendShortcutPref = useCallback(
+    (value: AssistantSendShortcut) => updateAssistantPreferences({ sendShortcut: value }),
+    [updateAssistantPreferences],
+  );
 
   const availableAssistantVariants = useMemo(
     () => (user ? getPlanFeaturesForUser(user).availableAssistantVariants : ASSISTANT_VARIANTS),
@@ -447,10 +436,10 @@ export const DashboardPage = () => {
         setIsChangeEmailOpen,
         setIsChangeUsernameOpen,
       }),
-    [credits, defaultTab, sidebarPinned, effectiveAssistantVariant, availableAssistantVariants, assistantSendShortcut, navigate, isStaff, user, now],
+    [credits, defaultTab, sidebarPinned, effectiveAssistantVariant, setAssistantVariantPref, availableAssistantVariants, assistantSendShortcut, setAssistantSendShortcutPref, navigate, isStaff, user, now],
   );
 
-  if (isLoading) {
+  if (isLoading || assistant.isLoading) {
     return <DashboardLoadingSkeleton activeTab={activePage} />;
   }
 
@@ -543,6 +532,7 @@ export const DashboardPage = () => {
                 defaultVariant={effectiveAssistantVariant}
                 dataShared={getPlanFeaturesForUser(user).dataShared}
                 sendShortcut={assistantSendShortcut}
+                assistant={assistant}
               />
             )}
 

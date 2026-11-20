@@ -1,5 +1,60 @@
 export const ASSISTANT_VARIANTS: AssistantVariant[] = ['nano', 'lite', 'standard', 'plus', 'turbo'];
 export type AssistantVariant = 'nano' | 'lite' | 'standard' | 'plus' | 'turbo';
+export type AssistantSendShortcut = 'enter' | 'shift-enter';
+
+export type AssistantMessageFeedback = 'like' | 'dislike' | null;
+
+export type AssistantMessage = {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: number;
+  interrupted?: boolean;
+  feedback?: AssistantMessageFeedback;
+  variant?: AssistantVariant;
+  durationMs?: number;
+};
+
+export type AssistantFolder = {
+  id: string;
+  name: string;
+  createdAt: number;
+};
+
+export type AssistantChat = {
+  id: string;
+  title: string;
+  folderId: string | null;
+  messages: AssistantMessage[];
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type AssistantPreferences = {
+  defaultVariant: AssistantVariant;
+  sendShortcut: AssistantSendShortcut;
+};
+
+export type AssistantState = {
+  chats: AssistantChat[];
+  folders: AssistantFolder[];
+  activeChatId: string | null;
+  activeFolderId: string | null;
+  preferences: AssistantPreferences;
+};
+
+export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
+  defaultVariant: 'standard',
+  sendShortcut: 'enter',
+};
+
+export const createDefaultAssistantState = (): AssistantState => ({
+  chats: [],
+  folders: [],
+  activeChatId: null,
+  activeFolderId: null,
+  preferences: { ...DEFAULT_ASSISTANT_PREFERENCES },
+});
 
 export type AssistantThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 

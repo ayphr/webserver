@@ -2,7 +2,7 @@ import { Binary, Collection, Db } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken } from '@common';
+import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantState } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -19,7 +19,8 @@ import {
   ALERTS_COLLECTION,
   DEVICE_TOKENS_COLLECTION,
   EMAIL_CODES_COLLECTION,
-  NOTIFICATIONS_COLLECTION
+  NOTIFICATIONS_COLLECTION,
+  ASSISTANT_STATES_COLLECTION
 } from '../../env';
 export * from './serialization';
 export * from './cacheKeys';
@@ -106,7 +107,13 @@ export interface Collections {
   teamInvites: Collection<TeamInvite>;
   appeals: Collection<Appeal>;
   notifications: Collection<UserNotification>;
+  assistantStates: Collection<AssistantStateDocument>;
 }
+
+export type AssistantStateDocument = AssistantState & {
+  userUuid: string;
+  updatedAt: Date;
+};
 
 export interface StoredAvatar {
   userUuid: string;
@@ -155,6 +162,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     teamInvites: db.collection<TeamInvite>('team_invites'),
     appeals: db.collection<Appeal>('appeals'),
     notifications: db.collection<UserNotification>(NOTIFICATIONS_COLLECTION),
+    assistantStates: db.collection<AssistantStateDocument>(ASSISTANT_STATES_COLLECTION),
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -189,6 +197,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, createdAt: -1 })],
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, read: 1 })],
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 })],
+    [ASSISTANT_STATES_COLLECTION, () => cols.assistantStates.createIndex({ userUuid: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ id: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ serial: 1, teamId: 1 })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ teamId: 1 })],

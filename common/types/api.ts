@@ -4,6 +4,7 @@ import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
 import type { CreditBalance } from './credits';
+import type { AssistantState } from './assistant';
 import type {
   SubscriptionTier,
 } from './subscription';
@@ -54,6 +55,10 @@ export type UserMePayload = {
   activeSuspension: Punishment | null;
   policyStatus: PolicyStatus | null;
   credits: CreditBalance;
+};
+
+export type AssistantStatePayload = {
+  state: AssistantState;
 };
 
 export type AcceptPoliciesPayload = {

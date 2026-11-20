@@ -1,0 +1,170 @@
+.assistant-input__box {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  padding: 0.5rem 0.75rem;
+  box-sizing: border-box;
+  transition: border-radius 0.3s ease;
+}
+
+.assistant-input__box--multiline {
+  flex-direction: column;
+  align-items: stretch;
+  border-radius: 1.25rem;
+}
+
+.assistant-input__box--multiline .assistant-input__footer {
+  justify-content: flex-end;
+}
+
+.assistant-input__textarea {
+  flex: 1 1 auto;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 0.25rem 0.25rem;
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  transition: height 0.2s ease;
+}
+
+.assistant-input__textarea::-webkit-scrollbar {
+  display: none;
+}
+
+.assistant-input__textarea::placeholder {
+  color: hsl(180, 67%, 99%, 0.45);
+}
+
+.assistant-input__textarea:disabled {
+  opacity: 0.7;
+}
+
+.assistant-input__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.assistant-input__footer .assistant-dropdown {
+  margin-right: auto;
+}
+
+.assistant-input__queue-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-muted);
+  line-height: 0;
+  white-space: nowrap;
+  animation: assistant-queue-hint-in 0.15s ease;
+}
+
+@keyframes assistant-queue-hint-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.assistant-input__send {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0 0.25rem;
+  border: none;
+  border-radius: 0.6rem;
+  background-color: hsl(0, 0%, 18%);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.assistant-input__send::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    var(--accent-purple),
+    var(--accent-indigo),
+    var(--accent-pink),
+    var(--accent-purple)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  animation: turbo-send-gradient 1.2s linear infinite;
+}
+
+.assistant-input__send:hover::before {
+  opacity: 1;
+}
+
+.assistant-input__send:hover {
+  background-color: hsl(0, 0%, 24%);
+}
+
+.assistant-input__send--stop {
+  background-color: hsl(0, 0%, 22%);
+}
+
+@keyframes turbo-send-gradient {
+  0%, 100% {
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    filter: hue-rotate(55deg);
+  }
+}
+
+.assistant-input__disclaimer {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  right: 0;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.assistant-input__disclaimer a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.assistant-input__disclaimer a:hover {
+  color: var(--text-primary);
+}
