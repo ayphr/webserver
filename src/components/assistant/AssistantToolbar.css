@@ -116,14 +116,24 @@
   flex: 1;
   min-width: 0;
   height: 1.6rem;
-  padding: 0 0.4rem;
-  border: 1px solid var(--border-focus);
-  border-radius: 0.4rem;
-  background-color: var(--bg-surface);
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background-color: transparent;
   color: var(--text-primary);
+  caret-color: var(--text-primary);
   font-family: var(--font-family-base);
   font-size: 0.8rem;
   outline: none;
+}
+
+.assistant-menu__create-input::placeholder {
+  color: var(--text-muted);
+}
+
+.assistant-menu__create-input:focus {
+  border-bottom-color: var(--border-focus);
 }
 
 .assistant-menu__divider {

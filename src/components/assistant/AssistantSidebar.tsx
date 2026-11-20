@@ -264,7 +264,6 @@ export const AssistantSidebar = ({
           <Row
             icon={<IconFolders size={16} strokeWidth={1.75} />}
             label="Uncategorised"
-            active={isGroupExpanded(UNCATEGORISED_KEY)}
             onClick={() => toggleExpanded(UNCATEGORISED_KEY)}
           />
           {isGroupExpanded(UNCATEGORISED_KEY) && uncategorisedChats.map(renderChatRow)}
@@ -286,7 +285,6 @@ export const AssistantSidebar = ({
                 )
               }
               label={folder.name}
-              active={isExpanded}
               onClick={() => toggleExpanded(folder.id)}
               editing={editing}
               editValue={editing ? editState.value : ''}
