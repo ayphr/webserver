@@ -19,7 +19,8 @@
 
 .dashboard-assistant {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
+  justify-content: center;
   gap: 1.5rem;
   width: 100%;
   min-width: 0;
@@ -27,6 +28,7 @@
 
 .dashboard-assistant > .assistant-input {
   flex: 1;
+  max-width: 768px;
   min-width: 0;
 }
 
