@@ -120,6 +120,9 @@ export const AssistantSidebar = ({
   const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
 
   const uncategorisedChats = chats.filter((chat) => chat.folderId === null);
+  const activeChat = chats.find((chat) => chat.id === activeChatId);
+  const activeGroupKey = activeChat ? (activeChat.folderId ?? UNCATEGORISED_KEY) : null;
+  const isGroupExpanded = (key: string) => expanded.has(key) || activeGroupKey === key;
 
   const toggleExpanded = (key: string) => {
     setExpanded((prev) => {
@@ -253,15 +256,15 @@ export const AssistantSidebar = ({
           <Row
             icon={<IconFolders size={16} strokeWidth={1.75} />}
             label="Uncategorised"
-            active={expanded.has(UNCATEGORISED_KEY)}
+            active={isGroupExpanded(UNCATEGORISED_KEY)}
             onClick={() => toggleExpanded(UNCATEGORISED_KEY)}
           />
-          {expanded.has(UNCATEGORISED_KEY) && uncategorisedChats.map(renderChatRow)}
+          {isGroupExpanded(UNCATEGORISED_KEY) && uncategorisedChats.map(renderChatRow)}
         </>
       )}
 
       {folders.map((folder) => {
-        const isExpanded = expanded.has(folder.id);
+        const isExpanded = isGroupExpanded(folder.id);
         const editing = editState?.kind === 'folder' && editState.id === folder.id;
         const folderChats = chats.filter((chat) => chat.folderId === folder.id);
         return (

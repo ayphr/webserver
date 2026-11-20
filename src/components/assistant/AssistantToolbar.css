@@ -110,6 +110,28 @@
   color: var(--text-muted);
 }
 
+.assistant-menu__create {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.9rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.assistant-menu__create-input {
+  flex: 1;
+  min-width: 0;
+  height: 1.6rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border-focus);
+  border-radius: 0.4rem;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.8rem;
+  outline: none;
+}
+
 .assistant-menu__divider {
   height: 1px;
   margin: 0.2rem 0.25rem;

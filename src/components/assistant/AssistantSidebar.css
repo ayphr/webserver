@@ -1,9 +1,10 @@
 .assistant-sidebar {
-  width: 230px;
+  width: 280px;
   flex-shrink: 0;
   height: 100vh;
   box-sizing: border-box;
-  padding: 2rem 0.75rem;
+  margin-left: 1.5rem;
+  padding: 4.5rem 1.5rem 2rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -27,17 +28,12 @@
 }
 
 .assistant-sidebar__row:hover {
-  background-color: var(--bg-elevated);
   color: var(--text-primary);
 }
 
 .assistant-sidebar__row--active {
-  background-color: var(--bg-input-off);
+  background-color: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
-}
-
-.assistant-sidebar__row--active:hover {
-  background-color: var(--bg-input);
 }
 
 .assistant-sidebar__main {
@@ -118,7 +114,6 @@
 }
 
 .assistant-sidebar__action:hover {
-  background-color: var(--bg-input);
   color: var(--text-primary);
 }
 
