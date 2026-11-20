@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconChartBar, IconBell, IconPlugConnected } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -17,6 +17,7 @@ const tabs: Tab[] = [
   { id: 'locations', name: 'Locations' },
   { id: 'games', name: 'Games' },
   { id: 'assistant', name: 'Iris' },
+  { id: 'assistant-metrics', name: 'Assistant metrics' },
 ];
 
 const staffTabs: Tab[] = [
@@ -28,6 +29,8 @@ const iconFor = (id: string) => {
   switch (id) {
     case 'assistant':
       return <IconSparkle2 size={18} />;
+    case 'assistant-metrics':
+      return <IconChartBar size={18} />;
     case 'overview':
       return <IconGauge size={18} />;
     case 'devices':

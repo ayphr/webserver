@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ASSISTANT_VARIANTS, type AssistantChat, type AssistantVariant } from '@common';
+import {
+  ASSISTANT_VARIANTS,
+  type AssistantChat,
+  type AssistantMode,
+  type AssistantVariant,
+} from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantStreamClient } from '../../lib/assistantStream';
 import { AssistantComposer } from './AssistantComposer';
@@ -96,6 +101,15 @@ const TASK_SUBTITLE_TEXTS = (displayName: string) => [
   'What’s the long game?',
 ];
 
+const mergeById = <T extends { id: string }>(items: T[] | undefined, incoming: T): T[] => {
+  const list = items ?? [];
+  const index = list.findIndex((item) => item.id === incoming.id);
+  if (index === -1) return [...list, incoming];
+  const next = [...list];
+  next[index] = { ...next[index], ...incoming };
+  return next;
+};
+
 export const AssistantInput = ({
   placeholder = 'Ask Iris',
   className = '',
@@ -143,12 +157,15 @@ export const AssistantInput = ({
   const streamRequestIdRef = useRef<string | null>(null);
   const streamCompleteRef = useRef<(() => void) | null>(null);
   const streamMessageIdRef = useRef<number | null>(null);
+  const streamTokensRef = useRef<string[]>([]);
   const streamStartRef = useRef<number | null>(null);
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
 
   const isChat = messages.length > 0;
 
   const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
+
+  const handleValueChange = (next: string) => setValue(next);
 
   useEffect(() => {
     if (!availableVariants.includes(variant)) {
@@ -235,40 +252,22 @@ export const AssistantInput = ({
     streamRequestIdRef.current = null;
     streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
+    streamTokensRef.current = [];
     streamStartRef.current = null;
     setStreamingMessageId(null);
     setIsGenerating(false);
   };
 
-  const handleStreamToken = (requestId: string, token: string) => {
+  const finishStream = (requestId: string, error?: string, durationMs?: number) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
-    if (messageId === null) return;
-
-    const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id !== messageId) return m;
-        const content = m.content + token;
-        const tokenCount = content.split(/\s+/).filter(Boolean).length;
-        return {
-          ...m,
-          content,
-          liveDurationMs: elapsedMs,
-          liveTokensPerSecond: tokenCount / (elapsedMs / 1000),
-        };
-      }),
-    );
-  };
-
-  const finishStream = (requestId: string, error?: string) => {
-    if (requestId !== streamRequestIdRef.current) return;
-    const messageId = streamMessageIdRef.current;
-    const durationMs = takeStreamDuration();
+    const elapsedMs = takeStreamDuration();
+    const finalDurationMs = durationMs ?? elapsedMs;
     const complete = streamCompleteRef.current;
     streamRequestIdRef.current = null;
     streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
+    streamTokensRef.current = [];
     setStreamingMessageId(null);
 
     if (messageId !== null) {
@@ -277,7 +276,7 @@ export const AssistantInput = ({
           m.id === messageId
             ? {
                 ...m,
-                durationMs: m.durationMs ?? durationMs,
+                durationMs: m.durationMs ?? finalDurationMs,
                 liveDurationMs: undefined,
                 liveTokensPerSecond: undefined,
                 ...(error ? { error } : {}),
@@ -291,20 +290,74 @@ export const AssistantInput = ({
     else setIsGenerating(false);
   };
 
-  const handleStreamDone = (requestId: string) => {
-    finishStream(requestId);
-  };
-
-  const handleStreamError = (requestId: string, error: string) => {
-    finishStream(requestId, error);
-  };
-
   const getStreamClient = () => {
     if (!streamClientRef.current) {
       streamClientRef.current = new AssistantStreamClient({
-        onToken: handleStreamToken,
-        onDone: handleStreamDone,
-        onError: handleStreamError,
+        onToken: (requestId, token, index) => {
+          if (requestId !== streamRequestIdRef.current) return;
+          const messageId = streamMessageIdRef.current;
+          if (messageId === null) return;
+          const tokens = streamTokensRef.current;
+          tokens[index] = token;
+          const content = tokens.join('');
+          const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
+          const wordCount = content.split(/\s+/).filter(Boolean).length;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId && m.role === 'assistant'
+                ? {
+                    ...m,
+                    content,
+                    liveDurationMs: elapsedMs,
+                    liveTokensPerSecond: wordCount / (elapsedMs / 1000),
+                  }
+                : m,
+            ),
+          );
+        },
+        onDone: (requestId, durationMs) => finishStream(requestId, undefined, durationMs),
+        onError: (requestId, error, _code, retryAfterMs) => {
+          const detail =
+            retryAfterMs && retryAfterMs > 0
+              ? `${error} Try again in ${Math.ceil(retryAfterMs / 1000)}s.`
+              : error;
+          finishStream(requestId, detail);
+        },
+        onThinking: (requestId, step) => {
+          if (requestId !== streamRequestIdRef.current) return;
+          const messageId = streamMessageIdRef.current;
+          if (messageId === null) return;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId && m.role === 'assistant'
+                ? { ...m, thinking: mergeById(m.thinking, step) }
+                : m,
+            ),
+          );
+        },
+        onTool: (requestId, tool) => {
+          if (requestId !== streamRequestIdRef.current) return;
+          const messageId = streamMessageIdRef.current;
+          if (messageId === null) return;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId && m.role === 'assistant'
+                ? { ...m, tools: mergeById(m.tools, tool) }
+                : m,
+            ),
+          );
+        },
+        onResumed: (requestId, nextIndex) => {
+          if (requestId !== streamRequestIdRef.current) return;
+          const messageId = streamMessageIdRef.current;
+          if (messageId === null) return;
+          const tokens = streamTokensRef.current.slice(0, Math.max(0, nextIndex));
+          streamTokensRef.current = tokens;
+          const content = tokens.join('');
+          setMessages((prev) =>
+            prev.map((m) => (m.id === messageId && m.role === 'assistant' ? { ...m, content } : m)),
+          );
+        },
       });
     }
     return streamClientRef.current;
@@ -331,6 +384,8 @@ export const AssistantInput = ({
       id: createId(),
       title: mode === 'task' ? 'New task' : 'New chat',
       folderId,
+      pinned: false,
+      order: 0,
       mode,
       messages: [],
       createdAt: now,
@@ -441,12 +496,42 @@ export const AssistantInput = ({
               error: undefined,
               feedback: null,
               durationMs: undefined,
+              thinking: undefined,
+              tools: undefined,
               variant,
             }
           : m,
       ),
     );
-    startStreaming(messageId, processQueue);
+    startStreaming(messageId, { variant }, processQueue);
+  };
+
+  const handleRetry = (messageId: number) => {
+    const target = messages.find((m) => m.id === messageId && m.role === 'assistant');
+    if (!target) return;
+    cancelStream();
+    const retryVariant =
+      target.variant && availableVariants.includes(target.variant) ? target.variant : variant;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? {
+              ...m,
+              content: '',
+              error: undefined,
+              interrupted: false,
+              feedback: null,
+              durationMs: undefined,
+              liveDurationMs: undefined,
+              liveTokensPerSecond: undefined,
+              thinking: undefined,
+              tools: undefined,
+              variant: retryVariant,
+            }
+          : m,
+      ),
+    );
+    startStreaming(messageId, { variant: retryVariant }, processQueue);
   };
 
   const copyMessage = async (messageId: number, content: string) => {
@@ -460,11 +545,16 @@ export const AssistantInput = ({
     }
   };
 
-  const startStreaming = (messageId: number, onComplete?: () => void) => {
+  const startStreaming = (
+    messageId: number,
+    options?: { mode?: AssistantMode; variant?: AssistantVariant },
+    onComplete?: () => void,
+  ) => {
     const requestId = createId();
     streamRequestIdRef.current = requestId;
     streamCompleteRef.current = onComplete ?? null;
     streamMessageIdRef.current = messageId;
+    streamTokensRef.current = [];
     streamStartRef.current = Date.now();
     setStreamingMessageId(messageId);
     setIsGenerating(true);
@@ -475,7 +565,10 @@ export const AssistantInput = ({
           : m,
       ),
     );
-    getStreamClient().stream(requestId);
+    getStreamClient().stream(requestId, {
+      mode: options?.mode ?? state.activeMode,
+      variant: options?.variant ?? variant,
+    });
   };
 
   const appendAndStream = (text: string, onComplete?: () => void) => {
@@ -508,7 +601,7 @@ export const AssistantInput = ({
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
 
-    startStreaming(assistantId, onComplete);
+    startStreaming(assistantId, undefined, onComplete);
     return true;
   };
 
@@ -546,6 +639,14 @@ export const AssistantInput = ({
 
   return (
     <div className={`assistant-input ${isChat ? 'assistant-input--chat' : ''} ${className}`}>
+      <div
+        className="assistant-input__sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {streamingMessageId !== null ? 'Assistant is responding.' : ''}
+      </div>
       <div className="assistant-input__stack">
         {!isChat && (
           <div className="assistant-input__intro">
@@ -580,6 +681,7 @@ export const AssistantInput = ({
             onFeedback={handleFeedback}
             onRegenerate={handleRegenerate}
             onCopy={copyMessage}
+            onRetry={handleRetry}
           />
         )}
         <div className="assistant-input__composer">
@@ -596,7 +698,7 @@ export const AssistantInput = ({
           <AssistantComposer
             placeholder={placeholder}
             value={value}
-            onValueChange={setValue}
+            onValueChange={handleValueChange}
             variant={variant}
             onVariantChange={setVariant}
             availableVariants={availableVariants}

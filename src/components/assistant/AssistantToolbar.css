@@ -178,3 +178,16 @@
     transform: translateY(0);
   }
 }
+
+.assistant-toolbar__item:focus-visible,
+.assistant-toolbar__mode-button:focus-visible,
+.assistant-menu__item:focus-visible,
+.assistant-menu__create-input:focus-visible {
+  outline: 2px solid var(--accent-blue-solid);
+  outline-offset: 2px;
+}
+
+.assistant-menu__item:focus-visible {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+}

@@ -8,7 +8,7 @@ import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, Ass
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
 import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
-import { AssistantSidebar, useAssistantState, type AssistantChatAction } from '../../components/assistant';
+import { AssistantMetricsPanel, AssistantSidebar, useAssistantState, type AssistantChatAction } from '../../components/assistant';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -27,7 +27,7 @@ const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ de
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
+const VALID_TABS = new Set(['assistant', 'assistant-metrics', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
 
 function formatDisplayDate(date: Date | string): string {
   return toDate(date).toLocaleDateString('en-GB');
@@ -76,7 +76,7 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 
 function getStoredDefaultTab(): string {
   const stored = localStorage.getItem('ayphr-pref-default-tab');
-  return stored === 'overview' || stored === 'devices' || stored === 'users' ? stored : 'overview';
+  return stored === 'overview' || stored === 'devices' || stored === 'users' || stored === 'assistant-metrics' ? stored : 'overview';
 }
 
 type DashboardPanelProps = {
@@ -485,7 +485,7 @@ export const DashboardPage = () => {
     <div className={`dashboard-layout`}>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main className="dashboard-main">
-        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
+        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' && activePage !== 'assistant-metrics' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
             <div className="dashboard-page__suspension-card">
               <div className="dashboard-page__suspension-card__header">
@@ -563,6 +563,10 @@ export const DashboardPage = () => {
                   onDeleteFolder={assistant.deleteFolder}
                   onRenameChat={assistant.renameChat}
                   onDeleteChat={handleSidebarDeleteChat}
+                  onTogglePinChat={assistant.togglePinChat}
+                  onReorderFolders={assistant.reorderFolders}
+                  onReorderChat={assistant.reorderChat}
+                  onMoveChat={assistant.moveChat}
                 />
                 <AssistantInput
                   availableVariants={availableAssistantVariants}
@@ -573,6 +577,14 @@ export const DashboardPage = () => {
                   assistant={assistant}
                   chatAction={chatAction}
                 />
+              </div>
+            )}
+
+            {activePage === 'assistant-metrics' && (
+              <div className="dashboard-panel dashboard-panel--full">
+                <div className="dashboard-panel__content">
+                  <AssistantMetricsPanel />
+                </div>
               </div>
             )}
 

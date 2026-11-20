@@ -6,7 +6,7 @@ type DashboardLoadingSkeletonProps = {
 };
 
 const getPanelClassName = (activeTab: string) => {
-  if (activeTab === 'users' || activeTab === 'games') {
+  if (activeTab === 'users' || activeTab === 'games' || activeTab === 'assistant-metrics') {
     return 'dashboard-panel--full';
   }
 

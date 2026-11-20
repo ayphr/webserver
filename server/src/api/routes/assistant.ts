@@ -10,9 +10,19 @@ import {
   type AssistantState,
   type AssistantVariant,
 } from '@common';
-import { getAssistantState, saveAssistantState } from '../../lib/db';
+import {
+  getAssistantMetrics,
+  getAssistantState,
+  normalizeAssistantMetricsPeriodDays,
+  recordAssistantStateMetrics,
+  saveAssistantState,
+} from '../../lib/db';
 import { json, readJsonBody } from '../../lib/http';
-import { requireAuth } from '../auth';
+import { createLogger } from '../../lib/logger';
+import { assistantRateLimitedTotal } from '../../lib/metrics';
+import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
+import { getClientIp } from '../../lib/requestContext';
+import { requireAuth, requireRole } from '../auth';
 import type { User } from '@common';
 
 const MAX_CHATS = 500;
@@ -21,6 +31,10 @@ const MAX_MESSAGES_PER_CHAT = 2000;
 const MAX_TITLE_LENGTH = 200;
 const MAX_FOLDER_NAME_LENGTH = 100;
 const MAX_MESSAGE_LENGTH = 100_000;
+
+const metricsLimiter = createRateLimiter(60 * 1000, 30, 'assistant-metrics');
+const staffMetricsLimiter = createRateLimiter(60 * 1000, 60, 'staff-assistant-metrics');
+const metricsLog = createLogger('assistant-metrics');
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -110,6 +124,77 @@ function parseMessage(value: unknown, label: string): AssistantMessage {
     message.durationMs = Math.max(0, durationMs);
   }
 
+  if (value.thinking !== undefined) {
+    if (!Array.isArray(value.thinking) || value.thinking.length > 100) {
+      throw new Error(`invalid ${label}.thinking`);
+    }
+    message.thinking = value.thinking.map((step, index) => {
+      if (!isRecord(step)) throw new Error(`invalid ${label}.thinking[${index}]`);
+      const status = step.status;
+      if (status !== 'pending' && status !== 'running' && status !== 'done') {
+        throw new Error(`invalid ${label}.thinking[${index}].status`);
+      }
+      const parsed: {
+        id: string;
+        title: string;
+        status: typeof status;
+        detail?: string;
+      } = {
+        id: requireId(step.id, `${label}.thinking[${index}].id`),
+        title: requireString(step.title, `${label}.thinking[${index}].title`, MAX_MESSAGE_LENGTH),
+        status,
+      };
+      if (step.detail !== undefined) {
+        parsed.detail = requireString(
+          step.detail,
+          `${label}.thinking[${index}].detail`,
+          MAX_MESSAGE_LENGTH,
+        );
+      }
+      return parsed;
+    });
+  }
+
+  if (value.tools !== undefined) {
+    if (!Array.isArray(value.tools) || value.tools.length > 100) {
+      throw new Error(`invalid ${label}.tools`);
+    }
+    message.tools = value.tools.map((tool, index) => {
+      if (!isRecord(tool)) throw new Error(`invalid ${label}.tools[${index}]`);
+      const status = tool.status;
+      if (
+        status !== 'pending' &&
+        status !== 'running' &&
+        status !== 'done' &&
+        status !== 'error'
+      ) {
+        throw new Error(`invalid ${label}.tools[${index}].status`);
+      }
+      const parsed: {
+        id: string;
+        name: string;
+        status: typeof status;
+        detail?: string;
+        durationMs?: number;
+      } = {
+        id: requireId(tool.id, `${label}.tools[${index}].id`),
+        name: requireString(tool.name, `${label}.tools[${index}].name`, MAX_TITLE_LENGTH),
+        status,
+      };
+      if (tool.detail !== undefined) {
+        parsed.detail = requireString(
+          tool.detail,
+          `${label}.tools[${index}].detail`,
+          MAX_MESSAGE_LENGTH,
+        );
+      }
+      if (tool.durationMs !== undefined) {
+        parsed.durationMs = Math.max(0, requireNumber(tool.durationMs, `${label}.tools[${index}].durationMs`));
+      }
+      return parsed;
+    });
+  }
+
   return message;
 }
 
@@ -123,6 +208,14 @@ function parseChat(value: unknown, label: string): AssistantChat {
     id: requireId(value.id, `${label}.id`),
     title: requireString(value.title, `${label}.title`, MAX_TITLE_LENGTH),
     folderId: requireNullableId(value.folderId, `${label}.folderId`),
+    pinned:
+      value.pinned === undefined
+        ? false
+        : (() => {
+            if (typeof value.pinned !== 'boolean') throw new Error(`invalid ${label}.pinned`);
+            return value.pinned;
+          })(),
+    order: value.order === undefined ? 0 : requireNumber(value.order, `${label}.order`),
     mode: value.mode === undefined ? 'chat' : requireMode(value.mode, `${label}.mode`),
     messages: value.messages.map((message, index) =>
       parseMessage(message, `${label}.messages[${index}]`),
@@ -137,6 +230,7 @@ function parseFolder(value: unknown, label: string): AssistantFolder {
   return {
     id: requireId(value.id, `${label}.id`),
     name: requireString(value.name, `${label}.name`, MAX_FOLDER_NAME_LENGTH),
+    order: value.order === undefined ? 0 : requireNumber(value.order, `${label}.order`),
     createdAt: requireNumber(value.createdAt, `${label}.createdAt`),
   };
 }
@@ -200,12 +294,46 @@ export const handleSaveState = requireAuth(async (request, user: User) => {
   const body = await readJsonBody<unknown>(request);
   if (!isRecord(body)) return json({ error: 'request body must be valid JSON' }, 400);
 
+  let state: AssistantState;
   try {
-    const state = parseAssistantState(body.state);
-    const saved = await saveAssistantState(user.uuid, state);
-    return json({ state: saved });
+    state = parseAssistantState(body.state);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'invalid assistant state';
     return json({ error: message }, 400);
   }
+
+  const saved = await saveAssistantState(user.uuid, state);
+  try {
+    // One count-only snapshot per user per hour; failures never break saves.
+    await recordAssistantStateMetrics(user.uuid, state);
+  } catch (error) {
+    metricsLog.warn({ error, userUuid: user.uuid }, 'failed to record assistant metrics snapshot');
+  }
+  return json({ state: saved });
+});
+
+export const handleGetMetrics = requireAuth(async (request, user: User) => {
+  const rate = await metricsLimiter.check(`user:${user.uuid}`);
+  if (!rate.allowed) {
+    assistantRateLimitedTotal.inc({ limiter: 'assistant-metrics' });
+    return tooManyRequests(rate.retryAfterMs);
+  }
+
+  const params = new URL(request.url).searchParams;
+  const periodDays = normalizeAssistantMetricsPeriodDays(params.get('days'));
+  return json(await getAssistantMetrics(user.uuid, periodDays));
+});
+
+export const handleGetStaffAssistantMetrics = requireRole('staff', async (request, staffUser: User) => {
+  const rate = await staffMetricsLimiter.check(`staff:${staffUser.uuid}:ip:${getClientIp(request)}`);
+  if (!rate.allowed) {
+    assistantRateLimitedTotal.inc({ limiter: 'staff-assistant-metrics' });
+    return tooManyRequests(rate.retryAfterMs);
+  }
+
+  const params = new URL(request.url).searchParams;
+  const requestedUuid = params.get('userUuid');
+  const userUuid = requestedUuid && requestedUuid.length <= 200 ? requestedUuid : null;
+  const periodDays = normalizeAssistantMetricsPeriodDays(params.get('days'));
+  return json(await getAssistantMetrics(userUuid, periodDays));
 });

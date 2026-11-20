@@ -79,7 +79,18 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
         url.pathname === ASSISTANT_STREAM_PATH &&
         request.headers.get('upgrade')?.toLowerCase() === 'websocket'
       ) {
-        if (!server.upgrade(request, { data: { userUuid: null } })) {
+        const clientIp = resolveClientIp(request, server.requestIP(request)?.address ?? null) ?? 'unknown';
+        if (
+          !server.upgrade(request, {
+            data: {
+              userUuid: null,
+              token: null,
+              tokenHash: null,
+              authedAt: null,
+              clientIp,
+            },
+          })
+        ) {
           const response = Response.json(
             { error: 'WebSocket upgrade failed' },
             { status: 500, headers: SECURITY_HEADERS },

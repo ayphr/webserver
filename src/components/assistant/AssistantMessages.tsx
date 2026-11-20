@@ -1,4 +1,14 @@
-import { useEffect, useRef } from 'react';
+import {
+  isValidElement,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import {
   IconArrowBackUp,
   IconChevronDown,
@@ -27,7 +37,68 @@ export interface AssistantMessagesProps {
   onFeedback: (messageId: number, feedback: 'like' | 'dislike') => void;
   onRegenerate: (messageId: number) => void;
   onCopy: (messageId: number, content: string) => void;
+  onRetry: (messageId: number) => void;
 }
+
+const getNodeText = (node: ReactNode): string => {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(getNodeText).join('');
+  if (isValidElement(node)) {
+    return getNodeText((node.props as { children?: ReactNode }).children);
+  }
+  return '';
+};
+
+const MarkdownCodeBlock = ({ children }: { children?: ReactNode }) => {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const code = getNodeText(children);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    [],
+  );
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setCopied(true);
+      timeoutRef.current = setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // Clipboard access can be unavailable; ignore.
+    }
+  };
+
+  return (
+    <div className="assistant-chat__code-block">
+      <button
+        type="button"
+        className={`assistant-chat__code-copy ${copied ? 'assistant-chat__code-copy--copied' : ''}`}
+        onClick={() => void handleCopy()}
+        aria-label={copied ? 'Code copied' : 'Copy code'}
+      >
+        <span className="assistant-chat__code-copy-icons">
+          <IconCopy size={13} strokeWidth={1.75} className="assistant-chat__code-copy-icon" />
+          <IconCopyCheck size={13} strokeWidth={1.75} className="assistant-chat__code-copied-icon" />
+        </span>
+        <span>{copied ? 'Copied' : 'Copy'}</span>
+      </button>
+      <pre>{children}</pre>
+    </div>
+  );
+};
+
+const markdownComponents: Components = {
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noreferrer noopener">
+      {children}
+    </a>
+  ),
+  pre: ({ children }) => <MarkdownCodeBlock>{children}</MarkdownCodeBlock>,
+};
 
 export const AssistantMessages = ({
   messages,
@@ -41,8 +112,10 @@ export const AssistantMessages = ({
   onFeedback,
   onRegenerate,
   onCopy,
+  onRetry,
 }: AssistantMessagesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuButtonRefs = useRef(new Map<number, HTMLButtonElement>());
 
   useEffect(() => {
     if (openMenuId === null) return;
@@ -58,8 +131,19 @@ export const AssistantMessages = ({
     return () => document.removeEventListener('mousedown', handler);
   }, [openMenuId, onOpenMenuChange]);
 
+  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>, messageId: number) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    onOpenMenuChange(null);
+    menuButtonRefs.current.get(messageId)?.focus();
+  };
+
   return (
-    <div className="assistant-chat__messages" ref={containerRef}>
+    <div
+      className="assistant-chat__messages"
+      ref={containerRef}
+      aria-busy={streamingMessageId !== null}
+    >
       {messages.map((message) => {
         const isStreaming = streamingMessageId === message.id;
         const isLatestAssistant =
@@ -70,6 +154,8 @@ export const AssistantMessages = ({
           : message.durationMs
             ? message.content.split(' ').filter(Boolean).length / (message.durationMs / 1000)
             : undefined;
+        const thinking = message.thinking ?? [];
+        const tools = message.tools ?? [];
 
         return (
           <div
@@ -82,19 +168,31 @@ export const AssistantMessages = ({
                 <button
                   type="button"
                   data-menu-id={message.id}
+                  ref={(element) => {
+                    if (element) menuButtonRefs.current.set(message.id, element);
+                    else menuButtonRefs.current.delete(message.id);
+                  }}
                   className={`assistant-chat__chevron ${openMenuId === message.id ? 'assistant-chat__chevron--open' : ''}`}
                   onClick={() => onOpenMenuChange(openMenuId === message.id ? null : message.id)}
                   aria-label="Message options"
+                  aria-haspopup="menu"
+                  aria-expanded={openMenuId === message.id}
                 >
                   <IconChevronDown size={14} strokeWidth={2} />
                 </button>
                 {openMenuId === message.id && (
-                  <div className="assistant-chat__menu">
+                  <div
+                    className="assistant-chat__menu"
+                    role="menu"
+                    aria-label="Message options"
+                    onKeyDown={(event) => handleMenuKeyDown(event, message.id)}
+                  >
                     <div className="assistant-chat__menu-time">
                       {formatMessageTime(message.createdAt)}
                     </div>
                     <button
                       type="button"
+                      role="menuitem"
                       className="assistant-chat__menu-item"
                       onClick={() => onUndo(message.id)}
                     >
@@ -103,6 +201,7 @@ export const AssistantMessages = ({
                     </button>
                     <button
                       type="button"
+                      role="menuitem"
                       className="assistant-chat__menu-item"
                       onClick={() => {
                         void onCopy(message.id, message.content);
@@ -117,14 +216,97 @@ export const AssistantMessages = ({
               </div>
             ) : (
               <div className="assistant-chat__assistant-wrap">
+                {(thinking.length > 0 || tools.length > 0) && (
+                  <div className="assistant-chat__activity">
+                    {thinking.length > 0 && (
+                      <details className="assistant-chat__thinking" open={isStreaming}>
+                        <summary>
+                          <IconChevronDown
+                            size={13}
+                            strokeWidth={2}
+                            className="assistant-chat__activity-chevron"
+                          />
+                          <span>Thinking</span>
+                          <span className="assistant-chat__activity-count">{thinking.length}</span>
+                        </summary>
+                        <ol className="assistant-chat__thinking-list">
+                          {thinking.map((step) => (
+                            <li
+                              key={step.id}
+                              className={`assistant-chat__activity-item assistant-chat__activity-item--${step.status}`}
+                            >
+                              <span className="assistant-chat__status-dot" aria-hidden="true" />
+                              <span className="assistant-chat__activity-title">{step.title}</span>
+                              <span className="assistant-chat__status-label">{step.status}</span>
+                              {step.detail && (
+                                <span className="assistant-chat__activity-detail">
+                                  {step.detail}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    )}
+                    {tools.length > 0 && (
+                      <ul className="assistant-chat__tool-list" aria-label="Tools used">
+                        {tools.map((tool) => (
+                          <li
+                            key={tool.id}
+                            className={`assistant-chat__activity-item assistant-chat__tool-card assistant-chat__activity-item--${tool.status}`}
+                          >
+                            <span className="assistant-chat__status-dot" aria-hidden="true" />
+                            <span className="assistant-chat__activity-title">{tool.name}</span>
+                            <span className="assistant-chat__status-label">{tool.status}</span>
+                            {tool.durationMs != null && (
+                              <span className="assistant-chat__activity-duration">
+                                {formatDuration(tool.durationMs)}
+                              </span>
+                            )}
+                            {tool.detail && (
+                              <span className="assistant-chat__activity-detail">
+                                {tool.detail}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 <div className="assistant-chat__bubble">
-                  {message.content.split(' ').filter(Boolean).map((word, i) => (
-                    <span key={i} className="assistant-chat__token">
-                      {word}{' '}
-                    </span>
-                  ))}
+                  {isStreaming ? (
+                    message.content.split(' ').filter(Boolean).map((word, i) => (
+                      <span key={i} className="assistant-chat__token">
+                        {word}{' '}
+                      </span>
+                    ))
+                  ) : (
+                    <div className="assistant-chat__markdown">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                        components={markdownComponents}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
-                {message.error && <p className="assistant-chat__error">{message.error}</p>}
+                {message.error && (
+                  <div className="assistant-chat__error-wrap" role="alert">
+                    <p className="assistant-chat__error">{message.error}</p>
+                    <button
+                      type="button"
+                      className="assistant-chat__retry"
+                      onClick={() => onRetry(message.id)}
+                      aria-label="Retry response"
+                    >
+                      <IconRefresh size={13} strokeWidth={1.75} />
+                      <span>Retry</span>
+                    </button>
+                  </div>
+                )}
                 {message.interrupted && (
                   <p className="assistant-chat__interrupted">You interrupted this response.</p>
                 )}
