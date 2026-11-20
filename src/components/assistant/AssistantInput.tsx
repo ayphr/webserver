@@ -575,16 +575,15 @@ export const AssistantInput = ({
           />
         )}
         <div className="assistant-input__composer">
-          {!state.activeChatId && (
-            <AssistantToolbar
-              folders={state.folders}
-              activeFolderId={state.activeFolderId}
-              activeMode={state.activeMode}
-              onSelectFolder={assistant.selectFolder}
-              onSelectMode={assistant.selectMode}
-              onCreateFolder={assistant.createFolder}
-            />
-          )}
+          <AssistantToolbar
+            folders={state.folders}
+            activeFolderId={state.activeFolderId}
+            activeMode={state.activeMode}
+            onSelectFolder={assistant.selectFolder}
+            onSelectMode={assistant.selectMode}
+            onCreateFolder={assistant.createFolder}
+            showControls={!state.activeChatId}
+          />
           <AssistantComposer
             placeholder={placeholder}
             value={value}

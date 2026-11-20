@@ -77,6 +77,14 @@
   opacity: 1;
 }
 
+.assistant-toolbar [hidden] {
+  display: none;
+}
+
+.assistant-toolbar__radio {
+  margin-left: auto;
+}
+
 .assistant-menu {
   position: absolute;
   bottom: calc(100% + 0.4rem);

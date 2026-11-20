@@ -24,3 +24,4 @@ export { ToggleDropdown, type ToggleDropdownProps } from './ToggleDropdown';
 export { Pagination, type PaginationProps } from './Pagination';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { CodeInput, type CodeInputProps } from './CodeInput';
+export { Slider, type SliderProps } from './Slider';

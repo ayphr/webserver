@@ -25,9 +25,10 @@ const TeamPanel = lazy(() => import('../../components/team/TeamPanel').then((m) 
 const IntegrationsPanel = lazy(() => import('../../components/integrations').then((m) => ({ default: m.IntegrationsPanel })));
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
+const RadioPanel = lazy(() => import('../../components/radio/RadioPanel').then((m) => ({ default: m.RadioPanel })));
 import './DashboardPage.css';
 
-const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'notifications', 'credits', 'users', 'games', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
+const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'notifications', 'credits', 'users', 'games', 'radio', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
 
 function formatDisplayDate(date: Date | string): string {
   return toDate(date).toLocaleDateString('en-GB');
@@ -76,7 +77,9 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 
 function getStoredDefaultTab(): string {
   const stored = localStorage.getItem('ayphr-pref-default-tab');
-  return stored === 'overview' || stored === 'devices' || stored === 'users' ? stored : 'overview';
+  return stored === 'overview' || stored === 'devices' || stored === 'users' || stored === 'radio'
+    ? stored
+    : 'overview';
 }
 
 type DashboardPanelProps = {
@@ -704,6 +707,18 @@ export const DashboardPage = () => {
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <GamesPanel />
+                </Suspense>
+              </DashboardPanel>
+            )}
+
+            {activePage === 'radio' && (
+              <DashboardPanel
+                title="Radio"
+                description="A little quiet company while you work"
+                className="dashboard-panel--full dashboard-panel--centered"
+              >
+                <Suspense fallback={<DashboardContentSkeleton />}>
+                  <RadioPanel />
                 </Suspense>
               </DashboardPanel>
             )}

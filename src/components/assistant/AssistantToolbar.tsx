@@ -6,9 +6,12 @@ import {
   IconFolders,
   IconFoldersFilled,
   IconMessageCircle,
+  IconPlayerPause,
+  IconPlayerPlay,
   IconPlus,
 } from '@tabler/icons-react';
 import type { AssistantFolder, AssistantMode } from '@common';
+import { useRadio } from '../../context';
 import './AssistantToolbar.css';
 
 export interface AssistantToolbarProps {
@@ -18,6 +21,7 @@ export interface AssistantToolbarProps {
   onSelectFolder: (folderId: string | null) => void;
   onSelectMode: (mode: AssistantMode) => void;
   onCreateFolder: (name: string) => void;
+  showControls?: boolean;
 }
 
 export const AssistantToolbar = ({
@@ -27,7 +31,9 @@ export const AssistantToolbar = ({
   onSelectFolder,
   onSelectMode,
   onCreateFolder,
+  showControls = true,
 }: AssistantToolbarProps) => {
+  const { isPlaying: isRadioPlaying, toggle: toggleRadio } = useRadio();
   const [menuOpen, setMenuOpen] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -71,7 +77,7 @@ export const AssistantToolbar = ({
 
   return (
     <div className="assistant-toolbar" ref={toolbarRef}>
-      <div className="assistant-toolbar__group">
+      <div className="assistant-toolbar__group" hidden={!showControls}>
         <button
           type="button"
           className={`assistant-toolbar__item ${menuOpen ? 'assistant-toolbar__item--open' : ''}`}
@@ -161,7 +167,7 @@ export const AssistantToolbar = ({
           </div>
         )}
       </div>
-      <div className="assistant-toolbar__mode" role="group" aria-label="Assistant mode">
+      <div className="assistant-toolbar__mode" role="group" aria-label="Assistant mode" hidden={!showControls}>
         <button
           type="button"
           className={`assistant-toolbar__mode-button ${activeMode === 'chat' ? 'assistant-toolbar__mode-button--active' : ''}`}
@@ -181,6 +187,18 @@ export const AssistantToolbar = ({
           <span>Task</span>
         </button>
       </div>
+      <button
+        type="button"
+        className={`assistant-toolbar__mode-button assistant-toolbar__radio ${isRadioPlaying ? 'assistant-toolbar__mode-button--active' : ''}`}
+        onClick={() => { void toggleRadio(); }}
+        title={isRadioPlaying ? 'Pause radio' : 'Play radio'}
+        aria-label={isRadioPlaying ? 'Pause radio' : 'Play radio'}
+        aria-pressed={isRadioPlaying}
+      >
+        {isRadioPlaying
+          ? <IconPlayerPause size={16} strokeWidth={1.75} />
+          : <IconPlayerPlay size={16} strokeWidth={1.75} />}
+      </button>
     </div>
   );
 };

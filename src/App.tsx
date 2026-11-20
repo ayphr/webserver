@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useEffect } from 'react';
 import { PolicyGate } from './components/policy';
 import { EmailGate } from './components/auth/EmailGate';
-import { ModalProvider, TooltipProvider, useTooltip } from './context';
+import { ModalProvider, RadioProvider, TooltipProvider, useTooltip } from './context';
 import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
 
 const AuthPage = lazy(() => import('./pages/auth/AuthPage').then((m) => ({ default: m.AuthPage })));
@@ -48,26 +48,28 @@ function App() {
   return (
     <TooltipProvider>
       <ModalProvider>
-        <BrowserRouter>
-          <TooltipRouteWatcher />
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
-              <Route path="/auth/login" element={<AuthPage initialMode="login" />} />
-              <Route path="/auth/register" element={<AuthPage initialMode="signup" />} />
-              <Route path="/link" element={<LinkPage />} />
-              <Route path="/policies" element={<PoliciesPage />} />
-              <Route path="/policies/terms" element={<TermsPage />} />
-              <Route path="/policies/privacy" element={<PrivacyPage />} />
-              <Route path="/policies/refunds" element={<RefundPage />} />
-              <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
-              <Route path="/dashboard" element={<PolicyGate loadingFallback={<DashboardLoadingSkeleton />}><EmailGate loadingFallback={<DashboardLoadingSkeleton />}><DashboardPage /></EmailGate></PolicyGate>} />
-              <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><EmailGate><ProfilePage /></EmailGate></PolicyGate>} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+        <RadioProvider>
+          <BrowserRouter>
+            <TooltipRouteWatcher />
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+                <Route path="/auth/login" element={<AuthPage initialMode="login" />} />
+                <Route path="/auth/register" element={<AuthPage initialMode="signup" />} />
+                <Route path="/link" element={<LinkPage />} />
+                <Route path="/policies" element={<PoliciesPage />} />
+                <Route path="/policies/terms" element={<TermsPage />} />
+                <Route path="/policies/privacy" element={<PrivacyPage />} />
+                <Route path="/policies/refunds" element={<RefundPage />} />
+                <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
+                <Route path="/dashboard" element={<PolicyGate loadingFallback={<DashboardLoadingSkeleton />}><EmailGate loadingFallback={<DashboardLoadingSkeleton />}><DashboardPage /></EmailGate></PolicyGate>} />
+                <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><EmailGate><ProfilePage /></EmailGate></PolicyGate>} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </RadioProvider>
       </ModalProvider>
     </TooltipProvider>
   );
