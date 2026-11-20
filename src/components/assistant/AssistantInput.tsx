@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ASSISTANT_VARIANTS,
+  CHAT_PROMPT_SUGGESTIONS,
+  TASK_PROMPT_SUGGESTIONS,
   type AssistantChat,
   type AssistantMode,
   type AssistantVariant,
@@ -127,6 +129,8 @@ export const AssistantInput = ({
     state.activeMode === 'task'
       ? TASK_SUBTITLE_TEXTS(displayName)
       : CHAT_SUBTITLE_TEXTS(displayName);
+  const suggestions =
+    state.activeMode === 'task' ? TASK_PROMPT_SUGGESTIONS : CHAT_PROMPT_SUGGESTIONS;
   const updateAssistant = assistant.update;
 
   const [value, setValue] = useState('');
@@ -160,12 +164,51 @@ export const AssistantInput = ({
   const streamTokensRef = useRef<string[]>([]);
   const streamStartRef = useRef<number | null>(null);
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
+  const typewriterRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const typewriterExpectedRef = useRef('');
 
   const isChat = messages.length > 0;
 
   const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
 
-  const handleValueChange = (next: string) => setValue(next);
+  const cancelTypewriter = useCallback(() => {
+    if (typewriterRef.current !== null) {
+      clearInterval(typewriterRef.current);
+      typewriterRef.current = null;
+    }
+  }, []);
+
+  const handleValueChange = (next: string) => {
+    if (typewriterRef.current !== null && next !== typewriterExpectedRef.current) cancelTypewriter();
+    setValue(next);
+  };
+
+  const startSuggestionTypewriter = (prompt: string) => {
+    cancelTypewriter();
+    setValue('');
+    if (textareaRef.current) textareaRef.current.value = '';
+    textareaRef.current?.focus();
+
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      typewriterExpectedRef.current = prompt;
+      setValue(prompt);
+      return;
+    }
+
+    let index = 0;
+    typewriterExpectedRef.current = '';
+    typewriterRef.current = setInterval(() => {
+      index += 1;
+      const next = prompt.slice(0, index);
+      typewriterExpectedRef.current = next;
+      setValue(next);
+      if (index >= prompt.length) cancelTypewriter();
+    }, 14);
+  };
 
   useEffect(() => {
     if (!availableVariants.includes(variant)) {
@@ -176,11 +219,27 @@ export const AssistantInput = ({
 
   useEffect(
     () => () => {
+      cancelTypewriter();
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       streamClientRef.current?.close();
     },
-    [],
+    [cancelTypewriter],
   );
+
+  useEffect(() => {
+    cancelTypewriter();
+  }, [cancelTypewriter, state.activeMode]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (['Tab', 'Shift', 'Control', 'Meta', 'Alt', 'CapsLock'].includes(event.key)) return;
+      cancelTypewriter();
+    };
+    textarea.addEventListener('keydown', handleKeyDown, true);
+    return () => textarea.removeEventListener('keydown', handleKeyDown, true);
+  }, [cancelTypewriter]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -401,6 +460,7 @@ export const AssistantInput = ({
 
   const handleNewChat = () => {
     cancelStream();
+    cancelTypewriter();
     queuedMessagesRef.current = [];
     setQueuedMessages([]);
     setMessages([]);
@@ -414,6 +474,7 @@ export const AssistantInput = ({
     const chat = state.chats.find((item) => item.id === id);
     if (!chat) return;
     cancelStream();
+    cancelTypewriter();
     queuedMessagesRef.current = [];
     setQueuedMessages([]);
     setValue('');
@@ -470,6 +531,7 @@ export const AssistantInput = ({
     if (assistantMessage?.variant) {
       setVariant(assistantMessage.variant);
     }
+    cancelTypewriter();
     setValue(userMessage.content);
     if (textareaRef.current) textareaRef.current.value = userMessage.content;
     queuedMessagesRef.current = [];
@@ -618,6 +680,7 @@ export const AssistantInput = ({
   };
 
   const handleSend = () => {
+    cancelTypewriter();
     if (isGenerating) {
       stopGeneration();
       return;
@@ -627,6 +690,7 @@ export const AssistantInput = ({
   };
 
   const queueCurrentMessage = () => {
+    cancelTypewriter();
     const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
     const trimmed = currentValue.trim();
     if (!trimmed) return;
@@ -666,6 +730,20 @@ export const AssistantInput = ({
             >
               {subtitles[subtitleIndex % subtitles.length]}
             </p>
+            <div className="assistant-input__suggestions" aria-label="Suggested prompts">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  className="assistant-input__suggestion"
+                  onClick={() => startSuggestionTypewriter(suggestion.prompt)}
+                  aria-label={`Type prompt: ${suggestion.label}`}
+                  title={suggestion.prompt}
+                >
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {isChat && (

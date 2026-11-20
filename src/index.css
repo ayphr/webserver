@@ -184,6 +184,7 @@ body::-webkit-scrollbar-thumb:hover {
   .assistant-chat__tool,
   .assistant-chat__code-copy,
   .assistant-chat__retry,
+  .assistant-input__suggestion,
   .assistant-toolbar__item,
   .assistant-toolbar__mode-button,
   .assistant-menu__item,

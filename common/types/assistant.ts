@@ -7,68 +7,18 @@ export type AssistantMode = 'chat' | 'task';
 
 export const ASSISTANT_STREAM_PATH = '/ws/assistant';
 
-export type AssistantStreamErrorCode =
-  | 'UNAUTHORIZED'
-  | 'AUTH_TIMEOUT'
-  | 'RATE_LIMITED'
-  | 'STREAM_LIMIT'
-  | 'STREAM_TIMEOUT'
-  | 'RESUME_UNAVAILABLE'
-  | 'SERVER_ERROR';
-
 export type AssistantStreamClientMessage =
   | { type: 'auth'; token: string }
-  | {
-      type: 'stream';
-      requestId: string;
-      mode: AssistantMode;
-      variant: AssistantVariant;
-    }
-  | { type: 'cancel'; requestId: string }
-  | { type: 'resume'; requestId: string; lastTokenIndex: number };
+  | { type: 'stream'; requestId: string }
+  | { type: 'cancel'; requestId: string };
 
 export type AssistantStreamServerMessage =
-  | { type: 'auth_ok' }
-  | {
-      type: 'auth_error';
-      error: string;
-      code?: AssistantStreamErrorCode;
-      retryAfterMs?: number;
-    }
-  | { type: 'resumed'; requestId: string; nextIndex: number }
-  | { type: 'thinking'; requestId: string; step: AssistantThinkingStep }
-  | { type: 'tool'; requestId: string; tool: AssistantToolCall }
-  | { type: 'token'; requestId: string; token: string; index: number }
-  | { type: 'cancelled'; requestId: string }
-  | { type: 'done'; requestId: string; durationMs: number }
-  | {
-      type: 'error';
-      requestId: string;
-      error: string;
-      code?: AssistantStreamErrorCode;
-      retryAfterMs?: number;
-    };
+  | { type: 'auth_error'; error: string }
+  | { type: 'token'; requestId: string; token: string }
+  | { type: 'done'; requestId: string }
+  | { type: 'error'; requestId: string; error: string };
 
 export type AssistantMessageFeedback = 'like' | 'dislike' | null;
-
-export type AssistantThinkingStatus = 'pending' | 'running' | 'done';
-
-export type AssistantThinkingStep = {
-  id: string;
-  title: string;
-  detail?: string;
-  status: AssistantThinkingStatus;
-};
-
-export type AssistantToolStatus = 'pending' | 'running' | 'done' | 'error';
-
-export type AssistantToolCall = {
-  id: string;
-  name: string;
-  status: AssistantToolStatus;
-  detail?: string;
-  durationMs?: number;
-};
 
 export type AssistantMessage = {
   id: number;
@@ -80,14 +30,11 @@ export type AssistantMessage = {
   feedback?: AssistantMessageFeedback;
   variant?: AssistantVariant;
   durationMs?: number;
-  thinking?: AssistantThinkingStep[];
-  tools?: AssistantToolCall[];
 };
 
 export type AssistantFolder = {
   id: string;
   name: string;
-  order: number;
   createdAt: number;
 };
 
@@ -95,8 +42,6 @@ export type AssistantChat = {
   id: string;
   title: string;
   folderId: string | null;
-  pinned: boolean;
-  order: number;
   mode: AssistantMode;
   messages: AssistantMessage[];
   createdAt: number;

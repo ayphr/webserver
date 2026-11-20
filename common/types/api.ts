@@ -4,13 +4,7 @@ import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
 import type { SessionInfo } from './session';
 import type { CreditBalance } from './credits';
-import type {
-  AssistantMode,
-  AssistantState,
-  AssistantThinkingStatus,
-  AssistantToolStatus,
-  AssistantVariant,
-} from './assistant';
+import type { AssistantState } from './assistant';
 import type {
   SubscriptionTier,
 } from './subscription';
@@ -65,99 +59,6 @@ export type UserMePayload = {
 
 export type AssistantStatePayload = {
   state: AssistantState;
-};
-
-/** Count-only values stored on a lightweight assistant state snapshot event. */
-export type AssistantMetricCounters = {
-  activeChats: number;
-  activeFolders: number;
-  messages: number;
-  userMessages: number;
-  assistantMessages: number;
-  interrupted: number;
-  errors: number;
-  likes: number;
-  dislikes: number;
-  tokens: number;
-  costProxy: number;
-  thinkingPending: number;
-  thinkingRunning: number;
-  thinkingDone: number;
-  toolsPending: number;
-  toolsRunning: number;
-  toolsDone: number;
-  toolsError: number;
-};
-
-export type AssistantMetricsTotals = {
-  events: number;
-  streams: number;
-  completedStreams: number;
-  cancelledStreams: number;
-  errorStreams: number;
-  messages: number;
-  userMessages: number;
-  assistantMessages: number;
-  interrupted: number;
-  errors: number;
-  cancelled: number;
-  thinkingSteps: number;
-  toolCalls: number;
-  tokens: number;
-  costProxy: number;
-  likes: number;
-  dislikes: number;
-  activeChats: number;
-  activeFolders: number;
-};
-
-export type AssistantDurationStats = {
-  count: number;
-  totalMs: number;
-  averageMs: number;
-  minMs: number;
-  maxMs: number;
-  p50Ms: number;
-  p95Ms: number;
-};
-
-export type AssistantDailyMetric = {
-  date: string;
-  streams: number;
-  messages: number;
-  tokens: number;
-  costProxy: number;
-  durationMs: number;
-  durationCount: number;
-  thinkingSteps: number;
-  toolCalls: number;
-  errors: number;
-  cancelled: number;
-  likes: number;
-  dislikes: number;
-};
-
-export type AssistantMetricBucket = {
-  name: string;
-  count: number;
-};
-
-export type AssistantMetricsPayload = {
-  scope: 'user' | 'global';
-  generatedAt: Date;
-  periodDays: number;
-  totals: AssistantMetricsTotals;
-  byMode: Record<AssistantMode, number>;
-  byVariant: Record<AssistantVariant, number>;
-  byFeedback: Record<'like' | 'dislike' | 'none', number>;
-  byRole: Record<'user' | 'assistant', number>;
-  byResult: Record<'complete' | 'done' | 'cancelled' | 'error', number>;
-  byError: Record<string, number>;
-  thinkingByStatus: Record<AssistantThinkingStatus, number>;
-  toolsByStatus: Record<AssistantToolStatus, number>;
-  topTools: AssistantMetricBucket[];
-  duration: AssistantDurationStats;
-  daily: AssistantDailyMetric[];
 };
 
 export type AcceptPoliciesPayload = {

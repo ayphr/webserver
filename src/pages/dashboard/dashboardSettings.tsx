@@ -211,7 +211,6 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
             { value: 'profile', label: 'Profile' },
             { value: 'credits', label: 'Credits' },
             { value: 'games', label: 'Games' },
-            { value: 'assistant-metrics', label: 'Assistant metrics' },
             { value: 'team', label: 'Team' },
             ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
           ],
