@@ -17,6 +17,19 @@
   overflow-y: auto;
 }
 
+.dashboard-assistant {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-assistant > .assistant-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .dashboard-panel {
   width: 100%;
   max-width: 640px;

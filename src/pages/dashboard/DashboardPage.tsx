@@ -484,20 +484,6 @@ export const DashboardPage = () => {
   return (
     <div className={`dashboard-layout`}>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
-      {activePage === 'assistant' && (
-        <AssistantSidebar
-          folders={assistant.state.folders}
-          chats={assistant.state.chats}
-          activeChatId={assistant.state.activeChatId}
-          isAssistantView
-          onNewChat={handleSidebarNewChat}
-          onOpenChat={handleSidebarOpenChat}
-          onRenameFolder={assistant.renameFolder}
-          onDeleteFolder={assistant.deleteFolder}
-          onRenameChat={assistant.renameChat}
-          onDeleteChat={handleSidebarDeleteChat}
-        />
-      )}
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
@@ -565,15 +551,29 @@ export const DashboardPage = () => {
         ) : (
           <>
             {activePage === 'assistant' && (
-              <AssistantInput
-                availableVariants={availableAssistantVariants}
-                username={user.username}
-                defaultVariant={effectiveAssistantVariant}
-                dataShared={getPlanFeaturesForUser(user).dataShared}
-                sendShortcut={assistantSendShortcut}
-                assistant={assistant}
-                chatAction={chatAction}
-              />
+              <div className="dashboard-assistant">
+                <AssistantSidebar
+                  folders={assistant.state.folders}
+                  chats={assistant.state.chats}
+                  activeChatId={assistant.state.activeChatId}
+                  isAssistantView
+                  onNewChat={handleSidebarNewChat}
+                  onOpenChat={handleSidebarOpenChat}
+                  onRenameFolder={assistant.renameFolder}
+                  onDeleteFolder={assistant.deleteFolder}
+                  onRenameChat={assistant.renameChat}
+                  onDeleteChat={handleSidebarDeleteChat}
+                />
+                <AssistantInput
+                  availableVariants={availableAssistantVariants}
+                  username={user.username}
+                  defaultVariant={effectiveAssistantVariant}
+                  dataShared={getPlanFeaturesForUser(user).dataShared}
+                  sendShortcut={assistantSendShortcut}
+                  assistant={assistant}
+                  chatAction={chatAction}
+                />
+              </div>
             )}
 
             {activePage === 'overview' && (
