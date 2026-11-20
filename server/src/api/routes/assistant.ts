@@ -85,6 +85,10 @@ function parseMessage(value: unknown, label: string): AssistantMessage {
     message.interrupted = value.interrupted;
   }
 
+  if (value.error !== undefined) {
+    message.error = requireString(value.error, `${label}.error`, MAX_MESSAGE_LENGTH);
+  }
+
   if (value.feedback !== undefined) {
     if (
       value.feedback === null ||

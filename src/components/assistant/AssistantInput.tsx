@@ -261,7 +261,7 @@ export const AssistantInput = ({
     );
   };
 
-  const handleStreamDone = (requestId: string) => {
+  const finishStream = (requestId: string, error?: string) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     const durationMs = takeStreamDuration();
@@ -280,6 +280,7 @@ export const AssistantInput = ({
                 durationMs: m.durationMs ?? durationMs,
                 liveDurationMs: undefined,
                 liveTokensPerSecond: undefined,
+                ...(error ? { error } : {}),
               }
             : m,
         ),
@@ -290,8 +291,12 @@ export const AssistantInput = ({
     else setIsGenerating(false);
   };
 
-  const handleStreamError = (requestId: string) => {
-    handleStreamDone(requestId);
+  const handleStreamDone = (requestId: string) => {
+    finishStream(requestId);
+  };
+
+  const handleStreamError = (requestId: string, error: string) => {
+    finishStream(requestId, error);
   };
 
   const getStreamClient = () => {
@@ -429,7 +434,15 @@ export const AssistantInput = ({
     setMessages((prev) =>
       prev.map((m) =>
         m.id === messageId && m.role === 'assistant'
-          ? { ...m, content: '', interrupted: false, feedback: null, durationMs: undefined, variant }
+          ? {
+              ...m,
+              content: '',
+              interrupted: false,
+              error: undefined,
+              feedback: null,
+              durationMs: undefined,
+              variant,
+            }
           : m,
       ),
     );

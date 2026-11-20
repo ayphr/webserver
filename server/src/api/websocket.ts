@@ -21,8 +21,10 @@ const TOKEN_DELAY_VARY_MS = 50;
 
 const activeStreams = new Map<AssistantWebSocket, ActiveStreams>();
 const authTimers = new Map<AssistantWebSocket, ReturnType<typeof setTimeout>>();
+const messageQueues = new Map<AssistantWebSocket, Promise<void>>();
 
 const send = (ws: AssistantWebSocket, message: AssistantStreamServerMessage) => {
+  if (ws.readyState !== 1) return;
   ws.send(JSON.stringify(message));
 };
 
@@ -90,6 +92,45 @@ const isClientMessage = (value: unknown): value is AssistantStreamClientMessage 
   );
 };
 
+const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayBuffer>) => {
+  const text = typeof raw === 'string' ? raw : raw.toString();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return;
+  }
+  if (!isClientMessage(parsed)) return;
+
+  if (parsed.type === 'auth') {
+    if (ws.data.userUuid) return;
+    const timer = authTimers.get(ws);
+    if (timer) clearTimeout(timer);
+    authTimers.delete(ws);
+
+    let user;
+    try {
+      user = await getUserFromToken(parsed.token);
+    } catch {
+      user = null;
+    }
+    if (!user) {
+      rejectUnauthenticated(ws, 'Unauthorized');
+      return;
+    }
+    ws.data.userUuid = user.uuid;
+    return;
+  }
+
+  if (!ws.data.userUuid) {
+    rejectUnauthenticated(ws, 'Authentication required');
+    return;
+  }
+
+  if (parsed.type === 'stream') startStream(ws, parsed.requestId);
+  else cancelStream(ws, parsed.requestId);
+};
+
 export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
   data: undefined as AssistantSocketData | undefined,
 
@@ -101,44 +142,27 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
     );
   },
 
-  async message(ws, raw) {
-    const text = typeof raw === 'string' ? raw : raw.toString();
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return;
-    }
-    if (!isClientMessage(parsed)) return;
-
-    if (parsed.type === 'auth') {
-      if (ws.data.userUuid) return;
-      const timer = authTimers.get(ws);
-      if (timer) clearTimeout(timer);
-      authTimers.delete(ws);
-
-      const user = await getUserFromToken(parsed.token);
-      if (!user) {
-        rejectUnauthenticated(ws, 'Unauthorized');
-        return;
-      }
-      ws.data.userUuid = user.uuid;
-      return;
-    }
-
-    if (!ws.data.userUuid) {
-      rejectUnauthenticated(ws, 'Authentication required');
-      return;
-    }
-
-    if (parsed.type === 'stream') startStream(ws, parsed.requestId);
-    else cancelStream(ws, parsed.requestId);
+  message(ws, raw) {
+    // Auth resolution is async, so serialize each socket's messages to keep
+    // stream/cancel requests from running before auth has completed.
+    const previous = messageQueues.get(ws) ?? Promise.resolve();
+    const next = previous.then(() => handleMessage(ws, raw));
+    messageQueues.set(ws, next);
+    void next.then(
+      () => {
+        if (messageQueues.get(ws) === next) messageQueues.delete(ws);
+      },
+      () => {
+        if (messageQueues.get(ws) === next) messageQueues.delete(ws);
+      },
+    );
   },
 
   close(ws) {
     const timer = authTimers.get(ws);
     if (timer) clearTimeout(timer);
     authTimers.delete(ws);
+    messageQueues.delete(ws);
 
     const streams = activeStreams.get(ws);
     if (streams) {

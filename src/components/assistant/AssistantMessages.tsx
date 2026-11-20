@@ -124,6 +124,7 @@ export const AssistantMessages = ({
                     </span>
                   ))}
                 </div>
+                {message.error && <p className="assistant-chat__error">{message.error}</p>}
                 {message.interrupted && (
                   <p className="assistant-chat__interrupted">You interrupted this response.</p>
                 )}

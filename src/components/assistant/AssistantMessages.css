@@ -145,6 +145,13 @@
   max-width: 100%;
 }
 
+.assistant-chat__error {
+  margin: 0;
+  color: var(--status-error);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
 .assistant-chat__interrupted {
   margin: 0;
   color: var(--text-muted);

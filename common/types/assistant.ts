@@ -26,6 +26,7 @@ export type AssistantMessage = {
   content: string;
   createdAt: number;
   interrupted?: boolean;
+  error?: string;
   feedback?: AssistantMessageFeedback;
   variant?: AssistantVariant;
   durationMs?: number;
