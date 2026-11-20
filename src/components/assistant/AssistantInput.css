@@ -59,7 +59,7 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, calc(-50% + 1.2rem));
+  transform: translate(-50%, calc(-50% + 3.5rem));
   width: 100%;
   max-width: 720px;
   display: flex;

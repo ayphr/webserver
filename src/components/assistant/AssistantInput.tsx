@@ -260,7 +260,7 @@ export const AssistantInput = ({
     const now = Date.now();
     const chat: AssistantChat = {
       id: createId(),
-      title: 'New chat',
+      title: mode === 'task' ? 'New task' : 'New chat',
       folderId,
       mode,
       messages: [],
