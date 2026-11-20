@@ -1,10 +1,12 @@
 import {
+  ASSISTANT_MODES,
   ASSISTANT_VARIANTS,
   createDefaultAssistantState,
   type AssistantChat,
   type AssistantFolder,
   type AssistantMessage,
   type AssistantMessageFeedback,
+  type AssistantMode,
   type AssistantState,
   type AssistantVariant,
 } from '@common';
@@ -53,6 +55,13 @@ const requireVariant = (value: unknown, label: string): AssistantVariant => {
     throw new Error(`invalid ${label}`);
   }
   return value as AssistantVariant;
+};
+
+const requireMode = (value: unknown, label: string): AssistantMode => {
+  if (typeof value !== 'string' || !ASSISTANT_MODES.includes(value as AssistantMode)) {
+    throw new Error(`invalid ${label}`);
+  }
+  return value as AssistantMode;
 };
 
 function parseMessage(value: unknown, label: string): AssistantMessage {
@@ -110,6 +119,7 @@ function parseChat(value: unknown, label: string): AssistantChat {
     id: requireId(value.id, `${label}.id`),
     title: requireString(value.title, `${label}.title`, MAX_TITLE_LENGTH),
     folderId: requireNullableId(value.folderId, `${label}.folderId`),
+    mode: value.mode === undefined ? 'chat' : requireMode(value.mode, `${label}.mode`),
     messages: value.messages.map((message, index) =>
       parseMessage(message, `${label}.messages[${index}]`),
     ),
@@ -153,6 +163,7 @@ function parseAssistantState(value: unknown): AssistantState {
 
   const activeChatId = requireNullableId(value.activeChatId, 'activeChatId');
   const activeFolderId = requireNullableId(value.activeFolderId, 'activeFolderId');
+  const activeMode = value.activeMode === undefined ? 'chat' : requireMode(value.activeMode, 'activeMode');
   if (activeChatId !== null && !chatIds.has(activeChatId)) {
     throw new Error('active chat does not exist');
   }
@@ -171,6 +182,7 @@ function parseAssistantState(value: unknown): AssistantState {
     folders,
     activeChatId,
     activeFolderId,
+    activeMode,
     preferences: { defaultVariant, sendShortcut },
   };
 }

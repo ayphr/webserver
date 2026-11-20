@@ -1,6 +1,8 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
   IconCheck,
+  IconClipboardList,
+  IconClipboardListFilled,
   IconFolder,
   IconFolderOpen,
   IconFolders,
@@ -225,16 +227,25 @@ export const AssistantSidebar = ({
 
   const renderChatRow = (chat: AssistantChat) => {
     const editing = editState?.kind === 'chat' && editState.id === chat.id;
+    const isActive = chat.id === activeChatId;
+    let chatIcon;
+    if (chat.mode === 'task') {
+      chatIcon = isActive ? (
+        <IconClipboardListFilled size={15} strokeWidth={1.75} />
+      ) : (
+        <IconClipboardList size={15} strokeWidth={1.75} />
+      );
+    } else {
+      chatIcon = isActive ? (
+        <IconMessageCircleFilled size={15} strokeWidth={1.75} />
+      ) : (
+        <IconMessageCircle size={15} strokeWidth={1.75} />
+      );
+    }
     return (
       <Row
         key={chat.id}
-        icon={
-          chat.id === activeChatId ? (
-            <IconMessageCircleFilled size={15} strokeWidth={1.75} />
-          ) : (
-            <IconMessageCircle size={15} strokeWidth={1.75} />
-          )
-        }
+        icon={chatIcon}
         label={chat.title}
         active={chat.id === activeChatId}
         indented

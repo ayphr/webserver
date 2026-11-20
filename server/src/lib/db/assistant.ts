@@ -7,10 +7,11 @@ import {
 } from './internal';
 
 const stripStoredFields = (document: AssistantStateDocument): AssistantState => ({
-  chats: document.chats,
+  chats: document.chats.map((chat) => ({ ...chat, mode: chat.mode ?? 'chat' })),
   folders: document.folders,
   activeChatId: document.activeChatId,
   activeFolderId: document.activeFolderId,
+  activeMode: document.activeMode ?? 'chat',
   preferences: document.preferences,
 });
 

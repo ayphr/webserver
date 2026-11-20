@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createDefaultAssistantState,
+  type AssistantMode,
   type AssistantPreferences,
   type AssistantState,
 } from '@common';
@@ -14,6 +15,7 @@ export type AssistantController = {
   update: (updater: (current: AssistantState) => AssistantState) => void;
   updatePreferences: (patch: Partial<AssistantPreferences>) => void;
   selectFolder: (folderId: string | null) => void;
+  selectMode: (mode: AssistantMode) => void;
   createFolder: (name: string) => void;
   renameFolder: (id: string, name: string) => void;
   deleteFolder: (id: string) => void;
@@ -94,6 +96,13 @@ export const useAssistantState = (): AssistantController => {
   const selectFolder = useCallback(
     (folderId: string | null) => {
       update((current) => ({ ...current, activeFolderId: folderId }));
+    },
+    [update],
+  );
+
+  const selectMode = useCallback(
+    (mode: AssistantMode) => {
+      update((current) => ({ ...current, activeMode: mode }));
     },
     [update],
   );
@@ -203,6 +212,7 @@ export const useAssistantState = (): AssistantController => {
       update,
       updatePreferences,
       selectFolder,
+      selectMode,
       createFolder,
       renameFolder,
       deleteFolder,
@@ -215,6 +225,7 @@ export const useAssistantState = (): AssistantController => {
       update,
       updatePreferences,
       selectFolder,
+      selectMode,
       createFolder,
       renameFolder,
       deleteFolder,

@@ -2,6 +2,9 @@ export const ASSISTANT_VARIANTS: AssistantVariant[] = ['nano', 'lite', 'standard
 export type AssistantVariant = 'nano' | 'lite' | 'standard' | 'plus' | 'turbo';
 export type AssistantSendShortcut = 'enter' | 'shift-enter';
 
+export const ASSISTANT_MODES: AssistantMode[] = ['chat', 'task'];
+export type AssistantMode = 'chat' | 'task';
+
 export type AssistantMessageFeedback = 'like' | 'dislike' | null;
 
 export type AssistantMessage = {
@@ -25,6 +28,7 @@ export type AssistantChat = {
   id: string;
   title: string;
   folderId: string | null;
+  mode: AssistantMode;
   messages: AssistantMessage[];
   createdAt: number;
   updatedAt: number;
@@ -40,6 +44,7 @@ export type AssistantState = {
   folders: AssistantFolder[];
   activeChatId: string | null;
   activeFolderId: string | null;
+  activeMode: AssistantMode;
   preferences: AssistantPreferences;
 };
 
@@ -53,6 +58,7 @@ export const createDefaultAssistantState = (): AssistantState => ({
   folders: [],
   activeChatId: null,
   activeFolderId: null,
+  activeMode: 'chat',
   preferences: { ...DEFAULT_ASSISTANT_PREFERENCES },
 });
 

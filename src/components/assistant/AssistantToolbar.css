@@ -40,6 +40,44 @@
   text-overflow: ellipsis;
 }
 
+.assistant-toolbar__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  height: 1.9rem;
+  padding: 0.15rem;
+  border-radius: 999px;
+  background-color: var(--bg-elevated);
+}
+
+.assistant-toolbar__mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.6rem;
+  padding: 0 0.6rem;
+  border: none;
+  border-radius: 999px;
+  background-color: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-md);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.assistant-toolbar__mode-button:hover {
+  color: var(--text-primary);
+}
+
+.assistant-toolbar__mode-button--active {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
 .assistant-menu {
   position: absolute;
   bottom: calc(100% + 0.4rem);

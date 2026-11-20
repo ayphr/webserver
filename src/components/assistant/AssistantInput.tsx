@@ -21,7 +21,7 @@ export interface AssistantInputProps {
   chatAction?: AssistantChatAction | null;
 }
 
-const SUBTITLE_TEXTS = (displayName: string) => [
+const CHAT_SUBTITLE_TEXTS = (displayName: string) => [
   `What should we tackle, ${displayName}?`,
   'How can I help?',
   'Ready when you are.',
@@ -58,6 +58,43 @@ const SUBTITLE_TEXTS = (displayName: string) => [
   'Let’s start something new.',
 ];
 
+const TASK_SUBTITLE_TEXTS = (displayName: string) => [
+  `What are we building, ${displayName}?`,
+  'Let’s think long-term.',
+  'Give me the big picture.',
+  'Let’s break it down.',
+  'What’s the end goal?',
+  'Ready for a deep dive.',
+  'Let’s map out the work.',
+  'What should we tackle first?',
+  'Tell me about the project.',
+  'Let’s plan the next steps.',
+  'Where are we headed?',
+  'Let’s work through it together.',
+  'What needs to get done?',
+  'Let’s make a plan.',
+  'What’s the real challenge?',
+  'Let’s connect the dots.',
+  'Think bigger with me.',
+  'What does success look like?',
+  'Let’s get strategic.',
+  'I’m ready for the details.',
+  'Let’s solve something complex.',
+  'What’s the roadmap?',
+  'Let’s dig deeper.',
+  'Where should we start?',
+  'Let’s build something great.',
+  'What’s the scope?',
+  'Let’s take it step by step.',
+  'What’s the vision?',
+  'Let’s see it through.',
+  'What are we aiming for?',
+  'Let’s lay the groundwork.',
+  'Where do you want to go?',
+  'Let’s make it happen.',
+  'What’s the long game?',
+];
+
 export const AssistantInput = ({
   placeholder = 'Ask Iris',
   className = '',
@@ -70,8 +107,11 @@ export const AssistantInput = ({
   chatAction = null,
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
-  const subtitles = SUBTITLE_TEXTS(displayName);
   const { state } = assistant;
+  const subtitles =
+    state.activeMode === 'task'
+      ? TASK_SUBTITLE_TEXTS(displayName)
+      : CHAT_SUBTITLE_TEXTS(displayName);
   const updateAssistant = assistant.update;
 
   const [value, setValue] = useState('');
@@ -216,12 +256,13 @@ export const AssistantInput = ({
     }
   };
 
-  const createChat = (folderId: string | null) => {
+  const createChat = (folderId: string | null, mode: AssistantChat['mode']) => {
     const now = Date.now();
     const chat: AssistantChat = {
       id: createId(),
       title: 'New chat',
       folderId,
+      mode,
       messages: [],
       createdAt: now,
       updatedAt: now,
@@ -407,7 +448,7 @@ export const AssistantInput = ({
     const trimmed = text.trim();
     if (!trimmed) return false;
 
-    if (!state.activeChatId) createChat(state.activeFolderId);
+    if (!state.activeChatId) createChat(state.activeFolderId, state.activeMode);
 
     const now = Date.now();
     const userMessage: LiveAssistantMessage = {
@@ -485,7 +526,7 @@ export const AssistantInput = ({
               aria-hidden="true"
             />
             <p key={subtitleIndex} className="assistant-input__subtitle">
-              {subtitles[subtitleIndex]}
+              {subtitles[subtitleIndex % subtitles.length]}
             </p>
           </div>
         )}
@@ -509,7 +550,9 @@ export const AssistantInput = ({
             <AssistantToolbar
               folders={state.folders}
               activeFolderId={state.activeFolderId}
+              activeMode={state.activeMode}
               onSelectFolder={assistant.selectFolder}
+              onSelectMode={assistant.selectMode}
               onCreateFolder={assistant.createFolder}
             />
           )}

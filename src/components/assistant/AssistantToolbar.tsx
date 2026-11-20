@@ -1,25 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  IconClipboardList,
   IconFolder,
   IconFolderFilled,
   IconFolders,
   IconFoldersFilled,
+  IconMessageCircle,
   IconPlus,
 } from '@tabler/icons-react';
-import type { AssistantFolder } from '@common';
+import type { AssistantFolder, AssistantMode } from '@common';
 import './AssistantToolbar.css';
 
 export interface AssistantToolbarProps {
   folders: AssistantFolder[];
   activeFolderId: string | null;
+  activeMode: AssistantMode;
   onSelectFolder: (folderId: string | null) => void;
+  onSelectMode: (mode: AssistantMode) => void;
   onCreateFolder: (name: string) => void;
 }
 
 export const AssistantToolbar = ({
   folders,
   activeFolderId,
+  activeMode,
   onSelectFolder,
+  onSelectMode,
   onCreateFolder,
 }: AssistantToolbarProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -154,6 +160,26 @@ export const AssistantToolbar = ({
             )}
           </div>
         )}
+      </div>
+      <div className="assistant-toolbar__mode" role="group" aria-label="Assistant mode">
+        <button
+          type="button"
+          className={`assistant-toolbar__mode-button ${activeMode === 'chat' ? 'assistant-toolbar__mode-button--active' : ''}`}
+          aria-pressed={activeMode === 'chat'}
+          onClick={() => onSelectMode('chat')}
+        >
+          <IconMessageCircle size={14} strokeWidth={1.75} />
+          <span>Chat</span>
+        </button>
+        <button
+          type="button"
+          className={`assistant-toolbar__mode-button ${activeMode === 'task' ? 'assistant-toolbar__mode-button--active' : ''}`}
+          aria-pressed={activeMode === 'task'}
+          onClick={() => onSelectMode('task')}
+        >
+          <IconClipboardList size={14} strokeWidth={1.75} />
+          <span>Task</span>
+        </button>
       </div>
     </div>
   );
