@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ASSISTANT_VARIANTS, type AssistantChat, type AssistantVariant } from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
+import { AssistantStreamClient } from '../../lib/assistantStream';
 import { AssistantComposer } from './AssistantComposer';
 import { AssistantMessages } from './AssistantMessages';
 import { AssistantToolbar } from './AssistantToolbar';
 import type { AssistantChatAction, LiveAssistantMessage } from './types';
 import type { AssistantController } from './useAssistantState';
-import { createId, generateGibberish, toPersistableMessage } from './utils';
+import { createId, toPersistableMessage } from './utils';
 import './AssistantInput.css';
 
 export interface AssistantInputProps {
@@ -138,9 +139,9 @@ export const AssistantInput = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const queuedMessagesRef = useRef<string[]>([]);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const streamTokensRef = useRef<string[]>([]);
-  const streamIndexRef = useRef(0);
+  const streamClientRef = useRef<AssistantStreamClient | null>(null);
+  const streamRequestIdRef = useRef<string | null>(null);
+  const streamCompleteRef = useRef<(() => void) | null>(null);
   const streamMessageIdRef = useRef<number | null>(null);
   const streamStartRef = useRef<number | null>(null);
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
@@ -159,7 +160,7 @@ export const AssistantInput = ({
   useEffect(
     () => () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-      if (streamRef.current) clearTimeout(streamRef.current);
+      streamClientRef.current?.close();
     },
     [],
   );
@@ -229,16 +230,79 @@ export const AssistantInput = ({
   };
 
   const cancelStream = () => {
-    if (streamRef.current) {
-      clearTimeout(streamRef.current);
-      streamRef.current = null;
-    }
-    streamTokensRef.current = [];
-    streamIndexRef.current = 0;
+    const requestId = streamRequestIdRef.current;
+    if (requestId) streamClientRef.current?.cancel(requestId);
+    streamRequestIdRef.current = null;
+    streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
     streamStartRef.current = null;
     setStreamingMessageId(null);
     setIsGenerating(false);
+  };
+
+  const handleStreamToken = (requestId: string, token: string) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    if (messageId === null) return;
+
+    const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const content = m.content + token;
+        const tokenCount = content.split(/\s+/).filter(Boolean).length;
+        return {
+          ...m,
+          content,
+          liveDurationMs: elapsedMs,
+          liveTokensPerSecond: tokenCount / (elapsedMs / 1000),
+        };
+      }),
+    );
+  };
+
+  const handleStreamDone = (requestId: string) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    const durationMs = takeStreamDuration();
+    const complete = streamCompleteRef.current;
+    streamRequestIdRef.current = null;
+    streamCompleteRef.current = null;
+    streamMessageIdRef.current = null;
+    setStreamingMessageId(null);
+
+    if (messageId !== null) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                durationMs: m.durationMs ?? durationMs,
+                liveDurationMs: undefined,
+                liveTokensPerSecond: undefined,
+              }
+            : m,
+        ),
+      );
+    }
+
+    if (complete) complete();
+    else setIsGenerating(false);
+  };
+
+  const handleStreamError = (requestId: string) => {
+    handleStreamDone(requestId);
+  };
+
+  const getStreamClient = () => {
+    if (!streamClientRef.current) {
+      streamClientRef.current = new AssistantStreamClient({
+        onToken: handleStreamToken,
+        onDone: handleStreamDone,
+        onError: handleStreamError,
+      });
+    }
+    return streamClientRef.current;
   };
 
   const stopGeneration = () => {
@@ -369,7 +433,7 @@ export const AssistantInput = ({
           : m,
       ),
     );
-    startStreaming(messageId, generateGibberish(), processQueue);
+    startStreaming(messageId, processQueue);
   };
 
   const copyMessage = async (messageId: number, content: string) => {
@@ -383,10 +447,10 @@ export const AssistantInput = ({
     }
   };
 
-  const startStreaming = (messageId: number, text: string, onComplete?: () => void) => {
-    const tokens = text.split(' ');
-    streamTokensRef.current = tokens;
-    streamIndexRef.current = 0;
+  const startStreaming = (messageId: number, onComplete?: () => void) => {
+    const requestId = createId();
+    streamRequestIdRef.current = requestId;
+    streamCompleteRef.current = onComplete ?? null;
     streamMessageIdRef.current = messageId;
     streamStartRef.current = Date.now();
     setStreamingMessageId(messageId);
@@ -398,50 +462,7 @@ export const AssistantInput = ({
           : m,
       ),
     );
-
-    const tick = () => {
-      if (streamIndexRef.current >= streamTokensRef.current.length) {
-        const durationMs = takeStreamDuration();
-        streamRef.current = null;
-        streamTokensRef.current = [];
-        streamIndexRef.current = 0;
-        streamMessageIdRef.current = null;
-        setStreamingMessageId(null);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === messageId && m.role === 'assistant'
-              ? {
-                  ...m,
-                  durationMs: m.durationMs ?? durationMs,
-                  liveDurationMs: undefined,
-                  liveTokensPerSecond: undefined,
-                }
-              : m,
-          ),
-        );
-        if (onComplete) onComplete();
-        else setIsGenerating(false);
-        return;
-      }
-      streamIndexRef.current += 1;
-      const partial = streamTokensRef.current.slice(0, streamIndexRef.current).join(' ');
-      const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
-      const tokenCount = partial.split(' ').filter(Boolean).length;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? {
-                ...m,
-                content: partial,
-                liveDurationMs: elapsedMs,
-                liveTokensPerSecond: tokenCount / (elapsedMs / 1000),
-              }
-            : m,
-        ),
-      );
-      streamRef.current = setTimeout(tick, 70 + Math.random() * 50);
-    };
-    streamRef.current = setTimeout(tick, 300);
+    getStreamClient().stream(requestId);
   };
 
   const appendAndStream = (text: string, onComplete?: () => void) => {
@@ -474,7 +495,7 @@ export const AssistantInput = ({
     setValue('');
     if (textareaRef.current) textareaRef.current.value = '';
 
-    startStreaming(assistantId, generateGibberish(), onComplete);
+    startStreaming(assistantId, onComplete);
     return true;
   };
 

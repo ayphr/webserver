@@ -1,5 +1,8 @@
 import type { Server } from 'bun';
+import { ASSISTANT_STREAM_PATH } from '@common';
+import { getAuthError, getUserFromRequest } from './auth';
 import { resolveRoute } from './router';
+import { assistantWebSocket, type AssistantSocketData } from './websocket';
 import { addCorsHeaders, SECURITY_HEADERS } from './routes/util';
 import { setClientIp } from '../lib/requestContext';
 import { createLogger } from '../lib/logger';
@@ -53,9 +56,10 @@ function normalizeRequest(request: Request): Request {
   }
 }
 
-export function setupServer(port: number, callback: () => void): Server<undefined> {
-  const server = Bun.serve({
+export function setupServer(port: number, callback: () => void): Server<AssistantSocketData> {
+  const server: Server<AssistantSocketData> = Bun.serve<AssistantSocketData>({
     port,
+    websocket: assistantWebSocket,
 
     async fetch(request) {
       const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
@@ -70,6 +74,29 @@ export function setupServer(port: number, callback: () => void): Server<undefine
 
       const normalized = normalizeRequest(request);
       setClientIp(normalized, resolveClientIp(request, server.requestIP(request)?.address ?? null));
+
+      const url = new URL(normalized.url);
+      if (
+        url.pathname === ASSISTANT_STREAM_PATH &&
+        request.headers.get('upgrade')?.toLowerCase() === 'websocket'
+      ) {
+        const token = url.searchParams.get('token');
+        const authRequest = token
+          ? new Request(request.url, { headers: { authorization: `Bearer ${token}` } })
+          : null;
+        const user = authRequest ? await getUserFromRequest(authRequest) : null;
+        if (!user) return addCorsHeaders(getAuthError('Unauthorized'), request);
+
+        if (!server.upgrade(request, { data: { userUuid: user.uuid } })) {
+          const response = Response.json(
+            { error: 'WebSocket upgrade failed' },
+            { status: 500, headers: SECURITY_HEADERS },
+          );
+          return addCorsHeaders(response, request);
+        }
+        return undefined;
+      }
+
       const method = normalized.method;
       const { template, dispatch } = resolveRoute(normalized);
 

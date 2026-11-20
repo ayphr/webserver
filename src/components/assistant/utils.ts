@@ -13,23 +13,6 @@ export const toPersistableMessage = (message: LiveAssistantMessage): AssistantMe
   return persistable;
 };
 
-const GIBBERISH_WORDS = [
-  'lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit',
-  'sed', 'do', 'eiusmod', 'tempor', 'incididunt', 'ut', 'labore', 'et', 'dolore',
-  'magna', 'aliqua', 'enim', 'ad', 'minim', 'veniam', 'quis', 'nostrud',
-  'exercitation', 'ullamco', 'laboris', 'nisi', 'aliquip', 'ex', 'ea', 'commodo',
-];
-
-export const generateGibberish = () => {
-  const length = (8 + Math.floor(Math.random() * 12)) * 5;
-  const words: string[] = [];
-  for (let i = 0; i < length; i++) {
-    words.push(GIBBERISH_WORDS[Math.floor(Math.random() * GIBBERISH_WORDS.length)]);
-  }
-  const sentence = words.join(' ');
-  return sentence.charAt(0).toUpperCase() + sentence.slice(1) + '.';
-};
-
 export const formatMessageTime = (timestamp: number) => {
   const date = new Date(timestamp);
   const now = new Date();

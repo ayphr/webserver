@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
   IconCheck,
   IconClipboardList,
@@ -126,6 +126,19 @@ export const AssistantSidebar = ({
   const activeChat = chats.find((chat) => chat.id === activeChatId);
   const activeGroupKey = activeChat ? (activeChat.folderId ?? UNCATEGORISED_KEY) : null;
   const isGroupExpanded = (key: string) => expanded.has(key) || activeGroupKey === key;
+
+  useEffect(() => {
+    if (!activeGroupKey) return;
+    // Keep a group open once its chat has been active, so starting a new chat
+    // does not collapse the folder the previous chat lived in.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setExpanded((prev) => {
+      if (prev.has(activeGroupKey)) return prev;
+      const next = new Set(prev);
+      next.add(activeGroupKey);
+      return next;
+    });
+  }, [activeGroupKey]);
 
   const toggleExpanded = (key: string) => {
     setExpanded((prev) => {
