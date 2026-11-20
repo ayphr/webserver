@@ -559,7 +559,10 @@ export const AssistantInput = ({
               preload="auto"
               aria-hidden="true"
             />
-            <p key={subtitleIndex} className="assistant-input__subtitle">
+            <p
+              key={`${state.activeMode}-${subtitleIndex}`}
+              className="assistant-input__subtitle"
+            >
               {subtitles[subtitleIndex % subtitles.length]}
             </p>
           </div>
