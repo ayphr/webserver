@@ -21,7 +21,7 @@ import {
   IconWifi,
   IconWifiOff,
 } from '@tabler/icons-react';
-import { getPlanFeaturesForUser, type CreditBalance, type DataPoint, type DeviceSummary, type Location, type PublicUser } from '@common';
+import { formatDuration, getPlanFeaturesForUser, type CreditBalance, type DataPoint, type DeviceSummary, type DeviceUptime, type Location, type PublicUser } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
@@ -32,11 +32,12 @@ import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinitio
 import { DEVICE_PERIODS, type DevicePeriod } from '../../lib/devicePeriod';
 import { EXTERNAL_URLS } from '../../lib/externalUrls';
 import { CHART_COLORS, createLineGraphConfig, resolveCssColor } from '../../lib/chartTheme';
+import type { DashboardTarget, DeviceDetailTab, DeviceRouteState } from '../../lib/dashboardRoutes';
 import { DeviceQueryModal } from './DeviceQueryModal';
 import { DeviceExportModal } from './DeviceExportModal';
 import { DataFillModal } from './DataFillModal';
 import { ForecastTab } from './ForecastTab';
-import { AlertsTab } from './AlertsTab';
+import { AlertsTab, type AlertFormRoute } from './AlertsTab';
 import { TokensTab } from './TokensTab';
 import '../common/Tabs.css';
 import './DevicesPanel.css';
@@ -163,11 +164,11 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 
 type Period = DevicePeriod;
 type GraphMode = 'combined' | 'separate' | 'summary';
-type DetailTab = 'graphs' | 'forecasts' | 'alerts' | 'tokens' | 'settings';
+type DetailTab = DeviceDetailTab;
 const DETAIL_TABS: readonly DetailTab[] = ['graphs', 'forecasts', 'alerts', 'tokens', 'settings'];
 type Props = {
-  initialDeviceSerial?: number | null;
-  onNavigate?: (tab: string) => void;
+  activeDevice?: DeviceRouteState | null;
+  onNavigate?: (target: string | DashboardTarget) => void;
   credits?: CreditBalance | null;
   onCreditsChange?: (credits: CreditBalance) => void;
 };
@@ -222,13 +223,12 @@ function createMetricConfig(
   };
 }
 
-export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: initialCredits = null, onCreditsChange }: Props) => {
-  const [view, setView] = useState<'list' | 'detail'>('list');
+export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initialCredits = null, onCreditsChange }: Props) => {
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [devicePage, setDevicePage] = useState(1);
-  const [selectedSerial, setSelectedSerial] = useState<number | null>(null);
-  const [rawDetailTab, setDetailTab] = useState<DetailTab>('graphs');
+  const selectedSerial = activeDevice?.serial ?? null;
+  const view: 'list' | 'detail' = selectedSerial === null ? 'list' : 'detail';
   const [isQueryOpen, setIsQueryOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDataFillOpen, setIsDataFillOpen] = useState(false);
@@ -240,7 +240,10 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;
   const canUseAlertsAndWebhooks = planFeatures?.alertsAndWebhooks ?? false;
   const maxDevices = planFeatures?.maxDevices ?? null;
-  const detailTab: DetailTab = rawDetailTab === 'alerts' && !canUseAlertsAndWebhooks ? 'graphs' : rawDetailTab;
+  const requestedDetailTab: DetailTab = activeDevice?.detailTab ?? 'graphs';
+  const detailTab: DetailTab = requestedDetailTab === 'alerts' && !canUseAlertsAndWebhooks
+    ? 'graphs'
+    : requestedDetailTab;
   const atDeviceLimit = maxDevices !== null && devices.length >= maxDevices;
 
   // Telemetry graph state
@@ -326,6 +329,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
     };
   }, [isGraphFullscreen]);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+  const [uptime, setUptime] = useState<DeviceUptime | null>(null);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -337,7 +341,6 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isUnlinkOpen, setIsUnlinkOpen] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
-  const appliedInitialDeviceRef = useRef<number | null>(null);
   const saveSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (saveSuccessTimeoutRef.current) clearTimeout(saveSuccessTimeoutRef.current);
@@ -358,21 +361,10 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         setCredits(userData.credits);
         if (userData.credits && onCreditsChange) onCreditsChange(userData.credits);
       }
-      if (
-        initialDeviceSerial !== null &&
-        initialDeviceSerial !== undefined &&
-        initialDeviceSerial !== appliedInitialDeviceRef.current &&
-        loadedDevices.some((device) => device.serial === initialDeviceSerial)
-      ) {
-        setSelectedSerial(initialDeviceSerial);
-        setDetailTab('graphs');
-        setView('detail');
-        appliedInitialDeviceRef.current = initialDeviceSerial;
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
     }
-  }, [initialDeviceSerial, onCreditsChange]);
+  }, [onCreditsChange]);
 
   useEffect(() => {
     void (async () => {
@@ -395,6 +387,15 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
   const canManageAlerts = user ? !user.teamId || user.teamRole === 'manager' : false;
   const canOpenIntegrations = Boolean(user && user.teamId && canUseAlertsAndWebhooks);
 
+  const updateDeviceRoute = (patch: Partial<DeviceRouteState>) => {
+    if (!activeDevice) return;
+    onNavigate?.({ tab: 'devices', device: { ...activeDevice, ...patch } });
+  };
+
+  const closeDevice = () => {
+    onNavigate?.({ tab: 'devices' });
+  };
+
   const deviceTotalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
   const currentDevicePage = Math.min(devicePage, deviceTotalPages);
   const visibleDevices = useMemo(
@@ -414,7 +415,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
 
   // Load telemetry data points when a device is selected and tab is 'graphs'
   useEffect(() => {
-    if (view !== 'detail' || selectedSerial === null || detailTab !== 'graphs') return;
+    if (!selectedDevice || view !== 'detail' || selectedSerial === null || detailTab !== 'graphs') return;
     let cancelled = false;
 
     const run = async () => {
@@ -442,11 +443,28 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
     return () => {
       cancelled = true;
     };
-  }, [view, selectedSerial, detailTab, period]);
+  }, [selectedDevice, view, selectedSerial, detailTab, period]);
+
+  // Current reporting streak, shown instead of "last seen" while the device is online.
+  useEffect(() => {
+    if (!selectedDevice || view !== 'detail' || selectedSerial === null) return;
+    let cancelled = false;
+    void api.devices.getUptime(selectedSerial)
+      .then((value) => { if (!cancelled) setUptime(value); })
+      .catch(() => { if (!cancelled) setUptime(null); });
+    return () => { cancelled = true; };
+  }, [selectedDevice, view, selectedSerial]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadAll();
+    if (selectedDevice && selectedSerial !== null) {
+      try {
+        setUptime(await api.devices.getUptime(selectedSerial));
+      } catch {
+        // Keep the last known uptime if the refresh fails.
+      }
+    }
     if (selectedSerial !== null && detailTab === 'graphs') {
       try {
         const res = await api.devices.getDataPoints(selectedSerial, { period });
@@ -459,11 +477,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
   };
 
   const handleSelectDevice = (device: DeviceSummary) => {
-    setSelectedSerial(device.serial);
-    setDetailTab('graphs');
     setIsQueryOpen(false);
     setIsExportOpen(false);
-    setView('detail');
+    onNavigate?.({ tab: 'devices', device: { serial: device.serial, detailTab: 'graphs' } });
   };
 
 
@@ -507,9 +523,8 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
     try {
       await api.devices.unlink(selectedDevice.serial);
       setDevices((current) => current.filter((d) => d.serial !== selectedDevice.serial));
-      setSelectedSerial(null);
       setIsUnlinkOpen(false);
-      setView('list');
+      closeDevice();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to unlink device');
     } finally {
@@ -813,7 +828,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
           onClick={() => {
             setIsQueryOpen(false);
             setIsExportOpen(false);
-            setView('list');
+            closeDevice();
           }}
         >
           <IconArrowLeft size={16} strokeWidth={1.75} />
@@ -906,7 +921,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
             </span>
             <span>
               <IconClock size={14} strokeWidth={1.75} />
-              Last seen {formatDeviceRelativeTime(selectedDevice.lastUploadAt)}
+              {online
+                ? uptime?.online
+                  ? `Uptime ${uptime.durationMs < 60_000 ? 'just now' : formatDuration(uptime.durationMs / 1000)}`
+                  : 'Online'
+                : `Last seen ${formatDeviceRelativeTime(selectedDevice.lastUploadAt)}`}
             </span>
           </div>
 
@@ -926,7 +945,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
             role="tab"
             aria-selected={detailTab === tab}
             className={`ui-tab ${detailTab === tab ? 'ui-tab--active' : ''}`}
-            onClick={() => setDetailTab(tab)}
+            onClick={() => updateDeviceRoute({
+              detailTab: tab,
+              alertId: undefined,
+              alertAction: undefined,
+            })}
           >
             {tab === 'graphs'
               ? 'Telemetry & Graphs'
@@ -1161,6 +1184,12 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
             deviceName={deviceLabel(selectedDevice)}
             canManage={canManageAlerts}
             onNavigate={canOpenIntegrations ? onNavigate : undefined}
+            route={{ alertId: activeDevice?.alertId, action: activeDevice?.alertAction }}
+            onRouteChange={(alertRoute: AlertFormRoute) => updateDeviceRoute({
+              detailTab: 'alerts',
+              alertId: alertRoute.alertId,
+              alertAction: alertRoute.action,
+            })}
           />
         )}
 

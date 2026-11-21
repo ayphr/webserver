@@ -6,11 +6,12 @@ import './SettingsPanel.css';
 
 export interface SettingsPanelProps {
   sections: SettingsSection[];
-  /** ID of the section that should be shown first. Defaults to the first section. */
+  /** ID of the section that should be shown. Defaults to the first section. */
   defaultTab?: string;
+  onTabChange?: (sectionId: string) => void;
 }
 
-export const SettingsPanel = ({ sections, defaultTab }: SettingsPanelProps) => {
+export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPanelProps) => {
   const [requestedId, setRequestedId] = useState<string>(() => {
     if (defaultTab && sections.some((section) => section.id === defaultTab)) {
       return defaultTab;
@@ -18,12 +19,16 @@ export const SettingsPanel = ({ sections, defaultTab }: SettingsPanelProps) => {
     return sections[0]?.id ?? '';
   });
 
-  // Fall back to the first available section when the requested one disappears.
+  // The URL is the source of truth when a section is provided; keep local
+  // state for panels embedded without route support.
+  const requested = defaultTab && sections.some((section) => section.id === defaultTab)
+    ? defaultTab
+    : requestedId;
   const activeId =
     sections.length === 0
       ? ''
-      : sections.some((section) => section.id === requestedId)
-        ? requestedId
+      : sections.some((section) => section.id === requested)
+        ? requested
         : sections[0].id;
 
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -151,7 +156,10 @@ export const SettingsPanel = ({ sections, defaultTab }: SettingsPanelProps) => {
               id={`settings-tab-${section.id}`}
               tabIndex={isActive ? 0 : -1}
               className={`ui-tab ${isActive ? 'ui-tab--active' : ''}`}
-              onClick={() => setRequestedId(section.id)}
+              onClick={() => {
+                setRequestedId(section.id);
+                onTabChange?.(section.id);
+              }}
             >
               {section.title ?? section.id}
             </button>

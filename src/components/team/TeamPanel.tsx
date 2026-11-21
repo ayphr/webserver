@@ -5,6 +5,7 @@ import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDa
 import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance, SubscriptionTier, SubscriptionPlan, BillingInterval, TeamSubscriptionPayload } from '@common';
 import { PLAN_NAMES } from '@common';
 import { getPlanFeatures } from '@common/utils/plans';
+import type { TeamSection } from '../../lib/dashboardRoutes';
 import { TeamAuditPanel } from './TeamAuditPanel';
 import '../common/Tabs.css';
 import './TeamPanel.css';
@@ -36,11 +37,13 @@ function formatPlanPrice(plan: SubscriptionPlan): string {
 type TeamPanelProps = {
   isManager?: boolean;
   userUuid?: string;
+  initialTab?: TeamSection;
+  onTabChange?: (tab: TeamSection) => void;
 };
 
-type TeamTab = 'members' | 'usage' | 'audit' | 'settings';
+type TeamTab = TeamSection;
 
-export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
+export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange }: TeamPanelProps) {
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<TeamInvite[]>([]);
@@ -51,7 +54,10 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
   const [editRole, setEditRole] = useState<TeamRole>('member');
   const [identifier, setIdentifier] = useState('');
   const [role, setRole] = useState<TeamRole>('member');
-  const [activeTab, setActiveTab] = useState<TeamTab>('members');
+  const [requestedTab, setRequestedTab] = useState<TeamTab>('members');
+  const canShowInitialTab = initialTab !== undefined
+    && (isManager || (initialTab !== 'audit' && initialTab !== 'settings'));
+  const activeTab: TeamTab = canShowInitialTab ? initialTab : requestedTab;
   const [teamName, setTeamName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
   const [usageCredits, setUsageCredits] = useState<CreditBalance | null>(null);
@@ -396,7 +402,10 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
             role="tab"
             aria-selected={activeTab === tab.id}
             className={`ui-tab ${activeTab === tab.id ? 'ui-tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setRequestedTab(tab.id);
+              onTabChange?.(tab.id);
+            }}
           >
             {tab.label}
           </button>

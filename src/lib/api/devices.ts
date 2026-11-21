@@ -10,6 +10,7 @@ import type {
   DeviceQueryPayload,
   DeviceQueryRequest,
   DeviceTokenListPayload,
+  DeviceUptimePayload,
   DeviceUnlinkPayload,
   DeviceUpdatePayload,
 } from '@common';
@@ -24,6 +25,10 @@ export function createDevicesApi(client: RequestClient) {
     async getBySerial(serial: number) {
       const response = await client.requestJson<DevicePayload>(`/api/devices/${serial}`);
       return response.device;
+    },
+    async getUptime(serial: number) {
+      const response = await client.requestJson<DeviceUptimePayload>(`/api/devices/${serial}/uptime`);
+      return response.uptime;
     },
     async getDataPoints(serial: number, options?: { period?: string; from?: string; to?: string; countOnly?: boolean }) {
       const params = new URLSearchParams();

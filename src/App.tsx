@@ -5,6 +5,7 @@ import { PolicyGate } from './components/policy';
 import { EmailGate } from './components/auth/EmailGate';
 import { ModalProvider, RadioProvider, TooltipProvider, useTooltip } from './context';
 import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
+import { parseDashboardPath } from './lib/dashboardRoutes';
 
 const AuthPage = lazy(() => import('./pages/auth/AuthPage').then((m) => ({ default: m.AuthPage })));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
@@ -30,7 +31,11 @@ function RouteFallback() {
   const location = useLocation();
 
   if (location.pathname.startsWith('/dashboard')) {
-    return <DashboardLoadingSkeleton activeTab={new URLSearchParams(location.search).get('tab') ?? undefined} />;
+    const route = parseDashboardPath(
+      location.pathname,
+      new URLSearchParams(location.search).get('tab'),
+    );
+    return <DashboardLoadingSkeleton activeTab={route.tab} />;
   }
 
   if (location.pathname === '/') {
@@ -45,6 +50,14 @@ function RouteFallback() {
 }
 
 function App() {
+  const dashboardElement = (
+    <PolicyGate loadingFallback={<DashboardLoadingSkeleton />}>
+      <EmailGate loadingFallback={<DashboardLoadingSkeleton />}>
+        <DashboardPage />
+      </EmailGate>
+    </PolicyGate>
+  );
+
   return (
     <TooltipProvider>
       <ModalProvider>
@@ -63,8 +76,9 @@ function App() {
                 <Route path="/policies/privacy" element={<PrivacyPage />} />
                 <Route path="/policies/refunds" element={<RefundPage />} />
                 <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
-                <Route path="/dashboard" element={<PolicyGate loadingFallback={<DashboardLoadingSkeleton />}><EmailGate loadingFallback={<DashboardLoadingSkeleton />}><DashboardPage /></EmailGate></PolicyGate>} />
+                <Route path="/dashboard" element={dashboardElement} />
                 <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><EmailGate><ProfilePage /></EmailGate></PolicyGate>} />
+                <Route path="/dashboard/*" element={dashboardElement} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>

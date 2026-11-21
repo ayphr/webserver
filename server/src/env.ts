@@ -33,6 +33,8 @@ export const ASSISTANT_STATES_COLLECTION = 'assistant_states';
 export const TEAMS_COLLECTION = 'teams';
 export const TEAM_INVITES_COLLECTION = 'team_invites';
 export const TEAM_AUDIT_LOGS_COLLECTION = 'team_audit_logs';
+/** Team audit history is kept for one year; enforced by a MongoDB TTL index. */
+export const TEAM_AUDIT_LOG_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 export const APPEALS_COLLECTION = 'appeals';
 
 export const API_PORT = envNumber('API_PORT', 7233);

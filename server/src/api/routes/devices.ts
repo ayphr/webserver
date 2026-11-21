@@ -61,6 +61,7 @@ import { toPresentedDeviceTokens } from '../../lib/deviceTokenService';
 import { createDeviceQueryPlan } from '../../lib/deviceQueryService';
 import { linkDevice } from '../../lib/deviceLinkService';
 import { uploadDeviceTelemetry } from '../../lib/deviceUploadService';
+import { getDeviceUptime } from '../../lib/deviceUptimeService';
 
 const pairingRequestLimiter = createRateLimiter(15 * 60 * 1000, 20, 'pairing-request');
 const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
@@ -193,6 +194,19 @@ const handleGetBySerial = requireAuth(async (_request, user: User, params) => {
   if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   return json({ device: toPublicDevice(device) });
+});
+
+const handleDeviceUptime = requireAuth(async (_request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  return json({ uptime: await getDeviceUptime(serial) });
 });
 
 async function handleUpload(request: Request): Promise<Response> {
@@ -581,6 +595,7 @@ export {
   handleLink,
   handleListMine,
   handleGetBySerial,
+  handleDeviceUptime,
   handleGetData as handleDeviceGetData,
   handleQueryDeviceData as handleDeviceQuery,
   handleDeleteDeviceDataPoints as handleDeviceDeleteDataPoints,

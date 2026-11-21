@@ -1,9 +1,15 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { formatDisplayDate, toDate } from '../../lib/date';
+import {
+  dashboardPath,
+  parseDashboardPath,
+  type DashboardTarget,
+  type TeamSection,
+} from '../../lib/dashboardRoutes';
 import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, AssistantSendShortcut } from '@common';
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
@@ -27,8 +33,6 @@ const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ de
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 const RadioPanel = lazy(() => import('../../components/radio/RadioPanel').then((m) => ({ default: m.RadioPanel })));
 import './DashboardPage.css';
-
-const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'notifications', 'credits', 'users', 'games', 'radio', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
 
 function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | null; isPermanent: boolean }>) {
   const [timeLeft, setTimeLeft] = useState('');
@@ -110,11 +114,16 @@ export const DashboardPage = () => {
   const appealsTotalPages = Math.max(1, Math.ceil(staffAppeals.length / APPEALS_PAGE_SIZE));
   const safeAppealsPage = Math.min(appealsPage, appealsTotalPages);
   const [isAppealsLoading, setIsAppealsLoading] = useState(false);
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activePage, setActivePage] = useState<string>(() => {
-    const tab = searchParams.get('tab');
-    return tab && VALID_TABS.has(tab) ? tab : getStoredDefaultTab();
-  });
+  const legacyTab = searchParams.get('tab');
+  const preferredDefaultTab = getStoredDefaultTab();
+  const dashboardRoute = useMemo(
+    () => parseDashboardPath(location.pathname, legacyTab ?? preferredDefaultTab),
+    [location.pathname, legacyTab, preferredDefaultTab],
+  );
+  const activePage = dashboardRoute.tab;
+  const activeDevice = dashboardRoute.device;
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
@@ -130,7 +139,6 @@ export const DashboardPage = () => {
   const chatActionTokenRef = useRef(0);
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [deviceToOpen, setDeviceToOpen] = useState<number | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -350,17 +358,26 @@ export const DashboardPage = () => {
 
   const navigate = useNavigate();
 
-  const changeTab = (value: string) => {
-    if (value !== 'devices') {
-      setDeviceToOpen(null);
-    }
-    setActivePage(value);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set('tab', value);
-      return next;
-    }, { replace: true });
+  const navigateToDashboard = (value: string | DashboardTarget, options?: { replace?: boolean }) => {
+    const target: DashboardTarget = typeof value === 'string'
+      ? (() => {
+          // Accept the old `?tab=` ids and internal aliases everywhere.
+          const parsed = parseDashboardPath('/dashboard', value);
+          return {
+            tab: parsed.tab,
+            ...(parsed.section ? { section: parsed.section } : {}),
+            ...(parsed.device ? { device: parsed.device } : {}),
+          };
+        })()
+      : value;
+
+    const params = new URLSearchParams(searchParams);
+    params.delete('tab');
+    const query = params.toString();
+    navigate(`${dashboardPath(target)}${query ? `?${query}` : ''}`, { replace: options?.replace ?? false });
   };
+
+  const changeTab = navigateToDashboard;
 
   const handleSidebarNewChat = () => {
     assistant.update((current) => ({ ...current, activeChatId: null }));
@@ -386,23 +403,26 @@ export const DashboardPage = () => {
   };
 
   const openDevice = (serial: number) => {
-    setDeviceToOpen(serial);
-    changeTab('devices');
+    navigateToDashboard({ tab: 'devices', device: { serial } });
   };
+
+  // Normalize legacy `?tab=` links and unknown paths to canonical dashboard URLs.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('tab');
+    const query = params.toString();
+    const next = `${dashboardRoute.canonicalPath}${query ? `?${query}` : ''}`;
+    if (next !== `${location.pathname}${location.search}`) {
+      navigate(next, { replace: true });
+    }
+  }, [dashboardRoute.canonicalPath, location.pathname, location.search, navigate, searchParams]);
 
   useEffect(() => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
-      changeTab('overview');
+      navigateToDashboard('overview', { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, user, activePage]);
-
-  useEffect(() => {
-    if (activePage === 'team-audit') {
-      changeTab('team');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePage]);
 
   const setDefaultTabPref = (value: string) => {
     setDefaultTab(value);
@@ -485,7 +505,7 @@ export const DashboardPage = () => {
     <div className={`dashboard-layout`}>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main className="dashboard-main">
-        {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
+        {isSuspended && activePage !== 'profile' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
             <div className="dashboard-page__suspension-card">
               <div className="dashboard-page__suspension-card__header">
@@ -598,7 +618,12 @@ export const DashboardPage = () => {
                 className="dashboard-panel--devices"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <DevicesPanel initialDeviceSerial={deviceToOpen} onNavigate={changeTab} credits={credits} onCreditsChange={setCredits} />
+                  <DevicesPanel
+                    activeDevice={activeDevice ?? null}
+                    onNavigate={navigateToDashboard}
+                    credits={credits}
+                    onCreditsChange={setCredits}
+                  />
                 </Suspense>
               </DashboardPanel>
             )}
@@ -631,13 +656,17 @@ export const DashboardPage = () => {
               </DashboardPanel>
             )}
 
-            {(activePage === 'settings' || activePage === 'account-settings') && (
+            {activePage === 'settings' && (
               <DashboardPanel
                 title="Settings"
                 description="Manage your account, sessions, and preferences"
                 className="dashboard-panel--wide"
               >
-                <SettingsPanel sections={settingsSections} />
+                <SettingsPanel
+                  sections={settingsSections}
+                  defaultTab={dashboardRoute.section}
+                  onTabChange={(section) => navigateToDashboard({ tab: 'settings', section })}
+                />
               </DashboardPanel>
             )}
 
@@ -680,10 +709,15 @@ export const DashboardPage = () => {
               </DashboardPanel>
             )}
 
-            {(activePage === 'team' || activePage === 'team-audit') && isTeamMember && (
+            {activePage === 'team' && isTeamMember && (
               <DashboardPanel title="Team" description="Manage your team members" className="dashboard-panel--wide">
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <TeamPanel isManager={isTeamManager} userUuid={user?.uuid} />
+                  <TeamPanel
+                    isManager={isTeamManager}
+                    userUuid={user?.uuid}
+                    initialTab={dashboardRoute.section as TeamSection | undefined}
+                    onTabChange={(section) => navigateToDashboard({ tab: 'team', section })}
+                  />
                 </Suspense>
               </DashboardPanel>
             )}

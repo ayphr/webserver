@@ -28,6 +28,7 @@ export {
 } from './username';
 export { parseDuration, formatDuration, type DurationUnit } from './duration';
 export { evaluateAlertConditions, getAlertMetricValue } from './alerts';
+export { computeCurrentUptime, DEVICE_ONLINE_THRESHOLD_MS } from './deviceUptime';
 export {
   EMAIL_CODE_LENGTH,
   EMAIL_MAX_LENGTH,

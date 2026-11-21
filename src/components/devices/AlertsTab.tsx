@@ -10,6 +10,7 @@ import type {
 } from '@common';
 import { api } from '../../lib/api';
 import { formatDeviceRelativeTime } from '../../lib/deviceActivity';
+import type { AlertRouteAction } from '../../lib/dashboardRoutes';
 import { Button, Checkbox, ConfirmDialog, Input, Select } from '../common';
 import './AlertsTab.css';
 
@@ -98,23 +99,59 @@ function toDraft(alert: DeviceAlert): Draft {
   };
 }
 
+export type AlertFormRoute = {
+  alertId?: string;
+  action?: AlertRouteAction;
+};
+
 type Props = {
   serial: number;
   deviceName: string;
   canManage: boolean;
   onNavigate?: (tab: string) => void;
+  /** The alert form is driven by the dashboard URL when provided. */
+  route?: AlertFormRoute | null;
+  onRouteChange?: (route: AlertFormRoute) => void;
 };
 
-export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) {
+export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, onRouteChange }: Props) {
   const [alerts, setAlerts] = useState<DeviceAlert[]>([]);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<DeviceAlert | null>(null);
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [formError, setFormError] = useState<string | null>(null);
+  const formAction = route?.action;
+  const formAlertId = formAction === 'edit' ? route?.alertId : undefined;
+  const editing = formAction === 'edit'
+    ? alerts.find((alert) => alert.id === formAlertId) ?? null
+    : null;
+  const showForm = Boolean(formAction);
+  const draftKey = formAction === 'new'
+    ? `new:${serial}`
+    : formAction === 'edit'
+      ? `edit:${formAlertId}`
+      : 'none';
+
+  const createDraft = useMemo<Draft>(() => ({
+    ...emptyDraft,
+    integrationIds: integrations
+      .filter((integration) => integration.enabled)
+      .slice(0, 1)
+      .map((integration) => integration.id),
+  }), [integrations]);
+  const baseDraft = editing ? toDraft(editing) : createDraft;
+  const [draftOverride, setDraftOverride] = useState<{ key: string; draft: Draft } | null>(null);
+  const draft = draftOverride?.key === draftKey ? draftOverride.draft : baseDraft;
+  const setDraft = (updater: (current: Draft) => Draft) => {
+    setDraftOverride({ key: draftKey, draft: updater(draft) });
+  };
+
+  const [formErrorState, setFormErrorState] = useState<{ key: string; message: string | null }>({ key: '', message: null });
+  const formError = formErrorState.key === draftKey ? formErrorState.message : null;
+  const setFormError = (message: string | null) => {
+    setFormErrorState({ key: draftKey, message });
+  };
+
   const [isSaving, setIsSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DeviceAlert | null>(null);
@@ -167,21 +204,22 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
     [integrations],
   );
 
-  const openCreate = () => {
-    setEditing(null);
-    setDraft({
-      ...emptyDraft,
-      integrationIds: integrations.filter((integration) => integration.enabled).slice(0, 1).map((integration) => integration.id),
-    });
+  const clearForm = () => {
+    setDraftOverride(null);
     setFormError(null);
-    setShowForm(true);
+    onRouteChange?.({});
+  };
+
+  const openCreate = () => {
+    setDraftOverride(null);
+    setFormError(null);
+    onRouteChange?.({ action: 'new' });
   };
 
   const openEdit = (alert: DeviceAlert) => {
-    setEditing(alert);
-    setDraft(toDraft(alert));
+    setDraftOverride(null);
     setFormError(null);
-    setShowForm(true);
+    onRouteChange?.({ alertId: alert.id, action: 'edit' });
   };
 
   const updateCondition = (index: number, patch: Partial<DraftCondition>) => {
@@ -279,7 +317,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
         });
         setAlerts((current) => [created, ...current]);
       }
-      setShowForm(false);
+      clearForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to save alert');
     } finally {
@@ -318,6 +356,15 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
 
   if (isLoading) {
     return <p className="alerts-tab__notice">Loading alerts…</p>;
+  }
+
+  if (showForm && formAction === 'edit' && !editing) {
+    return (
+      <div className="alerts-tab__notice">
+        <p>This alert no longer exists.</p>
+        <Button variant="secondary" onClick={clearForm}>Back to alerts</Button>
+      </div>
+    );
   }
 
   const formView = (
@@ -475,7 +522,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate }: Props) 
             checked={draft.enabled}
             onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))}
           />
-          <Button variant="secondary" onClick={() => setShowForm(false)}>
+          <Button variant="secondary" onClick={clearForm}>
             Cancel
           </Button>
           <Button variant="primary" onClick={() => void handleSave()} isLoading={isSaving}>

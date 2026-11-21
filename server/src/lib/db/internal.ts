@@ -24,6 +24,7 @@ import {
   TEAMS_COLLECTION,
   TEAM_INVITES_COLLECTION,
   TEAM_AUDIT_LOGS_COLLECTION,
+  TEAM_AUDIT_LOG_MAX_AGE_SECONDS,
   APPEALS_COLLECTION
 } from '../../env';
 export * from './serialization';
@@ -235,6 +236,10 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ email: 1 })],
     [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ teamId: 1, createdAt: -1 })],
     [TEAM_AUDIT_LOGS_COLLECTION, () => cols.teamAuditLogs.createIndex({ teamId: 1, createdAt: -1 })],
+    [TEAM_AUDIT_LOGS_COLLECTION, () => cols.teamAuditLogs.createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: TEAM_AUDIT_LOG_MAX_AGE_SECONDS }
+    )],
   ];
 
   await Promise.all(

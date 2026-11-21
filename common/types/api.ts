@@ -1,4 +1,4 @@
-import type { DataPoint, Device, DeviceSummary, DeviceUploadTokenInfo } from './device';
+import type { DataPoint, Device, DeviceSummary, DeviceUploadTokenInfo, DeviceUptime } from './device';
 import type { Location } from './location';
 import type { CountryOption } from '../utils/country';
 import type { Punishment } from './punishment';
@@ -94,6 +94,10 @@ export type LocationPayload = {
 
 export type DevicePayload = {
   device: Device;
+};
+
+export type DeviceUptimePayload = {
+  uptime: DeviceUptime;
 };
 
 export type DeviceDataPointsPayload = {

@@ -23,6 +23,15 @@ export type DeviceSummary = Device & {
   latestDataPoint: DataPoint | null;
 };
 
+/** Current uninterrupted reporting streak for a device. */
+export type DeviceUptime = {
+  online: boolean;
+  /** Start of the current streak; null when the device has no recent readings. */
+  since: Date | null;
+  /** Length of the current streak in milliseconds; 0 while offline. */
+  durationMs: number;
+};
+
 export type DeviceToken = {
   token: string;
   expiresAt: Date;
