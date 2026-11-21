@@ -167,10 +167,6 @@ export function estimatePipelineStepUnits(step: PipelineStepAST): number {
 }
 
 /**
- * Produces a static compute-unit estimate plus a per-part breakdown for a
- * parsed query.
- */
-/**
  * Estimates the cost of a query. When `dataPointCount` is provided, the estimate
  * scales with the amount of data the query will actually process (per 1,000
  * points); otherwise a 1,000-point baseline is assumed so that callers without

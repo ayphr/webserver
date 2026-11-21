@@ -66,7 +66,8 @@ import {
   handleAlertCreate,
   handleAlertUpdate,
   handleAlertDelete,
-} from './routes/alerts';import {
+} from './routes/alerts';
+import {
   handleIntegrationsListMine,
   handleIntegrationCreate,
   handleIntegrationGet,

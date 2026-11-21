@@ -1,4 +1,7 @@
-import { Compiler, Lexer, Parser, type QueryAST, type QueryExecutor, type QueryResult, type TelemetryPoint } from '.';
+import type { QueryAST, TelemetryPoint } from './ast';
+import { Compiler, type QueryExecutor, type QueryResult } from './compiler';
+import { Lexer } from './lexer';
+import { Parser } from './parser';
 import { estimateComputeUnits, type ComputeEstimate } from './cost';
 
 export function parseQuery(queryString: string): QueryAST {

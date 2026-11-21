@@ -80,18 +80,32 @@ export function resolveLocationFromClient(input: { timezone?: string; locale?: s
   return location;
 }
 
-function detectBrowser(userAgent: string): string | undefined {
-  const patterns: Array<[RegExp, string]> = [
-    [/Edg(?:e|A|iOS)?\/(\d+)/, 'Edge'],
-    [/OPR\/(\d+)|Opera\/(\d+)/, 'Opera'],
-    [/SamsungBrowser\/(\d+)/, 'Samsung Internet'],
-    [/Firefox\/(\d+)/, 'Firefox'],
-    [/ CriOS\/(\d+)/, 'Chrome'],
-    [/Chrome\/(\d+)/, 'Chrome'],
-    [/Version\/(\d+).+Safari/, 'Safari'],
-  ];
+const BROWSER_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/Edg(?:e|A|iOS)?\/(\d+)/, 'Edge'],
+  [/OPR\/(\d+)|Opera\/(\d+)/, 'Opera'],
+  [/SamsungBrowser\/(\d+)/, 'Samsung Internet'],
+  [/Firefox\/(\d+)/, 'Firefox'],
+  [/ CriOS\/(\d+)/, 'Chrome'],
+  [/Chrome\/(\d+)/, 'Chrome'],
+  [/Version\/(\d+).+Safari/, 'Safari'],
+];
 
-  for (const [pattern, name] of patterns) {
+const OS_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/Windows NT ([\d.]+)/, 'Windows'],
+  [/Android ([\d.]+)/, 'Android'],
+  [/(?:iPhone|iPad|iPod).*?OS ([\d_]+)/, 'iOS'],
+  [/Mac OS X ([\d_]+)/, 'macOS'],
+  [/Linux/, 'Linux'],
+];
+
+const TV_PATTERN = /\b(SmartTV|Smart-TV|HbbTV|NetCast|Viera|BRAVIA|Roku|CrKey|AFT[MNB]|AppleTV|GoogleTV)\b/i;
+const TABLET_PATTERN = /iPad|Tablet|PlayBook|Silk|Kindle/i;
+const ANDROID_PATTERN = /Android/i;
+const MOBILE_ANDROID_PATTERN = /Mobile/i;
+const PHONE_PATTERN = /Mobi|iPhone|iPod|Windows Phone|Android.*Mobile/i;
+
+function detectBrowser(userAgent: string): string | undefined {
+  for (const [pattern, name] of BROWSER_PATTERNS) {
     const match = pattern.exec(userAgent);
     const version = match?.[1] ?? match?.[2];
     if (match) {
@@ -103,15 +117,7 @@ function detectBrowser(userAgent: string): string | undefined {
 }
 
 function detectOs(userAgent: string): string | undefined {
-  const patterns: Array<[RegExp, string]> = [
-    [/Windows NT ([\d.]+)/, 'Windows'],
-    [/Android ([\d.]+)/, 'Android'],
-    [/(?:iPhone|iPad|iPod).*?OS ([\d_]+)/, 'iOS'],
-    [/Mac OS X ([\d_]+)/, 'macOS'],
-    [/Linux/, 'Linux'],
-  ];
-
-  for (const [pattern, name] of patterns) {
+  for (const [pattern, name] of OS_PATTERNS) {
     const match = pattern.exec(userAgent);
     if (match) {
       const version = match[1]?.replaceAll('_', '.');
@@ -125,12 +131,10 @@ function detectOs(userAgent: string): string | undefined {
 function detectDeviceType(userAgent: string): SessionDeviceType | undefined {
   if (!userAgent) return undefined;
 
-  if (/\b(SmartTV|Smart-TV|HbbTV|NetCast|Viera|BRAVIA|Roku|CrKey|AFT[MNB]|AppleTV|GoogleTV)\b/i.test(userAgent)) {
-    return 'tv';
-  }
-  if (/iPad|Tablet|PlayBook|Silk|Kindle/i.test(userAgent)) return 'tablet';
-  if (/Android/i.test(userAgent) && !/Mobile/i.test(userAgent)) return 'tablet';
-  if (/Mobi|iPhone|iPod|Windows Phone|Android.*Mobile/i.test(userAgent)) return 'phone';
+  if (TV_PATTERN.test(userAgent)) return 'tv';
+  if (TABLET_PATTERN.test(userAgent)) return 'tablet';
+  if (ANDROID_PATTERN.test(userAgent) && !MOBILE_ANDROID_PATTERN.test(userAgent)) return 'tablet';
+  if (PHONE_PATTERN.test(userAgent)) return 'phone';
   return 'desktop';
 }
 

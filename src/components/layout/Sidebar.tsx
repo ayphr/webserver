@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected, IconRadio } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
+import { useDismiss } from '../../hooks/useDismiss';
 import { isStoredAccountExpired, type StoredAccount } from '../../lib/accounts';
 import { formatCredits } from '../../lib/credits';
 import type { BadgeId, CreditBalance } from '@common/types';
@@ -69,6 +70,7 @@ type Props = {
   isStaff?: boolean;
   isTeamMember?: boolean;
   isTeamManager?: boolean;
+  canUseAlertsAndWebhooks?: boolean;
   credits?: CreditBalance | null;
   accounts?: StoredAccount[];
   activeToken?: string | null;
@@ -88,6 +90,7 @@ export const Sidebar: React.FC<Props> = ({
   isSuspended = false,
   isStaff = false,
   isTeamMember = false,
+  canUseAlertsAndWebhooks = false,
   credits = null,
   accounts = [],
   activeToken = null,
@@ -99,7 +102,7 @@ export const Sidebar: React.FC<Props> = ({
   const teamTabs: Tab[] = isTeamMember
     ? [
         { id: 'team', name: 'Team' },
-        { id: 'integrations', name: 'Integrations' },
+        ...(canUseAlertsAndWebhooks ? [{ id: 'integrations', name: 'Integrations' }] : []),
       ]
     : [];
 
@@ -135,16 +138,10 @@ export const Sidebar: React.FC<Props> = ({
     };
   };
 
-  useEffect(() => {
-    if (!isAccountMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsAccountMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isAccountMenuOpen]);
+  useDismiss(containerRef, () => setIsAccountMenuOpen(false), {
+    enabled: isAccountMenuOpen,
+    escape: false,
+  });
 
   const handleConfirmLogout = () => {
     const account = accountToLogout;

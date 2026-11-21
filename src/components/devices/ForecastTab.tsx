@@ -9,6 +9,7 @@ import { Button, ProgressBar } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphConfig, LineGraphData } from '../graphs/types';
 import { getSeriesDefinition } from '../../lib/series';
+import { CHART_COLORS, createLineGraphConfig, fade, resolveCssColor } from '../../lib/chartTheme';
 import './ForecastTab.css';
 
 type Props = {
@@ -20,33 +21,6 @@ type Props = {
 
 const FORECAST_MAX_ZOOM_IN_MS = 60 * 1000;
 const FORECAST_ZOOM_OUT_PADDING = 0.02;
-
-function resolveCssColor(value: string): string {
-  if (!value.startsWith('var(')) return value;
-  if (typeof document === 'undefined') return value;
-  const name = value.slice(4, -1).trim();
-  const resolved = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return resolved || value;
-}
-
-function fade(color: string, alpha: number): string {
-  const resolved = resolveCssColor(color).trim();
-  if (resolved.startsWith('rgb(')) {
-    return resolved.replace('rgb(', 'rgba(').replace(/\)$/, `, ${alpha})`);
-  }
-  if (resolved.startsWith('rgba(')) {
-    return resolved.replace(/,\s*[\d.]+\)$/, `, ${alpha})`);
-  }
-  if (resolved.startsWith('#')) {
-    const hex = resolved.slice(1);
-    const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex;
-    const r = parseInt(full.slice(0, 2), 16);
-    const g = parseInt(full.slice(2, 4), 16);
-    const b = parseInt(full.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  return resolved;
-}
 
 const METRICS = [
   {
@@ -259,9 +233,9 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
       x: {
         type: 'linear',
         ...(axisWindow ? { min: axisWindow.initialMin, max: axisWindow.initialMax } : {}),
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
+        grid: { color: CHART_COLORS.grid },
         ticks: {
-          color: 'hsl(180, 1%, 53%)',
+          color: CHART_COLORS.mutedText,
           maxTicksLimit: 8,
           callback: (value: string | number) => {
             const d = new Date(Number(value));
@@ -273,95 +247,58 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
         type: 'linear',
         display: true,
         position: 'left',
-        title: { display: true, text: '°C', color: 'hsl(180, 1%, 53%)' },
-        grid: { color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { color: 'hsl(180, 1%, 53%)' },
+        title: { display: true, text: '°C', color: CHART_COLORS.mutedText },
+        grid: { color: CHART_COLORS.grid },
+        ticks: { color: CHART_COLORS.mutedText },
       },
       y1: {
         type: 'linear',
         display: true,
         position: 'right',
-        title: { display: true, text: '%', color: 'hsl(180, 1%, 53%)' },
+        title: { display: true, text: '%', color: CHART_COLORS.mutedText },
         grid: { drawOnChartArea: false },
-        ticks: { color: 'hsl(180, 1%, 53%)' },
+        ticks: { color: CHART_COLORS.mutedText },
       },
       y2: {
         type: 'linear',
         display: true,
         position: 'right',
-        title: { display: true, text: 'hPa', color: 'hsl(180, 1%, 53%)' },
+        title: { display: true, text: 'hPa', color: CHART_COLORS.mutedText },
         grid: { drawOnChartArea: false },
-        ticks: { color: 'hsl(180, 1%, 53%)' },
+        ticks: { color: CHART_COLORS.mutedText },
       },
     };
 
     return {
-      responsive: true,
-      maintainAspectRatio: false,
-      parsing: false,
-      font: { family: "'DM Sans', sans-serif" },
-      animation: { duration: 250 },
-      transitions: {
-        zoom: { animation: { duration: 0 } },
-        active: { animation: { duration: 0 } },
-      },
-      interaction: { mode: 'index' as const, intersect: false },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top' as const,
-          labels: { color: 'hsla(180, 67%, 99%, 1)', boxWidth: 16, padding: 14 },
-        },
-        tooltip: {
-          backgroundColor: 'rgba(18, 18, 18, 0.96)',
-          titleColor: 'hsla(180, 67%, 99%, 1)',
-          bodyColor: 'hsl(180, 1%, 53%)',
-          borderColor: 'rgba(255, 255, 255, 0.15)',
-          borderWidth: 1,
-          padding: 10,
-          callbacks: {
-            title: (items: { parsed: { x: number | null } }[]) => {
-              const x = items[0]?.parsed?.x;
-              return typeof x === 'number'
-                ? new Date(x).toLocaleString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                  })
-                : '';
-            },
-            label: (item: { datasetIndex: number; dataIndex: number; parsed: { y: number | null } }) => {
-              const metric = METRICS[item.datasetIndex];
-              if (!metric) return '';
-              const value = item.parsed.y;
-              if (value === null || !Number.isFinite(value)) return '';
-              const region = item.dataIndex >= boundary ? 'forecast' : 'recorded';
-              return `${metric.shortLabel} (${region}): ${value.toFixed(1)} ${metric.unit}`;
-            },
+      ...createLineGraphConfig({
+        showLegend: true,
+        styledLegend: true,
+        zoomMinRange: FORECAST_MAX_ZOOM_IN_MS,
+        zoomWindow: axisWindow,
+        tooltipCallbacks: {
+          title: (items) => {
+            const x = items[0]?.parsed?.x;
+            return typeof x === 'number'
+              ? new Date(x).toLocaleString('en-GB', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })
+              : '';
+          },
+          label: (item) => {
+            const metric = METRICS[item.datasetIndex];
+            if (!metric) return '';
+            const value = item.parsed.y;
+            if (value === null || !Number.isFinite(value)) return '';
+            const region = item.dataIndex >= boundary ? 'forecast' : 'recorded';
+            return `${metric.shortLabel} (${region}): ${value.toFixed(1)} ${metric.unit}`;
           },
         },
-        zoom: {
-          zoom: {
-            wheel: { enabled: true },
-            pinch: { enabled: true },
-            mode: 'x',
-          },
-          pan: {
-            enabled: true,
-            mode: 'x',
-          },
-          ...(axisWindow
-            ? {
-                limits: {
-                  x: { min: axisWindow.limitMin, max: axisWindow.limitMax, minRange: FORECAST_MAX_ZOOM_IN_MS },
-                },
-              }
-            : {}),
-        },
-      },
+      }),
       scales: scales as LineGraphConfig['scales'],
     };
   }, [axisWindow, dataPoints.length]);

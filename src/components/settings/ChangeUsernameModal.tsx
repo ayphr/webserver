@@ -3,7 +3,7 @@ import { IconAlertCircle } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { Button, Input, Modal } from '../common';
 import { getUsernameValidationError } from '@common/utils/username';
-import './ChangePasswordModal.css';
+import '../common/ModalForm.css';
 
 export interface ChangeUsernameModalProps {
   isOpen: boolean;
@@ -48,7 +48,7 @@ export const ChangeUsernameModal: React.FC<ChangeUsernameModalProps> = ({ isOpen
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Change username" size="sm" showCancel={false}>
-      <div className="change-password__body">
+      <div className="modal-form__body">
         <Input
           label="New username"
           type="text"
@@ -73,17 +73,17 @@ export const ChangeUsernameModal: React.FC<ChangeUsernameModalProps> = ({ isOpen
         />
 
         {error && (
-          <div className="change-password__error">
+          <div className="modal-form__error">
             <IconAlertCircle size={18} strokeWidth={1.75} />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="change-password__note">
+        <div className="modal-form__note">
           You can change your username once every 29 days.
         </div>
 
-        <div className="change-password__footer">
+        <div className="modal-form__footer">
           <Button variant="secondary" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>

@@ -1,7 +1,5 @@
-import { getCollection, normalizeDateValues, trackMongoOperation } from './internal';
+import { getCollection, normalizeDateValues, trackMongoOperation, APPEALS_COLLECTION } from './internal';
 import type { Appeal } from '@common';
-
-const APPEALS_COLLECTION = 'appeals';
 
 export async function getAppealById(id: string): Promise<Appeal | null> {
   const appeals = await getCollection('appeals');

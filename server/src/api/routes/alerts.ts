@@ -12,6 +12,8 @@ import {
 } from '../../lib/db';
 import type { DeviceDocument } from '../../lib/db';
 import { canManageTeam } from '../../lib/db/teams';
+import { parseName, parseSerial } from '../../lib/deviceValidation';
+import { requireAlertsAndWebhooksPlan } from '../../lib/planAccess';
 import { getTeamContext } from '../../lib/teamContext';
 import {
   ALERT_LOGIC,
@@ -19,7 +21,6 @@ import {
   ALERT_MAX_REPEAT_MINUTES,
   ALERT_METRICS,
   ALERT_MIN_REPEAT_MINUTES,
-  ALERT_NAME_MAX_LENGTH,
   ALERT_OPERATORS,
   evaluateAlertConditions,
   type AlertCondition,
@@ -32,29 +33,6 @@ import {
 } from '@common';
 
 const MAX_INTEGRATIONS_PER_ALERT = 20;
-const MAX_SERIAL = 0xFFFFFFFF;
-
-function parseSerial(value: unknown): number | null {
-  let serial: number;
-
-  if (typeof value === 'number') {
-    serial = value;
-  } else if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    serial = Number(value.trim());
-  } else {
-    return null;
-  }
-
-  if (!Number.isInteger(serial) || serial < 0 || serial > MAX_SERIAL) return null;
-  return serial;
-}
-
-function parseName(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const name = value.trim();
-  if (!name || name.length > ALERT_NAME_MAX_LENGTH) return null;
-  return name;
-}
 
 function parseLogic(value: unknown): AlertLogic | null {
   if (typeof value !== 'string') return null;
@@ -141,6 +119,9 @@ function computeFiring(alert: DeviceAlert, latest: DataPoint | null): boolean {
 }
 
 const handleListAlerts = requireAuth(async (_request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   const scope = await getScopedDevice(user, params);
   if (scope instanceof Response) return scope;
 
@@ -156,6 +137,9 @@ const handleListAlerts = requireAuth(async (_request, user: User, params) => {
 });
 
 const handleCreateAlert = requireAuth(async (request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   if (!(await canManageAlerts(user))) return json({ error: 'Forbidden' }, 403);
 
   const scope = await getScopedDevice(user, params);
@@ -206,6 +190,9 @@ const handleCreateAlert = requireAuth(async (request, user: User, params) => {
 });
 
 const handleUpdateAlert = requireAuth(async (request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   if (!(await canManageAlerts(user))) return json({ error: 'Forbidden' }, 403);
 
   const scope = await getScopedDevice(user, params);
@@ -276,6 +263,9 @@ const handleUpdateAlert = requireAuth(async (request, user: User, params) => {
 });
 
 const handleDeleteAlert = requireAuth(async (_request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   if (!(await canManageAlerts(user))) return json({ error: 'Forbidden' }, 403);
 
   const scope = await getScopedDevice(user, params);

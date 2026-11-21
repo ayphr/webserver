@@ -15,6 +15,7 @@ import {
   IconShieldCheck,
 } from '@tabler/icons-react';
 import { Button, Card } from '../../components/common';
+import { EXTERNAL_URLS } from '../../lib/externalUrls';
 import logoSvg from '../../assets/logo.svg';
 import './LandingPage.css';
 
@@ -212,14 +213,14 @@ const FeatureVisual = ({ index }: { index: number }) => {
           <path
             d="M0 30 Q 25 5, 50 30 T 100 30 T 150 30 T 200 30"
             fill="none"
-            stroke="#7ef09a"
+            stroke="var(--landing-accent)"
             strokeWidth="2"
             opacity="0.9"
           />
           <path
             d="M0 30 Q 25 55, 50 30 T 100 30 T 150 30 T 200 30"
             fill="none"
-            stroke="rgba(126,240,154,0.35)"
+            stroke="rgba(var(--landing-accent-rgb),0.35)"
             strokeWidth="1.5"
             opacity="0.7"
           />
@@ -272,13 +273,13 @@ const FeatureVisual = ({ index }: { index: number }) => {
           <polyline
             points="0,60 20,55 40,40 60,45 80,25 100,30 120,15 140,20 160,10 180,18 200,8"
             fill="none"
-            stroke="#7ef09a"
+            stroke="var(--landing-accent)"
             strokeWidth="2"
           />
           <polyline
             points="0,70 20,68 40,60 60,62 80,50 100,52 120,44 140,46 160,38 180,40 200,32"
             fill="none"
-            stroke="rgba(90,180,255,0.7)"
+            stroke="rgba(var(--landing-blue-rgb),0.7)"
             strokeWidth="1.5"
           />
         </svg>
@@ -364,7 +365,7 @@ export const LandingPage = () => {
               FAQ
             </a>
             <a
-              href="https://store.ayphr.com"
+              href={EXTERNAL_URLS.store}
               target="_blank"
               rel="noopener noreferrer"
               className="landing-nav__link"
@@ -415,7 +416,7 @@ export const LandingPage = () => {
                 <IconArrowRight size={18} aria-hidden="true" />
               </Button>
               <Button
-                href="https://store.ayphr.com"
+                href={EXTERNAL_URLS.store}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="secondary"
@@ -777,7 +778,7 @@ export const LandingPage = () => {
                 FAQ
               </a>
               <a
-                href="https://store.ayphr.com"
+                href={EXTERNAL_URLS.store}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="landing-footer__link"

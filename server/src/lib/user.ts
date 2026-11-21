@@ -1,23 +1,12 @@
-import type { PlanTier, PublicUser, SelfUser, SubscriptionTier, User } from '@common';
+import type { PlanTier, PublicUser, SelfUser, SubscriptionTier, Team, User } from '@common';
 import { getBadgesForUser } from './badges';
 import { buildAvatarUrl } from './avatars';
-import { getTeamById, getTeamForUser, getTeamSeatLimit } from './db/teams';
-import { getUserFromUuid } from './db';
+import { getTeamById, getTeamForUser, getTeamsForUsers } from './db/teams';
+import { getTeamSeatLimit } from './teamBillingPolicy';
 
-export async function toPublicUser(user: User, teamSeats?: number): Promise<PublicUser> {
-  const team = user.teamId
-    ? await getTeamById(user.teamId)
-    : await getTeamForUser(user);
+function buildPublicUser(user: User, team: Team | null, teamSeats?: number): PublicUser {
   const teamTier: PlanTier = (team?.tier ?? 'free') as PlanTier;
-
-  let seats = teamSeats;
-  if (seats === undefined && team) {
-    const manager = await getUserFromUuid(team.managerUuid);
-    if (manager) {
-      seats = await getTeamSeatLimit(team, manager);
-    }
-  }
-  const resolvedSeats = seats ?? 1;
+  const resolvedSeats = teamSeats ?? (team ? getTeamSeatLimit(team) : 1);
 
   const { auth, avatar, email, emailVerifiedAt, ...rest } = user;
   void auth;
@@ -37,6 +26,20 @@ export async function toPublicUser(user: User, teamSeats?: number): Promise<Publ
         }
       : null,
   };
+}
+
+export async function toPublicUser(user: User, teamSeats?: number): Promise<PublicUser> {
+  const team = user.teamId
+    ? await getTeamById(user.teamId)
+    : await getTeamForUser(user);
+  return buildPublicUser(user, team, teamSeats);
+}
+
+/** Batch variant for list endpoints: resolves every user's team up front. */
+export async function toPublicUsers(users: User[]): Promise<PublicUser[]> {
+  if (users.length === 0) return [];
+  const teams = await getTeamsForUsers(users);
+  return users.map((user) => buildPublicUser(user, teams.get(user.uuid) ?? null));
 }
 
 export async function toSelfUser(user: User, teamSeats?: number): Promise<SelfUser> {

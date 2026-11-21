@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   IconClipboardList,
   IconFolder,
@@ -13,6 +13,7 @@ import {
 import type { AssistantFolder, AssistantMode } from '@common';
 import { Tooltip } from '../common/Tooltip';
 import { useRadio } from '../../context';
+import { useDismiss } from '../../hooks/useDismiss';
 import './AssistantToolbar.css';
 
 export interface AssistantToolbarProps {
@@ -46,21 +47,7 @@ export const AssistantToolbar = ({
     setNewFolderName('');
   };
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) closeMenu();
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeMenu();
-    };
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [menuOpen]);
+  useDismiss(toolbarRef, closeMenu, { enabled: menuOpen });
 
   const activeFolder = folders.find((folder) => folder.id === activeFolderId);
 

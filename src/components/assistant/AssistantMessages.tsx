@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import {
   IconArrowBackUp,
   IconChevronDown,
@@ -13,6 +13,7 @@ import {
 import { ASSISTANT_DATA, type AssistantVariant } from '@common';
 import type { LiveAssistantMessage } from './types';
 import { formatDuration, formatMessageTime } from './utils';
+import { useDismiss } from '../../hooks/useDismiss';
 import './AssistantMessages.css';
 
 export interface AssistantMessagesProps {
@@ -44,19 +45,16 @@ export const AssistantMessages = ({
 }: AssistantMessagesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (openMenuId === null) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
+  useDismiss(null, () => onOpenMenuChange(null), {
+    enabled: openMenuId !== null,
+    escape: false,
+    isInside: (target) => {
       const menu = containerRef.current?.querySelector('.assistant-chat__menu');
+      if (!menu) return true;
       const chevron = containerRef.current?.querySelector(`[data-menu-id="${openMenuId}"]`);
-      if (menu && !menu.contains(target) && !(chevron && chevron.contains(target))) {
-        onOpenMenuChange(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [openMenuId, onOpenMenuChange]);
+      return menu.contains(target) || Boolean(chevron?.contains(target));
+    },
+  });
 
   return (
     <div className="assistant-chat__messages" ref={containerRef}>

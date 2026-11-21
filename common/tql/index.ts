@@ -36,6 +36,7 @@ export {
   setNestedValue,
   parseDurationMs,
   evaluateMath,
+  createMathEvaluator,
 } from './compiler';
 export { Lexer, type Token, type TokenType } from './lexer';
 export { Parser } from './parser';

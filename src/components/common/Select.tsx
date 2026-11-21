@@ -1,5 +1,6 @@
-import { Children, useId, useEffect, useRef, useState, isValidElement } from 'react';
+import { Children, useId, useRef, useState, isValidElement } from 'react';
 import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, SelectHTMLAttributes } from 'react';
+import { useDismiss } from '../../hooks/useDismiss';
 import './Select.css';
 
 export interface SelectOption {
@@ -49,25 +50,7 @@ export const Select = ({
 
   const resolvedOptions = options ?? parseOptionChildren(children);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open]);
+  useDismiss(containerRef, () => setOpen(false), { enabled: open });
 
   const selectedOption = resolvedOptions.find((opt) => String(opt.value) === String(value ?? ''));
   const display = selectedOption

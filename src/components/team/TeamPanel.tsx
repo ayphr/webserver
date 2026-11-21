@@ -6,6 +6,7 @@ import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance, Subscriptio
 import { PLAN_NAMES } from '@common';
 import { getPlanFeatures } from '@common/utils/plans';
 import { TeamAuditPanel } from './TeamAuditPanel';
+import '../common/Tabs.css';
 import './TeamPanel.css';
 
 const ROLE_OPTIONS = [
@@ -387,14 +388,14 @@ export function TeamPanel({ isManager = false, userUuid }: TeamPanelProps) {
         )}
       </header>
 
-      <div className="settings__tabs" role="tablist" aria-label="Team sections">
+      <div className="ui-tabs" role="tablist" aria-label="Team sections">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             role="tab"
             aria-selected={activeTab === tab.id}
-            className={`settings__tab ${activeTab === tab.id ? 'settings__tab--active' : ''}`}
+            className={`ui-tab ${activeTab === tab.id ? 'ui-tab--active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}

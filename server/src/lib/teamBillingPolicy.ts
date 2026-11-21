@@ -1,7 +1,8 @@
 import type { Team } from '@common';
 import { PLAN_FEATURES } from '@common';
 
-export function getTeamSeatLimit(team: Team, _memberCount: number): number {
+/** Pure plan/seat calculation — member count is kept for API compatibility. */
+export function getTeamSeatLimit(team: Team, _memberCount?: number): number {
   const planMax = PLAN_FEATURES[team.tier]?.maxUsers ?? 1;
   if (team.seats && team.stripeSubscriptionId) return Math.min(team.seats, planMax);
   return planMax;

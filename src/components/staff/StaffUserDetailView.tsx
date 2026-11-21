@@ -4,6 +4,7 @@ import { Button, Select, Modal, PunishModal, Checkbox } from '../common';
 import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
 import type { PublicUser, Team, CreditBalance } from '@common';
 import { PLAN_NAMES, SUBSCRIPTION_TIERS } from '@common';
+import '../common/Tabs.css';
 
 type Tab = 'overview' | 'teams' | 'usage' | 'actions';
 
@@ -156,12 +157,12 @@ export function StaffUserDetailView({ user, onBack }: Props) {
         <h2>{user.username}</h2>
       </div>
 
-      <div className="settings__tabs" role="tablist" aria-label="User sections">
+      <div className="ui-tabs" role="tablist" aria-label="User sections">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={`settings__tab${tab === t.id ? ' settings__tab--active' : ''}`}
+            className={`ui-tab${tab === t.id ? ' ui-tab--active' : ''}`}
             onClick={() => setTab(t.id)}
           >
             {t.label}
@@ -174,7 +175,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
       ) : (
         <>
           {tab === 'overview' && (
-            <div className="staff-user-detail__overview settings__panel">
+            <div className="staff-user-detail__overview ui-tab-panel">
               <div className="staff-user-detail__hero"><IconUser size={28} /><div><h3>{user.username}</h3><span>{user.role}</span></div></div>
               <div className="staff-user-detail__facts">
                 <div><span>Username</span><strong>{user.username}</strong></div>
@@ -214,7 +215,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
           )}
 
           {tab === 'usage' && (
-            <div className="staff-user-detail__usage settings__panel">
+            <div className="staff-user-detail__usage ui-tab-panel">
               <div className="staff-user-detail__usage-list">
                 <div><span>Plan</span><strong>{credits?.plan ?? 'Free'}</strong></div>
                 <div><span>Devices</span><strong>{devices.count}</strong></div>
@@ -226,7 +227,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
           )}
 
           {tab === 'actions' && (
-            <div className="staff-user-detail__actions settings__panel">
+            <div className="staff-user-detail__actions ui-tab-panel">
               <div className="staff-user-detail__action-row"><div><strong>Staff access</strong><span>Control whether this user can access staff tools.</span></div>
               <Select
                 value={user.role}

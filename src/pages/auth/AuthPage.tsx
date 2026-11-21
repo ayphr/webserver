@@ -6,7 +6,7 @@ import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, Userna
 import { getActiveToken, getStoredAccounts, isStoredAccountExpired, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { api } from '../../lib/api';
 import { ApiError } from '../../lib/api/client';
-import { PASSWORD_MIN_LENGTH, getPasswordValidationChecks, getPasswordValidationErrors } from '@common/utils/password';
+import { PASSWORD_RULES, getPasswordValidationChecks, getPasswordValidationErrors, type PasswordValidationChecks } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { getEmailValidationError } from '@common/utils/email';
 import { EMAIL_CODE_LENGTH } from '@common';
@@ -25,6 +25,19 @@ const RESEND_COOLDOWN_SECONDS = 30;
 
 export interface AuthPageProps {
   initialMode?: AuthMode;
+}
+
+function PasswordChecklist({ checks }: Readonly<{ checks: PasswordValidationChecks }>) {
+  return (
+    <ul className="auth-form__password-checklist">
+      {PASSWORD_RULES.filter((rule) => !checks[rule.key]).map((rule) => (
+        <li key={rule.key} className="is-invalid">
+          <span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>
+          {rule.label}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
@@ -429,13 +442,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   fullWidth
                 />
                 {resetPassword.length > 0 && resetHasUnsatisfied && (
-                  <ul className="auth-form__password-checklist">
-                    {!resetPasswordChecks.minLength && <li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>At least {PASSWORD_MIN_LENGTH} characters</li>}
-                    {!resetPasswordChecks.lowercase && <li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One lowercase letter</li>}
-                    {!resetPasswordChecks.uppercase && <li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One uppercase letter</li>}
-                    {!resetPasswordChecks.number && <li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One number</li>}
-                    {!resetPasswordChecks.symbol && <li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One special character</li>}
-                  </ul>
+                  <PasswordChecklist checks={resetPasswordChecks} />
                 )}
                 <Input
                   label="Confirm new password"
@@ -543,13 +550,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                 )}
 
                 {isSignup && hasEnteredPassword && hasUnsatisfiedPasswordRequirements && (
-                  <ul className="auth-form__password-checklist">
-                    {!passwordChecks.minLength && (<li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>At least {PASSWORD_MIN_LENGTH} characters</li>)}
-                    {!passwordChecks.lowercase && (<li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One lowercase letter</li>)}
-                    {!passwordChecks.uppercase && (<li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One uppercase letter</li>)}
-                    {!passwordChecks.number && (<li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One number</li>)}
-                    {!passwordChecks.symbol && (<li className="is-invalid"><span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>One special character</li>)}
-                  </ul>
+                  <PasswordChecklist checks={passwordChecks} />
                 )}
 
                 {isSignup && (

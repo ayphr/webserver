@@ -17,6 +17,7 @@ import {
   acceptTeamInvite,
   getTeamSeatLimit,
   getTeamsForUser,
+  getTeamsByIds,
   setActiveTeam,
   createTeamForUser,
   enforceTeamMemberLimit,
@@ -24,7 +25,10 @@ import {
 import {
   getSubscriptionPlans,
 } from '../../lib/stripe';
-import { STRIPE_TRIAL_DAYS } from '../../env';
+import { CLIENT_URL, STRIPE_TRIAL_DAYS } from '../../env';
+import { sendEmail } from '../../lib/email';
+import { buildTeamInviteEmail } from '../../lib/email/templates';
+import { getCollection } from '../../lib/db/internal';
 import {
   getUserFromUuid,
   getUserFromUsername,
@@ -107,9 +111,6 @@ const handleTeamMemberAdd = requireAuth(async (request, user: User) => {
 
   // Send invite email (best effort).
   try {
-    const { sendEmail } = await import('../../lib/email');
-    const { CLIENT_URL } = await import('../../env');
-    const { buildTeamInviteEmail } = await import('../../lib/email/templates');
     const isExistingUser = Boolean(target);
     const link = isExistingUser
       ? `${CLIENT_URL}/dashboard?invite=${invite.token}`
@@ -245,12 +246,9 @@ const handleTeamInviteAccept = requireAuth(async (request, user: User) => {
 const handlePendingTeamInvites = requireAuth(async (_request, user: User) => {
   if (!user.email) return json({ invites: [] });
   const invites = await getPendingInvitesForEmail(user.email);
-  const enriched = await Promise.all(
-    invites.map(async (invite) => {
-      const team = await getTeamById(invite.teamId);
-      return { ...invite, teamName: team?.name };
-    }),
-  );
+  const teams = await getTeamsByIds(invites.map((invite) => invite.teamId));
+  const names = new Map(teams.map((team) => [team.id, team.name]));
+  const enriched = invites.map((invite) => ({ ...invite, teamName: names.get(invite.teamId) }));
   return json({ invites: enriched });
 });
 
@@ -276,10 +274,10 @@ const handleTeamDelete = requireAuth(async (_request, user: User) => {
   if (!team) return json({ error: 'No team found' }, 404);
   if (team.managerUuid !== user.uuid) return json({ error: 'Forbidden' }, 403);
   // Remove team from all members.
-  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  const users = await getCollection('users');
   await users.updateMany({ teamIds: team.id }, { $pull: { teamIds: team.id }, $unset: { [`teamRoles.${team.id}`]: '' } });
   await users.updateMany({ teamId: team.id }, { $unset: { teamId: '', teamRole: '' } });
-  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
+  const teams = await getCollection('teams');
   await teams.deleteOne({ id: team.id });
   // switch user to another team if available
   const remaining = (user.teamIds ?? []).filter((id) => id !== team.id);

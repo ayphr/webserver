@@ -7,6 +7,7 @@ import {
   IconSparkleHighlight,
 } from '@tabler/icons-react';
 import { ASSISTANT_DATA, ASSISTANT_VARIANTS, type AssistantVariant } from '@common';
+import { useDismiss } from '../../hooks/useDismiss';
 import { Tooltip } from './Tooltip';
 import { useTooltip } from '../../context';
 import './AssistantDropdown.css';
@@ -49,29 +50,11 @@ export const AssistantDropdown = ({
     if (value !== undefined) setInternal(value);
   }, [value]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        hideTooltip();
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open, hideTooltip]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        hideTooltip();
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, hideTooltip]);
+  useDismiss(
+    containerRef,
+    () => { setOpen(false); hideTooltip(); },
+    { enabled: open },
+  );
 
   useEffect(() => {
     if (prevOpenRef.current && !open) {

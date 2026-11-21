@@ -17,6 +17,7 @@ import { api } from '../../lib/api';
 import { formatCredits } from '../../lib/credits';
 import { DEVICE_PERIODS, devicePeriodLabel, type DevicePeriod } from '../../lib/devicePeriod';
 import { downloadRows, slugifyFilename, type ExportRow } from '../../lib/export';
+import { EXTERNAL_URLS } from '../../lib/externalUrls';
 import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/tqlEditor';
 import { Button, Modal, Tooltip } from '../common';
 import './DeviceQueryModal.css';
@@ -274,7 +275,7 @@ export const DeviceQueryModal = ({
             <div className="device-query__cost-row">
               <a
                 className="device-query__docs-link"
-                href="https://docs.ayphr.com/tql/overview/"
+                href={EXTERNAL_URLS.tqlDocs}
                 target="_blank"
                 rel="noopener noreferrer"
               >

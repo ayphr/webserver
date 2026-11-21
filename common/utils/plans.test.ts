@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { PLAN_FEATURES } from '../types/plans';
 import { getPlanFeaturesForUser, getPlanSeats } from './plans';
 
 describe('getPlanFeaturesForUser and team seats calculation', () => {
@@ -41,5 +42,23 @@ describe('getPlanFeaturesForUser and team seats calculation', () => {
     const features = getPlanFeaturesForUser(user, 10);
     expect(features.dataFillMaxPoints).toBe(200_000_000);
     expect(features.sharedMaxDataPointsPerUser).toBe(1_500_000_000);
+  });
+});
+
+describe('alerts and webhooks plan access', () => {
+  it('is disabled on free and lite', () => {
+    expect(PLAN_FEATURES.free.alertsAndWebhooks).toBe(false);
+    expect(PLAN_FEATURES.lite.alertsAndWebhooks).toBe(false);
+  });
+
+  it('is enabled on plus and above', () => {
+    expect(PLAN_FEATURES.plus.alertsAndWebhooks).toBe(true);
+    expect(PLAN_FEATURES.ultra.alertsAndWebhooks).toBe(true);
+  });
+
+  it('is enabled on every team plan', () => {
+    expect(PLAN_FEATURES['team-lite'].alertsAndWebhooks).toBe(true);
+    expect(PLAN_FEATURES['team-plus'].alertsAndWebhooks).toBe(true);
+    expect(PLAN_FEATURES['team-ultra'].alertsAndWebhooks).toBe(true);
   });
 });

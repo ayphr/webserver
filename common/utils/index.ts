@@ -16,6 +16,7 @@ export {
 } from './social';
 export {
   PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES,
   getPasswordValidationChecks,
   getPasswordValidationErrors,
   type PasswordValidationChecks,

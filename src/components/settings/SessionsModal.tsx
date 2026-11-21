@@ -10,49 +10,14 @@ import {
 } from '@tabler/icons-react';
 import type { SessionInfo } from '@common';
 import { api } from '../../lib/api';
-import { toDate } from '../../lib/date';
+import { getRelativeTime } from '../../lib/date';
+import { formatLocation } from '../../lib/region';
 import { Button, ConfirmDialog, Modal } from '../common';
 import './SessionsModal.css';
 
 export interface SessionsModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-const regionDisplayNames = new Intl.DisplayNames(['en'], { type: 'region' });
-
-function getRelativeTime(date: Date | string): string {
-  const resolved = toDate(date);
-  const diffMs = Date.now() - resolved.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 30) {
-    return resolved.toLocaleDateString('en-GB');
-  }
-  if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffMins > 0) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-  return 'just now';
-}
-
-function getCountryName(code?: string): string | undefined {
-  if (!code) return undefined;
-
-  try {
-    return regionDisplayNames.of(code) ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function formatLocation(session: SessionInfo): string {
-  const { city, country, countryName } = session.location;
-  const resolvedCountry = countryName ?? getCountryName(country);
-
-  if (city && resolvedCountry) return `${city}, ${resolvedCountry}`;
-  return city ?? resolvedCountry ?? 'Unknown location';
 }
 
 function DeviceIcon({ deviceType }: { deviceType?: SessionInfo['deviceType'] }) {
@@ -162,7 +127,7 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
 
                   <span className="sessions-modal__meta">
                     <IconMapPin size={14} strokeWidth={1.75} />
-                    {formatLocation(session)}
+                    {formatLocation(session.location)}
                   </span>
 
                   <span className="sessions-modal__meta">
@@ -199,7 +164,7 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
       >
         {sessionToRevoke && (
           <p>
-            Sign out <strong>{describeClient(sessionToRevoke)}</strong> ({formatLocation(sessionToRevoke)})? That
+            Sign out <strong>{describeClient(sessionToRevoke)}</strong> ({formatLocation(sessionToRevoke.location)})? That
             device will need to log in again.
           </p>
         )}

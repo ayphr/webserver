@@ -42,7 +42,7 @@
   padding: 0.85rem 1rem;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   border-radius: 0.75rem;
-  background: var(--surface, rgba(255, 255, 255, 0.03));
+  background: var(--bg-elevated);
 }
 
 .tokens-tab__icon {

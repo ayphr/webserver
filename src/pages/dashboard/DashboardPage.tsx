@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
-import { toDate } from '../../lib/date';
+import { formatDisplayDate, toDate } from '../../lib/date';
 import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, AssistantSendShortcut } from '@common';
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
@@ -29,10 +29,6 @@ const RadioPanel = lazy(() => import('../../components/radio/RadioPanel').then((
 import './DashboardPage.css';
 
 const VALID_TABS = new Set(['assistant', 'overview', 'devices', 'locations', 'profile', 'settings', 'account-settings', 'notifications', 'credits', 'users', 'games', 'radio', 'team', 'team-audit', 'integrations', 'appeal', 'appeals']);
-
-function formatDisplayDate(date: Date | string): string {
-  return toDate(date).toLocaleDateString('en-GB');
-}
 
 function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | null; isPermanent: boolean }>) {
   const [timeLeft, setTimeLeft] = useState('');
@@ -252,6 +248,7 @@ export const DashboardPage = () => {
   const isStaff = user?.role === 'staff';
   const isTeamMember = Boolean(user?.teamId);
   const isTeamManager = user?.teamRole === 'manager';
+  const canUseAlertsAndWebhooks = user ? getPlanFeaturesForUser(user).alertsAndWebhooks : false;
 
   const handleSelfPunishment = async () => {
     // Refresh user data to get the updated suspension status.
@@ -474,7 +471,7 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout`}>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main">
           <DashboardPanel title="Dashboard">
             <p>Could not load user profile.</p>
@@ -486,7 +483,7 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout`}>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main className="dashboard-main">
         {isSuspended && activePage !== 'profile' && activePage !== 'account-settings' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
@@ -691,7 +688,16 @@ export const DashboardPage = () => {
               </DashboardPanel>
             )}
 
-            {activePage === 'integrations' && isTeamMember && (
+            {activePage === 'integrations' && isTeamMember && !canUseAlertsAndWebhooks && (
+              <DashboardPanel title="Integrations" description="Webhooks shared with your team" className="dashboard-panel--wide">
+                <p>Alerts and webhooks are available on Plus and all team plans.</p>
+                <Button variant="primary" onClick={() => changeTab('credits')}>
+                  View plans
+                </Button>
+              </DashboardPanel>
+            )}
+
+            {activePage === 'integrations' && isTeamMember && canUseAlertsAndWebhooks && (
               <DashboardPanel title="Integrations" description="Webhooks shared with your team" className="dashboard-panel--wide">
                 <Suspense fallback={<DashboardContentSkeleton />}>
                   <IntegrationsPanel isManager={isTeamManager} />

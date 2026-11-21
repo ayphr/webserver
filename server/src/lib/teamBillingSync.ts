@@ -6,14 +6,12 @@ import {
   getTeamById,
   getTeamMembers,
 } from './db/teams';
-import { getCollection, trackMongoOperation } from './db/internal';
+import { getCollection, trackMongoOperation, TEAMS_COLLECTION } from './db/internal';
 import {
   getBillingIntervalFromStripeSubscription,
   resolveTierFromStripeSubscription,
   updateSubscriptionQuantity,
 } from './stripe';
-
-const TEAMS_COLLECTION = 'teams';
 
 export async function syncTeamStripeSubscription(teamId: string, subscription: Stripe.Subscription): Promise<void> {
   const teams = await getCollection('teams');

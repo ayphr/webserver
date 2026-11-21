@@ -9,6 +9,8 @@ import type {
 import { evaluateAlertConditions } from '@common';
 import { getAlertsForSerial, getIntegrationsForTeamId, updateAlert } from './db';
 import type { DeviceDocument } from './db';
+import { getTeamById } from './db/teams';
+import { teamSupportsAlertsAndWebhooks } from './planAccess';
 import { createLogger } from './logger';
 
 const log = createLogger('alerts');
@@ -136,6 +138,10 @@ export async function evaluateAlertsForDevice(
 
   const alerts = await getAlertsForSerial(device.serial, device.teamId);
   if (alerts.length === 0) return;
+
+  // A downgraded team may still have stale alerts; never deliver webhooks for them.
+  const team = await getTeamById(device.teamId);
+  if (!teamSupportsAlertsAndWebhooks(team)) return;
 
   const needsIntegrations = alerts.some((alert) => alert.enabled && alert.integrationIds.length > 0);
   const integrations = needsIntegrations ? await getIntegrationsForTeamId(device.teamId) : [];

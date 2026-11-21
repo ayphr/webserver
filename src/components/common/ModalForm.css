@@ -1,22 +1,25 @@
-.set-password__body {
+/* Shared layout for the small form modals (change password/email/username,
+   staff set-password). Keeps their spacing, inputs and error styling identical. */
+
+.modal-form__body {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
-.set-password__section {
+.modal-form__section {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.set-password__label {
+.modal-form__label {
   color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 600;
 }
 
-.set-password__input {
+.modal-form__input {
   padding: 0.75rem;
   background-color: var(--bg-base);
   border: 1px solid var(--border);
@@ -27,23 +30,23 @@
   transition: border-color 0.2s ease;
 }
 
-.set-password__input:focus {
+.modal-form__input:focus {
   border-color: var(--text-primary);
   outline: none;
 }
 
-.set-password__input::placeholder {
+.modal-form__input::placeholder {
   color: var(--text-muted);
   opacity: 0.6;
 }
 
-.set-password__mismatch {
-  color: #dc3545;
+.modal-form__mismatch {
+  color: var(--status-error);
   font-size: 0.85rem;
   margin: 0;
 }
 
-.set-password__rules {
+.modal-form__rules {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -52,36 +55,61 @@
   gap: 0.4rem;
 }
 
-.set-password__rule {
+.modal-form__rule {
   color: var(--text-muted);
   font-size: 0.85rem;
   padding-left: 1.25rem;
   position: relative;
 }
 
-.set-password__rule::before {
+.modal-form__rule::before {
   content: '✕';
   position: absolute;
   left: 0;
-  color: #dc3545;
+  color: var(--status-error);
 }
 
-.set-password__hint {
+.modal-form__note {
   color: var(--text-muted);
   font-size: 0.85rem;
   margin: 0;
 }
 
-.set-password__error {
+.modal-form__hint {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.modal-form__hint strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.modal-form__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background-color: rgba(220, 53, 69, 0.08);
-  border-left: 3px solid #dc3545;
+  background-color: var(--status-error-bg);
+  border-left: 3px solid var(--status-error);
   border-radius: var(--radius-md);
-  color: #dc3545;
+  color: var(--status-error);
   font-size: 0.9rem;
 }
 
-.set-password__footer {
+.modal-form__error span {
+  flex: 1;
+}
+
+.modal-form__resend {
+  display: flex;
+  justify-content: center;
+}
+
+.modal-form__footer {
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;

@@ -3,6 +3,7 @@ import type { BadgeId } from '@common';
 import { BADGES, countryCodeToFlag } from '@common';
 import { EmojiText } from './EmojiText';
 import { getBadgeIcon } from '../../lib/badges';
+import { getCountryName } from '../../lib/region';
 import { Tooltip } from './Tooltip';
 import { Avatar } from './Avatar';
 
@@ -25,7 +26,7 @@ export const UsernameDisplay = ({
 }: UsernameDisplayProps) => {
   const flag = countryCodeToFlag(country);
   const countryName = country && country.length === 2
-    ? (new Intl.DisplayNames(['en'], { type: 'region' }).of(country.toUpperCase()) ?? country.toUpperCase())
+    ? (getCountryName(country) ?? country.toUpperCase())
     : country;
 
   return (

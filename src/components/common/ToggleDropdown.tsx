@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { IconCheck } from '@tabler/icons-react';
+import { useDismiss } from '../../hooks/useDismiss';
 import './ToggleDropdown.css';
 
 export interface ToggleDropdownProps {
@@ -16,16 +17,7 @@ export const ToggleDropdown = ({ label, options, value, onChange, placeholder = 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  useDismiss(containerRef, () => setOpen(false), { enabled: open, escape: false });
 
   const toggle = (opt: string) => {
     if (value.includes(opt)) {

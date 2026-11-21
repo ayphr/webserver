@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { TeamAuditLog } from '@common';
-import { getCollection, normalizeDateValues, trackMongoOperation } from './db/internal';
-
-const TEAM_AUDIT_LOGS_COLLECTION = 'team_audit_logs';
+import { getCollection, normalizeDateValues, trackMongoOperation, TEAM_AUDIT_LOGS_COLLECTION } from './db/internal';
 
 export async function logTeamAudit(entry: Omit<TeamAuditLog, 'id' | 'createdAt'>): Promise<TeamAuditLog> {
   const auditLog: TeamAuditLog = {

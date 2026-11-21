@@ -19,7 +19,7 @@ import { countryCodeToFlag } from '@common/utils/country';
 import { PunishModal } from './PunishModal';
 
 import { prepareAvatarFile, validateAvatarFile } from '../../lib/image';
-import { toDate } from '../../lib/date';
+import { formatDisplayDate, getRelativeTime } from '../../lib/date';
 import type { ProfileCountriesPayload, PublicUser, SocialLinkType, SocialLinks, UserRole, DomainChallengePayload } from '@common';
 import { BIO_MAX_LENGTH, DEFAULT_BIO } from '@common';
 import {
@@ -51,33 +51,6 @@ const SOCIAL_LINK_ICONS: Record<SocialLinkType, { label: string; icon: ReactNode
 function getInitialSocialLinkKey(links: SocialLinks): SocialLinkType {
   const first = Object.entries(links).find(([, value]) => typeof value === 'string' && value.trim().length > 0)?.[0];
   return (first as SocialLinkType) ?? 'website';
-}
-
-function getRelativeTime(date: Date | string): string {
-  const resolvedDate = toDate(date);
-  const now = new Date();
-  const diffMs = now.getTime() - resolvedDate.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  const diffMonths = Math.floor(diffDays / 30);
-  const diffYears = Math.floor(diffDays / 365);
-
-  if (diffYears > 0) return `${diffYears} year${diffYears > 1 ? 's' : ''} ago`;
-  if (diffMonths > 0) return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
-  if (diffDays >= 7) {
-    const diffWeeks = Math.round(diffDays / 7);
-    return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
-  }
-  if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffMins > 0) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-  return 'just now';
-}
-
-function formatDisplayDate(date: Date | string): string {
-  return toDate(date).toLocaleDateString('en-GB');
 }
 
 export interface ProfileCardProps {
@@ -356,7 +329,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
             </div>
             <div className="profile-card__meta">
               <p>
-                Member since {getRelativeTime(user.createdAt)} ({formatDisplayDate(user.createdAt)})
+                Member since {getRelativeTime(user.createdAt, { detailed: true })} ({formatDisplayDate(user.createdAt)})
               </p>
             </div>
             <div className="profile-card__footerRow">

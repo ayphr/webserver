@@ -14,7 +14,7 @@ import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
 import { isDeviceOnline as isOnline } from '../../lib/deviceActivity';
 import { Button, Card, ConfirmDialog, Input, Modal, Pagination, Tooltip } from '../common';
-import '../settings/SettingsPanel.css';
+import '../common/Tabs.css';
 import './LocationsPanel.css';
 
 const PAGE_SIZE = 5;
@@ -291,14 +291,14 @@ export const LocationsPanel = ({ onDeviceNavigate }: Props) => {
 
       <h3 className="locations__title">{selectedLocation!.name}</h3>
 
-      <div className="settings__tabs" role="tablist" aria-label="Location sections">
+      <div className="ui-tabs" role="tablist" aria-label="Location sections">
         {(['overview', 'devices', 'settings'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             role="tab"
             aria-selected={detailTab === tab}
-            className={`settings__tab ${detailTab === tab ? 'settings__tab--active' : ''}`}
+            className={`ui-tab ${detailTab === tab ? 'ui-tab--active' : ''}`}
             onClick={() => setDetailTab(tab)}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -306,7 +306,7 @@ export const LocationsPanel = ({ onDeviceNavigate }: Props) => {
         ))}
       </div>
 
-      <div className="settings__panel">
+      <div className="ui-tab-panel">
         {detailTab === 'overview' && (
           <div className="locations__overview">
             <div className="locations__stat-grid">

@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import { Button, Modal, CodeInput } from '../common';
 import { EMAIL_CODE_LENGTH, getEmailValidationError, normalizeEmail } from '@common/utils/email';
 import type { SelfUser } from '@common';
-import './ChangeEmailModal.css';
+import '../common/ModalForm.css';
 
 export interface ChangeEmailModalProps {
   isOpen: boolean;
@@ -89,15 +89,15 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({ isOpen, onCl
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={step === 'email' ? 'Change email' : 'Verify email'} size="sm" showCancel={false}>
-      <div className="change-email__body">
+      <div className="modal-form__body">
         {step === 'email' && (
           <>
-            <div className="change-email__section">
-              <label htmlFor="change-email-new" className="change-email__label">New email address</label>
+            <div className="modal-form__section">
+              <label htmlFor="change-email-new" className="modal-form__label">New email address</label>
               <input
                 id="change-email-new"
                 type="email"
-                className="change-email__input"
+                className="modal-form__input"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 disabled={isSaving}
@@ -105,12 +105,12 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({ isOpen, onCl
                 autoComplete="email"
               />
             </div>
-            <div className="change-email__section">
-              <label htmlFor="change-email-password" className="change-email__label">Current password</label>
+            <div className="modal-form__section">
+              <label htmlFor="change-email-password" className="modal-form__label">Current password</label>
               <input
                 id="change-email-password"
                 type="password"
-                className="change-email__input"
+                className="modal-form__input"
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
                 disabled={isSaving}
@@ -119,12 +119,12 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({ isOpen, onCl
               />
             </div>
             {error && (
-              <div className="change-email__error">
+              <div className="modal-form__error">
                 <IconAlertCircle size={18} strokeWidth={1.75} />
                 <span>{error}</span>
               </div>
             )}
-            <div className="change-email__footer">
+            <div className="modal-form__footer">
               <Button variant="secondary" onClick={onClose} disabled={isSaving}>Cancel</Button>
               <Button variant="primary" onClick={handleRequestCode} isLoading={isSaving} disabled={isSaving}>
                 Send code
@@ -135,22 +135,22 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({ isOpen, onCl
 
         {step === 'code' && (
           <>
-            <p className="change-email__hint">
+            <p className="modal-form__hint">
               We sent a {EMAIL_CODE_LENGTH}-digit code to <strong>{email}</strong>. Enter it to verify your new email.
             </p>
             <CodeInput value={code} onChange={setCode} disabled={isSaving} />
             {error && (
-              <div className="change-email__error">
+              <div className="modal-form__error">
                 <IconAlertCircle size={18} strokeWidth={1.75} />
                 <span>{error}</span>
               </div>
             )}
-            <div className="change-email__resend">
+            <div className="modal-form__resend">
               <Button variant="secondary" onClick={handleResend} disabled={resendCooldown > 0 || isSaving}>
                 {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
               </Button>
             </div>
-            <div className="change-email__footer">
+            <div className="modal-form__footer">
               <Button variant="secondary" onClick={() => { setStep('email'); setCode(''); setError(null); }} disabled={isSaving}>
                 Back
               </Button>

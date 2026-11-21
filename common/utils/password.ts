@@ -9,6 +9,15 @@ export type PasswordValidationChecks = {
   symbol: boolean;
 };
 
+/** Single source of truth for the password requirements shown in the UI. */
+export const PASSWORD_RULES: ReadonlyArray<{ key: keyof PasswordValidationChecks; label: string }> = [
+  { key: 'minLength', label: `At least ${PASSWORD_MIN_LENGTH} characters` },
+  { key: 'lowercase', label: 'At least one lowercase letter' },
+  { key: 'uppercase', label: 'At least one uppercase letter' },
+  { key: 'number', label: 'At least one number' },
+  { key: 'symbol', label: 'At least one special character' },
+];
+
 export function getPasswordValidationChecks(password: string): PasswordValidationChecks {
   return {
     minLength: password.length >= PASSWORD_MIN_LENGTH,

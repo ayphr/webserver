@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { createPasswordHash, requireRole } from '../auth';
 import { createPunishment, deleteSessionsForUserUuid, deletePunishmentsForUserUuid, deleteUser, getPunishmentById, getPunishmentsByType, getUserCount, getUserFromUsername, getUserFromUuid, getUsersByRole, listUsers, countUsers, updatePunishment, updateUser, updateUserRole, getActiveSuspensionForUserUuid } from '../../lib/db';
 import { getTeamsForUser, getTeamById } from '../../lib/db/teams';
+import { getCollection, trackMongoOperation, TEAMS_COLLECTION } from '../../lib/db/internal';
 import { getCreditBalance } from '../../lib/credits';
 import { getDevicesForTeamId } from '../../lib/db/devices';
 import { getLocationsForTeamId } from '../../lib/db/locations';
 import { getAppeals, getAppealById, resolveAppeal } from '../../lib/db/appeals';
 import { isTeamRole, type Punishment, type UserRole } from '@common';
 import { getPasswordValidationErrors } from '@common/utils/password';
-import { toPublicUser } from '../../lib/user';
+import { toPublicUser, toPublicUsers } from '../../lib/user';
 import { punishmentsTotal, staffActionsTotal } from '../../lib/metrics';
 import { notifyUser } from '../../lib/notifications';
 import { getTeamMemberRole } from '../../lib/teamAccess';
@@ -56,7 +57,7 @@ const handleStaffUsers = requireRole('staff', async (request) => {
   const total = count;
 
   return json({
-    users: await Promise.all(pageUsers.map((u) => toPublicUser(u))),
+    users: await toPublicUsers(pageUsers),
     total,
     page,
     pageSize,
@@ -356,9 +357,8 @@ const handleStaffTeamUpdate = requireRole('staff', async (request, _staffUser, p
   if (body?.tier) $set.tier = body.tier;
   if (typeof body?.seats === 'number') $set.seats = body.seats;
   if (typeof body?.gifted === 'boolean') $set.gifted = body.gifted;
-  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
-  const { trackMongoOperation } = await import('../../lib/db/internal');
-  trackMongoOperation('updateOne', 'teams');
+  const teams = await getCollection('teams');
+  trackMongoOperation('updateOne', TEAMS_COLLECTION);
   await teams.updateOne({ id }, { $set });
   const updated = await getTeamById(id);
   return json({ team: updated });
@@ -367,8 +367,8 @@ const handleStaffTeamUpdate = requireRole('staff', async (request, _staffUser, p
 const handleStaffTeamDelete = requireRole('staff', async (_request, _staffUser, params) => {
   const id = params.id;
   if (!id) return json({ error: 'team id is required' }, 400);
-  const teams = await (await import('../../lib/db/internal')).getCollection('teams');
-  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  const teams = await getCollection('teams');
+  const users = await getCollection('users');
   await teams.deleteOne({ id });
   await users.updateMany({ teamIds: id }, { $pull: { teamIds: id }, $unset: { [`teamRoles.${id}`]: '' } });
   await users.updateMany({ teamId: id }, { $unset: { teamId: '', teamRole: '' } });
@@ -381,7 +381,7 @@ const handleStaffTeamMemberRole = requireRole('staff', async (request, _staffUse
   if (!teamId || !uuid) return json({ error: 'team id and uuid are required' }, 400);
   const body = await request.json().catch(() => null) as { role?: string } | null;
   if (!body?.role || !isTeamRole(body.role)) return json({ error: 'invalid role' }, 400);
-  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  const users = await getCollection('users');
   await users.updateOne({ uuid }, { $set: { [`teamRoles.${teamId}`]: body.role } });
   const user = await getUserFromUuid(uuid);
   if (user && user.teamId === teamId) {
@@ -394,7 +394,7 @@ const handleStaffTeamMemberRemove = requireRole('staff', async (_request, _staff
   const teamId = params.id;
   const uuid = params.uuid;
   if (!teamId || !uuid) return json({ error: 'team id and uuid are required' }, 400);
-  const users = await (await import('../../lib/db/internal')).getCollection('users');
+  const users = await getCollection('users');
   await users.updateOne({ uuid }, { $pull: { teamIds: teamId }, $unset: { [`teamRoles.${teamId}`]: '' } });
   const user = await getUserFromUuid(uuid);
   if (user && user.teamId === teamId) {

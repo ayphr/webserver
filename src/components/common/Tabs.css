@@ -1,0 +1,63 @@
+/* Shared tab bar used by settings, device, location, team and staff views. */
+.ui-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ui-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+  font-size: 0.88rem;
+  font-weight: var(--font-weight-md);
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.ui-tab:hover {
+  color: var(--text-primary);
+}
+
+.ui-tab--active {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-hv);
+}
+
+.ui-tab:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.ui-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.25rem 0;
+  animation: ui-tab-fade-in 0.18s ease;
+}
+
+@keyframes ui-tab-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .ui-tabs {
+    width: 100%;
+  }
+}

@@ -16,6 +16,7 @@ import {
 } from '../lib/metrics';
 
 const log = createLogger('http');
+const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 
 function resolveClientIp(request: Request, socketIp: string | null): string | null {
   if (!TRUST_PROXY) return socketIp;
@@ -61,7 +62,6 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
     websocket: assistantWebSocket,
 
     async fetch(request) {
-      const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
       const contentLength = request.headers.get('content-length');
       if (contentLength) {
         const size = Number(contentLength);

@@ -61,7 +61,7 @@
   padding: 0.45rem 0.6rem;
   border-radius: 0.6rem;
   border: 1px solid var(--border, rgba(255,255,255,0.12));
-  background: var(--surface, rgba(255,255,255,0.04));
+  background: var(--bg-elevated);
   color: var(--text-primary, #fff);
   font-size: 0.9rem;
   font-family: inherit;
@@ -70,7 +70,7 @@
 
 .n-sidebar__team-switcher select:focus {
   outline: none;
-  border-color: var(--accent, #19c233);
+  border-color: var(--accent-green-solid);
 }
 
 .n-sidebar__tabs {

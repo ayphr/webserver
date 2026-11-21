@@ -14,7 +14,7 @@ import {
 } from '@tabler/icons-react';
 import type { NotificationType, UserNotification } from '@common';
 import { api } from '../../lib/api';
-import { toDate } from '../../lib/date';
+import { getRelativeTime } from '../../lib/date';
 import { Button } from '../common';
 import './NotificationsPanel.css';
 
@@ -22,20 +22,6 @@ type NotificationsPanelProps = {
   onNavigate?: (tab: string) => void;
   onUnreadChange?: (count: number) => void;
 };
-
-function getRelativeTime(date: Date | string): string {
-  const resolved = toDate(date);
-  const diffMs = Date.now() - resolved.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 30) return resolved.toLocaleDateString('en-GB');
-  if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffMins > 0) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-  return 'just now';
-}
 
 function NotificationIcon({ type }: Readonly<{ type: NotificationType }>) {
   switch (type) {

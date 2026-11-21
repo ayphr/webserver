@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Checkbox, ConfirmDialog, Input } from '../common';
 import type { ButtonSettingsOption, SettingsSection } from '../../lib/settings';
+import '../common/Tabs.css';
 import './SettingsPanel.css';
 
 export interface SettingsPanelProps {
@@ -137,7 +138,7 @@ export const SettingsPanel = ({ sections, defaultTab }: SettingsPanelProps) => {
     <div className="settings">
       {error && <div className="settings__error">{error}</div>}
 
-      <div className="settings__tabs" role="tablist" aria-label="Settings sections">
+      <div className="ui-tabs" role="tablist" aria-label="Settings sections">
         {sections.map((section) => {
           const isActive = section.id === activeId;
           return (
@@ -149,7 +150,7 @@ export const SettingsPanel = ({ sections, defaultTab }: SettingsPanelProps) => {
               aria-controls={`settings-panel-${section.id}`}
               id={`settings-tab-${section.id}`}
               tabIndex={isActive ? 0 : -1}
-              className={`settings__tab ${isActive ? 'settings__tab--active' : ''}`}
+              className={`ui-tab ${isActive ? 'ui-tab--active' : ''}`}
               onClick={() => setRequestedId(section.id)}
             >
               {section.title ?? section.id}
@@ -160,7 +161,7 @@ export const SettingsPanel = ({ sections, defaultTab }: SettingsPanelProps) => {
 
       {activeSection && (
         <div
-          className="settings__panel"
+          className="ui-tab-panel"
           role="tabpanel"
           id={`settings-panel-${activeSection.id}`}
           aria-labelledby={`settings-tab-${activeSection.id}`}

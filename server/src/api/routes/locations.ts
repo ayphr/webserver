@@ -11,16 +11,8 @@ import {
 } from '../../lib/db';
 import { getPlanFeatures } from '@common';
 import { getTeamContext } from '../../lib/teamContext';
+import { parseName } from '../../lib/deviceValidation';
 import type { Location, User } from '@common';
-
-const MAX_NAME_LENGTH = 64;
-
-function parseName(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const name = value.trim();
-  if (!name || name.length > MAX_NAME_LENGTH) return null;
-  return name;
-}
 
 const handleListMine = requireAuth(async (_request, user: User) => {
   const { scopeUuid, scopeUsername } = await getTeamContext(user);

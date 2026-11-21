@@ -36,6 +36,25 @@ function getClientSessionMeta() {
   return { timezone, locale: navigator.language, deviceType: getClientDeviceType() };
 }
 
+/** Applies a successful auth response locally and returns the public session shape. */
+function persistSession(client: RequestClient, response: AuthResponsePayload): AuthSession {
+  client.setAuthToken(response.token);
+  addStoredAccount(response.token, response.user, response.expiresAt);
+  return {
+    user: response.user,
+    token: response.token,
+    ...(response.suspension ? { suspension: response.suspension } : {}),
+    policyStatus: response.policyStatus,
+  };
+}
+
+/** Drops the current session from both the request client and the account store. */
+function clearLocalSession(client: RequestClient): void {
+  const token = client.getAuthToken();
+  if (token) removeStoredAccount(token);
+  client.clearAuthToken();
+}
+
 export function createAuthApi(client: RequestClient) {
   return {
     async register(input: { username: string; password: string; email: string; code: string; country?: string; acceptPolicies: boolean }) {
@@ -45,15 +64,7 @@ export function createAuthApi(client: RequestClient) {
         body: { ...input, ...getClientSessionMeta() },
       });
 
-      client.setAuthToken(response.token);
-      addStoredAccount(response.token, response.user, response.expiresAt);
-
-      return {
-        user: response.user,
-        token: response.token,
-        ...(response.suspension ? { suspension: response.suspension } : {}),
-        policyStatus: response.policyStatus,
-      } satisfies AuthSession;
+      return persistSession(client, response);
     },
     async login(input: { username: string; password: string }) {
       const response = await client.requestJson<AuthResponsePayload | DeviceVerificationRequiredPayload>('/api/auth/login', {
@@ -66,16 +77,7 @@ export function createAuthApi(client: RequestClient) {
         return { requiresDeviceVerification: true as const, expiresAt: response.expiresAt };
       }
 
-      const success = response as AuthResponsePayload;
-      client.setAuthToken(success.token);
-      addStoredAccount(success.token, success.user, success.expiresAt);
-
-      return {
-        user: success.user,
-        token: success.token,
-        ...(success.suspension ? { suspension: success.suspension } : {}),
-        policyStatus: success.policyStatus,
-      } satisfies AuthSession;
+      return persistSession(client, response as AuthResponsePayload);
     },
     async verifyDeviceLogin(input: { username: string; code: string }) {
       const response = await client.requestJson<AuthResponsePayload>('/api/auth/login/verify', {
@@ -84,15 +86,7 @@ export function createAuthApi(client: RequestClient) {
         body: { ...input, ...getClientSessionMeta() },
       });
 
-      client.setAuthToken(response.token);
-      addStoredAccount(response.token, response.user, response.expiresAt);
-
-      return {
-        user: response.user,
-        token: response.token,
-        ...(response.suspension ? { suspension: response.suspension } : {}),
-        policyStatus: response.policyStatus,
-      } satisfies AuthSession;
+      return persistSession(client, response);
     },
     async requestEmailCode(input: { email: string }) {
       const response = await client.requestJson<EmailCodeSentPayload>('/api/auth/email/code', {
@@ -149,36 +143,28 @@ export function createAuthApi(client: RequestClient) {
       };
     },
     async deleteAccount(input: { password: string }) {
-      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/account', {
         method: 'DELETE',
         body: { password: input.password },
       });
-      if (token) removeStoredAccount(token);
-      client.clearAuthToken();
+      clearLocalSession(client);
     },
     async changePassword(input: ChangePasswordRequest) {
       // All sessions (including this one) are revoked when the password changes,
       // so the client clears its token and lets the user sign back in.
-      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/password', {
         method: 'POST',
         body: input,
       });
-      if (token) removeStoredAccount(token);
-      client.clearAuthToken();
+      clearLocalSession(client);
     },
     async logout() {
-      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/logout', { method: 'POST' });
-      if (token) removeStoredAccount(token);
-      client.clearAuthToken();
+      clearLocalSession(client);
     },
     async logoutAll() {
-      const token = client.getAuthToken();
       await client.requestJson<null>('/api/auth/logout-all', { method: 'POST' });
-      if (token) removeStoredAccount(token);
-      client.clearAuthToken();
+      clearLocalSession(client);
     },
     async logoutOthers() {
       await client.requestJson<null>('/api/auth/logout-others', { method: 'POST' });

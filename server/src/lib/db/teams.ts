@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUserCache } from './internal';
+import { getCollection, trackMongoOperation, normalizeDateValues, invalidateUserCache, TEAMS_COLLECTION } from './internal';
 import { isDuplicateKeyError } from '../http';
 import { invalidateAuthEntries } from '../authCache';
 import type { Team, TeamRole, User, TeamCredits } from '@common';
@@ -27,8 +27,6 @@ export {
   syncTeamMemberSubscriptions,
   syncTeamStripeSubscription,
 } from '../teamBillingSync';
-
-const TEAMS_COLLECTION = 'teams';
 
 export async function getTeamById(id: string): Promise<Team | null> {
   const teams = await getCollection('teams');
@@ -190,12 +188,51 @@ export async function setActiveTeam(userUuid: string, teamId: string): Promise<v
   await invalidateAuthEntries();
 }
 
-export async function getTeamsForUser(user: Pick<User, 'teamIds' | 'teamId'>): Promise<Team[]> {
-  const ids = user.teamIds && user.teamIds.length > 0 ? user.teamIds : user.teamId ? [user.teamId] : [];
+/** Fetches several teams in one query instead of one query per id. */
+export async function getTeamsByIds(ids: string[]): Promise<Team[]> {
   if (ids.length === 0) return [];
   const teams = await getCollection('teams');
-  trackMongoOperation('find', 'teams');
+  trackMongoOperation('find', TEAMS_COLLECTION);
   return teams.find({ id: { $in: ids } }).toArray();
+}
+
+export async function getTeamsForUser(user: Pick<User, 'teamIds' | 'teamId'>): Promise<Team[]> {
+  const ids = user.teamIds && user.teamIds.length > 0 ? user.teamIds : user.teamId ? [user.teamId] : [];
+  return getTeamsByIds(ids);
+}
+
+/**
+ * Resolves the active team for each user, keyed by user uuid, using one query
+ * for users with a team id. Legacy users without one still go through
+ * `getTeamForUser` so their personal team is created when needed.
+ */
+export async function getTeamsForUsers(
+  users: ReadonlyArray<Pick<User, 'uuid' | 'teamId'>>,
+): Promise<Map<string, Team>> {
+  const resolved = new Map<string, Team>();
+  const withTeamId = users.filter((user) => user.teamId);
+  const legacyUsers = users.filter((user) => !user.teamId);
+
+  if (withTeamId.length > 0) {
+    const ids = [...new Set(withTeamId.map((user) => user.teamId!))];
+    const teams = await getTeamsByIds(ids);
+    const byId = new Map(teams.map((team) => [team.id, team]));
+    for (const user of withTeamId) {
+      const team = byId.get(user.teamId!);
+      if (team) resolved.set(user.uuid, team);
+    }
+  }
+
+  if (legacyUsers.length > 0) {
+    const entries = await Promise.all(
+      legacyUsers.map(async (user) => [user.uuid, await getTeamForUser(user)] as const),
+    );
+    for (const [uuid, team] of entries) {
+      if (team) resolved.set(uuid, team);
+    }
+  }
+
+  return resolved;
 }
 
 export async function clearUserTeamMembership(userUuid: string, teamId?: string): Promise<void> {

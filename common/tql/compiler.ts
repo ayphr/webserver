@@ -104,12 +104,14 @@ export function setNestedValue(obj: Record<string, unknown>, path: string, value
   }
 }
 
+const DURATION_PATTERN = /^(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)?$/;
+
 /**
  * Parses time strings like "10s", "1m", "5m", "1h", "24h", "7d" into milliseconds.
  */
 export function parseDurationMs(duration: string): number {
   const trimmed = duration.trim().toLowerCase();
-  const match = new RegExp(/^(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)?$/).exec(trimmed);
+  const match = DURATION_PATTERN.exec(trimmed);
   if (!match) {
     const asNum = Number(trimmed);
     if (!Number.isNaN(asNum)) return asNum;
@@ -130,13 +132,20 @@ export function parseDurationMs(duration: string): number {
   }
 }
 
+const MATH_TOKEN_PATTERN = /\(|\)|\+|-|\*|\/|%|[a-zA-Z_][a-zA-Z0-9_.]*|\d+(?:\.\d+)?/g;
+const NUMBER_LITERAL_PATTERN = /^\d+(?:\.\d+)?$/;
+
 /**
- * Simple recursive descent evaluator for math expressions in `compute(...)`.
+ * Creates a reusable evaluator for a `compute(...)` math expression. The
+ * expression is tokenized once up front, which matters when the same formula
+ * is applied to every point of a large dataset.
+ *
  * Supports +, -, *, /, %, parentheses, numeric literals, and field identifiers.
  */
-export function evaluateMath(expression: string, point: TelemetryPoint): number | null {
-  const tokens = expression.match(/\(|\)|\+|-|\*|\/|%|[a-zA-Z_][a-zA-Z0-9_.]*|\d+(?:\.\d+)?/g) || [];
+export function createMathEvaluator(expression: string): (point: TelemetryPoint) => number | null {
+  const tokens = expression.match(MATH_TOKEN_PATTERN) || [];
   let pos = 0;
+  let point: TelemetryPoint;
 
   function peek(): string | undefined {
     return tokens[pos];
@@ -191,7 +200,7 @@ export function evaluateMath(expression: string, point: TelemetryPoint): number 
 
     consume();
     // Number literal
-    if (/^\d+(?:\.\d+)?$/.test(token)) {
+    if (NUMBER_LITERAL_PATTERN.test(token)) {
       return Number.parseFloat(token);
     }
 
@@ -203,12 +212,24 @@ export function evaluateMath(expression: string, point: TelemetryPoint): number 
     return Number.NaN;
   }
 
-  try {
-    const res = parseExpr();
-    return Number.isFinite(res) ? res : null;
-  } catch {
-    return null;
-  }
+  return (nextPoint: TelemetryPoint): number | null => {
+    point = nextPoint;
+    pos = 0;
+    try {
+      const res = parseExpr();
+      return Number.isFinite(res) ? res : null;
+    } catch {
+      return null;
+    }
+  };
+}
+
+/**
+ * Evaluates a `compute(...)` math expression against a single point. Prefer
+ * `createMathEvaluator` when the same expression is applied to many points.
+ */
+export function evaluateMath(expression: string, point: TelemetryPoint): number | null {
+  return createMathEvaluator(expression)(point);
 }
 
 export class Compiler {
@@ -530,9 +551,10 @@ export class Compiler {
           }
 
           case 'compute': {
+            const evaluate = createMathEvaluator(step.expression);
             rows = rows.map((pt) => {
               const clone = { ...pt };
-              const evaluated = evaluateMath(step.expression, clone);
+              const evaluated = evaluate(clone);
               if (evaluated !== null) {
                 setNestedValue(clone, step.field, evaluated);
               }
@@ -544,16 +566,19 @@ export class Compiler {
           case 'movingAverage': {
             const win = Math.max(1, step.windowSize);
             const target = step.targetField || step.field;
-            rows = rows.map((pt, idx, arr) => {
+            // Resolve each field once instead of once per window membership.
+            const windowValues = rows.map((pt) => {
+              const v = getNestedValue(pt, step.field);
+              return typeof v === 'number' && !Number.isNaN(v) ? v : null;
+            });
+            rows = rows.map((pt, idx) => {
               const clone = { ...pt };
               const startIdx = Math.max(0, idx - win + 1);
               let sum = 0;
               let count = 0;
               for (let i = startIdx; i <= idx; i++) {
-                const currentPoint = arr[i];
-                if (!currentPoint) continue;
-                const v = getNestedValue(currentPoint, step.field);
-                if (typeof v === 'number' && !Number.isNaN(v)) {
+                const v = windowValues[i];
+                if (v !== null && v !== undefined) {
                   sum += v;
                   count++;
                 }

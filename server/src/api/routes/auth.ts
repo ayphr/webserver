@@ -121,12 +121,13 @@ async function handleRegister(request: Request) {
   }
 
   const now = new Date();
+  const fingerprint = deviceFingerprint(request);
   const user: User = {
     uuid: crypto.randomUUID(),
     username,
     email,
     emailVerifiedAt: now,
-    trustedDevices: deviceFingerprint(request) ? [deviceFingerprint(request)!] : undefined,
+    trustedDevices: fingerprint ? [fingerprint] : undefined,
     role: 'user',
     bio: DEFAULT_BIO,
     socialLinks: {},

@@ -27,6 +27,7 @@ const MARKER_ALLOWED_AFTER = /[\s.,;:!?'")\]}>]/;
 const CLOSABLE_MARKER = /[^\s]/;
 const LIMITED_ESCAPED = /([*\\])/g;
 const MARKDOWN_ESCAPED = /([*\\`~])/g;
+const FENCE_MARKER = /^\s*(`+)/;
 
 const LIMITED_ESCAPABLE = '*\\';
 const MARKDOWN_ESCAPABLE = '*\\`~';
@@ -296,7 +297,7 @@ function fenceFor(value: string, minimum: number): string {
   let longest = 0;
 
   for (const line of value.split('\n')) {
-    const marker = new RegExp(/^\s*(`+)/).exec(line);
+    const marker = FENCE_MARKER.exec(line);
     if (marker?.[1]) longest = Math.max(longest, marker[1].length);
   }
 

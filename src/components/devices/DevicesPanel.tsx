@@ -29,14 +29,16 @@ import { Button, Card, ConfirmDialog, Input, Pagination, ToggleDropdown, Tooltip
 import { LineGraph } from '../graphs';
 import type { LineGraphScale } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
-import type { DevicePeriod } from '../../lib/devicePeriod';
+import { DEVICE_PERIODS, type DevicePeriod } from '../../lib/devicePeriod';
+import { EXTERNAL_URLS } from '../../lib/externalUrls';
+import { CHART_COLORS, createLineGraphConfig, resolveCssColor } from '../../lib/chartTheme';
 import { DeviceQueryModal } from './DeviceQueryModal';
 import { DeviceExportModal } from './DeviceExportModal';
 import { DataFillModal } from './DataFillModal';
 import { ForecastTab } from './ForecastTab';
 import { AlertsTab } from './AlertsTab';
 import { TokensTab } from './TokensTab';
-import '../settings/SettingsPanel.css';
+import '../common/Tabs.css';
 import './DevicesPanel.css';
 
 const PAGE_SIZE = 5;
@@ -162,6 +164,7 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 type Period = DevicePeriod;
 type GraphMode = 'combined' | 'separate' | 'summary';
 type DetailTab = 'graphs' | 'forecasts' | 'alerts' | 'tokens' | 'settings';
+const DETAIL_TABS: readonly DetailTab[] = ['graphs', 'forecasts', 'alerts', 'tokens', 'settings'];
 type Props = {
   initialDeviceSerial?: number | null;
   onNavigate?: (tab: string) => void;
@@ -170,14 +173,6 @@ type Props = {
 };
 
 
-
-function resolveCssColor(value: string): string {
-  if (!value.startsWith('var(')) return value;
-  if (typeof document === 'undefined') return value;
-  const name = value.slice(4, -1).trim();
-  const resolved = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return resolved || value;
-}
 
 function createMetricConfig(
   unit: string,
@@ -189,72 +184,27 @@ function createMetricConfig(
   zoomWindow: GraphWindow | null,
 ) {
   return {
-    responsive: true,
-    maintainAspectRatio: false,
-    parsing: false,
-    font: {
-      family: "'DM Sans', sans-serif",
-    },
-    animation: { duration: 250 },
-    transitions: {
-      zoom: { animation: { duration: 0 } },
-      active: { animation: { duration: 0 } },
-    },
-    interaction: {
-      mode: 'index' as const,
-      intersect: false,
-    },
-    plugins: {
-      decimation: {
-        enabled: true,
-        algorithm: 'lttb' as const,
-        samples: 300,
-        threshold: 350,
-      },
-      legend: { display: showLegend },
-      tooltip: {
-        backgroundColor: 'rgba(18, 18, 18, 0.96)',
-        titleColor: 'hsla(180, 67%, 99%, 1)',
-        bodyColor: 'hsl(180, 1%, 53%)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        borderWidth: 1,
-        padding: 10,
-        callbacks: {
-          title: (items: { parsed: { x: number } }[]) => {
-            const x = items[0]?.parsed?.x;
-            return typeof x === 'number' ? formatChartLabel(new Date(x), period, true) : '';
-          },
+    ...createLineGraphConfig({
+      showLegend,
+      zoomMinRange: GRAPH_MAX_ZOOM_IN_MS,
+      zoomWindow,
+      tooltipCallbacks: {
+        title: (items) => {
+          const x = items[0]?.parsed?.x;
+          return typeof x === 'number' ? formatChartLabel(new Date(x), period, true) : '';
         },
       },
-      zoom: {
-        zoom: {
-          wheel: { enabled: true },
-          pinch: { enabled: true },
-          mode: 'x',
-        },
-        pan: {
-          enabled: true,
-          mode: 'x',
-        },
-        ...(zoomWindow
-          ? {
-              limits: {
-                x: { min: zoomWindow.limitMin, max: zoomWindow.limitMax, minRange: GRAPH_MAX_ZOOM_IN_MS },
-              },
-            }
-          : {}),
-      },
-    },
+    }),
     scales: {
       x: {
         type: 'linear' as const,
         display: true,
         ...(zoomWindow ? { min: zoomWindow.initialMin, max: zoomWindow.initialMax } : {}),
         border: { display: showXAxis },
-        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
+        grid: { display: showGrid, color: CHART_COLORS.grid },
         ticks: {
           display: showXAxis,
-          color: 'hsl(180, 1%, 53%)',
+          color: CHART_COLORS.mutedText,
           maxTicksLimit: 8,
           callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
         },
@@ -264,9 +214,9 @@ function createMetricConfig(
         display: true,
         position: 'left' as const,
         border: { display: showAxes },
-        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
-        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { display: showAxes, color: 'hsl(180, 1%, 53%)' },
+        title: { display: showAxes, text: unit, color: CHART_COLORS.mutedText },
+        grid: { display: showGrid, color: CHART_COLORS.grid },
+        ticks: { display: showAxes, color: CHART_COLORS.mutedText },
       },
     },
   };
@@ -278,7 +228,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
   const [locations, setLocations] = useState<Location[]>([]);
   const [devicePage, setDevicePage] = useState(1);
   const [selectedSerial, setSelectedSerial] = useState<number | null>(null);
-  const [detailTab, setDetailTab] = useState<DetailTab>('graphs');
+  const [rawDetailTab, setDetailTab] = useState<DetailTab>('graphs');
   const [isQueryOpen, setIsQueryOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDataFillOpen, setIsDataFillOpen] = useState(false);
@@ -288,7 +238,9 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
   const [user, setUser] = useState<PublicUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(initialCredits);
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;
+  const canUseAlertsAndWebhooks = planFeatures?.alertsAndWebhooks ?? false;
   const maxDevices = planFeatures?.maxDevices ?? null;
+  const detailTab: DetailTab = rawDetailTab === 'alerts' && !canUseAlertsAndWebhooks ? 'graphs' : rawDetailTab;
   const atDeviceLimit = maxDevices !== null && devices.length >= maxDevices;
 
   // Telemetry graph state
@@ -441,9 +393,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
   }, [locations, selectedDevice]);
 
   const canManageAlerts = user ? !user.teamId || user.teamRole === 'manager' : false;
-  const canOpenIntegrations = Boolean(
-    user && Boolean(user.teamId),
-  );
+  const canOpenIntegrations = Boolean(user && user.teamId && canUseAlertsAndWebhooks);
 
   const deviceTotalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
   const currentDevicePage = Math.min(devicePage, deviceTotalPages);
@@ -660,10 +610,10 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         display: true,
         ...(graphWindow ? { min: graphWindow.initialMin, max: graphWindow.initialMax } : {}),
         border: { display: showXAxis },
-        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
+        grid: { display: showGrid, color: CHART_COLORS.grid },
         ticks: {
           display: showXAxis,
-          color: 'hsl(180, 1%, 53%)',
+          color: CHART_COLORS.mutedText,
           maxTicksLimit: 8,
           callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
         },
@@ -676,11 +626,11 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         display: true,
         position: i === 0 ? 'left' : 'right',
         border: { display: showAxes },
-        title: { display: showAxes, text: unit, color: 'hsl(180, 1%, 53%)' },
+        title: { display: showAxes, text: unit, color: CHART_COLORS.mutedText },
         grid: i === 0
-          ? { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' }
+          ? { display: showGrid, color: CHART_COLORS.grid }
           : { drawOnChartArea: false },
-        ticks: { display: showAxes, color: 'hsl(180, 1%, 53%)' },
+        ticks: { display: showAxes, color: CHART_COLORS.mutedText },
       };
     });
     if (unitGroups.length === 0) {
@@ -689,67 +639,24 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         display: true,
         position: 'left',
         border: { display: showAxes },
-        title: { display: showAxes, text: '', color: 'hsl(180, 1%, 53%)' },
-        grid: { display: showGrid, color: 'rgba(255, 255, 255, 0.08)' },
-        ticks: { display: showAxes, color: 'hsl(180, 1%, 53%)' },
+        title: { display: showAxes, text: '', color: CHART_COLORS.mutedText },
+        grid: { display: showGrid, color: CHART_COLORS.grid },
+        ticks: { display: showAxes, color: CHART_COLORS.mutedText },
       };
     }
     return {
-      responsive: true,
-      maintainAspectRatio: false,
-      parsing: false,
-      font: { family: "'DM Sans', sans-serif" },
-      animation: { duration: 250 },
-      transitions: {
-        zoom: { animation: { duration: 0 } },
-        active: { animation: { duration: 0 } },
-      },
-      interaction: { mode: 'index' as const, intersect: false },
-      plugins: {
-        decimation: {
-          enabled: true,
-          algorithm: 'lttb' as const,
-          samples: 300,
-          threshold: 350,
-        },
-        legend: {
-          display: showLegend,
-          position: 'top' as const,
-          labels: { color: 'hsla(180, 67%, 99%, 1)', boxWidth: 16, padding: 14 },
-        },
-        tooltip: {
-          backgroundColor: 'rgba(18, 18, 18, 0.96)',
-          titleColor: 'hsla(180, 67%, 99%, 1)',
-          bodyColor: 'hsl(180, 1%, 53%)',
-          borderColor: 'rgba(255, 255, 255, 0.15)',
-          borderWidth: 1,
-          padding: 10,
-          callbacks: {
-            title: (items: { parsed: { x: number } }[]) => {
-              const x = items[0]?.parsed?.x;
-              return typeof x === 'number' ? formatChartLabel(new Date(x), period, true) : '';
-            },
+      ...createLineGraphConfig({
+        showLegend,
+        styledLegend: true,
+        zoomMinRange: GRAPH_MAX_ZOOM_IN_MS,
+        zoomWindow: graphWindow,
+        tooltipCallbacks: {
+          title: (items) => {
+            const x = items[0]?.parsed?.x;
+            return typeof x === 'number' ? formatChartLabel(new Date(x), period, true) : '';
           },
         },
-        zoom: {
-          zoom: {
-            wheel: { enabled: true },
-            pinch: { enabled: true },
-            mode: 'x',
-          },
-          pan: {
-            enabled: true,
-            mode: 'x',
-          },
-          ...(graphWindow
-            ? {
-                limits: {
-                  x: { min: graphWindow.limitMin, max: graphWindow.limitMax, minRange: GRAPH_MAX_ZOOM_IN_MS },
-                },
-              }
-            : {}),
-        },
-      },
+      }),
       scales,
     };
   }, [unitGroups, showAxes, showXAxis, showLegend, showGrid, period, graphWindow]);
@@ -801,7 +708,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
             </Button>
             <Button
               variant="primary"
-              onClick={() => window.open('https://ayphr.com/link', '_blank', 'noopener,noreferrer')}
+              onClick={() => window.open(EXTERNAL_URLS.link, '_blank', 'noopener,noreferrer')}
             >
               <IconExternalLink size={16} strokeWidth={1.75} />
               Add device
@@ -1011,14 +918,14 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         </div>
       </div>
 
-      <div className="settings__tabs" role="tablist" aria-label="Device sections">
-        {(['graphs', 'forecasts', 'alerts', 'tokens', 'settings'] as const).map((tab) => (
+      <div className="ui-tabs" role="tablist" aria-label="Device sections">
+        {DETAIL_TABS.filter((tab) => tab !== 'alerts' || canUseAlertsAndWebhooks).map((tab) => (
           <button
             key={tab}
             type="button"
             role="tab"
             aria-selected={detailTab === tab}
-            className={`settings__tab ${detailTab === tab ? 'settings__tab--active' : ''}`}
+            className={`ui-tab ${detailTab === tab ? 'ui-tab--active' : ''}`}
             onClick={() => setDetailTab(tab)}
           >
             {tab === 'graphs'
@@ -1040,7 +947,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
           <div className="devices__graphs">
             <div className="devices__graphs-controls" onContextMenu={(e) => e.preventDefault()}>
               <div className="devices__period-selector" role="group" aria-label="Time period">
-                {(['1h', '24h', '7d', '30d', 'all'] as const).map((p) => (
+                {DEVICE_PERIODS.map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -1248,7 +1155,7 @@ export const DevicesPanel = ({ initialDeviceSerial = null, onNavigate, credits: 
         )}
 
         {/* ALERTS TAB */}
-        {detailTab === 'alerts' && selectedDevice && (
+        {detailTab === 'alerts' && canUseAlertsAndWebhooks && selectedDevice && (
           <AlertsTab
             serial={selectedDevice.serial}
             deviceName={deviceLabel(selectedDevice)}

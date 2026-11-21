@@ -8,20 +8,14 @@ import {
   updateIntegration,
 } from '../../lib/db';
 import { canManageTeam } from '../../lib/db/teams';
+import { parseName } from '../../lib/deviceValidation';
+import { requireAlertsAndWebhooksPlan } from '../../lib/planAccess';
 import { getTeamContext } from '../../lib/teamContext';
 import type { Integration, IntegrationProvider, User } from '@common';
 
-const MAX_NAME_LENGTH = 64;
 const MAX_URL_LENGTH = 2048;
 
 const PROVIDERS: readonly IntegrationProvider[] = ['discord', 'slack', 'webhook'];
-
-function parseName(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const name = value.trim();
-  if (!name || name.length > MAX_NAME_LENGTH) return null;
-  return name;
-}
 
 function parseProvider(value: unknown): IntegrationProvider | null {
   if (typeof value !== 'string') return null;
@@ -43,12 +37,18 @@ function parseUrl(value: unknown): string | null {
 }
 
 const handleListMine = requireAuth(async (_request, user: User) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   const { scopeUuid } = await getTeamContext(user);
   const integrations = await getIntegrationsForTeamId(scopeUuid);
   return json({ integrations });
 });
 
 const handleCreate = requireAuth(async (request, user: User) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   const { team, scopeUuid } = await getTeamContext(user);
   if (team && !canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
 
@@ -78,6 +78,9 @@ const handleCreate = requireAuth(async (request, user: User) => {
 });
 
 const handleGet = requireAuth(async (_request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 
@@ -90,6 +93,9 @@ const handleGet = requireAuth(async (_request, user: User, params) => {
 });
 
 const handleUpdate = requireAuth(async (request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   const { team, scopeUuid } = await getTeamContext(user);
   if (team && !canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
 
@@ -129,6 +135,9 @@ const handleUpdate = requireAuth(async (request, user: User, params) => {
 });
 
 const handleDelete = requireAuth(async (_request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   const { team, scopeUuid } = await getTeamContext(user);
   if (team && !canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
 
@@ -145,6 +154,9 @@ const handleDelete = requireAuth(async (_request, user: User, params) => {
 });
 
 const handleTest = requireAuth(async (_request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
   const id = typeof params.id === 'string' ? params.id : '';
   if (!id) return json({ error: 'invalid id' }, 400);
 

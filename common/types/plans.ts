@@ -34,6 +34,7 @@ export type PlanFeatures = {
   eventsAccess: EventsAccess;
   maxUsers: number;
   forecasts: boolean;
+  alertsAndWebhooks: boolean;
   dataFillMaxPoints: number;
   dataFillCreditCostPerThousandPoints: number;
 };
@@ -56,6 +57,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     eventsAccess: 'limited',
     maxUsers: 1,
     forecasts: false,
+    alertsAndWebhooks: false,
     dataFillMaxPoints: 1000,
     dataFillCreditCostPerThousandPoints: 1,
   },
@@ -76,6 +78,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     eventsAccess: 'limited',
     maxUsers: 1,
     forecasts: false,
+    alertsAndWebhooks: false,
     dataFillMaxPoints: 10000,
     dataFillCreditCostPerThousandPoints: 0.75,
   },
@@ -96,6 +99,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     eventsAccess: 'standard',
     maxUsers: 1,
     forecasts: true,
+    alertsAndWebhooks: true,
     dataFillMaxPoints: 500000,
     dataFillCreditCostPerThousandPoints: 0.5,
   },
@@ -122,6 +126,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     eventsAccess: 'standard',
     maxUsers: 1,
     forecasts: true,
+    alertsAndWebhooks: true,
     dataFillMaxPoints: 5000000,
     dataFillCreditCostPerThousandPoints: 0.35,
   },
@@ -142,6 +147,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     eventsAccess: 'limited',
     maxUsers: 5,
     forecasts: false,
+    alertsAndWebhooks: true,
     dataFillMaxPoints: 5000000,
     dataFillCreditCostPerThousandPoints: 0.5,
   },
@@ -167,6 +173,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     eventsAccess: 'standard',
     maxUsers: 15,
     forecasts: true,
+    alertsAndWebhooks: true,
     dataFillMaxPoints: 10000000,
     dataFillCreditCostPerThousandPoints: 0.4,
   },
@@ -193,6 +200,7 @@ export const PLAN_FEATURES: Record<PlanTier, PlanFeatures> = {
     eventsAccess: 'priority',
     maxUsers: 50,
     forecasts: true,
+    alertsAndWebhooks: true,
     dataFillMaxPoints: 20000000,
     dataFillCreditCostPerThousandPoints: 0.25,
   },

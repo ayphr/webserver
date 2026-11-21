@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Team, TeamInvite, TeamRole, User } from '@common';
-import { getCollection, normalizeDateValues, trackMongoOperation } from './db/internal';
+import { getCollection, normalizeDateValues, trackMongoOperation, TEAM_INVITES_COLLECTION } from './db/internal';
 import {
   addUserToTeam,
   getTeamById,
@@ -12,7 +12,6 @@ import { logTeamAudit } from './teamAuditService';
 import { notifyUser } from './notifications';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const TEAM_INVITES_COLLECTION = 'team_invites';
 
 export async function createTeamInvite(params: {
   team: Team;

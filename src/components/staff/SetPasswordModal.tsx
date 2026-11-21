@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Modal } from '../common';
-import { getPasswordValidationChecks } from '@common/utils/password';
-import './SetPasswordModal.css';
+import { getPasswordValidationChecks, PASSWORD_RULES } from '@common/utils/password';
+import '../common/ModalForm.css';
 
 export interface SetPasswordModalProps {
   isOpen: boolean;
@@ -11,20 +11,6 @@ export interface SetPasswordModalProps {
   username: string;
   onChanged?: (user?: import('@common').PublicUser) => void;
 }
-
-const lowercaseLabel = 'At least one lowercase letter';
-const uppercaseLabel = 'At least one uppercase letter';
-const numberLabel = 'At least one number';
-const symbolLabel = 'At least one special character';
-const minLengthLabel = 'At least 12 characters';
-
-const RULES: { key: keyof ReturnType<typeof getPasswordValidationChecks>; label: string }[] = [
-  { key: 'minLength', label: minLengthLabel },
-  { key: 'lowercase', label: lowercaseLabel },
-  { key: 'uppercase', label: uppercaseLabel },
-  { key: 'number', label: numberLabel },
-  { key: 'symbol', label: symbolLabel },
-];
 
 export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
   isOpen,
@@ -39,7 +25,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const checks = getPasswordValidationChecks(password);
-  const missingRules = RULES.filter((rule) => !checks[rule.key]);
+  const missingRules = PASSWORD_RULES.filter((rule) => !checks[rule.key]);
   const passwordsMatch = confirmPassword === password;
   const isValid = password.length > 0 && missingRules.length === 0 && passwordsMatch;
 
@@ -70,13 +56,13 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Set password for ${username}`} size="sm" showCancel={false}>
-      <div className="set-password__body">
-        <div className="set-password__section">
-          <label htmlFor="set-password" className="set-password__label">New password</label>
+      <div className="modal-form__body">
+        <div className="modal-form__section">
+          <label htmlFor="set-password" className="modal-form__label">New password</label>
           <input
             id="set-password"
             type="password"
-            className="set-password__input"
+            className="modal-form__input"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             disabled={isSaving}
@@ -85,12 +71,12 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
           />
         </div>
 
-        <div className="set-password__section">
-          <label htmlFor="set-password-confirm" className="set-password__label">Confirm password</label>
+        <div className="modal-form__section">
+          <label htmlFor="set-password-confirm" className="modal-form__label">Confirm password</label>
           <input
             id="set-password-confirm"
             type="password"
-            className="set-password__input"
+            className="modal-form__input"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
             disabled={isSaving}
@@ -98,23 +84,23 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
             autoComplete="new-password"
           />
           {confirmPassword.length > 0 && !passwordsMatch && (
-            <p className="set-password__mismatch">Passwords do not match</p>
+            <p className="modal-form__mismatch">Passwords do not match</p>
           )}
         </div>
 
         {password.length > 0 && missingRules.length > 0 && (
-          <ul className="set-password__rules">
+          <ul className="modal-form__rules">
             {missingRules.map((rule) => (
-              <li key={rule.key} className="set-password__rule">{rule.label}</li>
+              <li key={rule.key} className="modal-form__rule">{rule.label}</li>
             ))}
           </ul>
         )}
 
-        <p className="set-password__hint">This user will be signed out of all devices.</p>
+        <p className="modal-form__note">This user will be signed out of all devices.</p>
 
-        {error && <div className="set-password__error">{error}</div>}
+        {error && <div className="modal-form__error">{error}</div>}
 
-        <div className="set-password__footer">
+        <div className="modal-form__footer">
           <Button variant="secondary" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>

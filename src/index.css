@@ -61,6 +61,20 @@
 
   --status-success: hsl(129, 77%, 60%);
   --status-error: hsl(4, 100%, 71%);
+  --status-error-bg: rgba(220, 53, 69, 0.08);
+
+  /* Landing page palette */
+  --landing-accent: #7ef09a;
+  --landing-accent-rgb: 126, 240, 154;
+  --landing-blue-rgb: 90, 180, 255;
+  --landing-orange-rgb: 255, 180, 90;
+  --landing-red-rgb: 255, 107, 107;
+  --landing-red: #ff6b6b;
+  --landing-red-soft: #ff8a8a;
+  --landing-dot-red: #ff5f57;
+  --landing-dot-yellow: #febc2e;
+  --landing-dot-green: #28c840;
+  --landing-ink: #0b1a10;
 }
 
 * {

@@ -20,7 +20,11 @@ import {
   DEVICE_TOKENS_COLLECTION,
   EMAIL_CODES_COLLECTION,
   NOTIFICATIONS_COLLECTION,
-  ASSISTANT_STATES_COLLECTION
+  ASSISTANT_STATES_COLLECTION,
+  TEAMS_COLLECTION,
+  TEAM_INVITES_COLLECTION,
+  TEAM_AUDIT_LOGS_COLLECTION,
+  APPEALS_COLLECTION
 } from '../../env';
 export * from './serialization';
 export * from './cacheKeys';
@@ -157,10 +161,10 @@ export async function setupCollections(db: Db): Promise<Collections> {
     alerts: db.collection<DeviceAlert>(ALERTS_COLLECTION),
     deviceTokens: db.collection<DeviceUploadToken>(DEVICE_TOKENS_COLLECTION),
     emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION),
-    teams: db.collection<Team>('teams'),
-    teamAuditLogs: db.collection<TeamAuditLog>('team_audit_logs'),
-    teamInvites: db.collection<TeamInvite>('team_invites'),
-    appeals: db.collection<Appeal>('appeals'),
+    teams: db.collection<Team>(TEAMS_COLLECTION),
+    teamAuditLogs: db.collection<TeamAuditLog>(TEAM_AUDIT_LOGS_COLLECTION),
+    teamInvites: db.collection<TeamInvite>(TEAM_INVITES_COLLECTION),
+    appeals: db.collection<Appeal>(APPEALS_COLLECTION),
     notifications: db.collection<UserNotification>(NOTIFICATIONS_COLLECTION),
     assistantStates: db.collection<AssistantStateDocument>(ASSISTANT_STATES_COLLECTION),
   };
@@ -171,8 +175,17 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [DATA_POINTS_COLLECTION, () => cols.dataPoints.createIndex({ timestamp: -1 })],
     [USERS_COLLECTION, () => cols.users.createIndex({ uuid: 1 }, { unique: true })],
     [USERS_COLLECTION, () => cols.users.createIndex({ username: 1 }, { unique: true })],
+    // Email is optional, so only string values participate in the uniqueness
+    // constraint. Registration relies on this to close the check-then-insert race.
+    [USERS_COLLECTION, () => cols.users.createIndex(
+      { email: 1 },
+      { unique: true, partialFilterExpression: { email: { $type: 'string' } } }
+    )],
+    [USERS_COLLECTION, () => cols.users.createIndex({ createdAt: -1 })],
+    [USERS_COLLECTION, () => cols.users.createIndex({ role: 1, createdAt: -1 })],
     [AVATARS_COLLECTION, () => cols.avatars.createIndex({ userUuid: 1 }, { unique: true })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1 })],
+    [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, issuedAt: -1 })],
     [PUNISHMENTS_COLLECTION, () => cols.punishments.createIndex({ userUuid: 1, type: 1, liftedAt: 1, startsAt: 1, endsAt: 1 })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ serial: 1 }, { unique: true })],
     [DEVICES_COLLECTION, () => cols.devices.createIndex({ teamId: 1 })],
@@ -199,11 +212,29 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 })],
     [ASSISTANT_STATES_COLLECTION, () => cols.assistantStates.createIndex({ userUuid: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ id: 1 }, { unique: true })],
-    [ALERTS_COLLECTION, () => cols.alerts.createIndex({ serial: 1, teamId: 1 })],
-    [ALERTS_COLLECTION, () => cols.alerts.createIndex({ teamId: 1 })],
-  [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ id: 1 }, { unique: true })],
-  [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ tokenHash: 1 }, { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } })],
-  [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ serial: 1, teamId: 1 })],
+    [ALERTS_COLLECTION, () => cols.alerts.createIndex({ serial: 1, teamId: 1, createdAt: -1 })],
+    [ALERTS_COLLECTION, () => cols.alerts.createIndex({ teamId: 1, createdAt: -1 })],
+    [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ id: 1 }, { unique: true })],
+    [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex(
+      { tokenHash: 1 },
+      { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
+    )],
+    [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ serial: 1, teamId: 1 })],
+    [DOMAIN_VERIFICATIONS_COLLECTION, () => cols.domainVerifications.createIndex({ id: 1 }, { unique: true })],
+    [DOMAIN_VERIFICATIONS_COLLECTION, () => cols.domainVerifications.createIndex(
+      { userUuid: 1, socialType: 1, domain: 1, createdAt: -1 }
+    )],
+    [APPEALS_COLLECTION, () => cols.appeals.createIndex({ id: 1 }, { unique: true })],
+    // One appeal per punishment: backs the check in createAppeal.
+    [APPEALS_COLLECTION, () => cols.appeals.createIndex({ punishmentId: 1 }, { unique: true })],
+    [APPEALS_COLLECTION, () => cols.appeals.createIndex({ status: 1, createdAt: -1 })],
+    [INTEGRATIONS_COLLECTION, () => cols.integrations.createIndex({ id: 1 }, { unique: true })],
+    [INTEGRATIONS_COLLECTION, () => cols.integrations.createIndex({ teamId: 1, createdAt: -1 })],
+    [TEAMS_COLLECTION, () => cols.teams.createIndex({ id: 1 }, { unique: true })],
+    [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ token: 1 }, { unique: true })],
+    [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ email: 1 })],
+    [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ teamId: 1, createdAt: -1 })],
+    [TEAM_AUDIT_LOGS_COLLECTION, () => cols.teamAuditLogs.createIndex({ teamId: 1, createdAt: -1 })],
   ];
 
   await Promise.all(

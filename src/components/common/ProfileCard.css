@@ -326,7 +326,7 @@
   color: var(--status-error);
   font-size: 0.9rem;
   padding: 0.75rem;
-  background: rgba(220, 53, 69, 0.1);
+  background: var(--status-error-bg);
   border-radius: var(--radius-md);
   margin: 0;
 }
