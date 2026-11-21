@@ -111,6 +111,61 @@ function deviceOptionLabel(device: DeviceSummary): string {
   return name ? `${name} (${device.serial})` : `Device ${device.serial}`;
 }
 
+/** Device label for the context picker: name only, with a serial added only for duplicate names. */
+function buildDeviceOptions(devices: DeviceSummary[]): string[] {
+  const baseLabels = devices.map((device) => device.name?.trim() || `Device ${device.serial}`);
+  const occurrences = new Map<string, number>();
+  for (const label of baseLabels) {
+    occurrences.set(label, (occurrences.get(label) ?? 0) + 1);
+  }
+  return devices.map((device, index) => {
+    const label = baseLabels[index]!;
+    return occurrences.get(label)! > 1 ? `${label} (${device.serial})` : label;
+  });
+}
+
+function formatQueryDuration(durationMs: number): string {
+  const milliseconds = Math.max(0, Math.round(durationMs));
+  if (milliseconds < 1000) return `${milliseconds.toLocaleString()} ms`;
+  const seconds = milliseconds / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${(seconds - minutes * 60).toFixed(1)}s`;
+}
+
+/** Copy via the Clipboard API, falling back to execCommand when it is unavailable or blocked. */
+async function copyToClipboard(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // Fall back to the legacy copy path below.
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.opacity = '0';
+  textarea.style.userSelect = 'text';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, value.length);
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    // Leave copied as false when the browser blocks legacy copying.
+  } finally {
+    textarea.remove();
+  }
+  if (!copied) throw new Error('Unable to copy to clipboard.');
+}
+
 type CopyFeedbackButtonProps = {
   value: string;
   label: string;
@@ -129,12 +184,12 @@ function CopyFeedbackButton({ value, label, className = '' }: CopyFeedbackButton
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(value);
+      await copyToClipboard(value);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setCopied(true);
       timeoutRef.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
     } catch {
-      // Clipboard access can be denied; leave the normal icon in place.
+      // Leave the normal icon in place if the browser blocks clipboard access.
     }
   };
 
@@ -166,7 +221,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'json'>('table');
 
-  const deviceOptions = useMemo(() => devices.map(deviceOptionLabel), [devices]);
+  const deviceOptions = useMemo(() => buildDeviceOptions(devices), [devices]);
   const selectedSerials = useMemo(
     () => devices
       .filter((device) => draft.context.serials.includes(device.serial))
@@ -285,11 +340,15 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     && pointCount > MAX_STANDARD_QUERY_POINTS
     ? `This range contains ${pointCount.toLocaleString()} data points. Switch Query Type to Boost to continue.`
     : null;
+  const noPointsMessage = pointCount === 0
+    ? 'There are no data points in the selected range for the selected devices.'
+    : null;
 
   const errors = useMemo(() => {
     const list: string[] = [];
     if (error) list.push(error);
     if (!selectedSerialsKey && !isDevicesLoading) list.push('Select at least one device context.');
+    if (noPointsMessage) list.push(noPointsMessage);
     if (rangeError) list.push(rangeError);
     if (!validation.valid) list.push(validation.error ?? 'This TQL query is invalid.');
     if (exceedsComputeLimit) {
@@ -303,6 +362,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     error,
     selectedSerialsKey,
     isDevicesLoading,
+    noPointsMessage,
     rangeError,
     validation.valid,
     validation.error,
@@ -318,6 +378,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     && !isCountLoading
     && !tooManyPointsMessage
     && !boostRequiredMessage
+    && !noPointsMessage
     && !exceedsComputeLimit
     && (!credits || credits.available >= creditCost)
     && !isRunning;
@@ -409,14 +470,13 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
             <ToggleDropdown
               label="Query context"
               options={isDevicesLoading ? ['Loading devices…'] : deviceOptions}
-              value={isDevicesLoading ? [] : deviceOptions.filter((option) => {
-                const device = devices.find((item) => deviceOptionLabel(item) === option);
-                return device ? selectedSerials.includes(device.serial) : false;
-              })}
+              value={isDevicesLoading
+                ? []
+                : deviceOptions.filter((_, index) => selectedSerials.includes(devices[index]!.serial))}
               onChange={(labels) => patchDraft({
                 context: {
                   serials: devices
-                    .filter((device) => labels.includes(deviceOptionLabel(device)))
+                    .filter((_, index) => labels.includes(deviceOptions[index]!))
                     .map((device) => device.serial),
                 },
               })}
@@ -551,23 +611,8 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
             <div className="queries-panel__results-header">
               <div className="queries-panel__results-stats">
                 <span>
-                  {result.serials.length} device{result.serials.length === 1 ? '' : 's'}
+                  {result.totalCount.toLocaleString()} points queried in {formatQueryDuration(result.durationMs)}
                 </span>
-                <span>
-                  {result.rowCount === null
-                    ? 'Scalar result'
-                    : `${result.rowCount.toLocaleString()} row${result.rowCount === 1 ? '' : 's'}`}
-                </span>
-                <span>{result.durationMs.toLocaleString()} ms</span>
-                <span>{result.dataPointCount.toLocaleString()} points scanned</span>
-                <span>{result.computeUnits.toLocaleString()} CU</span>
-                <span>{formatCredits(result.creditCost)} credits</span>
-                {result.type === 'boost' && (
-                  <span className="queries-panel__boost-result">
-                    <IconSparkle2 size={12} strokeWidth={1.75} />
-                    Boost
-                  </span>
-                )}
               </div>
               <div className="queries-panel__result-actions">
                 <div className="queries-panel__view-toggle" role="group" aria-label="Result view">
@@ -588,6 +633,13 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
                     JSON
                   </button>
                 </div>
+                {viewMode === 'json' && (
+                  <CopyFeedbackButton
+                    value={jsonText}
+                    label="Copy JSON"
+                    className="queries-panel__json-copy"
+                  />
+                )}
                 <Button variant="secondary" onClick={() => handleExport('csv')} disabled={rows.length === 0}>
                   <IconDownload size={15} strokeWidth={1.75} />
                   CSV
@@ -632,14 +684,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
                 </div>
               )
             ) : (
-              <div className="queries-panel__json-wrap">
-                <CopyFeedbackButton
-                  value={jsonText}
-                  label="Copy JSON"
-                  className="queries-panel__json-copy"
-                />
-                <pre className="queries-panel__json">{jsonText}</pre>
-              </div>
+              <pre className="queries-panel__json">{jsonText}</pre>
             )}
 
             {viewMode === 'table' && rows.length > MAX_PREVIEW_ROWS && (

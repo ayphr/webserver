@@ -449,6 +449,9 @@ async function executeDeviceQuery(
     targets.map(({ serial }) => countDataPointsForDevice(serial, { since, until })),
   );
   const pointCount = counts.reduce((sum, count) => sum + count, 0);
+  if (pointCount === 0) {
+    return json({ error: 'There are no data points in the selected range for the selected devices.' }, 400);
+  }
   if (pointCount > MAX_BOOST_QUERY_POINTS) {
     return json(
       {

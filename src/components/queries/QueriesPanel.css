@@ -1,6 +1,6 @@
 .dashboard-queries {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   justify-content: center;
   width: 100%;
   min-width: 0;
@@ -8,9 +8,10 @@
 
 .queries-panel__content {
   display: flex;
-  flex: 1;
+  width: 100%;
   min-width: 0;
   max-width: 1040px;
+  margin-block: auto;
   flex-direction: column;
   gap: 1rem;
 }
@@ -185,9 +186,8 @@
   width: 1.75rem;
   height: 1.75rem;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  border: none;
+  background: none;
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0.5;
@@ -202,8 +202,6 @@
 }
 
 .queries-panel__copy-button:hover {
-  border-color: var(--border-subtle);
-  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
@@ -238,6 +236,10 @@
 .queries-panel__copy-button.is-copied .queries-panel__copy-success-icon {
   opacity: 1;
   transform: scale(1);
+}
+
+.queries-panel__json-copy {
+  opacity: 0.85;
 }
 
 .queries-panel__warning {
@@ -428,7 +430,7 @@ body .cm-tooltip-lint .cm-diagnostic:first-child {
 
 .queries-panel__results-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -441,19 +443,6 @@ body .cm-tooltip-lint .cm-diagnostic:first-child {
   gap: 0.35rem 0.75rem;
   color: var(--text-muted);
   font-size: 0.78rem;
-}
-
-.queries-panel__results-stats > span:not(:last-child)::after {
-  content: '·';
-  margin-left: 0.75rem;
-  color: var(--text-dim);
-}
-
-.queries-panel__boost-result {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: var(--accent-purple-solid, var(--text-primary));
 }
 
 .queries-panel__result-actions {
@@ -563,24 +552,11 @@ body .cm-tooltip-lint .cm-diagnostic:first-child {
   color: var(--text-primary);
 }
 
-.queries-panel__json-wrap {
-  position: relative;
-  min-width: 0;
-}
-
-.queries-panel__json-copy {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
-  z-index: 1;
-  opacity: 0.85;
-}
-
 .queries-panel__json {
   max-height: 340px;
   margin: 0;
   overflow: auto;
-  padding: 0.85rem 2.9rem 0.85rem 0.85rem;
+  padding: 0.85rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
