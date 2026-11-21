@@ -1,4 +1,4 @@
-import { json, readJsonBody } from '../../lib/http';
+import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomBytes, randomInt } from 'node:crypto';
 import { requireAuth } from '../auth';
 import {
@@ -62,12 +62,16 @@ import { createDeviceQueryPlan } from '../../lib/deviceQueryService';
 import { linkDevice } from '../../lib/deviceLinkService';
 import { uploadDeviceTelemetry } from '../../lib/deviceUploadService';
 import { getDeviceUptime } from '../../lib/deviceUptimeService';
+import { countDeviceLogs, listDeviceLogs, queueDeviceLog } from '../../lib/deviceLogService';
 
 const pairingRequestLimiter = createRateLimiter(15 * 60 * 1000, 20, 'pairing-request');
 const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
 const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
 const deviceQueryLimiter = createRateLimiter(60 * 1000, 60, 'device-query');
 const deviceUploadLimiter = createRateLimiter(60 * 1000, 120, 'device-upload');
+
+const DEFAULT_DEVICE_LOG_PAGE_SIZE = 20;
+const MAX_DEVICE_LOG_PAGE_SIZE = 100;
 
 const handleRequestPairing = async (request: Request): Promise<Response> => {
   const ipCheck = await pairingRequestLimiter.check(`ip:${getClientIp(request)}`);
@@ -196,6 +200,38 @@ const handleGetBySerial = requireAuth(async (_request, user: User, params) => {
   return json({ device: toPublicDevice(device) });
 });
 
+const handleDeviceLogs = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  const query = new URL(request.url).searchParams;
+  const page = parsePositiveInt(query.get('page'), 1);
+  const pageSize = Math.min(
+    parsePositiveInt(query.get('pageSize'), DEFAULT_DEVICE_LOG_PAGE_SIZE),
+    MAX_DEVICE_LOG_PAGE_SIZE,
+  );
+  const skip = (page - 1) * pageSize;
+
+  const [logs, total] = await Promise.all([
+    listDeviceLogs(serial, { skip, limit: pageSize }),
+    countDeviceLogs(serial),
+  ]);
+
+  return json({
+    logs,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  });
+});
+
 const handleDeviceUptime = requireAuth(async (_request, user: User, params) => {
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
@@ -210,8 +246,17 @@ const handleDeviceUptime = requireAuth(async (_request, user: User, params) => {
 });
 
 async function handleUpload(request: Request): Promise<Response> {
-  const ipCheck = await deviceUploadLimiter.check(`ip:${getClientIp(request)}`);
-  if (!ipCheck.allowed) return tooManyRequests(ipCheck.retryAfterMs);
+  const clientIp = getClientIp(request);
+  const ipCheck = await deviceUploadLimiter.check(`ip:${clientIp}`);
+  if (!ipCheck.allowed) {
+    queueDeviceLog({
+      event: 'rate_limited',
+      level: 'warning',
+      message: 'Upload rejected: rate limit exceeded',
+      details: { clientIp, scope: 'ip' },
+    });
+    return tooManyRequests(ipCheck.retryAfterMs);
+  }
 
   const endTimer = telemetryUploadDuration.startTimer();
 
@@ -244,6 +289,12 @@ async function handleUpload(request: Request): Promise<Response> {
     return json({ device: toPublicDevice(result.device), accepted: result.accepted }, 200);
   } catch (error) {
     telemetryUploadErrorsTotal.inc();
+    queueDeviceLog({
+      event: 'upload_error',
+      level: 'error',
+      message: 'Upload failed: unexpected server error',
+      details: { error: error instanceof Error ? error.message : String(error) },
+    });
     throw error;
   } finally {
     endTimer();
@@ -586,6 +637,16 @@ const handleRevokeDeviceToken = requireAuth(async (_request, user: User, params)
 
   const revoked = await revokeDeviceToken(id, scopeUuid, serial);
   if (!revoked) return json({ error: 'not found' }, 404);
+
+  queueDeviceLog({
+    serial,
+    teamId: scopeUuid,
+    event: 'token_revoked',
+    level: 'warning',
+    message: 'Upload token was revoked',
+    details: { tokenId: id },
+  });
+
   return new Response(null, { status: 204 });
 });
 
@@ -595,6 +656,7 @@ export {
   handleLink,
   handleListMine,
   handleGetBySerial,
+  handleDeviceLogs,
   handleDeviceUptime,
   handleGetData as handleDeviceGetData,
   handleQueryDeviceData as handleDeviceQuery,

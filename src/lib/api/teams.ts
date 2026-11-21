@@ -5,6 +5,7 @@ import type {
   TeamMemberRoleUpdateRequest,
   TeamPayload,
   TeamAuditLogListPayload,
+  TeamAuditLogListQuery,
   TeamSubscriptionPayload,
   SubscriptionTier,
   BillingInterval,
@@ -99,9 +100,14 @@ export function createTeamsApi(client: RequestClient) {
     async acceptInvite(token: string) {
       await client.requestJson('/api/team/invites/accept', { method: 'POST', body: { token } });
     },
-    async auditLogs() {
-      const response = await client.requestJson<TeamAuditLogListPayload>('/api/team/audit');
-      return response.logs;
+    async auditLogs(query: TeamAuditLogListQuery = {}) {
+      const params = new URLSearchParams();
+      if (query.page) params.set('page', String(query.page));
+      if (query.pageSize) params.set('pageSize', String(query.pageSize));
+      const search = params.toString();
+      return client.requestJson<TeamAuditLogListPayload>(
+        `/api/team/audit${search ? `?${search}` : ''}`,
+      );
     },
   };
 }

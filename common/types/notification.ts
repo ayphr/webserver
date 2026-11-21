@@ -1,3 +1,7 @@
+import type { PaginationMeta, PaginationQuery } from './pagination';
+
+export type NotificationFilter = 'unread' | 'all';
+
 export type NotificationType =
   | 'login'
   | 'team_invite'
@@ -21,10 +25,14 @@ export type UserNotification = {
   readAt?: Date;
 };
 
+export type NotificationListQuery = PaginationQuery & {
+  filter?: NotificationFilter;
+};
+
 export type NotificationListPayload = {
   notifications: UserNotification[];
   unreadCount: number;
-};
+} & PaginationMeta;
 
 export type NotificationUnreadCountPayload = {
   unreadCount: number;

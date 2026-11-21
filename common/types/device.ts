@@ -1,3 +1,4 @@
+import type { PaginationMeta, PaginationQuery } from './pagination';
 import type { SessionLocation } from './session';
 
 export type Device = {
@@ -51,6 +52,35 @@ export type DeviceUploadToken = {
 };
 
 export type DeviceUploadTokenInfo = Omit<DeviceUploadToken, 'tokenHash'>;
+
+/** Short-lived device activity entries shown in the device Logs tab. */
+export type DeviceLogLevel = 'info' | 'warning' | 'error';
+
+export type DeviceLogEvent =
+  | 'upload_success'
+  | 'upload_error'
+  | 'auth_error'
+  | 'malformed_data'
+  | 'rate_limited'
+  | 'token_revoked';
+
+export type DeviceLog = {
+  id: string;
+  /** Present once the upload has been attributed to a registered device. */
+  serial?: number;
+  teamId?: string;
+  event: DeviceLogEvent;
+  level: DeviceLogLevel;
+  message: string;
+  details?: Record<string, unknown>;
+  createdAt: Date;
+};
+
+export type DeviceLogListQuery = PaginationQuery;
+
+export type DeviceLogListPayload = {
+  logs: DeviceLog[];
+} & PaginationMeta;
 
 // Backwards/alternate names used by callers and tests.
 export type DeviceTokenInfo = DeviceUploadTokenInfo;

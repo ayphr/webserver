@@ -168,6 +168,18 @@
   font-size: 0.75rem;
 }
 
+.team-panel__audit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.team-panel__audit-summary {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .team-panel__list--plain .team-panel__member-row {
   background: transparent;
 }

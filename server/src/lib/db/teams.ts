@@ -12,7 +12,7 @@ import {
   syncTeamMemberSubscriptions,
 } from '../teamBillingSync';
 
-export { getTeamAuditLogs, logTeamAudit } from '../teamAuditService';
+export { countTeamAuditLogs, getTeamAuditLogs, listTeamAuditLogs, logTeamAudit } from '../teamAuditService';
 export {
   acceptTeamInvite,
   createTeamInvite,

@@ -1,29 +1,44 @@
-import { json } from '../../lib/http';
+import type { NotificationFilter } from '@common';
+import { json, parsePositiveInt } from '../../lib/http';
 import { requireAuth } from '../auth';
 import {
-  getNotificationsForUserUuid,
+  countNotificationsForUserUuid,
   getUnreadNotificationCount,
+  listNotificationsForUserUuid,
   markAllNotificationsRead,
   markNotificationRead,
 } from '../../lib/db';
 
 const guardOptions = { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true };
 
-const DEFAULT_NOTIFICATION_LIMIT = 50;
-const MAX_NOTIFICATION_LIMIT = 100;
+const DEFAULT_NOTIFICATION_PAGE_SIZE = 20;
+const MAX_NOTIFICATION_PAGE_SIZE = 100;
 
 const handleList = requireAuth(async (request, user) => {
-  const rawLimit = Number(new URL(request.url).searchParams.get('limit'));
-  const limit = Number.isFinite(rawLimit) && rawLimit > 0
-    ? Math.min(Math.floor(rawLimit), MAX_NOTIFICATION_LIMIT)
-    : DEFAULT_NOTIFICATION_LIMIT;
+  const params = new URL(request.url).searchParams;
+  const rawFilter = params.get('filter');
+  const filter: NotificationFilter = rawFilter === 'all' ? 'all' : 'unread';
+  const page = parsePositiveInt(params.get('page'), 1);
+  const pageSize = Math.min(
+    parsePositiveInt(params.get('pageSize'), DEFAULT_NOTIFICATION_PAGE_SIZE),
+    MAX_NOTIFICATION_PAGE_SIZE,
+  );
+  const skip = (page - 1) * pageSize;
 
-  const [notifications, unreadCount] = await Promise.all([
-    getNotificationsForUserUuid(user.uuid, limit),
+  const [notifications, total, unreadCount] = await Promise.all([
+    listNotificationsForUserUuid(user.uuid, filter, { skip, limit: pageSize }),
+    countNotificationsForUserUuid(user.uuid, filter),
     getUnreadNotificationCount(user.uuid),
   ]);
 
-  return json({ notifications, unreadCount });
+  return json({
+    notifications,
+    total,
+    unreadCount,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  });
 }, guardOptions);
 
 const handleUnreadCount = requireAuth(async (_request, user) => {

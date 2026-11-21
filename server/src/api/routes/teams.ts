@@ -1,4 +1,4 @@
-import { json, readJsonBody } from '../../lib/http';
+import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { requireAuth } from '../auth';
 import {
   getTeamForUser,
@@ -6,7 +6,8 @@ import {
   getTeamMembers,
   removeTeamMember as removeMember,
   updateTeamMemberRole as updateRole,
-  getTeamAuditLogs,
+  countTeamAuditLogs,
+  listTeamAuditLogs,
   canManageTeam,
   updateTeamName,
   createTeamInvite,
@@ -39,6 +40,9 @@ import { isTeamRole, isSubscriptionTier, isPurchasableTier, isBillingInterval } 
 import { notifyUser } from '../../lib/notifications';
 import { createTeamBillingPortal, createTeamCheckout, downgradeTeamToFree } from '../../lib/subscriptions';
 import { getTeamMemberRole, toTeamMembers } from '../../lib/teamAccess';
+
+const DEFAULT_AUDIT_PAGE_SIZE = 20;
+const MAX_AUDIT_PAGE_SIZE = 100;
 
 const handleTeamMe = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
@@ -184,13 +188,31 @@ const handleTeamMemberRemove = requireAuth(async (_request, user: User, params) 
   return json({ removed: true });
 });
 
-const handleTeamAuditLogs = requireAuth(async (_request, user: User) => {
+const handleTeamAuditLogs = requireAuth(async (request, user: User) => {
   const team = await getTeamForUser(user);
   if (!team) return json({ error: 'No team found' }, 404);
   if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
 
-  const logs = await getTeamAuditLogs(team.id);
-  return json({ logs });
+  const params = new URL(request.url).searchParams;
+  const page = parsePositiveInt(params.get('page'), 1);
+  const pageSize = Math.min(
+    parsePositiveInt(params.get('pageSize'), DEFAULT_AUDIT_PAGE_SIZE),
+    MAX_AUDIT_PAGE_SIZE,
+  );
+  const skip = (page - 1) * pageSize;
+
+  const [logs, total] = await Promise.all([
+    listTeamAuditLogs(team.id, { skip, limit: pageSize }),
+    countTeamAuditLogs(team.id),
+  ]);
+
+  return json({
+    logs,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  });
 });
 
 

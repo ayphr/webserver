@@ -1,0 +1,155 @@
+.device-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.device-logs__status {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.device-logs__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.device-logs__summary {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.device-logs__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  background: rgba(255, 100, 100, 0.08);
+  color: var(--status-error);
+  font-size: 0.85rem;
+}
+
+.device-logs__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.device-logs__empty svg {
+  color: var(--status-success);
+}
+
+.device-logs__empty p {
+  margin: 0.4rem 0 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-md);
+}
+
+.device-logs__empty span {
+  font-size: 0.82rem;
+}
+
+.device-logs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.device-logs__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.device-logs__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input-off);
+  color: var(--text-muted);
+}
+
+.device-logs__item--info .device-logs__icon {
+  color: var(--status-success);
+}
+
+.device-logs__item--warning .device-logs__icon {
+  color: var(--status-warning, #f0ad4e);
+}
+
+.device-logs__item--error .device-logs__icon {
+  color: var(--status-error);
+}
+
+.device-logs__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.device-logs__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.device-logs__event {
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: var(--font-weight-md);
+}
+
+.device-logs__time {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
+.device-logs__message {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.device-logs__details {
+  color: var(--text-dim);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .device-logs__heading {
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+}

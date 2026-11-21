@@ -1,14 +1,20 @@
 import type {
   NotificationListPayload,
+  NotificationListQuery,
   NotificationUnreadCountPayload,
 } from '@common';
 import type { RequestClient } from './client';
 
 export function createNotificationsApi(client: RequestClient) {
   return {
-    async list(limit = 50) {
+    async list(query: NotificationListQuery = {}) {
+      const params = new URLSearchParams();
+      if (query.filter) params.set('filter', query.filter);
+      if (query.page) params.set('page', String(query.page));
+      if (query.pageSize) params.set('pageSize', String(query.pageSize));
+      const search = params.toString();
       return client.requestJson<NotificationListPayload>(
-        `/api/notifications?limit=${encodeURIComponent(String(limit))}`,
+        `/api/notifications${search ? `?${search}` : ''}`,
       );
     },
     async unreadCount() {

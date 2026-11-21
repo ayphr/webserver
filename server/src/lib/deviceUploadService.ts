@@ -15,6 +15,7 @@ import { hashToken } from './tokens';
 import { resolveLocationFromClient } from './session';
 import { pruneOwnerDataPoints } from '../api/routes/deviceRetention';
 import { evaluateAlertsForDevice } from './alerts';
+import { queueDeviceLog } from './deviceLogService';
 import { createLogger } from './logger';
 
 const log = createLogger('device-upload');
@@ -33,8 +34,15 @@ export async function uploadDeviceTelemetry(params: {
   userAgent?: string;
 }): Promise<UploadResult> {
   const { token, points, metadata, userAgent } = params;
-  if (!token) return { kind: 'missing-token' };
-  if (!points) return { kind: 'invalid-device' };
+  if (!token) {
+    queueDeviceLog({
+      event: 'auth_error',
+      level: 'error',
+      message: 'Upload rejected: missing device token',
+      details: { reason: 'missing-token', ...(userAgent ? { userAgent } : {}) },
+    });
+    return { kind: 'missing-token' };
+  }
 
   const tokenHash = hashToken(token);
   const now = new Date();
@@ -43,7 +51,28 @@ export async function uploadDeviceTelemetry(params: {
     ? await getDeviceBySerial(tokenRecord.serial)
     : await getDeviceByTokenHash(tokenHash);
 
-  if (!device) return { kind: 'device-not-linked' };
+  if (!points) {
+    queueDeviceLog({
+      serial: device?.serial,
+      teamId: device?.teamId,
+      event: 'malformed_data',
+      level: 'error',
+      message: 'Upload rejected: malformed telemetry data',
+      details: { reason: 'invalid-data', ...(userAgent ? { userAgent } : {}) },
+    });
+    return { kind: 'invalid-device' };
+  }
+
+  if (!device) {
+    queueDeviceLog({
+      event: 'auth_error',
+      level: 'error',
+      message: 'Upload rejected: device token is not linked to a device',
+      details: { reason: 'unknown-token', ...(userAgent ? { userAgent } : {}) },
+    });
+    return { kind: 'device-not-linked' };
+  }
+
   if (!tokenRecord) {
     tokenRecord = await createDeviceToken({
       id: crypto.randomUUID(),
@@ -55,7 +84,17 @@ export async function uploadDeviceTelemetry(params: {
       active: true,
     });
   }
-  if (!tokenRecord.active) return { kind: 'token-revoked' };
+  if (!tokenRecord.active) {
+    queueDeviceLog({
+      serial: device.serial,
+      teamId: device.teamId,
+      event: 'token_revoked',
+      level: 'error',
+      message: 'Upload rejected: device token has been revoked',
+      details: { reason: 'token-inactive', ...(userAgent ? { userAgent } : {}) },
+    });
+    return { kind: 'token-revoked' };
+  }
 
   const location = metadata
     ? resolveLocationFromClient({
@@ -81,6 +120,19 @@ export async function uploadDeviceTelemetry(params: {
       log.error({ error, serial: device.serial }, 'failed to evaluate device alerts');
     });
   }
+
+  queueDeviceLog({
+    serial: device.serial,
+    teamId: device.teamId,
+    event: 'upload_success',
+    level: 'info',
+    message: `Accepted ${points.length.toLocaleString()} telemetry point${points.length === 1 ? '' : 's'}`,
+    details: {
+      pointCount: points.length,
+      accepted,
+      ...(userAgent ? { userAgent } : {}),
+    },
+  });
 
   return {
     kind: 'accepted',

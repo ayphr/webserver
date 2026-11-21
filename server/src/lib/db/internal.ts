@@ -1,8 +1,8 @@
-import { Binary, Collection, Db } from 'mongodb';
+import { Binary, Collection, Db, type Document } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantState } from '@common';
+import { type DataPoint, type Device, type DeviceLog, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantState } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -18,6 +18,8 @@ import {
   INTEGRATIONS_COLLECTION,
   ALERTS_COLLECTION,
   DEVICE_TOKENS_COLLECTION,
+  DEVICE_LOGS_COLLECTION,
+  DEVICE_LOG_MAX_AGE_SECONDS,
   EMAIL_CODES_COLLECTION,
   NOTIFICATIONS_COLLECTION,
   ASSISTANT_STATES_COLLECTION,
@@ -106,6 +108,7 @@ export interface Collections {
   integrations: Collection<Integration>;
   alerts: Collection<DeviceAlert>;
   deviceTokens: Collection<DeviceUploadToken>;
+  deviceLogs: Collection<DeviceLog>;
   emailCodes: Collection<EmailCode>;
   teams: Collection<Team>;
   teamAuditLogs: Collection<TeamAuditLog>;
@@ -130,6 +133,38 @@ export interface StoredAvatar {
 
 export function trackMongoOperation(operation: string, collection: string) {
   recordMongoOperation(operation, collection);
+}
+
+/**
+ * Ensures a `createdAt` TTL index has the expected expiry. Recreated indexes
+ * with different options throw `IndexOptionsConflict`, so existing indexes are
+ * reconciled with `collMod` instead of relying on `createIndex` alone.
+ */
+async function ensureCreatedAtTtlIndex<T extends Document>(
+  db: Db,
+  collectionName: string,
+  collection: Collection<T>,
+  expireAfterSeconds: number,
+): Promise<void> {
+  trackMongoOperation('listIndexes', collectionName);
+  const existing = (await collection.listIndexes().toArray()).find((index) => {
+    const key = index.key as Record<string, unknown>;
+    return Object.keys(key).length === 1 && key.createdAt === 1;
+  });
+
+  if (existing) {
+    if (existing.expireAfterSeconds !== expireAfterSeconds) {
+      trackMongoOperation('collMod', collectionName);
+      await db.command({
+        collMod: collectionName,
+        index: { keyPattern: { createdAt: 1 }, expireAfterSeconds },
+      });
+    }
+    return;
+  }
+
+  trackMongoOperation('createIndex', collectionName);
+  await collection.createIndex({ createdAt: 1 }, { expireAfterSeconds });
 }
 
 export async function setupCollections(db: Db): Promise<Collections> {
@@ -161,6 +196,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     integrations: db.collection<Integration>(INTEGRATIONS_COLLECTION),
     alerts: db.collection<DeviceAlert>(ALERTS_COLLECTION),
     deviceTokens: db.collection<DeviceUploadToken>(DEVICE_TOKENS_COLLECTION),
+    deviceLogs: db.collection<DeviceLog>(DEVICE_LOGS_COLLECTION),
     emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION),
     teams: db.collection<Team>(TEAMS_COLLECTION),
     teamAuditLogs: db.collection<TeamAuditLog>(TEAM_AUDIT_LOGS_COLLECTION),
@@ -206,11 +242,11 @@ export async function setupCollections(db: Db): Promise<Collections> {
       { unique: true, partialFilterExpression: { isDefault: true } }
     )],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
-    [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 })],
+    [STRIPE_EVENTS_COLLECTION, () => ensureCreatedAtTtlIndex(db, STRIPE_EVENTS_COLLECTION, cols.stripeEvents, 60 * 60 * 24 * 30)],
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ id: 1 }, { unique: true })],
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, createdAt: -1 })],
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, read: 1 })],
-    [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 })],
+    [NOTIFICATIONS_COLLECTION, () => ensureCreatedAtTtlIndex(db, NOTIFICATIONS_COLLECTION, cols.notifications, 60 * 60 * 24 * 90)],
     [ASSISTANT_STATES_COLLECTION, () => cols.assistantStates.createIndex({ userUuid: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ id: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ serial: 1, teamId: 1, createdAt: -1 })],
@@ -221,6 +257,14 @@ export async function setupCollections(db: Db): Promise<Collections> {
       { unique: true, partialFilterExpression: { tokenHash: { $type: 'string' } } }
     )],
     [DEVICE_TOKENS_COLLECTION, () => cols.deviceTokens.createIndex({ serial: 1, teamId: 1 })],
+    [DEVICE_LOGS_COLLECTION, () => cols.deviceLogs.createIndex({ id: 1 }, { unique: true })],
+    [DEVICE_LOGS_COLLECTION, () => cols.deviceLogs.createIndex({ serial: 1, createdAt: -1 })],
+    [DEVICE_LOGS_COLLECTION, () => ensureCreatedAtTtlIndex(
+      db,
+      DEVICE_LOGS_COLLECTION,
+      cols.deviceLogs,
+      DEVICE_LOG_MAX_AGE_SECONDS,
+    )],
     [DOMAIN_VERIFICATIONS_COLLECTION, () => cols.domainVerifications.createIndex({ id: 1 }, { unique: true })],
     [DOMAIN_VERIFICATIONS_COLLECTION, () => cols.domainVerifications.createIndex(
       { userUuid: 1, socialType: 1, domain: 1, createdAt: -1 }
@@ -236,9 +280,11 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ email: 1 })],
     [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ teamId: 1, createdAt: -1 })],
     [TEAM_AUDIT_LOGS_COLLECTION, () => cols.teamAuditLogs.createIndex({ teamId: 1, createdAt: -1 })],
-    [TEAM_AUDIT_LOGS_COLLECTION, () => cols.teamAuditLogs.createIndex(
-      { createdAt: 1 },
-      { expireAfterSeconds: TEAM_AUDIT_LOG_MAX_AGE_SECONDS }
+    [TEAM_AUDIT_LOGS_COLLECTION, () => ensureCreatedAtTtlIndex(
+      db,
+      TEAM_AUDIT_LOGS_COLLECTION,
+      cols.teamAuditLogs,
+      TEAM_AUDIT_LOG_MAX_AGE_SECONDS,
     )],
   ];
 

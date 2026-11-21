@@ -24,7 +24,7 @@ export const DASHBOARD_TABS = [
 
 export type DashboardTab = (typeof DASHBOARD_TABS)[number];
 
-export const DEVICE_DETAIL_TABS = ['graphs', 'forecasts', 'alerts', 'tokens', 'settings'] as const;
+export const DEVICE_DETAIL_TABS = ['graphs', 'forecasts', 'alerts', 'tokens', 'logs', 'settings'] as const;
 export type DeviceDetailTab = (typeof DEVICE_DETAIL_TABS)[number];
 
 export const TEAM_SECTIONS = ['members', 'usage', 'audit', 'settings'] as const;

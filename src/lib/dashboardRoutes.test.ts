@@ -11,6 +11,7 @@ describe('dashboardPath', () => {
   it('builds nested device and alert URLs', () => {
     expect(dashboardPath({ tab: 'devices', device: { serial: 42 } })).toBe('/dashboard/devices/42');
     expect(dashboardPath({ tab: 'devices', device: { serial: 42, detailTab: 'graphs' } })).toBe('/dashboard/devices/42');
+    expect(dashboardPath({ tab: 'devices', device: { serial: 42, detailTab: 'logs' } })).toBe('/dashboard/devices/42/logs');
     expect(dashboardPath({
       tab: 'devices',
       device: { serial: 42, detailTab: 'alerts', alertAction: 'new' },
@@ -28,6 +29,12 @@ describe('parseDashboardPath', () => {
       tab: 'settings',
       section: 'iris',
       canonicalPath: '/dashboard/settings/iris',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/devices/42/logs')).toMatchObject({
+      tab: 'devices',
+      device: { serial: 42, detailTab: 'logs' },
+      canonicalPath: '/dashboard/devices/42/logs',
       valid: true,
     });
     expect(parseDashboardPath('/dashboard/devices/42/alerts/alert-id/edit')).toMatchObject({

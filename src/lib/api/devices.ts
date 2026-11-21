@@ -4,6 +4,8 @@ import type {
   DeviceForecastPayload,
   DeviceLinkPayload,
   DeviceListPayload,
+  DeviceLogListPayload,
+  DeviceLogListQuery,
   DevicePairingRequestPayload,
   DevicePairingTokenPayload,
   DevicePayload,
@@ -29,6 +31,15 @@ export function createDevicesApi(client: RequestClient) {
     async getUptime(serial: number) {
       const response = await client.requestJson<DeviceUptimePayload>(`/api/devices/${serial}/uptime`);
       return response.uptime;
+    },
+    async listLogs(serial: number, query: DeviceLogListQuery = {}) {
+      const params = new URLSearchParams();
+      if (query.page) params.set('page', String(query.page));
+      if (query.pageSize) params.set('pageSize', String(query.pageSize));
+      const search = params.toString();
+      return client.requestJson<DeviceLogListPayload>(
+        `/api/devices/${serial}/logs${search ? `?${search}` : ''}`,
+      );
     },
     async getDataPoints(serial: number, options?: { period?: string; from?: string; to?: string; countOnly?: boolean }) {
       const params = new URLSearchParams();

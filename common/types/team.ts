@@ -1,3 +1,4 @@
+import type { PaginationMeta, PaginationQuery } from './pagination';
 import type { PlanTier } from './plans';
 import type { TeamCredits } from './credits';
 import type { BillingInterval, PaidSubscriptionStatus, SubscriptionPlan } from './subscription';
@@ -61,9 +62,11 @@ export type TeamMemberPayload = {
   member: TeamMember;
 };
 
+export type TeamAuditLogListQuery = PaginationQuery;
+
 export type TeamAuditLogListPayload = {
   logs: TeamAuditLog[];
-};
+} & PaginationMeta;
 
 export type TeamMemberAddRequest = {
   username?: string;

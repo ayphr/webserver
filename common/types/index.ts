@@ -15,4 +15,5 @@ export * from './credits';
 export * from './team';
 export * from './integration';
 export * from './notification';
+export * from './pagination';
 export * from './forecast';
