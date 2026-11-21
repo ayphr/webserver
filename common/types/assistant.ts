@@ -36,6 +36,8 @@ export type AssistantFolder = {
   id: string;
   name: string;
   createdAt: number;
+  /** Display position. Legacy folders without it fall back to createdAt. */
+  order?: number;
 };
 
 export type AssistantChat = {
@@ -46,6 +48,8 @@ export type AssistantChat = {
   messages: AssistantMessage[];
   createdAt: number;
   updatedAt: number;
+  /** Display position within folderId. Legacy chats without it fall back to createdAt. */
+  order?: number;
 };
 
 export type AssistantPreferences = {

@@ -10,7 +10,7 @@ import {
   IconPlayerPlay,
   IconPlus,
 } from '@tabler/icons-react';
-import type { AssistantFolder, AssistantMode } from '@common';
+import { sortAssistantFolders, type AssistantFolder, type AssistantMode } from '@common';
 import { Tooltip } from '../common/Tooltip';
 import { useRadio } from '../../context';
 import { useDismiss } from '../../hooks/useDismiss';
@@ -92,7 +92,7 @@ export const AssistantToolbar = ({
               )}
               <span className="assistant-menu__text">Uncategorised</span>
             </button>
-            {folders.map((folder) => {
+            {sortAssistantFolders(folders).map((folder) => {
               const selected = activeFolderId === folder.id;
               return (
                 <button

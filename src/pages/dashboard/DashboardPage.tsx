@@ -583,6 +583,9 @@ export const DashboardPage = () => {
                   onDeleteFolder={assistant.deleteFolder}
                   onRenameChat={assistant.renameChat}
                   onDeleteChat={handleSidebarDeleteChat}
+                  onReorderFolders={assistant.reorderFolders}
+                  onReorderChat={assistant.reorderChat}
+                  onMoveChat={assistant.moveChat}
                 />
                 <AssistantInput
                   availableVariants={availableAssistantVariants}

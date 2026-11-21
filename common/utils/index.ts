@@ -30,6 +30,14 @@ export { parseDuration, formatDuration, type DurationUnit } from './duration';
 export { evaluateAlertConditions, getAlertMetricValue } from './alerts';
 export { computeCurrentUptime, DEVICE_ONLINE_THRESHOLD_MS } from './deviceUptime';
 export {
+  moveAssistantChatsToFolder,
+  placeAssistantChat,
+  prependAssistantChat,
+  reorderAssistantFolders,
+  sortAssistantChats,
+  sortAssistantFolders,
+} from './assistantOrdering';
+export {
   EMAIL_CODE_LENGTH,
   EMAIL_MAX_LENGTH,
   normalizeEmail,

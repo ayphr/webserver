@@ -317,24 +317,8 @@ export const AssistantInput = ({
     }
   };
 
-  const createChat = (folderId: string | null, mode: AssistantChat['mode']) => {
-    const now = Date.now();
-    const chat: AssistantChat = {
-      id: createId(),
-      title: mode === 'task' ? 'New task' : 'New chat',
-      folderId,
-      mode,
-      messages: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    assistant.update((current) => ({
-      ...current,
-      chats: [chat, ...current.chats],
-      activeChatId: chat.id,
-    }));
-    return chat;
-  };
+  const createChat = (folderId: string | null, mode: AssistantChat['mode']) =>
+    assistant.createChat(folderId, mode);
 
   const handleNewChat = () => {
     cancelStream();

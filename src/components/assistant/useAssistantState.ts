@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createDefaultAssistantState,
+  moveAssistantChatsToFolder,
+  placeAssistantChat,
+  prependAssistantChat,
+  reorderAssistantFolders,
+  type AssistantChat,
   type AssistantMode,
   type AssistantPreferences,
   type AssistantState,
@@ -17,10 +22,14 @@ export type AssistantController = {
   selectFolder: (folderId: string | null) => void;
   selectMode: (mode: AssistantMode) => void;
   createFolder: (name: string) => void;
+  createChat: (folderId: string | null, mode: AssistantMode) => AssistantChat;
   renameFolder: (id: string, name: string) => void;
   deleteFolder: (id: string) => void;
   renameChat: (id: string, title: string) => void;
   deleteChat: (id: string) => void;
+  reorderFolders: (fromId: string, toId: string) => void;
+  reorderChat: (chatId: string, folderId: string | null, targetIndex: number) => void;
+  moveChat: (chatId: string, folderId: string | null, targetIndex: number) => void;
 };
 
 const SAVE_DELAY_MS = 500;
@@ -112,11 +121,39 @@ export const useAssistantState = (): AssistantController => {
       const trimmed = name.trim();
       if (!trimmed) return;
       const folder = { id: createId(), name: trimmed, createdAt: Date.now() };
+      update((current) => {
+        const firstOrder = current.folders.reduce(
+          (minimum, item) => Math.min(minimum, item.order ?? 0),
+          0,
+        );
+        return {
+          ...current,
+          folders: [{ ...folder, order: firstOrder - 1 }, ...current.folders],
+          activeFolderId: folder.id,
+        };
+      });
+    },
+    [update],
+  );
+
+  const createChat = useCallback(
+    (folderId: string | null, mode: AssistantMode) => {
+      const now = Date.now();
+      const chat: AssistantChat = {
+        id: createId(),
+        title: mode === 'task' ? 'New task' : 'New chat',
+        folderId,
+        mode,
+        messages: [],
+        createdAt: now,
+        updatedAt: now,
+      };
       update((current) => ({
         ...current,
-        folders: [folder, ...current.folders],
-        activeFolderId: folder.id,
+        chats: prependAssistantChat(current.chats, chat),
+        activeChatId: chat.id,
       }));
+      return chat;
     },
     [update],
   );
@@ -140,9 +177,7 @@ export const useAssistantState = (): AssistantController => {
       update((current) => ({
         ...current,
         folders: current.folders.filter((folder) => folder.id !== id),
-        chats: current.chats.map((chat) =>
-          chat.folderId === id ? { ...chat, folderId: null, updatedAt: Date.now() } : chat,
-        ),
+        chats: moveAssistantChatsToFolder(current.chats, id, null),
         activeFolderId: current.activeFolderId === id ? null : current.activeFolderId,
       }));
     },
@@ -170,6 +205,36 @@ export const useAssistantState = (): AssistantController => {
         chats: current.chats.filter((chat) => chat.id !== id),
         activeChatId: current.activeChatId === id ? null : current.activeChatId,
       }));
+    },
+    [update],
+  );
+
+  const reorderFolders = useCallback(
+    (fromId: string, toId: string) => {
+      update((current) => {
+        const folders = reorderAssistantFolders(current.folders, fromId, toId);
+        return folders === current.folders ? current : { ...current, folders };
+      });
+    },
+    [update],
+  );
+
+  const reorderChat = useCallback(
+    (chatId: string, folderId: string | null, targetIndex: number) => {
+      update((current) => {
+        const chats = placeAssistantChat(current.chats, chatId, folderId, targetIndex);
+        return chats === current.chats ? current : { ...current, chats };
+      });
+    },
+    [update],
+  );
+
+  const moveChat = useCallback(
+    (chatId: string, folderId: string | null, targetIndex: number) => {
+      update((current) => {
+        const chats = placeAssistantChat(current.chats, chatId, folderId, targetIndex);
+        return chats === current.chats ? current : { ...current, chats };
+      });
     },
     [update],
   );
@@ -214,10 +279,14 @@ export const useAssistantState = (): AssistantController => {
       selectFolder,
       selectMode,
       createFolder,
+      createChat,
       renameFolder,
       deleteFolder,
       renameChat,
       deleteChat,
+      reorderFolders,
+      reorderChat,
+      moveChat,
     }),
     [
       state,
@@ -227,10 +296,14 @@ export const useAssistantState = (): AssistantController => {
       selectFolder,
       selectMode,
       createFolder,
+      createChat,
       renameFolder,
       deleteFolder,
       renameChat,
       deleteChat,
+      reorderFolders,
+      reorderChat,
+      moveChat,
     ],
   );
 };

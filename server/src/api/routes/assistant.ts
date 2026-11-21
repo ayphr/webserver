@@ -119,7 +119,7 @@ function parseChat(value: unknown, label: string): AssistantChat {
     throw new Error(`invalid ${label}.messages`);
   }
 
-  return {
+  const chat: AssistantChat = {
     id: requireId(value.id, `${label}.id`),
     title: requireString(value.title, `${label}.title`, MAX_TITLE_LENGTH),
     folderId: requireNullableId(value.folderId, `${label}.folderId`),
@@ -130,15 +130,19 @@ function parseChat(value: unknown, label: string): AssistantChat {
     createdAt: requireNumber(value.createdAt, `${label}.createdAt`),
     updatedAt: requireNumber(value.updatedAt, `${label}.updatedAt`),
   };
+  if (value.order !== undefined) chat.order = requireNumber(value.order, `${label}.order`);
+  return chat;
 }
 
 function parseFolder(value: unknown, label: string): AssistantFolder {
   if (!isRecord(value)) throw new Error(`invalid ${label}`);
-  return {
+  const folder: AssistantFolder = {
     id: requireId(value.id, `${label}.id`),
     name: requireString(value.name, `${label}.name`, MAX_FOLDER_NAME_LENGTH),
     createdAt: requireNumber(value.createdAt, `${label}.createdAt`),
   };
+  if (value.order !== undefined) folder.order = requireNumber(value.order, `${label}.order`);
+  return folder;
 }
 
 function parseAssistantState(value: unknown): AssistantState {
