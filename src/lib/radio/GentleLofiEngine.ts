@@ -26,10 +26,24 @@ type StylePreset = {
   progressions: Chord[][];
   melodyPool: number[];
   melodyChance: number;
+  melodyToneHz: number;
   brushVelocity: number;
+  brushHz: number;
+  percussionLevel: number;
+  kickSteps: number[];
+  brushSteps: number[];
+  ghostBrushSteps: number[];
+  bassAccentSteps: number[];
+  chordStabSteps: number[];
+  chordAttack: number;
+  chordToneHz: number;
+  tapeDrift: number;
   filterHz: number;
   reverbWet: number;
+  delayFeedback: number;
+  delayToneHz: number;
   ambienceLevel: number;
+  ambienceFilterHz: number;
 };
 
 // Curated warm Neo-Soul / lofi progressions in a low-mid register.
@@ -85,38 +99,83 @@ const RAINY_PROGRESSIONS: Chord[][] = [
 ];
 
 const STYLE_PRESETS: Record<RadioStyle, StylePreset> = {
+  // Soft, spacious, and sparse: slow pads, a heartbeat kick, and a distant bed.
   gentle: {
-    bpm: 69,
-    swing: 0.18,
+    bpm: 64,
+    swing: 0.2,
     progressions: GENTLE_PROGRESSIONS,
-    melodyPool: [64, 67, 69, 72, 74, 76, 79, 81],
-    melodyChance: 0.24,
-    brushVelocity: 0.85,
-    filterHz: 2100,
-    reverbWet: 0.42,
-    ambienceLevel: 0.16,
+    melodyPool: [64, 67, 69, 72, 74, 76],
+    melodyChance: 0.18,
+    melodyToneHz: 1250,
+    brushVelocity: 0.55,
+    brushHz: 720,
+    percussionLevel: 0.7,
+    kickSteps: [0, 10],
+    brushSteps: [4, 12],
+    ghostBrushSteps: [2, 6, 8, 14],
+    bassAccentSteps: [10],
+    chordStabSteps: [],
+    chordAttack: 0.6,
+    chordToneHz: 820,
+    tapeDrift: 0.0035,
+    filterHz: 1700,
+    reverbWet: 0.5,
+    delayFeedback: 0.2,
+    delayToneHz: 850,
+    ambienceLevel: 0.1,
+    ambienceFilterHz: 850,
   },
+  // Bright and syncopated: brushed ride pattern, chord stabs, and blue notes.
   jazzy: {
-    bpm: 82,
-    swing: 0.22,
+    bpm: 88,
+    swing: 0.36,
     progressions: JAZZY_PROGRESSIONS,
-    melodyPool: [64, 67, 69, 71, 72, 74, 76, 77, 79, 81],
-    melodyChance: 0.34,
-    brushVelocity: 1,
-    filterHz: 2700,
-    reverbWet: 0.32,
-    ambienceLevel: 0.12,
+    melodyPool: [65, 67, 69, 71, 72, 74, 76, 77, 79, 81],
+    melodyChance: 0.55,
+    melodyToneHz: 2600,
+    brushVelocity: 1.1,
+    brushHz: 2400,
+    percussionLevel: 1,
+    kickSteps: [0, 8, 14],
+    brushSteps: [2, 4, 6, 10, 12, 14],
+    ghostBrushSteps: [0, 8],
+    bassAccentSteps: [6, 10, 14],
+    chordStabSteps: [6, 14],
+    chordAttack: 0.02,
+    chordToneHz: 1500,
+    tapeDrift: 0.0015,
+    filterHz: 3800,
+    reverbWet: 0.24,
+    delayFeedback: 0.34,
+    delayToneHz: 1800,
+    ambienceLevel: 0.05,
+    ambienceFilterHz: 1500,
   },
+  // Slow and washed out: no kick, wide rain texture, and low, rare melody notes.
   rainy: {
-    bpm: 62,
-    swing: 0.14,
+    bpm: 54,
+    swing: 0.08,
     progressions: RAINY_PROGRESSIONS,
-    melodyPool: [60, 62, 64, 67, 69, 72, 74],
-    melodyChance: 0.12,
-    brushVelocity: 0.5,
-    filterHz: 1550,
-    reverbWet: 0.52,
-    ambienceLevel: 0.24,
+    melodyPool: [60, 62, 63, 67, 69],
+    melodyChance: 0.1,
+    melodyToneHz: 900,
+    brushVelocity: 0.75,
+    brushHz: 1100,
+    percussionLevel: 0.65,
+    kickSteps: [],
+    brushSteps: [2, 6, 10, 14],
+    ghostBrushSteps: [0, 4, 8, 12],
+    bassAccentSteps: [10],
+    chordStabSteps: [],
+    chordAttack: 0.9,
+    chordToneHz: 640,
+    tapeDrift: 0.006,
+    filterHz: 1200,
+    reverbWet: 0.62,
+    delayFeedback: 0.24,
+    delayToneHz: 700,
+    ambienceLevel: 0.38,
+    ambienceFilterHz: 3000,
   },
 };
 
@@ -152,6 +211,7 @@ export class GentleLofiEngine {
   private barCounter = 0;
   private ambienceSource: AudioBufferSourceNode | null = null;
   private ambienceGain: GainNode | null = null;
+  private ambienceFilter: BiquadFilterNode | null = null;
 
   constructor(volume: number, style: RadioStyle = 'gentle') {
     this.volume = clampVolume(volume);
@@ -199,10 +259,10 @@ export class GentleLofiEngine {
     this.delayL.delayTime.value = 0.43;
     this.delayR.delayTime.value = 0.65;
     this.delayFeedback = this.ctx.createGain();
-    this.delayFeedback.gain.value = 0.28;
+    this.delayFeedback.gain.value = this.preset.delayFeedback;
     this.delayTone = this.ctx.createBiquadFilter();
     this.delayTone.type = 'lowpass';
-    this.delayTone.frequency.value = 1100;
+    this.delayTone.frequency.value = this.preset.delayToneHz;
 
     const merger = this.ctx.createChannelMerger(2);
     this.delayL.connect(this.delayTone);
@@ -283,7 +343,7 @@ export class GentleLofiEngine {
 
     const lp = this.ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 1150;
+    lp.frequency.value = this.preset.ambienceFilterHz;
 
     const bedGain = this.ctx.createGain();
     bedGain.gain.value = this.preset.ambienceLevel;
@@ -294,31 +354,45 @@ export class GentleLofiEngine {
     src.start();
     this.ambienceSource = src;
     this.ambienceGain = bedGain;
+    this.ambienceFilter = lp;
   }
 
-  /** Gentle tape pitch drift. */
+  /** Style-dependent tape pitch drift. */
   private getTapeDrift(time: number): number {
-    const wow = Math.sin(time * Math.PI * 2 * 0.42) * 0.0035;
-    const flutter = Math.sin(time * Math.PI * 2 * 3.1) * 0.0008;
+    const wow = Math.sin(time * Math.PI * 2 * 0.42) * this.preset.tapeDrift;
+    const flutter = Math.sin(time * Math.PI * 2 * 3.1) * this.preset.tapeDrift * 0.23;
     return 1 + wow + flutter;
   }
 
-  /** Lush, slow-attack electric piano / pad chord. */
-  private playChord(notes: number[], time: number, duration: number): void {
+  /** Lush pad chord, or a short bright stab when the preset calls for one. */
+  private playChord(
+    notes: number[],
+    time: number,
+    duration: number,
+    levelScale = 1,
+    attack = this.preset.chordAttack,
+  ): void {
     const drift = this.getTapeDrift(time);
 
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.Q.value = 0.7;
-    filter.frequency.setValueAtTime(980, time);
-    filter.frequency.exponentialRampToValueAtTime(520, time + duration * 0.85);
+    filter.frequency.setValueAtTime(this.preset.chordToneHz, time);
+    filter.frequency.exponentialRampToValueAtTime(
+      Math.max(320, this.preset.chordToneHz * 0.55),
+      time + duration * 0.85,
+    );
 
     const env = this.ctx.createGain();
-    const level = 0.16 / Math.sqrt(notes.length);
+    const level = (0.16 * levelScale) / Math.sqrt(notes.length);
+    const attackEnd = time + Math.max(0.02, attack);
+    const sustainAt = time + Math.max(attack + 0.05, duration * 0.55);
+    const releaseAt = Math.max(sustainAt + 0.05, time + duration);
+    const tail = attack > 0.1 ? 1.4 : 0.35;
     env.gain.setValueAtTime(MIN_GAIN, time);
-    env.gain.linearRampToValueAtTime(level, time + 0.45);
-    env.gain.setValueAtTime(level * 0.85, time + duration - 0.6);
-    env.gain.exponentialRampToValueAtTime(MIN_GAIN, time + duration + 1.4);
+    env.gain.linearRampToValueAtTime(level, attackEnd);
+    env.gain.setValueAtTime(level * 0.85, sustainAt);
+    env.gain.exponentialRampToValueAtTime(MIN_GAIN, releaseAt + tail);
 
     filter.connect(env);
     env.connect(this.instrumentBus);
@@ -340,7 +414,7 @@ export class GentleLofiEngine {
       osc1.connect(filter);
       osc2.connect(filter);
 
-      const end = t + duration + 1.5;
+      const end = releaseAt + tail + 0.1;
       osc1.start(t);
       osc2.start(t);
       osc1.stop(end);
@@ -392,7 +466,7 @@ export class GentleLofiEngine {
 
     const lp = this.ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 1250;
+    lp.frequency.value = this.preset.melodyToneHz;
 
     const env = this.ctx.createGain();
     const peak = 0.11 * velocity;
@@ -427,7 +501,7 @@ export class GentleLofiEngine {
 
     const env = this.ctx.createGain();
     env.gain.setValueAtTime(MIN_GAIN, time);
-    env.gain.linearRampToValueAtTime(0.26, time + 0.018);
+    env.gain.linearRampToValueAtTime(0.26 * this.preset.percussionLevel, time + 0.018);
     env.gain.exponentialRampToValueAtTime(MIN_GAIN, time + 0.36);
 
     osc.connect(lp);
@@ -454,12 +528,12 @@ export class GentleLofiEngine {
 
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = 720;
+    bp.frequency.value = this.preset.brushHz;
     bp.Q.value = 1.2;
 
     const env = this.ctx.createGain();
     env.gain.setValueAtTime(MIN_GAIN, time);
-    env.gain.linearRampToValueAtTime(0.065 * velocity, time + 0.015);
+    env.gain.linearRampToValueAtTime(0.065 * velocity * this.preset.percussionLevel, time + 0.015);
     env.gain.exponentialRampToValueAtTime(MIN_GAIN, time + dur);
 
     src.connect(bp);
@@ -489,20 +563,23 @@ export class GentleLofiEngine {
     if (stepInBar === 0) {
       this.playChord(chord.notes, t, sixteenth * 15);
       this.playBass(chord.root, t, sixteenth * 11);
+    }
+
+    if (preset.kickSteps.includes(stepInBar)) {
       this.playSoftKick(t);
     }
 
-    if (stepInBar === 10 && Math.random() > 0.35) {
+    if (preset.bassAccentSteps.includes(stepInBar) && Math.random() > 0.35) {
       this.playBass(chord.root + 7, t, sixteenth * 5);
     }
 
-    if (stepInBar === 10 && Math.random() > 0.45) {
-      this.playSoftKick(t);
+    if (preset.chordStabSteps.includes(stepInBar)) {
+      this.playChord(chord.notes, t, sixteenth * 2, 0.55);
     }
 
-    if (stepInBar === 4 || stepInBar === 12) {
+    if (preset.brushSteps.includes(stepInBar)) {
       this.playSoftBrush(t, preset.brushVelocity);
-    } else if (stepInBar % 2 === 0 && Math.random() > 0.55) {
+    } else if (preset.ghostBrushSteps.includes(stepInBar) && Math.random() > 0.45) {
       this.playSoftBrush(t, preset.brushVelocity * 0.3);
     }
 
@@ -546,10 +623,18 @@ export class GentleLofiEngine {
     this.masterFilter.frequency.setTargetAtTime(this.preset.filterHz, now, 0.25);
     this.reverbWet.gain.cancelScheduledValues(now);
     this.reverbWet.gain.setTargetAtTime(this.preset.reverbWet, now, 0.25);
+    this.delayFeedback.gain.cancelScheduledValues(now);
+    this.delayFeedback.gain.setTargetAtTime(this.preset.delayFeedback, now, 0.25);
+    this.delayTone.frequency.cancelScheduledValues(now);
+    this.delayTone.frequency.setTargetAtTime(this.preset.delayToneHz, now, 0.25);
 
     if (this.ambienceGain) {
       this.ambienceGain.gain.cancelScheduledValues(now);
       this.ambienceGain.gain.setTargetAtTime(this.preset.ambienceLevel, now, 0.25);
+    }
+    if (this.ambienceFilter) {
+      this.ambienceFilter.frequency.cancelScheduledValues(now);
+      this.ambienceFilter.frequency.setTargetAtTime(this.preset.ambienceFilterHz, now, 0.25);
     }
   }
 
