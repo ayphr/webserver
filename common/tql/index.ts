@@ -19,6 +19,7 @@ export type {
   QueryAST,
 } from './ast';
 export { compileQuery, parseQuery, evaluateQuery, validateQuery, estimateQueryComputeUnits } from './utils';
+export { formatTql } from './formatter';
 export {
   estimateComputeUnits,
   estimatePredicateUnits,

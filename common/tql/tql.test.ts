@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   estimateQueryComputeUnits,
   evaluateQuery,
+  formatTql,
   parseQuery,
   validateQuery,
   type TelemetryPoint,
@@ -471,6 +472,40 @@ describe('TQL Query Engine', () => {
 
     it('rejects invalid queries', () => {
       expect(() => estimateQueryComputeUnits('not a query')).toThrow();
+    });
+  });
+
+  describe('TQL formatter', () => {
+    it('puts each pipeline step on its own line', () => {
+      const formatted = formatTql(
+        'findAll(p -> {p.tempC > 20}) then sortDescending(p -> {p.timestamp}) then limit(100)',
+      );
+      expect(formatted).toBe(
+        'findAll(p -> { p.tempC > 20 })\n  then sortDescending(p -> { p.timestamp })\n  then limit(100)',
+      );
+    });
+
+    it('preserves selectors, aliases, literals, and meaning', () => {
+      const query = 'findAll(p -> {p.status in ["ACTIVE", "WARN_HIGH_TEMP"]} | {p.tempC ~2%~= 21})'
+        + ' then project(p -> {p.tempC}, p -> {p.status})'
+        + ' then compute(pt -> {pt.fahrenheit}, (pt.tempC * 1.8) + 32)';
+      const formatted = formatTql(query);
+
+      expect(formatted).toContain('in ["ACTIVE", "WARN_HIGH_TEMP"]');
+      expect(formatted).toContain('~2%~=');
+      expect(formatted).toContain('project(p -> { p.tempC }, p -> { p.status })');
+      expect(formatted).toContain('compute(pt -> { pt.fahrenheit }, (pt.tempC * 1.8) + 32)');
+      expect(formatTql(formatted)).toBe(formatted);
+      expect(evaluateQuery(formatted, mockDataset)).toEqual(evaluateQuery(query, mockDataset));
+    });
+
+    it('keeps comments in place', () => {
+      const formatted = formatTql('findAll(p -> {p.tempC > 20}) // warm only\n  then limit(10)');
+      expect(formatted).toBe('findAll(p -> { p.tempC > 20 })\n  // warm only\n  then limit(10)');
+    });
+
+    it('returns an empty string for empty input', () => {
+      expect(formatTql('   ')).toBe('');
     });
   });
 });

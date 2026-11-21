@@ -122,6 +122,18 @@
   margin-left: auto;
 }
 
+.queries-panel__editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -0.5rem;
+}
+
+.queries-panel__format-button {
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+
 .queries-panel__keybind {
   display: inline-flex;
   align-items: center;

@@ -17,6 +17,7 @@ export interface Token {
 
 export class Lexer {
   private pos = 0;
+  private tokenStart = 0;
   private readonly input: string;
 
   constructor(input: string) {
@@ -28,6 +29,7 @@ export class Lexer {
     while (this.pos < this.input.length) {
       this.skipWhitespaceAndComments();
       if (this.pos >= this.input.length) break;
+      this.tokenStart = this.pos;
 
       const char = this.charAt(0);
       if (!char) break;
@@ -211,7 +213,7 @@ export class Lexer {
       throw new Error(`Unexpected character '${char}' at position ${this.pos}`);
     }
 
-    tokens.push(this.makeToken('EOF', ''));
+    tokens.push({ type: 'EOF', value: '', position: this.input.length });
     return tokens;
   }
 
@@ -221,7 +223,7 @@ export class Lexer {
   }
 
   private makeToken(type: TokenType, value: string): Token {
-    return { type, value, position: this.pos };
+    return { type, value, position: this.tokenStart };
   }
 
   private skipWhitespaceAndComments() {

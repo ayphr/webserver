@@ -16,6 +16,7 @@ import {
   IconKeyboard,
   IconPlayerPlay,
   IconSparkle2,
+  IconWand,
   IconTable,
 } from '@tabler/icons-react';
 import {
@@ -23,6 +24,7 @@ import {
   MAX_QUERY_POINTS_BY_TYPE,
   MAX_STANDARD_QUERY_POINTS,
   estimateQueryComputeUnits,
+  formatTql,
   getPlanFeaturesForUser,
   validateQuery,
   type CreditBalance,
@@ -389,6 +391,16 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     setError(null);
   };
 
+  const handleFormat = () => {
+    if (!trimmedQuery || !validation.valid) return;
+    try {
+      const formatted = formatTql(trimmedQuery);
+      if (formatted !== draft.query) patchDraft({ query: formatted });
+    } catch {
+      // Leave the editor text untouched if formatting fails.
+    }
+  };
+
   const handleRun = async () => {
     if (selectedSerials.length === 0 || isCountLoading || !validation.valid || !canRun) return;
     setIsRunning(true);
@@ -604,6 +616,19 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
             basicSetup={{ autocompletion: false }}
             onChange={(value) => patchDraft({ query: value })}
           />
+        </div>
+
+        <div className="queries-panel__editor-actions">
+          <Button
+            variant="secondary"
+            className="queries-panel__format-button"
+            onClick={handleFormat}
+            disabled={!validation.valid}
+            title="Format TQL"
+          >
+            <IconWand size={14} strokeWidth={1.75} />
+            Format
+          </Button>
         </div>
 
         {result && (
