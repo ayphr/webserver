@@ -123,10 +123,13 @@
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
+}
+
+.assistant-input--new-chat .assistant-input__send::before {
   animation: turbo-send-gradient 1.2s linear infinite;
 }
 
-.assistant-input__send:hover::before {
+.assistant-input--new-chat .assistant-input__send:hover::before {
   opacity: 1;
 }
 

@@ -26,6 +26,13 @@
   min-width: 0;
 }
 
+.dashboard-assistant__sidebar-slot {
+  position: relative;
+  width: 200px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
 .dashboard-assistant > .assistant-input {
   flex: 1;
   max-width: 768px;

@@ -13,6 +13,17 @@
   overflow-x: hidden;
 }
 
+.dashboard-assistant__sidebar-slot > .assistant-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: max-content;
+  min-width: 200px;
+  /* Grow left into the free space without pushing the composer or overflowing. */
+  max-width: clamp(200px, calc(50vw - 19.875rem), 20rem);
+}
+
 .assistant-sidebar__section {
   display: flex;
   flex-direction: column;

@@ -521,7 +521,7 @@ export const AssistantInput = ({
   };
 
   return (
-    <div className={`assistant-input ${isChat ? 'assistant-input--chat' : ''} ${className}`}>
+    <div className={`assistant-input ${isChat ? 'assistant-input--chat' : 'assistant-input--new-chat'} ${className}`}>
       <div className="assistant-input__stack">
         {!isChat && (
           <div className="assistant-input__intro">

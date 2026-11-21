@@ -572,21 +572,23 @@ export const DashboardPage = () => {
           <>
             {activePage === 'assistant' && (
               <div className="dashboard-assistant">
-                <AssistantSidebar
-                  folders={assistant.state.folders}
-                  chats={assistant.state.chats}
-                  activeChatId={assistant.state.activeChatId}
-                  isAssistantView
-                  onNewChat={handleSidebarNewChat}
-                  onOpenChat={handleSidebarOpenChat}
-                  onRenameFolder={assistant.renameFolder}
-                  onDeleteFolder={assistant.deleteFolder}
-                  onRenameChat={assistant.renameChat}
-                  onDeleteChat={handleSidebarDeleteChat}
-                  onReorderFolders={assistant.reorderFolders}
-                  onReorderChat={assistant.reorderChat}
-                  onMoveChat={assistant.moveChat}
-                />
+                <div className="dashboard-assistant__sidebar-slot">
+                  <AssistantSidebar
+                    folders={assistant.state.folders}
+                    chats={assistant.state.chats}
+                    activeChatId={assistant.state.activeChatId}
+                    isAssistantView
+                    onNewChat={handleSidebarNewChat}
+                    onOpenChat={handleSidebarOpenChat}
+                    onRenameFolder={assistant.renameFolder}
+                    onDeleteFolder={assistant.deleteFolder}
+                    onRenameChat={assistant.renameChat}
+                    onDeleteChat={handleSidebarDeleteChat}
+                    onReorderFolders={assistant.reorderFolders}
+                    onReorderChat={assistant.reorderChat}
+                    onMoveChat={assistant.moveChat}
+                  />
+                </div>
                 <AssistantInput
                   availableVariants={availableAssistantVariants}
                   username={user.username}
