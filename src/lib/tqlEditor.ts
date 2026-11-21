@@ -117,9 +117,9 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
       'Returns the last telemetry point that matches the condition, or null. Call findLast() to take the last point without filtering.',
   },
   count: {
-    signature: 'count(p -> { condition })  ·  count()',
+    signature: 'count(p -> { condition })  ·  count()  ·  then count(p -> { p.field }?)',
     description:
-      'As a query root, counts matching points (all points when called as count()). As a pipeline step, counts values in a field (or rows when no field is given).',
+      'As a query root, counts matching points (all points when called as count()). As a pipeline step, counts values in a selected field (or rows when no selector is given).',
   },
   exists: {
     signature: 'exists(p -> { condition })  ·  exists()',
@@ -127,7 +127,7 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
       'Returns true when at least one telemetry point matches the condition. Call exists() with no arguments to check whether any points exist.',
   },
   select: {
-    signature: 'select(p -> { condition })  ·  select()  ·  then select(field, ...)',
+    signature: 'select(p -> { condition })  ·  select()  ·  then select(p -> { p.field }, ...)',
     description:
       'As a query root, returns matching points (alias of findAll; select() skips filtering). As a pipeline step, projects only the listed fields.',
   },
@@ -139,12 +139,14 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
     example: 'findAll(p -> { p.temperature > 20 }) then limit(100)',
   },
   sortAscending: {
-    signature: 'sortAscending(field?)',
-    description: 'Sorts points in ascending order by the given field. Defaults to timestamp.',
+    signature: 'sortAscending(p -> { p.field }?)',
+    description: 'Sorts points in ascending order by the selected field. Defaults to timestamp.',
+    example: 'then sortAscending(p -> { p.temperature })',
   },
   sortDescending: {
-    signature: 'sortDescending(field?)',
-    description: 'Sorts points in descending order by the given field. Defaults to timestamp.',
+    signature: 'sortDescending(p -> { p.field }?)',
+    description: 'Sorts points in descending order by the selected field. Defaults to timestamp.',
+    example: 'then sortDescending(p -> { p.timestamp })',
   },
   limit: {
     signature: 'limit(count)',
@@ -177,112 +179,112 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
     example: "timeRange('2024-01-01', '2024-02-01')",
   },
   project: {
-    signature: 'project(field, ...)',
-    description: 'Alias for select(field, ...). Keeps only the listed fields.',
+    signature: 'project(p -> { p.field }, ...)',
+    description: 'Alias for select(p -> { p.field }, ...). Keeps only the listed fields.',
   },
   omit: {
-    signature: 'omit(field, ...)',
-    description: 'Removes the listed fields and keeps everything else.',
+    signature: 'omit(p -> { p.field }, ...)',
+    description: 'Removes the selected fields and keeps everything else.',
   },
   rename: {
-    signature: 'rename(from, to)',
-    description: 'Renames a field.',
+    signature: 'rename(p -> { p.from }, p -> { p.to })',
+    description: 'Renames a field using two field selectors.',
   },
   distinct: {
-    signature: 'distinct(field?)',
+    signature: 'distinct(p -> { p.field }?)',
     description:
-      'Keeps one point per unique value of the field. With no field, de-duplicates whole points.',
+      'Keeps one point per unique value of the selected field. With no selector, de-duplicates whole points.',
   },
   dedup: {
-    signature: 'dedup(field?)',
-    description: 'Alias for distinct(field?).',
+    signature: 'dedup(p -> { p.field }?)',
+    description: 'Alias for distinct(p -> { p.field }?).',
   },
   dropNulls: {
-    signature: 'dropNulls(field, ...)',
-    description: 'Drops points where any of the listed fields is null or missing.',
+    signature: 'dropNulls(p -> { p.field }, ...)',
+    description: 'Drops points where any of the selected fields is null or missing.',
   },
   fill: {
-    signature: 'fill(field, value)',
-    description: 'Replaces null or missing values in a field with a constant.',
+    signature: 'fill(p -> { p.field }, value)',
+    description: 'Replaces null or missing values in the selected field with a constant.',
   },
   fillPrevious: {
-    signature: 'fillPrevious(field)',
-    description: 'Replaces missing values with the previous non-null value.',
+    signature: 'fillPrevious(p -> { p.field })',
+    description: 'Replaces missing values in the selected field with the previous non-null value.',
   },
   clamp: {
-    signature: 'clamp(field, min, max)',
-    description: 'Clamps a numeric field so it stays between min and max.',
+    signature: 'clamp(p -> { p.field }, min, max)',
+    description: 'Clamps the selected numeric field so it stays between min and max.',
   },
   movingAverage: {
-    signature: 'movingAverage(field, windowSize, targetField?)',
+    signature: 'movingAverage(p -> { p.field }, windowSize, p -> { p.targetField }?)',
     description: 'Adds a rolling average over the given window size.',
   },
   rate: {
-    signature: 'rate(field, targetField?)',
+    signature: 'rate(p -> { p.field }, p -> { p.targetField }?)',
     description: 'Calculates the per-second rate of change of a numeric field.',
   },
   diff: {
-    signature: 'diff(field, targetField?)',
+    signature: 'diff(p -> { p.field }, p -> { p.targetField }?)',
     description: 'Calculates the difference from the previous point.',
   },
   window: {
-    signature: "window('duration', aggregation, field)",
+    signature: "window('duration', aggregation, p -> { p.field })",
     description:
       "Groups points into time buckets and aggregates each bucket. Duration must be a quoted string, e.g. '1h'.",
-    example: "then window('1h', 'avg', temperature)",
+    example: "then window('1h', 'avg', p -> { p.temperature })",
   },
   resample: {
-    signature: "resample('duration', aggregation, field)",
+    signature: "resample('duration', aggregation, p -> { p.field })",
     description:
       'Alias for window. Groups points into time buckets and aggregates each bucket. Duration must be a quoted string.',
-    example: "then resample('15m', 'max', humidity)",
+    example: "then resample('15m', 'max', p -> { p.humidity })",
   },
   summary: {
-    signature: 'summary(field, ...)',
+    signature: 'summary(p -> { p.field }, ...)',
     description:
-      'Computes count, min, max, avg, sum and stddev for the listed fields. With no fields, summarizes every numeric field.',
+      'Computes count, min, max, avg, sum and stddev for the selected fields. With no selectors, summarizes every numeric field.',
   },
   avg: {
-    signature: 'avg(field)',
-    description: 'Aggregates the field and returns its mean.',
+    signature: 'avg(p -> { p.field })',
+    description: 'Aggregates the selected field and returns its mean.',
   },
   min: {
-    signature: 'min(field)',
-    description: 'Aggregates the field and returns its minimum value.',
+    signature: 'min(p -> { p.field })',
+    description: 'Aggregates the selected field and returns its minimum value.',
   },
   max: {
-    signature: 'max(field)',
-    description: 'Aggregates the field and returns its maximum value.',
+    signature: 'max(p -> { p.field })',
+    description: 'Aggregates the selected field and returns its maximum value.',
   },
   sum: {
-    signature: 'sum(field)',
-    description: 'Aggregates the field and returns its total.',
+    signature: 'sum(p -> { p.field })',
+    description: 'Aggregates the selected field and returns its total.',
   },
   median: {
-    signature: 'median(field)',
-    description: 'Aggregates the field and returns its median value.',
+    signature: 'median(p -> { p.field })',
+    description: 'Aggregates the selected field and returns its median value.',
   },
   stddev: {
-    signature: 'stddev(field)',
-    description: 'Aggregates the field and returns its standard deviation.',
+    signature: 'stddev(p -> { p.field })',
+    description: 'Aggregates the selected field and returns its standard deviation.',
   },
   first: {
-    signature: "resample('duration', 'first', field)",
+    signature: "resample('duration', 'first', p -> { p.field })",
     description: 'Window aggregation that keeps the first value in each bucket.',
   },
   last: {
-    signature: "resample('duration', 'last', field)",
+    signature: "resample('duration', 'last', p -> { p.field })",
     description: 'Window aggregation that keeps the last value in each bucket.',
   },
   groupBy: {
-    signature: 'groupBy(field)',
-    description: 'Groups points into an object keyed by the field value.',
+    signature: 'groupBy(p -> { p.field })',
+    description: 'Groups points into an object keyed by the selected field value.',
   },
   compute: {
-    signature: 'compute(field, expression)',
+    signature: 'compute(p -> { p.field }, expression)',
     description:
-      'Creates or overwrites a numeric field using a math expression. Supports +, -, *, /, %, parentheses and field names.',
-    example: 'then compute(tempF, (temperature * 1.8) + 32)',
+      'Creates or overwrites a numeric field using a math expression. Supports +, -, *, /, %, parentheses, and lambda-prefixed field references.',
+    example: 'then compute(p -> { p.tempF }, (p.temperature * 1.8) + 32)',
   },
   filter: {
     signature: 'filter(p -> { p.condition })',
@@ -303,40 +305,40 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
     description: 'Negates a condition. Can also be written as !.',
   },
   in: {
-    signature: 'field in [value, value, ...]',
+    signature: 'p.field in [value, value, ...]',
     description: 'Matches when the field equals any value in the set. Use "not in" to invert it.',
   },
   between: {
-    signature: 'field between min and max',
+    signature: 'p.field between min and max',
     description: 'Matches when the field is between min and max, inclusive.',
   },
   is: {
-    signature: 'field is null | present | missing',
+    signature: 'p.field is null | present | missing',
     description:
       'Checks a field state. "is null" checks for null, "is present"/"is missing" check existence.',
   },
   null: {
-    signature: 'field is null  ·  field is not null',
+    signature: 'p.field is null  ·  p.field is not null',
     description: 'Checks whether a field is null.',
   },
   missing: {
-    signature: 'field is missing  ·  field missing',
+    signature: 'p.field is missing  ·  p.field missing',
     description: 'Checks whether a field is absent.',
   },
   present: {
-    signature: 'field is present  ·  field exists',
+    signature: 'p.field is present  ·  p.field exists',
     description: 'Checks whether a field is present.',
   },
   contains: {
-    signature: 'field contains "text"',
+    signature: 'p.field contains "text"',
     description: 'Matches when a string field contains the given text. Use "not contains" to invert it.',
   },
   startsWith: {
-    signature: 'field startsWith "text"',
+    signature: 'p.field startsWith "text"',
     description: 'Matches when a string field starts with the given text.',
   },
   endsWith: {
-    signature: 'field endsWith "text"',
+    signature: 'p.field endsWith "text"',
     description: 'Matches when a string field ends with the given text.',
   },
   true: {
@@ -348,43 +350,59 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
     description: 'Boolean literal.',
   },
 
-  // Fields
+  // Lambda variable
+  p: {
+    signature: 'p -> { p.field ... }',
+    description:
+      'The lambda variable for the current telemetry point. Always prefix field references with it inside condition blocks and pipeline field selectors; the name may be anything you choose.',
+    example: 'findAll(p -> { p.temperature > 20 }) then sortDescending(p -> { p.timestamp })',
+  },
+
+  // Fields (shown with the example lambda prefix; any variable name works)
   timestamp: {
-    signature: 'timestamp',
-    description: 'The point time in Unix epoch milliseconds.',
+    signature: 'p.timestamp',
+    description:
+      'The point time in Unix epoch milliseconds. Use it for time-based conditions and sorting, for example sortDescending(p -> { p.timestamp }).',
+    example: 'findAll(p -> { p.timestamp > 1700000000000 })',
   },
   temperature: {
-    signature: 'temperature',
-    description: 'Temperature reading in degrees Celsius.',
+    signature: 'p.temperature',
+    description:
+      'Temperature reading in degrees Celsius. Prefix it with the lambda variable in conditions and pipeline selectors, for example p.temperature > 20.',
+    example: 'findAll(p -> { p.temperature > 20 })',
   },
   humidity: {
-    signature: 'humidity',
-    description: 'Relative humidity reading in percent.',
+    signature: 'p.humidity',
+    description:
+      'Relative humidity reading in percent. Prefix it with the lambda variable in conditions and pipeline selectors.',
+    example: 'findAll(p -> { p.humidity is not null })',
   },
   airPressure: {
-    signature: 'airPressure',
-    description: 'Air pressure reading in hectopascals (hPa).',
+    signature: 'p.airPressure',
+    description:
+      'Air pressure reading in hectopascals (hPa). Prefix it with the lambda variable in conditions and pipeline selectors.',
+    example: 'findAll(p -> { p.airPressure between 980 and 1050 })',
   },
 
   // Operators
   '->': {
-    signature: 'p -> { p.condition }',
+    signature: 'p -> { p.condition }  ·  p -> { p.field }',
     description:
-      'Separates the lambda variable from the condition block. Fields inside the block can be prefixed with that variable (for example p.temperature).',
+      'Binds a lambda variable for a condition block or a pipeline field selector. Field references must be prefixed with that variable (for example p.temperature).',
   },
-  '>': { signature: 'field > value', description: 'Greater than.' },
-  '>=': { signature: 'field >= value', description: 'Greater than or equal to.' },
-  '<': { signature: 'field < value', description: 'Less than.' },
-  '<=': { signature: 'field <= value', description: 'Less than or equal to.' },
-  '==': { signature: 'field == value', description: 'Equal to.' },
-  '!=': { signature: 'field != value', description: 'Not equal to.' },
-  '=~': { signature: 'field =~ "pattern"', description: 'Matches a regular expression.' },
-  '!~': { signature: 'field !~ "pattern"', description: 'Does not match a regular expression.' },
+  '>': { signature: 'p.field > value', description: 'Greater than.' },
+  '>=': { signature: 'p.field >= value', description: 'Greater than or equal to.' },
+  '<': { signature: 'p.field < value', description: 'Less than.' },
+  '<=': { signature: 'p.field <= value', description: 'Less than or equal to.' },
+  '==': { signature: 'p.field == value', description: 'Equal to.' },
+  '!=': { signature: 'p.field != value', description: 'Not equal to.' },
+  '=~': { signature: 'p.field =~ "pattern"', description: 'Matches a regular expression.' },
+  '!~': { signature: 'p.field !~ "pattern"', description: 'Does not match a regular expression.' },
   '~...~=': {
-    signature: 'field ~delta~= value  ·  field ~delta%~= value',
+    signature: 'p.field ~delta~= value  ·  p.field ~delta%~= value',
     description:
       'Tolerance match. Absolute delta by default, or a percentage when the delta ends with %.',
-    example: 'temperature ~2~= 21  ·  temperature ~10%~= 21',
+    example: 'p.temperature ~2~= 21  ·  p.temperature ~10%~= 21',
   },
   '&': { signature: 'condition & condition', description: 'Logical AND (alias for "and").' },
   '|': { signature: 'condition | condition', description: 'Logical OR (alias for "or").' },
@@ -526,6 +544,17 @@ const comparisonCompletions: Completion[] = [
   { label: '!~', type: 'operator', detail: 'does not match regex', info: TQL_DOCS['!~']?.description },
 ];
 
+/** Finds the lambda variable for the condition or field selector the cursor is in. */
+function lambdaVariableBefore(text: string): string {
+  const pattern = /\b([A-Za-z_]\w*)\s*->\s*\{/g;
+  let match: RegExpExecArray | null;
+  let variable = 'p';
+  while ((match = pattern.exec(text))) {
+    variable = match[1] ?? 'p';
+  }
+  return variable;
+}
+
 export function tqlCompletionSource(context: CompletionContext): CompletionResult | null {
   const word = context.matchBefore(/[A-Za-z_][\w.]*/);
   if (!word && !context.explicit) return null;
@@ -537,8 +566,13 @@ export function tqlCompletionSource(context: CompletionContext): CompletionResul
   let options: Completion[];
 
   if (inCondition) {
+    const varName = lambdaVariableBefore(beforeCursor);
     options = [
-      ...fieldCompletions.map((completion) => ({ ...completion, boost: 20 })),
+      ...fieldCompletions.map((completion) => ({
+        ...completion,
+        label: `${varName}.${completion.label}`,
+        boost: 20,
+      })),
       ...keywordCompletions.map((completion) => ({ ...completion, boost: 5 })),
       ...comparisonCompletions,
     ];
@@ -660,6 +694,21 @@ function createDocElement(name: string, doc: TqlDoc): HTMLElement {
   return dom;
 }
 
+/** Resolves a hovered token, including lambda-prefixed field references like p.temperature. */
+function findTqlDoc(word: string): { name: string; doc: TqlDoc } | null {
+  const direct = TQL_DOCS[word];
+  if (direct) return { name: word, doc: direct };
+
+  const dot = word.indexOf('.');
+  if (dot > 0) {
+    const field = word.slice(dot + 1);
+    const doc = TQL_DOCS[field];
+    if (doc) return { name: word, doc };
+  }
+
+  return null;
+}
+
 export const tqlHover = hoverTooltip((view, pos) => {
   const line = view.state.doc.lineAt(pos);
   const offset = pos - line.from;
@@ -672,13 +721,13 @@ export const tqlHover = hoverTooltip((view, pos) => {
   const wordEnd = offset + (afterMatch?.[0].length ?? 0);
   const word = line.text.slice(wordStart, wordEnd);
 
-  if (word && TQL_DOCS[word]) {
-    const doc = TQL_DOCS[word];
+  const match = word ? findTqlDoc(word) : null;
+  if (match) {
     return {
       pos: line.from + wordStart,
       end: line.from + wordEnd,
       above: true,
-      create: () => ({ dom: createDocElement(word, doc) }),
+      create: () => ({ dom: createDocElement(match.name, match.doc) }),
     };
   }
 

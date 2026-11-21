@@ -108,7 +108,7 @@ export type PipelineStepAST =
   | { type: 'aggregate'; function: AggregationFunction; field?: string }
   | { type: 'summary'; fields?: string[] }
   | { type: 'filter'; varName: string; filter: ASTNode }
-  | { type: 'compute'; field: string; expression: string }
+  | { type: 'compute'; field: string; varName: string; expression: string }
   | { type: 'groupBy'; field: string };
 
 export interface QueryAST {

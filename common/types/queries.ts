@@ -20,7 +20,7 @@ export type QueryDraft = {
 };
 
 export const DEFAULT_TQL_QUERY = `findAll(p -> { p.temperature > 20 })
-  then sortDescending(timestamp)
+  then sortDescending(p -> { p.timestamp })
   then limit(100)`;
 
 export const MAX_STANDARD_QUERY_POINTS = 50_000;

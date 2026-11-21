@@ -195,7 +195,7 @@ export function estimateComputeUnits(ast: QueryAST, dataPointCount?: number): Co
   const rounded = parts.map((part) => ({ ...part, units: roundUnits(part.units) }));
   const total = rounded.reduce((sum, part) => sum + part.units, 0);
   return {
-    units: roundUnits(total),
+    units: Math.max(0.1, roundUnits(total)),
     parts: rounded,
   };
 }

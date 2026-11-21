@@ -3,6 +3,7 @@ import type {
   QueryAST,
   TelemetryPoint,
 } from './ast';
+import { stripLambdaPrefix } from './fields';
 
 export type PredicateFn<T> = (point: T) => boolean;
 
@@ -71,13 +72,13 @@ export function getNestedValue(obj: unknown, path: string): unknown {
 }
 
 /**
- * Strips the optional lambda variable prefix from a field reference so that
- * both `temperature` and `p.temperature` resolve against the point itself.
+ * Removes the required lambda prefix from a field reference so that
+ * `p.temperature` resolves against the point itself. Bare field references are
+ * no longer accepted.
  */
 export function normalizeFieldPath(field: string, varName?: string): string {
   if (!varName) return field;
-  const prefix = `${varName}.`;
-  return field.startsWith(prefix) ? field.slice(prefix.length) : field;
+  return stripLambdaPrefix(field, varName);
 }
 
 /**
@@ -142,7 +143,7 @@ const NUMBER_LITERAL_PATTERN = /^\d+(?:\.\d+)?$/;
  *
  * Supports +, -, *, /, %, parentheses, numeric literals, and field identifiers.
  */
-export function createMathEvaluator(expression: string): (point: TelemetryPoint) => number | null {
+export function createMathEvaluator(expression: string, varName: string): (point: TelemetryPoint) => number | null {
   const tokens = expression.match(MATH_TOKEN_PATTERN) || [];
   let pos = 0;
   let point: TelemetryPoint;
@@ -204,8 +205,8 @@ export function createMathEvaluator(expression: string): (point: TelemetryPoint)
       return Number.parseFloat(token);
     }
 
-    // Field reference
-    const rawVal = getNestedValue(point, token);
+    // Field reference (lambda prefix is required)
+    const rawVal = getNestedValue(point, stripLambdaPrefix(token, varName));
     if (typeof rawVal === 'number' && !Number.isNaN(rawVal)) {
       return rawVal;
     }
@@ -228,14 +229,14 @@ export function createMathEvaluator(expression: string): (point: TelemetryPoint)
  * Evaluates a `compute(...)` math expression against a single point. Prefer
  * `createMathEvaluator` when the same expression is applied to many points.
  */
-export function evaluateMath(expression: string, point: TelemetryPoint): number | null {
-  return createMathEvaluator(expression)(point);
+export function evaluateMath(expression: string, point: TelemetryPoint, varName: string): number | null {
+  return createMathEvaluator(expression, varName)(point);
 }
 
 export class Compiler {
   public static compilePredicate<T extends TelemetryPoint>(
     ast: ASTNode,
-    varName?: string,
+    varName: string,
   ): PredicateFn<T> {
     switch (ast.type) {
       case 'standard': {
@@ -551,7 +552,7 @@ export class Compiler {
           }
 
           case 'compute': {
-            const evaluate = createMathEvaluator(step.expression);
+            const evaluate = createMathEvaluator(step.expression, step.varName);
             rows = rows.map((pt) => {
               const clone = { ...pt };
               const evaluated = evaluate(clone);

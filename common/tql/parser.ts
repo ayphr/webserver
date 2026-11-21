@@ -7,6 +7,7 @@ import type {
   RootClauseType,
 } from './ast';
 import type { Token, TokenType } from './lexer';
+import { assertLambdaField, stripLambdaPrefix } from './fields';
 
 export class Parser {
   private readonly tokens: Token[];
@@ -43,7 +44,7 @@ export class Parser {
       const varToken = this.consume('IDENTIFIER', 'Expected variable identifier');
       varName = varToken.value;
       this.consume('ARROW', "Expected '->'");
-      filter = this.parseExpression();
+      filter = this.parseExpression(varName);
     }
 
     this.consume('RPAREN', "Expected ')' ending query clause");
@@ -61,47 +62,47 @@ export class Parser {
     };
   }
 
-  private parseExpression(): ASTNode {
-    let left = this.parseTerm();
+  private parseExpression(varName: string): ASTNode {
+    let left = this.parseTerm(varName);
 
     while (this.check('OR')) {
       const op = this.advance().value as '|';
-      const right = this.parseTerm();
+      const right = this.parseTerm(varName);
       left = { type: 'logical', op, left, right };
     }
 
     return left;
   }
 
-  private parseTerm(): ASTNode {
-    let left = this.parseFactor();
+  private parseTerm(varName: string): ASTNode {
+    let left = this.parseFactor(varName);
 
     while (this.check('AND')) {
       const op = this.advance().value as '&';
-      const right = this.parseFactor();
+      const right = this.parseFactor(varName);
       left = { type: 'logical', op, left, right };
     }
 
     return left;
   }
 
-  private parseFactor(): ASTNode {
+  private parseFactor(varName: string): ASTNode {
     // Negation: !{ ... } or !( ... ) or not ...
     if (this.match('NOT')) {
-      const expr = this.parseFactor();
+      const expr = this.parseFactor(varName);
       return { type: 'not', expr };
     }
 
     // Nested parenthesized expression: ( expr )
     if (this.match('LPAREN')) {
-      const expr = this.parseExpression();
+      const expr = this.parseExpression(varName);
       this.consume('RPAREN', "Expected ')' after nested expression");
       return expr;
     }
 
     // Condition block: { ... }
     if (this.match('LBRACE')) {
-      const condition = this.parseConditionBlock();
+      const condition = this.parseConditionBlock(varName);
       this.consume('RBRACE', "Expected '}' after condition");
       return condition;
     }
@@ -109,10 +110,11 @@ export class Parser {
     throw new Error(`Unexpected token '${this.peek().value}' at pos ${this.peek().position}`);
   }
 
-  private parseConditionBlock(): ASTNode {
-    // Field name (e.g. "tempC", "status", "sensor.temperature")
+  private parseConditionBlock(varName: string): ASTNode {
+    // Fields must be explicitly scoped to the lambda variable, e.g. "p.temperature".
     const fieldToken = this.consume('IDENTIFIER', 'Expected field name in condition block');
     const field = fieldToken.value;
+    assertLambdaField(field, varName, fieldToken.position);
 
     // 1. Standard Comparison Operators (<, <=, >, >=, ==, !=)
     if (this.check('STD_OP')) {
@@ -127,6 +129,7 @@ export class Parser {
       } else if (valToken.type === 'BOOLEAN') {
         value = valToken.value === 'true';
       } else if (valToken.type === 'IDENTIFIER') {
+        assertLambdaField(valToken.value, varName, valToken.position);
         value = { field: valToken.value };
       } else {
         throw new Error(`Invalid comparison value at pos ${valToken.position}`);
@@ -147,6 +150,7 @@ export class Parser {
       if (centerToken.type === 'NUMBER') {
         center = Number.parseFloat(centerToken.value);
       } else if (centerToken.type === 'IDENTIFIER') {
+        assertLambdaField(centerToken.value, varName, centerToken.position);
         center = { field: centerToken.value };
       } else {
         throw new Error(`Expected numerical center or field for tolerance at pos ${centerToken.position}`);
@@ -246,6 +250,32 @@ export class Parser {
     throw new Error(`Unexpected condition token '${this.peek().value}' at position ${this.peek().position}`);
   }
 
+  /** Parses a pipeline field selector such as `p -> { p.temperature }`. */
+  private parseFieldSelector(): { varName: string; field: string } {
+    const varToken = this.consume('IDENTIFIER', 'Expected variable identifier in field selector');
+    if (!this.check('ARROW')) {
+      throw new Error(
+        `Pipeline field references must use a selector like p -> { p.field } at position ${varToken.position}`,
+      );
+    }
+    this.consume('ARROW', "Expected '->' after field selector variable");
+    this.consume('LBRACE', "Expected '{' after '->' in field selector");
+    const fieldToken = this.consume('IDENTIFIER', 'Expected field name in field selector');
+    assertLambdaField(fieldToken.value, varToken.value, fieldToken.position);
+    this.consume('RBRACE', "Expected '}' after field selector");
+    return { varName: varToken.value, field: stripLambdaPrefix(fieldToken.value, varToken.value) };
+  }
+
+  private parseFieldSelectors(): Array<{ varName: string; field: string }> {
+    const selectors: Array<{ varName: string; field: string }> = [];
+    if (this.check('IDENTIFIER')) {
+      do {
+        selectors.push(this.parseFieldSelector());
+      } while (this.match('COMMA'));
+    }
+    return selectors;
+  }
+
   private parsePipelineOp(): PipelineStepAST {
     const opToken = this.advance();
     const opName = opToken.value;
@@ -256,11 +286,8 @@ export class Parser {
     switch (opName) {
       case 'sortAscending':
       case 'sortDescending': {
-        let field: string | undefined;
-        if (this.check('IDENTIFIER')) {
-          field = this.advance().value;
-        }
-        step = { type: opName, field };
+        const selector = this.check('IDENTIFIER') ? this.parseFieldSelector() : undefined;
+        step = { type: opName, field: selector?.field };
         break;
       }
 
@@ -321,61 +348,37 @@ export class Parser {
 
       case 'select':
       case 'project': {
-        const fields: string[] = [];
-        if (this.check('IDENTIFIER') || this.check('STRING')) {
-          do {
-            const f = this.advance();
-            fields.push(f.value);
-          } while (this.match('COMMA'));
-        }
-        step = { type: 'select', fields };
+        step = { type: 'select', fields: this.parseFieldSelectors().map((selector) => selector.field) };
         break;
       }
 
       case 'omit': {
-        const fields: string[] = [];
-        if (this.check('IDENTIFIER') || this.check('STRING')) {
-          do {
-            const f = this.advance();
-            fields.push(f.value);
-          } while (this.match('COMMA'));
-        }
-        step = { type: 'omit', fields };
+        step = { type: 'omit', fields: this.parseFieldSelectors().map((selector) => selector.field) };
         break;
       }
 
       case 'rename': {
-        const fromToken = this.advance();
+        const from = this.parseFieldSelector();
         this.consume('COMMA', "Expected ',' in rename(from, to)");
-        const toToken = this.advance();
-        step = { type: 'rename', from: fromToken.value, to: toToken.value };
+        const to = this.parseFieldSelector();
+        step = { type: 'rename', from: from.field, to: to.field };
         break;
       }
 
       case 'distinct':
       case 'dedup': {
-        let field: string | undefined;
-        if (this.check('IDENTIFIER')) {
-          field = this.advance().value;
-        }
-        step = { type: 'distinct', field };
+        const selector = this.check('IDENTIFIER') ? this.parseFieldSelector() : undefined;
+        step = { type: 'distinct', field: selector?.field };
         break;
       }
 
       case 'dropNulls': {
-        const fields: string[] = [];
-        if (this.check('IDENTIFIER') || this.check('STRING')) {
-          do {
-            const f = this.advance();
-            fields.push(f.value);
-          } while (this.match('COMMA'));
-        }
-        step = { type: 'dropNulls', fields };
+        step = { type: 'dropNulls', fields: this.parseFieldSelectors().map((selector) => selector.field) };
         break;
       }
 
       case 'fill': {
-        const fieldToken = this.consume('IDENTIFIER', 'Expected field name in fill(field, value)');
+        const selector = this.parseFieldSelector();
         this.consume('COMMA', "Expected ',' in fill(field, value)");
         const valToken = this.advance();
         let val: number | string | boolean;
@@ -384,25 +387,25 @@ export class Parser {
         else if (valToken.type === 'BOOLEAN') val = valToken.value === 'true';
         else throw new Error(`Invalid fill value at pos ${valToken.position}`);
 
-        step = { type: 'fill', field: fieldToken.value, value: val };
+        step = { type: 'fill', field: selector.field, value: val };
         break;
       }
 
       case 'fillPrevious': {
-        const fieldToken = this.consume('IDENTIFIER', 'Expected field name in fillPrevious(field)');
-        step = { type: 'fillPrevious', field: fieldToken.value };
+        const selector = this.parseFieldSelector();
+        step = { type: 'fillPrevious', field: selector.field };
         break;
       }
 
       case 'clamp': {
-        const fieldToken = this.consume('IDENTIFIER', 'Expected field in clamp(field, min, max)');
+        const selector = this.parseFieldSelector();
         this.consume('COMMA', "Expected ','");
         const minToken = this.consume('NUMBER', 'Expected min number in clamp');
         this.consume('COMMA', "Expected ','");
         const maxToken = this.consume('NUMBER', 'Expected max number in clamp');
         step = {
           type: 'clamp',
-          field: fieldToken.value,
+          field: selector.field,
           min: Number.parseFloat(minToken.value),
           max: Number.parseFloat(maxToken.value),
         };
@@ -410,16 +413,16 @@ export class Parser {
       }
 
       case 'movingAverage': {
-        const fieldToken = this.consume('IDENTIFIER', 'Expected field in movingAverage(field, windowSize)');
+        const selector = this.parseFieldSelector();
         this.consume('COMMA', "Expected ','");
         const winToken = this.consume('NUMBER', 'Expected windowSize number in movingAverage');
         let targetField: string | undefined;
         if (this.match('COMMA')) {
-          targetField = this.consume('IDENTIFIER', 'Expected target field name in movingAverage').value;
+          targetField = this.parseFieldSelector().field;
         }
         step = {
           type: 'movingAverage',
-          field: fieldToken.value,
+          field: selector.field,
           windowSize: Number.parseInt(winToken.value, 10),
           targetField,
         };
@@ -428,12 +431,12 @@ export class Parser {
 
       case 'rate':
       case 'diff': {
-        const fieldToken = this.consume('IDENTIFIER', `Expected field in ${opName}(field, [targetField])`);
+        const selector = this.parseFieldSelector();
         let targetField: string | undefined;
         if (this.match('COMMA')) {
-          targetField = this.consume('IDENTIFIER', `Expected target field name in ${opName}`).value;
+          targetField = this.parseFieldSelector().field;
         }
-        step = { type: opName, field: fieldToken.value, targetField };
+        step = { type: opName, field: selector.field, targetField };
         break;
       }
 
@@ -443,25 +446,19 @@ export class Parser {
         this.consume('COMMA', "Expected ',' in resample(duration, aggregation, field)");
         const aggToken = this.advance();
         this.consume('COMMA', "Expected ',' in resample(duration, aggregation, field)");
-        const fieldToken = this.consume('IDENTIFIER', 'Expected field in resample');
+        const selector = this.parseFieldSelector();
 
         step = {
           type: 'resample',
           duration: durToken.value,
           aggregation: aggToken.value.toLowerCase() as AggregationFunction,
-          field: fieldToken.value,
+          field: selector.field,
         };
         break;
       }
 
       case 'summary': {
-        const fields: string[] = [];
-        if (this.check('IDENTIFIER') || this.check('STRING')) {
-          do {
-            const f = this.advance();
-            fields.push(f.value);
-          } while (this.match('COMMA'));
-        }
+        const fields = this.parseFieldSelectors().map((selector) => selector.field);
         step = { type: 'summary', fields: fields.length > 0 ? fields : undefined };
         break;
       }
@@ -472,31 +469,28 @@ export class Parser {
       case 'sum':
       case 'median':
       case 'stddev': {
-        const fieldToken = this.consume('IDENTIFIER', `Expected field name in ${opName}(field)`);
-        step = { type: 'aggregate', function: opName as AggregationFunction, field: fieldToken.value };
+        const selector = this.parseFieldSelector();
+        step = { type: 'aggregate', function: opName as AggregationFunction, field: selector.field };
         break;
       }
 
       case 'count': {
-        let field: string | undefined;
-        if (this.check('IDENTIFIER')) {
-          field = this.advance().value;
-        }
-        step = { type: 'aggregate', function: 'count', field };
+        const selector = this.check('IDENTIFIER') ? this.parseFieldSelector() : undefined;
+        step = { type: 'aggregate', function: 'count', field: selector?.field };
         break;
       }
 
       case 'groupBy': {
-        const fieldToken = this.consume('IDENTIFIER', 'Expected group field in groupBy(field)');
-        step = { type: 'groupBy', field: fieldToken.value };
+        const selector = this.parseFieldSelector();
+        step = { type: 'groupBy', field: selector.field };
         break;
       }
 
       case 'compute': {
-        const fieldToken = this.consume('IDENTIFIER', 'Expected new field name in compute(field, expression)');
+        const selector = this.parseFieldSelector();
         this.consume('COMMA', "Expected ',' in compute(field, expression)");
 
-        // Collect all tokens until matching closing parenthesis for compute(...)
+        // Collect expression tokens, requiring every field reference to use the selector's variable.
         let exprTokens = '';
         let depth = 0;
         while (!this.isAtEnd()) {
@@ -510,18 +504,27 @@ export class Parser {
             exprTokens += ' ) ';
             this.advance();
           } else {
-            exprTokens += ` ${this.advance().value} `;
+            const token = this.advance();
+            if (token.type === 'IDENTIFIER') {
+              assertLambdaField(token.value, selector.varName, token.position);
+            }
+            exprTokens += ` ${token.value} `;
           }
         }
 
-        step = { type: 'compute', field: fieldToken.value, expression: exprTokens.trim() };
+        step = {
+          type: 'compute',
+          field: selector.field,
+          varName: selector.varName,
+          expression: exprTokens.trim(),
+        };
         break;
       }
 
       case 'filter': {
         const varToken = this.consume('IDENTIFIER', 'Expected variable identifier in filter');
         this.consume('ARROW', "Expected '->'");
-        const filterNode = this.parseExpression();
+        const filterNode = this.parseExpression(varToken.value);
         step = { type: 'filter', varName: varToken.value, filter: filterNode };
         break;
       }

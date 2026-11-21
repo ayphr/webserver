@@ -42,6 +42,7 @@ import { createQueryDraft } from './utils';
 import './QueriesPanel.css';
 
 const MAX_PREVIEW_ROWS = 250;
+const MAX_JSON_PREVIEW_CHARS = 100_000;
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
 export interface QueriesPanelProps {
@@ -439,6 +440,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     `devices-${selectedSerials.join('-') || 'query'}-query`,
   );
   const jsonText = useMemo(() => JSON.stringify(result?.result ?? null, null, 2), [result]);
+  const jsonTooLarge = jsonText.length > MAX_JSON_PREVIEW_CHARS;
 
   const handleExport = (format: 'csv' | 'json') => {
     if (!result || rows.length === 0) return;
@@ -448,23 +450,6 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   return (
     <div className="dashboard-queries">
       <div className="queries-panel__content">
-        <header className="queries-panel__header">
-          <div>
-            <h2>Query</h2>
-          </div>
-          <div className="queries-panel__header-actions">
-            <a
-              className="queries-panel__docs-link"
-              href={EXTERNAL_URLS.tqlDocs}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              TQL docs
-              <IconExternalLink size={13} strokeWidth={1.75} />
-            </a>
-          </div>
-        </header>
-
         <section className="queries-panel__settings">
           <div className="queries-panel__settings-grid">
             <ToggleDropdown
@@ -526,6 +511,15 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
                   : `${pointCount.toLocaleString()} points in range`}
             </span>
             <div className="queries-panel__run-group">
+              <a
+                className="queries-panel__docs-link"
+                href={EXTERNAL_URLS.tqlDocs}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                TQL docs
+                <IconExternalLink size={13} strokeWidth={1.75} />
+              </a>
               {computeEstimate && (
                 <div className="queries-panel__cost">
                   <Tooltip content="Credits this query will cost.">
@@ -599,6 +593,12 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
               tqlLinter,
               tqlHover,
               tooltips({ parent: document.body }),
+              EditorView.contentAttributes.of({
+                spellcheck: 'false',
+                autocorrect: 'off',
+                autocapitalize: 'off',
+                translate: 'no',
+              }),
               EditorView.lineWrapping,
             ]}
             basicSetup={{ autocompletion: false }}
@@ -633,7 +633,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
                     JSON
                   </button>
                 </div>
-                {viewMode === 'json' && (
+                {viewMode === 'json' && !jsonTooLarge && (
                   <CopyFeedbackButton
                     value={jsonText}
                     label="Copy JSON"
@@ -683,6 +683,10 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
                   </table>
                 </div>
               )
+            ) : jsonTooLarge ? (
+              <div className="queries-panel__empty">
+                JSON output is too large to display. Use the JSON download button above to save the full result.
+              </div>
             ) : (
               <pre className="queries-panel__json">{jsonText}</pre>
             )}

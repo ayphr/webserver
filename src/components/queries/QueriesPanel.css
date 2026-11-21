@@ -16,27 +16,6 @@
   gap: 1rem;
 }
 
-.queries-panel__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.queries-panel__header h2 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 1.25rem;
-  font-weight: var(--font-weight-semibold);
-}
-
-.queries-panel__header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 .queries-panel__docs-link {
   display: inline-flex;
   align-items: center;
@@ -45,6 +24,7 @@
   font-size: 0.8rem;
   font-weight: var(--font-weight-md);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .queries-panel__docs-link:hover {
