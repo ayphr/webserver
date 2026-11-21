@@ -24,6 +24,7 @@ import { useDashboardClock } from './useDashboardClock';
 import { buildSettingsSections } from './dashboardSettings';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
+const QueriesPanel = lazy(() => import('../../components/queries').then((m) => ({ default: m.QueriesPanel })));
 const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
 const NotificationsPanel = lazy(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
 const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
@@ -371,10 +372,12 @@ export const DashboardPage = () => {
         })()
       : value;
 
+    const targetPath = dashboardPath(target);
+
     const params = new URLSearchParams(searchParams);
     params.delete('tab');
     const query = params.toString();
-    navigate(`${dashboardPath(target)}${query ? `?${query}` : ''}`, { replace: options?.replace ?? false });
+    navigate(`${targetPath}${query ? `?${query}` : ''}`, { replace: options?.replace ?? false });
   };
 
   const changeTab = navigateToDashboard;
@@ -631,6 +634,16 @@ export const DashboardPage = () => {
                   />
                 </Suspense>
               </DashboardPanel>
+            )}
+
+            {activePage === 'queries' && (
+              <Suspense fallback={<DashboardContentSkeleton />}>
+                <QueriesPanel
+                  user={user}
+                  credits={credits}
+                  onCreditsChange={setCredits}
+                />
+              </Suspense>
             )}
 
             {activePage === 'locations' && (

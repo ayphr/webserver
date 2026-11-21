@@ -259,13 +259,16 @@ export async function deleteAllDataPointsForDevice(serial: number): Promise<numb
  */
 export async function getDataPointsForQuery(
   serial: number,
-  options?: { since?: Date; until?: Date; maxPoints?: number },
+  options?: { since?: Date; until?: Date; maxPoints?: number; knownTotalCount?: number },
 ): Promise<{ points: DataPoint[]; totalCount: number; truncated: boolean }> {
   const dataPoints = await getCollection('dataPoints');
   const filter = buildDataPointFilter(serial, options);
 
-  trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
-  const totalCount = await dataPoints.countDocuments(filter);
+  let totalCount = options?.knownTotalCount;
+  if (totalCount === undefined) {
+    trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
+    totalCount = await dataPoints.countDocuments(filter);
+  }
 
   if (totalCount === 0) {
     return { points: [], totalCount: 0, truncated: false };

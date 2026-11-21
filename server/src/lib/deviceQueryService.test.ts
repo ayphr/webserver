@@ -2,7 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import { createDeviceQueryPlan } from './deviceQueryService';
 
 describe('device query service', () => {
-  const features = { queryComputeUnitLimit: 150, queryCostCredits: 0.5 };
+  const features = {
+    queryComputeUnitLimit: 150,
+    queryCostCredits: 0.5,
+    boostedQueryCostCredits: 2,
+  };
 
   test('normalizes valid queries and calculates cost', () => {
     const plan = createDeviceQueryPlan('  findAll(p -> {tempC > 20})  ', 10, features);
@@ -14,5 +18,17 @@ describe('device query service', () => {
   test('rejects empty and over-limit queries', () => {
     expect(() => createDeviceQueryPlan(' ', 10, features)).toThrow('query is required');
     expect(() => createDeviceQueryPlan('x'.repeat(10_001), 10, features)).toThrow('characters or fewer');
+  });
+
+  test('charges boost queries at the boosted plan rate', () => {
+    const standard = createDeviceQueryPlan('findAll(p -> {tempC > 20})', 1000, features);
+    const boost = createDeviceQueryPlan('findAll(p -> {tempC > 20})', 1000, features, 'boost');
+
+    expect(standard.type).toBe('standard');
+    expect(standard.creditRate).toBe(0.5);
+    expect(boost.type).toBe('boost');
+    expect(boost.creditRate).toBe(2);
+    expect(boost.creditCost).toBeCloseTo(standard.creditCost * 4);
+    expect(boost.computeUnits).toBe(standard.computeUnits);
   });
 });

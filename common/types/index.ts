@@ -16,4 +16,5 @@ export * from './team';
 export * from './integration';
 export * from './notification';
 export * from './pagination';
+export * from './queries';
 export * from './forecast';

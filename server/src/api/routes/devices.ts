@@ -43,9 +43,14 @@ import { consumeCredits, getCreditBalance } from '../../lib/credits';
 import { PAIRING_CODE_TTL_MS } from '../../env';
 import {
   compileQuery,
-  MAX_QUERY_POINTS,
+  MAX_BOOST_QUERY_POINTS,
+  MAX_QUERY_POINTS_BY_TYPE,
+  MAX_STANDARD_QUERY_POINTS,
+  QUERY_TYPES,
   type DeviceQueryRequest,
   type DeviceSummary,
+  type MultiDeviceQueryRequest,
+  type QueryType,
   type User,
   getPlanFeatures,
 } from '@common';
@@ -59,6 +64,7 @@ import {
 import { generateDevicePairingCode } from '../../lib/devicePairingService';
 import { toPresentedDeviceTokens } from '../../lib/deviceTokenService';
 import { createDeviceQueryPlan } from '../../lib/deviceQueryService';
+import { deviceQueryQueue } from '../../lib/deviceQueryQueue';
 import { linkDevice } from '../../lib/deviceLinkService';
 import { uploadDeviceTelemetry } from '../../lib/deviceUploadService';
 import { getDeviceUptime } from '../../lib/deviceUptimeService';
@@ -338,21 +344,69 @@ const handleGetData = requireAuth(async (request, user: User, params) => {
   });
 });
 
-const handleQueryDeviceData = requireAuth(async (request, user: User, params) => {
-  const serial = parseSerial(params.serial);
-  if (serial === null) return json({ error: 'invalid serial' }, 400);
+type QueryTarget = {
+  serial: number;
+  name: string;
+};
 
+type QueryExecution = QueryTarget & {
+  result: unknown;
+  dataPointCount: number;
+  totalCount: number;
+  truncated: boolean;
+};
+
+/** Split the global point budget across devices without exceeding it. */
+function allocateQueryBudgets(counts: number[], maxPoints: number): number[] {
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  if (total <= maxPoints) return counts.map((count) => count);
+
+  const exact = counts.map((count) => (count / total) * maxPoints);
+  const budgets = exact.map((value) => Math.floor(value));
+  let remaining = maxPoints - budgets.reduce((sum, budget) => sum + budget, 0);
+  const remainderOrder = counts
+    .map((_count, index) => ({ index, remainder: exact[index]! - budgets[index]! }))
+    .sort((a, b) => b.remainder - a.remainder);
+
+  for (const { index } of remainderOrder) {
+    if (remaining <= 0) break;
+    const room = counts[index]! - budgets[index]!;
+    if (room <= 0) continue;
+    const added = Math.min(room, remaining);
+    budgets[index] = budgets[index]! + added;
+    remaining -= added;
+  }
+
+  return budgets;
+}
+
+function annotateQueryRow(value: unknown, target: QueryTarget): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+    return {
+      ...(value as Record<string, unknown>),
+      serial: target.serial,
+      device: target.name,
+    };
+  }
+
+  return { result: value, serial: target.serial, device: target.name };
+}
+
+async function executeDeviceQuery(
+  user: User,
+  serials: number[],
+  body: DeviceQueryRequest,
+  options: { annotateResults?: boolean } = {},
+): Promise<Response> {
   const queryCheck = await deviceQueryLimiter.check(`user:${user.uuid}`);
   if (!queryCheck.allowed) return tooManyRequests(queryCheck.retryAfterMs);
 
-  const device = await getDeviceBySerial(serial);
-  if (!device) return json({ error: 'not found' }, 404);
-  const scopeUuid = await getTeamScopeUuid(user);
-  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
-
-  const body = await readJsonBody<DeviceQueryRequest>(request);
   const query = typeof body?.query === 'string' ? body.query.trim() : '';
   if (!query) return json({ error: 'query is required' }, 400);
+  if (body?.type !== undefined && !QUERY_TYPES.includes(body.type as QueryType)) {
+    return json({ error: 'invalid query type' }, 400);
+  }
+  const type: QueryType = body?.type === 'boost' ? 'boost' : 'standard';
   let executor: ReturnType<typeof compileQuery>;
   try {
     executor = compileQuery(query);
@@ -363,22 +417,59 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
   const period = typeof body?.period === 'string' && body.period ? body.period : '24h';
   const fromParam = typeof body?.from === 'string' ? body.from : null;
   const toParam = typeof body?.to === 'string' ? body.to : null;
+
+  const parsedFrom = fromParam ? parseTimestamp(fromParam) : null;
+  const parsedTo = toParam ? parseTimestamp(toParam) : null;
+  if (fromParam && !parsedFrom) return json({ error: 'invalid from timestamp' }, 400);
+  if (toParam && !parsedTo) return json({ error: 'invalid to timestamp' }, 400);
+  if (parsedFrom && parsedTo && parsedFrom > parsedTo) {
+    return json({ error: 'from must be before to' }, 400);
+  }
+
   const { since, until } = resolveDeviceTimeRange(period, fromParam, toParam);
+
+  const scopeUuid = await getTeamScopeUuid(user);
+  const targets: QueryTarget[] = [];
+  for (const serial of serials) {
+    const device = await getDeviceBySerial(serial);
+    if (!device) return json({ error: 'not found' }, 404);
+    if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+    targets.push({
+      serial,
+      name: device.name?.trim() || `Device ${serial}`,
+    });
+  }
 
   const team = await getTeamForUser(user);
   const manager = team ? await getUserFromUuid(team.managerUuid) : null;
   const seats = team && manager ? await getTeamSharedSeats(team, manager) : undefined;
   const features = getPlanFeatures(team?.tier ?? 'free', seats);
 
-  const { points, totalCount, truncated } = await getDataPointsForQuery(serial, {
-    since,
-    until,
-    maxPoints: MAX_QUERY_POINTS,
-  });
+  const counts = await Promise.all(
+    targets.map(({ serial }) => countDataPointsForDevice(serial, { since, until })),
+  );
+  const pointCount = counts.reduce((sum, count) => sum + count, 0);
+  if (pointCount > MAX_BOOST_QUERY_POINTS) {
+    return json(
+      {
+        error: `This temporal range contains ${pointCount.toLocaleString()} data points, which is too many. Narrow the range to ${MAX_BOOST_QUERY_POINTS.toLocaleString()} points or fewer.`,
+      },
+      400,
+    );
+  }
+  if (type === 'standard' && pointCount > MAX_STANDARD_QUERY_POINTS) {
+    return json(
+      {
+        error: `This temporal range contains ${pointCount.toLocaleString()} data points. Standard queries support at most ${MAX_STANDARD_QUERY_POINTS.toLocaleString()}. Switch Query Type to Boost to continue.`,
+      },
+      400,
+    );
+  }
 
+  const maxPoints = MAX_QUERY_POINTS_BY_TYPE[type];
   let queryPlan;
   try {
-    queryPlan = createDeviceQueryPlan(query, points.length, features);
+    queryPlan = createDeviceQueryPlan(query, Math.min(pointCount, maxPoints), features, type);
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'invalid query' }, 400);
   }
@@ -391,10 +482,44 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
     }
   }
 
+  const budgets = allocateQueryBudgets(counts, maxPoints);
   const startedAt = performance.now();
-  let result: unknown;
+  let executions: QueryExecution[];
   try {
-    result = executor(points as unknown as Parameters<typeof executor>[0]);
+    executions = await deviceQueryQueue.run(type === 'boost' ? 1 : 0, async () => {
+      const completed: QueryExecution[] = [];
+      for (let index = 0; index < targets.length; index += 1) {
+        const target = targets[index]!;
+        const loaded = await getDataPointsForQuery(target.serial, {
+          since,
+          until,
+          maxPoints: budgets[index]!,
+          knownTotalCount: counts[index]!,
+        });
+        const points = loaded.points.map((point) => ({
+          timestamp: point.timestamp,
+          temperature: point.temperature,
+          humidity: point.humidity,
+          airPressure: point.airPressure,
+          serial: target.serial,
+          device: target.name,
+        })) as unknown as Parameters<typeof executor>[0];
+        const rawResult = executor(points);
+        const result = options.annotateResults
+          ? Array.isArray(rawResult)
+            ? rawResult.map((row) => annotateQueryRow(row, target))
+            : [annotateQueryRow(rawResult, target)]
+          : rawResult;
+        completed.push({
+          ...target,
+          result,
+          dataPointCount: loaded.points.length,
+          totalCount: loaded.totalCount,
+          truncated: loaded.truncated,
+        });
+      }
+      return completed;
+    });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'query failed' }, 400);
   }
@@ -403,15 +528,42 @@ const handleQueryDeviceData = requireAuth(async (request, user: User, params) =>
     await consumeCredits(user.uuid, creditCost);
   }
 
+  const result = options.annotateResults
+    ? executions.flatMap((execution) => execution.result as Record<string, unknown>[])
+    : executions[0]?.result ?? null;
+  const deviceTargets = targets.map(({ serial, name }) => ({ serial, name }));
   return json({
-    serial,
+    serials: serials.slice(),
+    ...(!options.annotateResults && serials.length === 1 ? { serial: serials[0] } : {}),
+    devices: deviceTargets,
     query: queryPlan.query,
+    type,
     result,
     rowCount: Array.isArray(result) ? result.length : null,
-    dataPointCount: points.length,
-    totalCount,
-    truncated,
+    dataPointCount: executions.reduce((sum, execution) => sum + execution.dataPointCount, 0),
+    totalCount: executions.reduce((sum, execution) => sum + execution.totalCount, 0),
+    truncated: executions.some((execution) => execution.truncated),
+    computeUnits: queryPlan.computeUnits,
+    creditCost,
     durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+  });
+}
+
+const handleQueryDeviceData = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+  const body = await readJsonBody<DeviceQueryRequest>(request);
+  return executeDeviceQuery(user, [serial], body ?? { query: '' });
+});
+
+const handleQueryDevices = requireAuth(async (request, user: User) => {
+  const body = await readJsonBody<MultiDeviceQueryRequest>(request);
+  const rawSerials = Array.isArray(body?.serials) ? body.serials : [];
+  const serials = rawSerials.map(parseSerial).filter((serial): serial is number => serial !== null);
+  if (serials.length === 0) return json({ error: 'select at least one device' }, 400);
+  if (serials.length !== rawSerials.length) return json({ error: 'invalid serials' }, 400);
+  return executeDeviceQuery(user, [...new Set(serials)], body ?? { query: '', serials }, {
+    annotateResults: true,
   });
 });
 
@@ -660,6 +812,7 @@ export {
   handleDeviceUptime,
   handleGetData as handleDeviceGetData,
   handleQueryDeviceData as handleDeviceQuery,
+  handleQueryDevices,
   handleDeleteDeviceDataPoints as handleDeviceDeleteDataPoints,
   handleUpdateDevice as handleDeviceUpdate,
   handleUnlinkDevice as handleDeviceUnlink,

@@ -9,6 +9,8 @@ import type {
   SubscriptionTier,
 } from './subscription';
 import type { PolicyAgreements, PolicyKey, PolicyVersions, PublicUser, SelfUser, UserRole } from './user';
+import type { QueryType } from './queries';
+export { MAX_STANDARD_QUERY_POINTS as MAX_QUERY_POINTS } from './queries';
 
 export type PolicyStatus = {
   upToDate: boolean;
@@ -112,18 +114,33 @@ export type DeviceQueryRequest = {
   period?: string;
   from?: string;
   to?: string;
+  type?: QueryType;
 };
 
-export const MAX_QUERY_POINTS = 50_000;
+export type MultiDeviceQueryRequest = DeviceQueryRequest & {
+  serials: number[];
+};
+
+export type DeviceQueryTarget = {
+  serial: number;
+  name?: string;
+};
 
 export type DeviceQueryPayload = {
-  serial: number;
+  /** Serials included in the query context. */
+  serials: number[];
+  /** Present only for legacy single-device responses. */
+  serial?: number;
+  devices?: DeviceQueryTarget[];
   query: string;
+  type: QueryType;
   result: unknown;
   rowCount: number | null;
   dataPointCount: number;
   totalCount: number;
   truncated: boolean;
+  computeUnits: number;
+  creditCost: number;
   durationMs: number;
 };
 

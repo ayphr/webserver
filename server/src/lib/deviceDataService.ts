@@ -1,4 +1,4 @@
-import type { DataPoint, PlanFeatures } from '@common';
+import type { DataPoint, PlanFeatures, QueryType } from '@common';
 import { parseTimestamp } from './deviceValidation';
 
 export function resolveDeviceTimeRange(
@@ -35,8 +35,22 @@ export function resolveDeviceTimeRange(
   return { since, until };
 }
 
-export function calculateQueryCreditCost(computeUnits: number, features: Pick<PlanFeatures, 'queryCostCredits'>): number {
-  return Math.max(0.1, computeUnits * features.queryCostCredits);
+type QueryRateFeatures = {
+  queryCostCredits: number;
+  boostedQueryCostCredits?: number;
+};
+
+export function getQueryCreditRate(features: QueryRateFeatures, type: QueryType = 'standard'): number {
+  if (type === 'boost') return features.boostedQueryCostCredits ?? features.queryCostCredits;
+  return features.queryCostCredits;
+}
+
+export function calculateQueryCreditCost(
+  computeUnits: number,
+  features: QueryRateFeatures,
+  type: QueryType = 'standard',
+): number {
+  return Math.max(0.1, computeUnits * getQueryCreditRate(features, type));
 }
 
 export function calculateDataFillCreditCost(

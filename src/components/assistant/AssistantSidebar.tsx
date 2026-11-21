@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
@@ -52,7 +51,21 @@ import {
   type AssistantChat,
   type AssistantFolder,
 } from '@common';
+import {
+  SidebarAction,
+  SidebarDragHandle,
+  SidebarRow,
+  SidebarSection,
+  SidebarShell,
+  type SidebarRowProps,
+} from '../common';
 import './AssistantSidebar.css';
+
+const PREFIX = 'assistant-sidebar' as const;
+
+type AssistantRowProps = Omit<SidebarRowProps, 'prefix'>;
+
+const Row = (props: AssistantRowProps) => <SidebarRow prefix={PREFIX} {...props} />;
 
 export interface AssistantSidebarProps {
   folders: AssistantFolder[];
@@ -144,104 +157,7 @@ const chatIcon = (chat: AssistantChat, isActive: boolean) => {
   );
 };
 
-type RowProps = {
-  icon: ReactNode;
-  label: string;
-  active?: boolean;
-  indented?: boolean;
-  onClick: () => void;
-  editing?: boolean;
-  editValue?: string;
-  onEditChange?: (value: string) => void;
-  onEditBlur?: () => void;
-  onEditKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
-  actions?: ReactNode;
-  forceActions?: boolean;
-  dragHandle?: ReactNode;
-  rootRef?: (node: HTMLDivElement | null) => void;
-  rowStyle?: CSSProperties;
-  isDragging?: boolean;
-  isDropTarget?: boolean;
-  rowId?: string;
-  tabIndex?: number;
-  onRowFocus?: () => void;
-  ariaExpanded?: boolean;
-  ariaCurrent?: boolean;
-};
-
-const Row = ({
-  icon,
-  label,
-  active = false,
-  indented = false,
-  onClick,
-  editing = false,
-  editValue = '',
-  onEditChange,
-  onEditBlur,
-  onEditKeyDown,
-  actions,
-  forceActions = false,
-  dragHandle,
-  rootRef,
-  rowStyle,
-  isDragging = false,
-  isDropTarget = false,
-  rowId,
-  tabIndex = 0,
-  onRowFocus,
-  ariaExpanded,
-  ariaCurrent = false,
-}: RowProps) => {
-  const handleMainKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (editing) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onClick();
-    }
-  };
-
-  return (
-    <div
-      ref={rootRef}
-      className={`assistant-sidebar__row ${active ? 'assistant-sidebar__row--active' : ''} ${indented ? 'assistant-sidebar__row--indented' : ''} ${forceActions ? 'assistant-sidebar__row--confirming' : ''} ${isDragging ? 'assistant-sidebar__row--dragging' : ''} ${isDropTarget ? 'assistant-sidebar__row--drop-target' : ''}`}
-      style={rowStyle}
-    >
-      <div
-        className="assistant-sidebar__main"
-        role="button"
-        data-row-id={rowId}
-        tabIndex={tabIndex}
-        aria-expanded={ariaExpanded}
-        aria-current={ariaCurrent ? 'true' : undefined}
-        onClick={onClick}
-        onKeyDown={handleMainKeyDown}
-        onFocus={onRowFocus}
-      >
-        <span className="assistant-sidebar__icon">{icon}</span>
-        {editing ? (
-          <input
-            autoFocus
-            className="assistant-sidebar__edit"
-            value={editValue}
-            onChange={(event) => onEditChange?.(event.target.value)}
-            onBlur={onEditBlur}
-            onKeyDown={onEditKeyDown}
-            onFocus={(event) => event.currentTarget.select()}
-            onClick={(event) => event.stopPropagation()}
-            aria-label={`Rename ${label}`}
-          />
-        ) : (
-          <span className="assistant-sidebar__label">{label}</span>
-        )}
-      </div>
-      {actions && <div className="assistant-sidebar__actions">{actions}</div>}
-      {dragHandle && <div className="assistant-sidebar__drag">{dragHandle}</div>}
-    </div>
-  );
-};
-
-type SortableRowProps = RowProps & {
+type SortableRowProps = AssistantRowProps & {
   itemId: string;
   itemType: ItemKind;
   data: Record<string, unknown>;
@@ -278,23 +194,21 @@ const SortableRow = ({
       }}
       isDragging={isDragging || rowProps.isDragging}
       dragHandle={
-        <button
-          type="button"
+        <SidebarDragHandle
+          prefix={PREFIX}
+          label={label}
           ref={setActivatorNodeRef}
-          className="assistant-sidebar__drag-handle"
           {...attributes}
           {...listeners}
-          aria-label={`Drag ${label}`}
-          onClick={(event) => event.stopPropagation()}
         >
           <IconGripVertical size={14} strokeWidth={1.75} />
-        </button>
+        </SidebarDragHandle>
       }
     />
   );
 };
 
-type SortableFolderSectionProps = RowProps & {
+type SortableFolderSectionProps = AssistantRowProps & {
   itemId: string;
   data: Record<string, unknown>;
   children: ReactNode;
@@ -319,9 +233,10 @@ const SortableFolderSection = ({
   } = useSortable({ id: itemId, data: { type: 'folder', ...data } });
 
   return (
-    <div
-      ref={setNodeRef}
-      className={`assistant-sidebar__section ${sortableIsDragging || isDragging ? 'assistant-sidebar__section--dragging' : ''}`}
+    <SidebarSection
+      prefix={PREFIX}
+      rootRef={setNodeRef}
+      isDragging={sortableIsDragging || isDragging}
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
@@ -332,21 +247,19 @@ const SortableFolderSection = ({
         {...rowProps}
         isDragging={false}
         dragHandle={
-          <button
-            type="button"
+          <SidebarDragHandle
+            prefix={PREFIX}
+            label={rowProps.label}
             ref={setActivatorNodeRef}
-            className="assistant-sidebar__drag-handle"
             {...attributes}
             {...listeners}
-            aria-label={`Drag ${rowProps.label}`}
-            onClick={(event) => event.stopPropagation()}
           >
             <IconGripVertical size={14} strokeWidth={1.75} />
-          </button>
+          </SidebarDragHandle>
         }
       />
       {children}
-    </div>
+    </SidebarSection>
   );
 };
 
@@ -577,10 +490,9 @@ export const AssistantSidebar = ({
     if (deleteState?.kind === kind && deleteState.id === id) {
       return (
         <>
-          <span className="assistant-sidebar__confirm-hint">Confirm?</span>
-          <button
-            type="button"
-            className="assistant-sidebar__action"
+          <span className="sidebar-list__confirm-hint assistant-sidebar__confirm-hint">Confirm?</span>
+          <SidebarAction
+            prefix={PREFIX}
             aria-label={`Confirm delete ${name}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -588,10 +500,9 @@ export const AssistantSidebar = ({
             }}
           >
             <IconCheck size={14} strokeWidth={2} />
-          </button>
-          <button
-            type="button"
-            className="assistant-sidebar__action"
+          </SidebarAction>
+          <SidebarAction
+            prefix={PREFIX}
             aria-label={`Cancel delete ${name}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -599,16 +510,15 @@ export const AssistantSidebar = ({
             }}
           >
             <IconX size={14} strokeWidth={2} />
-          </button>
+          </SidebarAction>
         </>
       );
     }
 
     return (
       <>
-        <button
-          type="button"
-          className="assistant-sidebar__action"
+        <SidebarAction
+          prefix={PREFIX}
           aria-label={`Rename ${name}`}
           onClick={(event) => {
             event.stopPropagation();
@@ -616,10 +526,9 @@ export const AssistantSidebar = ({
           }}
         >
           <IconPencil size={14} strokeWidth={1.75} />
-        </button>
-        <button
-          type="button"
-          className="assistant-sidebar__action"
+        </SidebarAction>
+        <SidebarAction
+          prefix={PREFIX}
           aria-label={`Delete ${name}`}
           onClick={(event) => {
             event.stopPropagation();
@@ -628,7 +537,7 @@ export const AssistantSidebar = ({
           }}
         >
           <IconTrash size={14} strokeWidth={1.75} />
-        </button>
+        </SidebarAction>
       </>
     );
   };
@@ -758,9 +667,9 @@ export const AssistantSidebar = ({
   };
 
   return (
-    <aside
-      className="assistant-sidebar"
-      aria-label="Assistant sidebar"
+    <SidebarShell
+      prefix={PREFIX}
+      ariaLabel="Assistant sidebar"
       onKeyDown={handleSidebarKeyDown}
     >
       <DndContext
@@ -847,22 +756,22 @@ export const AssistantSidebar = ({
             style={{ pointerEvents: 'none' }}
           >
             {dragState && (
-              <div className="assistant-sidebar__row assistant-sidebar__row--overlay">
-                <div className="assistant-sidebar__main">
-                  <span className="assistant-sidebar__icon">{dragState.icon}</span>
-                  <span className="assistant-sidebar__label">{dragState.label}</span>
-                </div>
-              </div>
+              <SidebarRow
+                prefix={PREFIX}
+                className="sidebar-list__row--overlay assistant-sidebar__row--overlay"
+                icon={dragState.icon}
+                label={dragState.label}
+              />
             )}
           </DragOverlay>,
           document.body,
         )}
       </DndContext>
-    </aside>
+    </SidebarShell>
   );
 };
 
-type UncategorisedRowProps = RowProps & { children: ReactNode; dropDisabled?: boolean };
+type UncategorisedRowProps = AssistantRowProps & { children: ReactNode; dropDisabled?: boolean };
 
 const UncategorisedRow = ({
   children,
@@ -879,9 +788,9 @@ const UncategorisedRow = ({
     rootRef?.(node);
   };
   return (
-    <div className="assistant-sidebar__section">
-      <Row {...rowProps} rootRef={handleRef} />
+    <SidebarSection prefix={PREFIX} rootRef={handleRef}>
+      <Row {...rowProps} />
       {children}
-    </div>
+    </SidebarSection>
   );
 };

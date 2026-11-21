@@ -4,6 +4,7 @@ import { dashboardPath, parseDashboardPath } from './dashboardRoutes';
 describe('dashboardPath', () => {
   it('builds top-level and section URLs', () => {
     expect(dashboardPath({ tab: 'devices' })).toBe('/dashboard/devices');
+    expect(dashboardPath({ tab: 'queries' })).toBe('/dashboard/queries');
     expect(dashboardPath({ tab: 'settings', section: 'iris' })).toBe('/dashboard/settings/iris');
     expect(dashboardPath({ tab: 'team', section: 'audit' })).toBe('/dashboard/team/audit');
   });
@@ -25,6 +26,11 @@ describe('dashboardPath', () => {
 
 describe('parseDashboardPath', () => {
   it('parses canonical paths', () => {
+    expect(parseDashboardPath('/dashboard/queries')).toMatchObject({
+      tab: 'queries',
+      canonicalPath: '/dashboard/queries',
+      valid: true,
+    });
     expect(parseDashboardPath('/dashboard/settings/iris')).toMatchObject({
       tab: 'settings',
       section: 'iris',

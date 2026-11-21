@@ -25,3 +25,18 @@ export { Pagination, type PaginationProps } from './Pagination';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { CodeInput, type CodeInputProps } from './CodeInput';
 export { Slider, type SliderProps } from './Slider';
+export {
+  SidebarShell,
+  SidebarSection,
+  SidebarRow,
+  SidebarAction,
+  SidebarDragHandle,
+  SidebarEditInput,
+  type SidebarPrefix,
+  type SidebarShellProps,
+  type SidebarSectionProps,
+  type SidebarRowProps,
+  type SidebarActionProps,
+  type SidebarDragHandleProps,
+  type SidebarEditInputProps,
+} from './SidebarList';

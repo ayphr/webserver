@@ -1,19 +1,22 @@
-import type { PlanFeatures } from '@common';
+import type { PlanFeatures, QueryType } from '@common';
 import { estimateQueryComputeUnits } from '@common';
-import { calculateQueryCreditCost } from './deviceDataService';
+import { calculateQueryCreditCost, getQueryCreditRate } from './deviceDataService';
 
 export const MAX_DEVICE_QUERY_LENGTH = 10_000;
 
 export type DeviceQueryPlan = {
   query: string;
+  type: QueryType;
   computeUnits: number;
   creditCost: number;
+  creditRate: number;
 };
 
 export function createDeviceQueryPlan(
   query: string,
   pointCount: number,
-  features: Pick<PlanFeatures, 'queryComputeUnitLimit' | 'queryCostCredits'>,
+  features: Pick<PlanFeatures, 'queryComputeUnitLimit' | 'queryCostCredits' | 'boostedQueryCostCredits'>,
+  type: QueryType = 'standard',
 ): DeviceQueryPlan {
   const normalized = query.trim();
   if (!normalized) throw new Error('query is required');
@@ -28,7 +31,9 @@ export function createDeviceQueryPlan(
 
   return {
     query: normalized,
+    type,
     computeUnits: estimate.units,
-    creditCost: calculateQueryCreditCost(estimate.units, features),
+    creditCost: calculateQueryCreditCost(estimate.units, features, type),
+    creditRate: getQueryCreditRate(features, type),
   };
 }

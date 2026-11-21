@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
-import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected, IconRadio } from '@tabler/icons-react';
+import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected, IconRadio, IconTerminal2 } from '@tabler/icons-react';
 import { UsernameDisplay } from '../common';
 import { ConfirmDialog } from '../common/Dialog';
 import { useTooltip } from '../../context';
@@ -15,6 +15,7 @@ type Tab = { id: string; name: string };
 const tabs: Tab[] = [
   { id: 'overview', name: 'Overview' },
   { id: 'devices', name: 'Devices' },
+  { id: 'queries', name: 'Queries' },
   { id: 'locations', name: 'Locations' },
   { id: 'games', name: 'Games' },
   { id: 'radio', name: 'Radio' },
@@ -34,6 +35,8 @@ const iconFor = (id: string) => {
       return <IconGauge size={18} />;
     case 'devices':
       return <IconDatabase size={18} />;
+    case 'queries':
+      return <IconTerminal2 size={18} />;
     case 'locations':
       return <IconMapPin size={18} />;
     case 'games':

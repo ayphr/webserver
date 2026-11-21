@@ -38,6 +38,11 @@ describe('router', () => {
     expect(match?.params.serial).toBe('42');
   });
 
+  test('matches multi-device query route before parameterized device routes', () => {
+    const match = matchRoute('POST', '/api/devices/query');
+    expect(match?.template).toBe('/api/devices/query');
+  });
+
   test('matches device logs route', () => {
     const match = matchRoute('GET', '/api/devices/42/logs');
     expect(match?.template).toBe('/api/devices/:serial/logs');

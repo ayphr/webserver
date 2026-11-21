@@ -7,6 +7,7 @@
 export const DASHBOARD_TABS = [
   'overview',
   'devices',
+  'queries',
   'locations',
   'games',
   'radio',

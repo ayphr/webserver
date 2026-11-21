@@ -15,7 +15,6 @@ import {
   IconMaximize,
   IconMinimize,
   IconRefresh,
-  IconTerminal2,
   IconThermometer,
   IconTrash,
   IconWifi,
@@ -33,7 +32,6 @@ import { DEVICE_PERIODS, type DevicePeriod } from '../../lib/devicePeriod';
 import { EXTERNAL_URLS } from '../../lib/externalUrls';
 import { CHART_COLORS, createLineGraphConfig, resolveCssColor } from '../../lib/chartTheme';
 import type { DashboardTarget, DeviceDetailTab, DeviceRouteState } from '../../lib/dashboardRoutes';
-import { DeviceQueryModal } from './DeviceQueryModal';
 import { DeviceExportModal } from './DeviceExportModal';
 import { DataFillModal } from './DataFillModal';
 import { ForecastTab } from './ForecastTab';
@@ -230,7 +228,6 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const [devicePage, setDevicePage] = useState(1);
   const selectedSerial = activeDevice?.serial ?? null;
   const view: 'list' | 'detail' = selectedSerial === null ? 'list' : 'detail';
-  const [isQueryOpen, setIsQueryOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDataFillOpen, setIsDataFillOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -478,7 +475,6 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   };
 
   const handleSelectDevice = (device: DeviceSummary) => {
-    setIsQueryOpen(false);
     setIsExportOpen(false);
     onNavigate?.({ tab: 'devices', device: { serial: device.serial, detailTab: 'graphs' } });
   };
@@ -827,7 +823,6 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         <Button
           variant="secondary"
           onClick={() => {
-            setIsQueryOpen(false);
             setIsExportOpen(false);
             closeDevice();
           }}
@@ -855,16 +850,10 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
             </Tooltip>
           )}
           {detailTab !== 'forecasts' && detailTab !== 'settings' && detailTab !== 'alerts' && detailTab !== 'tokens' && detailTab !== 'logs' && (
-            <>
-              <Button variant="secondary" onClick={() => setIsQueryOpen(true)}>
-                <IconTerminal2 size={16} strokeWidth={1.75} />
-                New query
-              </Button>
-              <Button variant="secondary" onClick={() => setIsDataFillOpen(true)}>
-                <IconDatabase size={16} strokeWidth={1.75} />
-                Data fill
-              </Button>
-            </>
+            <Button variant="secondary" onClick={() => setIsDataFillOpen(true)}>
+              <IconDatabase size={16} strokeWidth={1.75} />
+              Data fill
+            </Button>
           )}
           {detailTab !== 'alerts' && detailTab !== 'tokens' && detailTab !== 'logs' && (
             <Button
@@ -1293,22 +1282,6 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
           </div>
         )}
       </div>
-
-      <DeviceQueryModal
-        key={`query-${selectedDevice.serial}-${period}`}
-        isOpen={isQueryOpen}
-        onClose={() => setIsQueryOpen(false)}
-        serial={selectedDevice.serial}
-        deviceName={deviceLabel(selectedDevice)}
-        defaultPeriod={period}
-        credits={credits}
-        queryCostCredits={planFeatures?.queryCostCredits ?? 0.5}
-        queryComputeUnitLimit={planFeatures?.queryComputeUnitLimit}
-        onCreditsChange={(next) => {
-          setCredits(next);
-          onCreditsChange?.(next);
-        }}
-      />
 
       <DeviceExportModal
         isOpen={isExportOpen}

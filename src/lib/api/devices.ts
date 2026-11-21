@@ -76,6 +76,12 @@ export function createDevicesApi(client: RequestClient) {
         body: input,
       });
     },
+    async queryDevices(serials: number[], input: DeviceQueryRequest) {
+      return client.requestJson<DeviceQueryPayload>('/api/devices/query', {
+        method: 'POST',
+        body: { ...input, serials },
+      });
+    },
     async update(serial: number, input: { name?: string; locationId?: string }) {
       const response = await client.requestJson<DeviceUpdatePayload>(`/api/devices/${serial}`, {
         method: 'PATCH',
