@@ -193,11 +193,11 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
   distinct: {
     signature: 'distinct(p -> { p.field }?)',
     description:
-      'Keeps one point per unique value of the selected field. With no selector, de-duplicates whole points.',
+      'Keeps one point per unique value of the selected field. With no selector, de-duplicates whole points. Requires Boost mode.',
   },
   dedup: {
     signature: 'dedup(p -> { p.field }?)',
-    description: 'Alias for distinct(p -> { p.field }?).',
+    description: 'Alias for distinct(p -> { p.field }?). Requires Boost mode.',
   },
   dropNulls: {
     signature: 'dropNulls(p -> { p.field }, ...)',
@@ -217,7 +217,7 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
   },
   movingAverage: {
     signature: 'movingAverage(p -> { p.field }, windowSize, p -> { p.targetField }?)',
-    description: 'Adds a rolling average over the given window size.',
+    description: 'Adds a rolling average over the given window size. Requires Boost mode.',
   },
   rate: {
     signature: 'rate(p -> { p.field }, p -> { p.targetField }?)',
@@ -230,19 +230,19 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
   window: {
     signature: "window('duration', aggregation, p -> { p.field })",
     description:
-      "Groups points into time buckets and aggregates each bucket. Duration must be a quoted string, e.g. '1h'.",
+      "Groups points into time buckets and aggregates each bucket. Duration must be a quoted string, e.g. '1h'. Requires Boost mode.",
     example: "then window('1h', 'avg', p -> { p.temperature })",
   },
   resample: {
     signature: "resample('duration', aggregation, p -> { p.field })",
     description:
-      'Alias for window. Groups points into time buckets and aggregates each bucket. Duration must be a quoted string.',
+      'Alias for window. Groups points into time buckets and aggregates each bucket. Duration must be a quoted string. Requires Boost mode.',
     example: "then resample('15m', 'max', p -> { p.humidity })",
   },
   summary: {
     signature: 'summary(p -> { p.field }, ...)',
     description:
-      'Computes count, min, max, avg, sum and stddev for the selected fields. With no selectors, summarizes every numeric field.',
+      'Computes count, min, max, avg, sum and stddev for the selected fields. With no selectors, summarizes every numeric field. Requires Boost mode.',
   },
   avg: {
     signature: 'avg(p -> { p.field })',
@@ -278,7 +278,7 @@ export const TQL_DOCS: Record<string, TqlDoc> = {
   },
   groupBy: {
     signature: 'groupBy(p -> { p.field })',
-    description: 'Groups points into an object keyed by the selected field value.',
+    description: 'Groups points into an object keyed by the selected field value. Requires Boost mode.',
   },
   compute: {
     signature: 'compute(p -> { p.field }, expression)',

@@ -42,7 +42,7 @@ const AGGREGATION_UNITS: Record<AggregationFunction, number> = {
   stddev: 0.2,
 };
 
-const PIPELINE_LABELS: Record<PipelineStepAST['type'], string> = {
+export const PIPELINE_LABELS: Record<PipelineStepAST['type'], string> = {
   sortAscending: 'sortAscending',
   sortDescending: 'sortDescending',
   limit: 'limit',

@@ -18,8 +18,20 @@ export type {
   PipelineStepAST,
   QueryAST,
 } from './ast';
-export { compileQuery, parseQuery, evaluateQuery, validateQuery, estimateQueryComputeUnits } from './utils';
+export {
+  compileQuery,
+  parseQuery,
+  evaluateQuery,
+  validateQuery,
+  estimateQueryComputeUnits,
+  getQueryBoostRequiredSteps,
+} from './utils';
 export { formatTql } from './formatter';
+export {
+  BOOST_ONLY_PIPELINE_STEPS,
+  getBoostRequiredSteps,
+  formatBoostRequiredMessage,
+} from './requirements';
 export {
   estimateComputeUnits,
   estimatePredicateUnits,

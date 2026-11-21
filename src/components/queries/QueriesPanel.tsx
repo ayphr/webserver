@@ -24,8 +24,10 @@ import {
   MAX_QUERY_POINTS_BY_TYPE,
   MAX_STANDARD_QUERY_POINTS,
   estimateQueryComputeUnits,
+  formatBoostRequiredMessage,
   formatTql,
   getPlanFeaturesForUser,
+  getQueryBoostRequiredSteps,
   validateQuery,
   type CreditBalance,
   type DeviceQueryPayload,
@@ -313,6 +315,15 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     return validateQuery(trimmedQuery);
   }, [trimmedQuery]);
 
+  const boostOnlySteps = useMemo(() => {
+    if (!validation.valid) return [];
+    try {
+      return getQueryBoostRequiredSteps(trimmedQuery);
+    } catch {
+      return [];
+    }
+  }, [trimmedQuery, validation.valid]);
+
   const effectivePointCount = pointCount === null
     ? undefined
     : Math.min(pointCount, MAX_QUERY_POINTS_BY_TYPE[draft.type]);
@@ -337,11 +348,16 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const tooManyPointsMessage = pointCount !== null && pointCount > MAX_BOOST_QUERY_POINTS
     ? `This range contains ${pointCount.toLocaleString()} data points, which is too many. Narrow it to ${MAX_BOOST_QUERY_POINTS.toLocaleString()} points or fewer.`
     : null;
-  const boostRequiredMessage = !tooManyPointsMessage
-    && draft.type === 'standard'
+  const boostStepMessage = draft.type === 'standard' && boostOnlySteps.length > 0
+    ? formatBoostRequiredMessage(boostOnlySteps)
+    : null;
+  const pointsBoostMessage = draft.type === 'standard'
     && pointCount !== null
     && pointCount > MAX_STANDARD_QUERY_POINTS
     ? `This range contains ${pointCount.toLocaleString()} data points. Switch Query Type to Boost to continue.`
+    : null;
+  const boostRequiredMessage = !tooManyPointsMessage
+    ? boostStepMessage ?? pointsBoostMessage
     : null;
   const noPointsMessage = pointCount === 0
     ? 'There are no data points in the selected range for the selected devices.'

@@ -1,5 +1,10 @@
 import type { PlanFeatures, QueryType } from '@common';
-import { estimateQueryComputeUnits } from '@common';
+import {
+  estimateComputeUnits,
+  formatBoostRequiredMessage,
+  getBoostRequiredSteps,
+  parseQuery,
+} from '@common';
 import { calculateQueryCreditCost, getQueryCreditRate } from './deviceDataService';
 
 export const MAX_DEVICE_QUERY_LENGTH = 10_000;
@@ -24,7 +29,13 @@ export function createDeviceQueryPlan(
     throw new Error(`query must be ${MAX_DEVICE_QUERY_LENGTH.toLocaleString()} characters or fewer`);
   }
 
-  const estimate = estimateQueryComputeUnits(normalized, pointCount);
+  const ast = parseQuery(normalized);
+  const boostOnlySteps = getBoostRequiredSteps(ast);
+  if (type === 'standard' && boostOnlySteps.length > 0) {
+    throw new Error(formatBoostRequiredMessage(boostOnlySteps));
+  }
+
+  const estimate = estimateComputeUnits(ast, pointCount);
   if (estimate.units > features.queryComputeUnitLimit) {
     throw new Error(`query exceeds your plan's compute unit limit of ${features.queryComputeUnitLimit}`);
   }

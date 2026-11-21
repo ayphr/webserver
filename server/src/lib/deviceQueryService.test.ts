@@ -27,6 +27,18 @@ describe('device query service', () => {
       .toThrow(/must use a selector/);
   });
 
+  test('requires boost mode for heavy processing steps', () => {
+    const query = 'findAll() then resample("5m", "avg", p -> { p.tempC })';
+    expect(() => createDeviceQueryPlan(query, 10, features))
+      .toThrow(/boost-only steps: resample/);
+    expect(createDeviceQueryPlan(query, 10, features, 'boost').type).toBe('boost');
+  });
+
+  test('allows sorting and arithmetic in standard mode', () => {
+    const query = 'findAll() then sortDescending(p -> { p.timestamp }) then compute(p -> { p.tempF }, (p.tempC * 1.8) + 32)';
+    expect(createDeviceQueryPlan(query, 10, features).type).toBe('standard');
+  });
+
   test('charges boost queries at the boosted plan rate', () => {
     const standard = createDeviceQueryPlan('findAll(p -> {p.tempC > 20})', 1000, features);
     const boost = createDeviceQueryPlan('findAll(p -> {p.tempC > 20})', 1000, features, 'boost');

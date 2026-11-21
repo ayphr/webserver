@@ -2,7 +2,9 @@ import { describe, expect, it } from 'bun:test';
 import {
   estimateQueryComputeUnits,
   evaluateQuery,
+  formatBoostRequiredMessage,
   formatTql,
+  getQueryBoostRequiredSteps,
   parseQuery,
   validateQuery,
   type TelemetryPoint,
@@ -506,6 +508,26 @@ describe('TQL Query Engine', () => {
 
     it('returns an empty string for empty input', () => {
       expect(formatTql('   ')).toBe('');
+    });
+  });
+
+  describe('TQL boost requirements', () => {
+    it('flags only heavy processing steps', () => {
+      expect(getQueryBoostRequiredSteps(
+        'findAll() then sortDescending(p -> { p.timestamp }) then limit(10)',
+      )).toEqual([]);
+      expect(getQueryBoostRequiredSteps(
+        'findAll() then resample("5m", "avg", p -> { p.tempC })'
+          + ' then groupBy(p -> { p.status })'
+          + ' then dedup(p -> { p.tempC })'
+          + ' then resample("1h", "max", p -> { p.tempC })',
+      )).toEqual(['resample', 'groupBy', 'distinct']);
+    });
+
+    it('shares the Standard-to-Boost prompt wording', () => {
+      expect(formatBoostRequiredMessage(['resample', 'groupBy'])).toBe(
+        'This query uses boost-only steps: resample, groupBy. Switch Query Type to Boost to continue.',
+      );
     });
   });
 });
