@@ -346,6 +346,19 @@
   color: var(--text-muted);
 }
 
+/* Task lists already have a checkbox, so drop the bullet and pull the row back
+   to the list's left edge without disturbing ordinary bullets in mixed lists. */
+.assistant-markdown li.task-list-item,
+.assistant-markdown li:has(> input[type='checkbox']) {
+  margin-left: -1.25rem;
+  list-style: none;
+}
+
+.assistant-markdown li.task-list-item::marker,
+.assistant-markdown li:has(> input[type='checkbox'])::marker {
+  content: '';
+}
+
 .assistant-markdown a {
   color: var(--text-primary);
   text-decoration: underline;
