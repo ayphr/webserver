@@ -99,7 +99,7 @@ export async function acceptTeamInvite(params: { invite: TeamInvite; user: User 
       type: 'team',
       title: `${user.username} joined ${team.name ?? 'your team'}`,
       message: `${user.username} accepted your invitation and joined ${team.name ?? 'the team'}.`,
-      link: '/dashboard?tab=team',
+      link: '/dashboard/team',
     });
   }
 }

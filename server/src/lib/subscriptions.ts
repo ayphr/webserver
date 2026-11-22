@@ -91,7 +91,7 @@ export async function createTeamCheckout(
       if (updated) {
         await syncTeamStripeSubscription(team.id, updated);
         subscriptionEventsTotal.inc({ event: 'auto_renew_enabled', result: 'success' });
-        return { kind: 'updated', url: dashboardUrl('?tab=team&checkout=success') };
+        return { kind: 'updated', url: dashboardUrl('/team?checkout=success') };
       }
     } catch (error) {
       log.warn({ error, teamId: team.id, stripeSubscriptionId: team.stripeSubscriptionId }, 'stored subscription unavailable');
@@ -108,8 +108,8 @@ export async function createTeamCheckout(
     tier,
     teamId: team.id,
     quantity,
-    successUrl: dashboardUrl('?tab=team&checkout=success'),
-    cancelUrl: dashboardUrl('?tab=team&checkout=cancel'),
+    successUrl: dashboardUrl('/team?checkout=success'),
+    cancelUrl: dashboardUrl('/team?checkout=cancel'),
   };
 
   try {
@@ -162,7 +162,7 @@ export async function createTeamBillingPortal(team: Team): Promise<
 
   const url = await createBillingPortalSession({
     customerId: team.stripeCustomerId,
-    returnUrl: dashboardUrl('?tab=team'),
+    returnUrl: dashboardUrl('/team'),
   });
   if (!url) return { kind: 'unavailable' };
   return { kind: 'created', url };

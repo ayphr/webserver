@@ -4,9 +4,14 @@ import { api } from '../../lib/api';
 import type { CreditBalance, PublicUser } from '@common';
 import { Card, CardBody, CardHeader, ProfileCard } from '../../components/common';
 import { Sidebar } from '../../components/layout';
+import { tabToPath } from '../../lib/dashboardRoutes';
 import './ProfilePage.css';
 
-export const ProfilePage = () => {
+type Props = {
+  initialEditing?: boolean;
+};
+
+export const ProfilePage = ({ initialEditing = false }: Props) => {
   const { userUuid } = useParams<{ userUuid: string }>();
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
@@ -31,8 +36,20 @@ export const ProfilePage = () => {
   }, []);
 
   const handleTabChange = async (id: string) => {
-    await navigate(`/dashboard?tab=${encodeURIComponent(id)}`);
+    await navigate(tabToPath(id));
   };
+
+  const isOwnProfile = Boolean(currentUser && userUuid && currentUser.uuid === userUuid);
+  const isStaff = currentUser?.role === 'staff';
+  const canEditProfile = isOwnProfile || isStaff;
+
+  // Editing your own profile has one canonical URL; the per-user edit path is
+  // only for staff editing someone else.
+  useEffect(() => {
+    if (initialEditing && isOwnProfile && userUuid) {
+      void navigate('/dashboard/profile/edit', { replace: true });
+    }
+  }, [initialEditing, isOwnProfile, navigate, userUuid]);
 
   if (isLoadingCurrent) {
     return (
@@ -64,10 +81,6 @@ export const ProfilePage = () => {
     );
   }
 
-  const isOwnProfile = currentUser?.uuid === userUuid;
-  const isStaff = currentUser?.role === 'staff';
-  const canEditProfile = isOwnProfile || isStaff;
-
   return (
     <div className="profile-layout">
       <Sidebar activeTab="profile" onChange={handleTabChange} username={currentUser?.username ?? '...'} badges={currentUser?.badges} avatarUrl={currentUser?.avatarUrl} credits={credits} />
@@ -83,6 +96,14 @@ export const ProfilePage = () => {
               viewerUuid={currentUser?.uuid}
               viewerRole={currentUser?.role}
               canEditProfile={canEditProfile}
+              isEditing={initialEditing}
+              onEditingChange={(editing) => navigate(
+                editing
+                  ? (isOwnProfile
+                    ? '/dashboard/profile/edit'
+                    : `/dashboard/profile/${encodeURIComponent(userUuid)}/edit`)
+                  : `/dashboard/profile/${encodeURIComponent(userUuid)}`,
+              )}
               isPunishable={isStaff}
             />
           </CardBody>

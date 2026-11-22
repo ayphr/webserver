@@ -145,7 +145,7 @@ const handleStaffPunishments = requireRole('staff', async (request, staffUser) =
       message: punishment.endsAt
         ? `${reason} · Ends ${punishment.endsAt.toUTCString()}`
         : `${reason} · This suspension is permanent.`,
-      link: '/dashboard?tab=appeal',
+      link: '/dashboard/appeal',
     });
 
     return json({ punishment }, 201);
@@ -187,7 +187,7 @@ const handleStaffPunishmentLift = requireRole('staff', async (_request, staffUse
     type: 'punishment',
     title: 'Your suspension was lifted',
     message: 'Your account suspension has been lifted.',
-    link: '/dashboard?tab=overview',
+    link: '/dashboard/overview',
   });
 
   return json({ punishment });
@@ -239,7 +239,7 @@ const handleStaffAppealResolve = requireRole('staff', async (request, staffUser,
     message: decision === 'lift'
       ? 'Your appeal was accepted and your suspension has been lifted.'
       : 'Your appeal was reviewed and denied.',
-    link: decision === 'lift' ? '/dashboard?tab=overview' : '/dashboard?tab=appeal',
+    link: decision === 'lift' ? '/dashboard/overview' : '/dashboard/appeal',
   });
 
   return json({ appeal: resolved });
@@ -327,7 +327,7 @@ const handleStaffPasswordUpdate = requireRole('staff', async (request, _staffUse
     type: 'security',
     title: 'Your password was reset by staff',
     message: 'A staff member set a new password for your account and signed out all devices.',
-    link: '/dashboard?tab=account-settings',
+    link: '/dashboard/settings',
   });
 
   return json({ user: await toPublicUser(targetUser) });

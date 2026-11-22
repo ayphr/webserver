@@ -191,7 +191,7 @@ async function handleResetPassword(request: Request) {
     type: 'security',
     title: 'Your password was reset',
     message: 'The password for your account was reset and all devices were signed out.',
-    link: '/dashboard?tab=account-settings',
+    link: '/dashboard/settings',
   });
 
   if (user.email) {
@@ -297,7 +297,7 @@ const handleEmailConfirm = requireAuth(async (request, user) => {
     type: 'security',
     title: 'Your email address was changed',
     message: `Your account email address is now ${email}.`,
-    link: '/dashboard?tab=account-settings',
+    link: '/dashboard/settings',
   });
 
   if (previousEmail) {

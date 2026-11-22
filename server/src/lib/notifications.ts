@@ -314,7 +314,7 @@ export async function notifyLogin(
     type: 'login',
     title: 'New login to your account',
     message: `${device} · ${location}`,
-    link: '/dashboard?tab=account-settings',
+    link: '/dashboard/settings',
   });
 
   if (!options.sendEmail || !user.email || !user.emailVerifiedAt) return;

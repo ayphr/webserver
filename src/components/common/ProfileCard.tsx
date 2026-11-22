@@ -60,6 +60,9 @@ export interface ProfileCardProps {
   canEditProfile?: boolean;
   isPunishable?: boolean;
   onPunishSelf?: () => void;
+  /** When provided, edit mode is driven by the caller (usually the URL). */
+  isEditing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
 }
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({
@@ -69,12 +72,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   canEditProfile = false,
   isPunishable = false,
   onPunishSelf,
+  isEditing,
+  onEditingChange,
 }) => {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [countries, setCountries] = useState<ProfileCountriesPayload['countries']>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [internalEditing, setInternalEditing] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState('');
   const [bio, setBio] = useState('');
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({});
@@ -96,6 +101,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const [isDnsChecking, setIsDnsChecking] = useState(false);
   const [dnsError, setDnsError] = useState<string | null>(null);
   const [dnsSuccess, setDnsSuccess] = useState(false);
+
+  const isEditingProfile = isEditing ?? internalEditing;
+  const setEditingProfile = (editing: boolean) => {
+    if (isEditing === undefined) setInternalEditing(editing);
+    onEditingChange?.(editing);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -144,7 +155,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
       setSaveSuccess(true);
       if (saveSuccessTimeoutRef.current) clearTimeout(saveSuccessTimeoutRef.current);
       saveSuccessTimeoutRef.current = window.setTimeout(() => setSaveSuccess(false), 3000);
-      setIsEditingProfile(false);
+      setEditingProfile(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update profile';
       setError(message);
@@ -276,7 +287,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
         <div className="profile-card__actions">
           {canEditThisProfile && !isEditingProfile && (
             <Button
-              onClick={() => setIsEditingProfile(true)}
+              onClick={() => setEditingProfile(true)}
               variant="primary"
             >
               Edit Profile
@@ -293,7 +304,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
               <Button
                 variant="secondary"
                 onClick={() => {
-                  setIsEditingProfile(false);
+                  setEditingProfile(false);
                   setSelectedCountry(user.country ?? '');
                   setBio(user.bio ?? DEFAULT_BIO);
                   const nextSocialLinks = user.socialLinks ?? {};

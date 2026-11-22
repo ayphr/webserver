@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../common';
 import { api } from '../../lib/api';
+import type { GameId } from '../../lib/dashboardRoutes';
 import {
   IconBomb,
   IconCircleFilled,
@@ -15,16 +16,25 @@ import {
 } from '@tabler/icons-react';
 import './GamesPanel.css';
 
-type GameId = 'menu' | 'memory' | 'minesweeper';
+type Props = {
+  /** Selected game from the URL; omit to keep selection local. */
+  activeGame?: GameId | null;
+  onGameChange?: (game: GameId | null) => void;
+};
 
-export function GamesPanel() {
-  const [game, setGame] = useState<GameId>('menu');
+export function GamesPanel({ activeGame, onGameChange }: Props) {
+  const [internalGame, setInternalGame] = useState<GameId | null>(null);
+  const game = activeGame ?? internalGame ?? 'menu';
+  const selectGame = (next: GameId | null) => {
+    if (activeGame === undefined) setInternalGame(next);
+    onGameChange?.(next);
+  };
 
   return (
     <div className="games-panel">
       {game !== 'menu' && (
         <div className="games-panel__back">
-          <Button variant="secondary" onClick={() => setGame('menu')}>
+          <Button variant="secondary" onClick={() => selectGame(null)}>
             Back to menu
           </Button>
         </div>
@@ -35,11 +45,11 @@ export function GamesPanel() {
           <div className="games-panel__menu">
             <p className="games-panel__intro">Pick a game to play.</p>
             <div className="games-panel__menu-grid">
-              <button className="games-panel__menu-card" onClick={() => setGame('memory')}>
+              <button className="games-panel__menu-card" onClick={() => selectGame('memory')}>
                 <span className="games-panel__menu-title">Card Match</span>
                 <span className="games-panel__menu-desc">Flip cards and match coloured shapes.</span>
               </button>
-              <button className="games-panel__menu-card" onClick={() => setGame('minesweeper')}>
+              <button className="games-panel__menu-card" onClick={() => selectGame('minesweeper')}>
                 <span className="games-panel__menu-title">Minesweeper</span>
                 <span className="games-panel__menu-desc">Clear the board without hitting a mine.</span>
               </button>

@@ -4,19 +4,25 @@ import { Button, Select, Modal, PunishModal, Checkbox } from '../common';
 import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
 import type { PublicUser, Team, CreditBalance } from '@common';
 import { PLAN_NAMES, SUBSCRIPTION_TIERS } from '@common';
+import type { StaffUserTab } from '../../lib/dashboardRoutes';
 import '../common/Tabs.css';
-
-type Tab = 'overview' | 'teams' | 'usage' | 'actions';
 
 type TeamEntry = { team: Team; role: string };
 
 type Props = {
   user: PublicUser;
   onBack: () => void;
+  tab?: StaffUserTab;
+  onTabChange?: (tab: StaffUserTab) => void;
 };
 
-export function StaffUserDetailView({ user, onBack }: Props) {
-  const [tab, setTab] = useState<Tab>('overview');
+export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }: Props) {
+  const [internalTab, setInternalTab] = useState<StaffUserTab>('overview');
+  const tab = routeTab ?? internalTab;
+  const selectTab = (next: StaffUserTab) => {
+    if (routeTab === undefined) setInternalTab(next);
+    onTabChange?.(next);
+  };
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [devices, setDevices] = useState<{ count: number; dataPoints: number }>({ count: 0, dataPoints: 0 });
@@ -141,7 +147,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
     }
   };
 
-  const tabs: { id: Tab; label: string }[] = [
+  const tabs: { id: StaffUserTab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'teams', label: 'Teams' },
     { id: 'usage', label: 'Usage' },
@@ -163,7 +169,7 @@ export function StaffUserDetailView({ user, onBack }: Props) {
             key={t.id}
             type="button"
             className={`ui-tab${tab === t.id ? ' ui-tab--active' : ''}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => selectTab(t.id)}
           >
             {t.label}
           </button>

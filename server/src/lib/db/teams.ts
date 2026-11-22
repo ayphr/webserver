@@ -373,7 +373,7 @@ export async function removeTeamMember(params: {
     type: 'team',
     title: 'You were removed from a team',
     message: `${actor.username} removed you from ${team.name ?? 'the team'}.`,
-    link: '/dashboard?tab=overview',
+    link: '/dashboard/overview',
   });
 }
 
@@ -403,7 +403,7 @@ export async function updateTeamMemberRole(params: {
     type: 'team',
     title: 'Your team role was updated',
     message: `${actor.username} changed your team role to ${role} in ${team.name ?? 'the team'}.`,
-    link: '/dashboard?tab=team',
+    link: '/dashboard/team',
   });
 }
 

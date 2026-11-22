@@ -34,6 +34,12 @@ export type TeamSection = (typeof TEAM_SECTIONS)[number];
 export const LOCATION_DETAIL_TABS = ['overview', 'devices', 'history', 'settings'] as const;
 export type LocationDetailTab = (typeof LOCATION_DETAIL_TABS)[number];
 
+export const GAMES = ['memory', 'minesweeper'] as const;
+export type GameId = (typeof GAMES)[number];
+
+export const STAFF_USER_TABS = ['overview', 'teams', 'usage', 'actions'] as const;
+export type StaffUserTab = (typeof STAFF_USER_TABS)[number];
+
 export type AlertRouteAction = 'new' | 'edit';
 
 export type DeviceRouteState = {
@@ -55,11 +61,22 @@ export type AssistantRouteState = {
   chatId: string;
 };
 
+export type StaffUserRouteState = {
+  uuid: string;
+  tab?: StaffUserTab;
+};
+
 export type DashboardTarget = {
   tab: DashboardTab;
   device?: DeviceRouteState;
   location?: LocationRouteState;
   assistant?: AssistantRouteState;
+  /** Whether the profile form is open (only meaningful for the profile tab). */
+  profileEdit?: boolean;
+  /** Selected game (only meaningful for the games tab). */
+  game?: GameId;
+  /** User inspected by staff (only meaningful for the users tab). */
+  staffUser?: StaffUserRouteState;
   /** Settings section id or team section id, depending on `tab`. */
   section?: string;
 };
@@ -74,6 +91,8 @@ const TAB_SET: ReadonlySet<string> = new Set(DASHBOARD_TABS);
 const DETAIL_TAB_SET: ReadonlySet<string> = new Set(DEVICE_DETAIL_TABS);
 const TEAM_SECTION_SET: ReadonlySet<string> = new Set(TEAM_SECTIONS);
 const LOCATION_DETAIL_TAB_SET: ReadonlySet<string> = new Set(LOCATION_DETAIL_TABS);
+const GAME_SET: ReadonlySet<string> = new Set(GAMES);
+const STAFF_USER_TAB_SET: ReadonlySet<string> = new Set(STAFF_USER_TABS);
 
 /** Legacy query-string tabs and internal aliases mapped to canonical sections. */
 const LEGACY_TAB_PATHS: Record<string, string> = {
@@ -115,6 +134,20 @@ export function dashboardPath(target: DashboardTarget): string {
 
   if (target.tab === 'assistant' && target.assistant) {
     return `/dashboard/assistant/chat/${encodeURIComponent(target.assistant.chatId)}`;
+  }
+
+  if (target.tab === 'profile' && target.profileEdit) {
+    return '/dashboard/profile/edit';
+  }
+
+  if (target.tab === 'games' && target.game) {
+    return `/dashboard/games/${target.game}`;
+  }
+
+  if (target.tab === 'users' && target.staffUser) {
+    const base = `/dashboard/users/${encodeURIComponent(target.staffUser.uuid)}`;
+    const tab = target.staffUser.tab;
+    return tab && tab !== 'overview' ? `${base}/${tab}` : base;
   }
 
   if (target.tab === 'settings' && target.section) {
@@ -232,6 +265,57 @@ function parseAssistantParts(parts: string[]): ParsedDashboardRoute {
   return { ...target, canonicalPath: dashboardPath(target), valid: true };
 }
 
+function parseProfileParts(parts: string[]): ParsedDashboardRoute {
+  if (parts.length === 1) {
+    return { tab: 'profile', canonicalPath: '/dashboard/profile', valid: true };
+  }
+  if (parts.length === 2 && parts[1] === 'edit') {
+    const target: DashboardTarget = { tab: 'profile', profileEdit: true };
+    return { ...target, canonicalPath: dashboardPath(target), valid: true };
+  }
+  return invalid({ tab: 'profile' }, '/dashboard/profile');
+}
+
+function parseGamesParts(parts: string[]): ParsedDashboardRoute {
+  if (parts.length === 1) {
+    return { tab: 'games', canonicalPath: '/dashboard/games', valid: true };
+  }
+  const game = parts[1]!;
+  if (parts.length === 2 && GAME_SET.has(game)) {
+    const target: DashboardTarget = { tab: 'games', game: game as GameId };
+    return { ...target, canonicalPath: dashboardPath(target), valid: true };
+  }
+  return invalid({ tab: 'games' }, '/dashboard/games');
+}
+
+function parseStaffUserParts(parts: string[]): ParsedDashboardRoute {
+  const rawUuid = parts[1];
+  if (!rawUuid) {
+    return { tab: 'users', canonicalPath: '/dashboard/users', valid: parts.length === 1 };
+  }
+
+  let uuid: string;
+  try {
+    uuid = decodeURIComponent(rawUuid);
+  } catch {
+    return invalid({ tab: 'users' }, '/dashboard/users');
+  }
+  if (!uuid) return invalid({ tab: 'users' }, '/dashboard/users');
+
+  const base = `/dashboard/users/${encodeURIComponent(uuid)}`;
+  const tab = parts[2];
+  if (parts.length > 3 || (tab && !STAFF_USER_TAB_SET.has(tab))) {
+    return invalid({ tab: 'users', staffUser: { uuid } }, base);
+  }
+
+  const staffUser: StaffUserRouteState = {
+    uuid,
+    ...(tab && tab !== 'overview' ? { tab: tab as StaffUserTab } : {}),
+  };
+  const target: DashboardTarget = { tab: 'users', staffUser };
+  return { ...target, canonicalPath: dashboardPath(target), valid: true };
+}
+
 /** Parses both canonical dashboard paths and legacy `?tab=` links. */
 export function parseDashboardPath(pathname: string, legacyTab?: string | null): ParsedDashboardRoute {
   const path = pathname.replace(/\/+$/, '') || '/dashboard';
@@ -259,6 +343,12 @@ export function parseDashboardPath(pathname: string, legacyTab?: string | null):
   if (head === 'locations') return parseLocationParts(parts);
 
   if (head === 'assistant') return parseAssistantParts(parts);
+
+  if (head === 'profile') return parseProfileParts(parts);
+
+  if (head === 'games') return parseGamesParts(parts);
+
+  if (head === 'users') return parseStaffUserParts(parts);
 
   if (head === 'settings') {
     const section = parts[1];

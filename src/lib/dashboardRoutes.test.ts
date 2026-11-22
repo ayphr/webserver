@@ -36,6 +36,15 @@ describe('dashboardPath', () => {
     expect(dashboardPath({ tab: 'assistant', assistant: { chatId: 'chat-1' } })).toBe('/dashboard/assistant/chat/chat-1');
     expect(dashboardPath({ tab: 'assistant', assistant: { chatId: 'my chat/1' } })).toBe('/dashboard/assistant/chat/my%20chat%2F1');
   });
+
+  it('builds profile, game and staff user URLs', () => {
+    expect(dashboardPath({ tab: 'profile' })).toBe('/dashboard/profile');
+    expect(dashboardPath({ tab: 'profile', profileEdit: true })).toBe('/dashboard/profile/edit');
+    expect(dashboardPath({ tab: 'games', game: 'memory' })).toBe('/dashboard/games/memory');
+    expect(dashboardPath({ tab: 'users', staffUser: { uuid: 'u1' } })).toBe('/dashboard/users/u1');
+    expect(dashboardPath({ tab: 'users', staffUser: { uuid: 'u1', tab: 'overview' } })).toBe('/dashboard/users/u1');
+    expect(dashboardPath({ tab: 'users', staffUser: { uuid: 'my user/1', tab: 'actions' } })).toBe('/dashboard/users/my%20user%2F1/actions');
+  });
 });
 
 describe('parseDashboardPath', () => {
@@ -108,6 +117,35 @@ describe('parseDashboardPath', () => {
       assistant: { chatId: 'my chat/1' },
       valid: true,
     });
+    expect(parseDashboardPath('/dashboard/profile')).toMatchObject({
+      tab: 'profile',
+      canonicalPath: '/dashboard/profile',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/profile/edit')).toMatchObject({
+      tab: 'profile',
+      profileEdit: true,
+      canonicalPath: '/dashboard/profile/edit',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/games/memory')).toMatchObject({
+      tab: 'games',
+      game: 'memory',
+      canonicalPath: '/dashboard/games/memory',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/users/my%20user%2F1/actions')).toMatchObject({
+      tab: 'users',
+      staffUser: { uuid: 'my user/1', tab: 'actions' },
+      canonicalPath: '/dashboard/users/my%20user%2F1/actions',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/users/u1/overview')).toMatchObject({
+      tab: 'users',
+      staffUser: { uuid: 'u1' },
+      canonicalPath: '/dashboard/users/u1',
+      valid: true,
+    });
   });
 
   it('supports legacy query-string tabs', () => {
@@ -168,6 +206,24 @@ describe('parseDashboardPath', () => {
     expect(parseDashboardPath('/dashboard/assistant/chat/chat-1/extra')).toMatchObject({
       tab: 'assistant',
       canonicalPath: '/dashboard/assistant',
+      valid: false,
+    });
+  });
+
+  it('rejects invalid profile, game and staff user paths', () => {
+    expect(parseDashboardPath('/dashboard/profile/unknown')).toMatchObject({
+      tab: 'profile',
+      canonicalPath: '/dashboard/profile',
+      valid: false,
+    });
+    expect(parseDashboardPath('/dashboard/games/unknown')).toMatchObject({
+      tab: 'games',
+      canonicalPath: '/dashboard/games',
+      valid: false,
+    });
+    expect(parseDashboardPath('/dashboard/users/u1/unknown')).toMatchObject({
+      tab: 'users',
+      canonicalPath: '/dashboard/users/u1',
       valid: false,
     });
   });

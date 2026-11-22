@@ -195,6 +195,9 @@ export const DashboardPage = () => {
   const activePage = dashboardRoute.tab;
   const activeDevice = dashboardRoute.device;
   const routeChatId = dashboardRoute.assistant?.chatId ?? null;
+  const isEditingProfile = dashboardRoute.profileEdit === true;
+  const activeGame = dashboardRoute.game ?? null;
+  const staffUserRoute = dashboardRoute.staffUser ?? null;
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
@@ -879,6 +882,11 @@ export const DashboardPage = () => {
                   viewerUuid={user.uuid}
                   viewerRole={user.role}
                   canEditProfile
+                  isEditing={isEditingProfile}
+                  onEditingChange={(editing) => navigateToDashboard({
+                    tab: 'profile',
+                    ...(editing ? { profileEdit: true } : {}),
+                  })}
                   onPunishSelf={handleSelfPunishment}
                 />
               </DashboardPanel>
@@ -932,7 +940,13 @@ export const DashboardPage = () => {
                 className="dashboard-panel--full"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <UsersPanel />
+                  <UsersPanel
+                    routeUser={staffUserRoute}
+                    onRouteUserChange={(staffUser) => navigateToDashboard({
+                      tab: 'users',
+                      ...(staffUser ? { staffUser } : {}),
+                    })}
+                  />
                 </Suspense>
               </DashboardPanel>
             )}
@@ -974,7 +988,13 @@ export const DashboardPage = () => {
                 className="dashboard-panel--full dashboard-panel--centered"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <GamesPanel />
+                  <GamesPanel
+                    activeGame={activeGame}
+                    onGameChange={(game) => navigateToDashboard({
+                      tab: 'games',
+                      ...(game ? { game } : {}),
+                    })}
+                  />
                 </Suspense>
               </DashboardPanel>
             )}

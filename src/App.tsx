@@ -54,7 +54,11 @@ function DocumentTitle() {
     else if (path.startsWith('/link')) title = 'Connect a device — Ayphr';
     else if (path.startsWith('/dashboard')) {
       const route = parseDashboardPath(path, legacyTab);
-      const label = DASHBOARD_TITLES[route.tab] ?? 'Dashboard';
+      const label = route.profileEdit
+        ? 'Edit Profile'
+        : route.staffUser
+          ? 'User details'
+          : DASHBOARD_TITLES[route.tab] ?? 'Dashboard';
       title = route.device?.serial
         ? `Device ${route.device.serial} — Ayphr`
         : `${label} — Ayphr`;
@@ -168,6 +172,8 @@ function App() {
                 <Route path="/policies/refunds" element={<RefundPage />} />
                 <Route path="/policies/refund" element={<Navigate to="/policies/refunds" replace />} />
                 <Route path="/dashboard" element={dashboardElement} />
+                <Route path="/dashboard/profile/edit" element={dashboardElement} />
+                <Route path="/dashboard/profile/:userUuid/edit" element={<PolicyGate><EmailGate><ProfilePage initialEditing /></EmailGate></PolicyGate>} />
                 <Route path="/dashboard/profile/:userUuid" element={<PolicyGate><EmailGate><ProfilePage /></EmailGate></PolicyGate>} />
                 <Route path="/dashboard/*" element={dashboardElement} />
                 <Route path="*" element={<NotFoundPage />} />

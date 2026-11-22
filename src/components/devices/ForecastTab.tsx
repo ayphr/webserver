@@ -307,7 +307,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
     return (
       <div className="forecast-tab forecast-tab--locked">
         <p className="forecast-tab__locked-message">Forecasts are available for Plus &amp; Ultra plans.</p>
-        <Button variant="primary" onClick={() => onNavigate?.('subscription')}>
+        <Button variant="primary" onClick={() => onNavigate?.('credits')}>
           Go to subscription
         </Button>
       </div>

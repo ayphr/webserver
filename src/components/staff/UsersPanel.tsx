@@ -13,6 +13,7 @@ import { Button, Input, Pagination, PunishModal, Select, UsernameDisplay } from 
 import { StaffUserDetailView } from './StaffUserDetailView';
 import { SetPasswordModal } from './SetPasswordModal';
 import { getBadgeIcon } from '../../lib/badges';
+import type { StaffUserRouteState, StaffUserTab } from '../../lib/dashboardRoutes';
 import './UsersPanel.css';
 
 const PAGE_SIZE = 20;
@@ -54,7 +55,12 @@ type PagedUsers = {
   totalPages: number;
 };
 
-export const UsersPanel = () => {
+type Props = {
+  routeUser?: StaffUserRouteState | null;
+  onRouteUserChange?: (user: StaffUserRouteState | null) => void;
+};
+
+export const UsersPanel = ({ routeUser, onRouteUserChange }: Props) => {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -65,6 +71,8 @@ export const UsersPanel = () => {
   const [reloadToken, setReloadToken] = useState(0);
   const [punishTarget, setPunishTarget] = useState<PublicUser | null>(null);
   const [viewedUser, setViewedUser] = useState<PublicUser | null>(null);
+  const [isLoadingViewedUser, setIsLoadingViewedUser] = useState(false);
+  const routeUuid = routeUser?.uuid ?? null;
   const [passwordTarget, setPasswordTarget] = useState<PublicUser | null>(null);
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -109,6 +117,29 @@ export const UsersPanel = () => {
     };
   }, [debouncedSearch, filters.role, filters.tier, filters.status, page, reloadToken]);
 
+  // The inspected user lives in the URL so the detail view survives refreshes
+  // and browser back/forward navigation.
+  useEffect(() => {
+    if (!routeUuid) return;
+
+    let cancelled = false;
+    const load = async () => {
+      setViewedUser(null);
+      setIsLoadingViewedUser(true);
+      try {
+        const { user } = await api.users.getByUuid(routeUuid);
+        if (!cancelled) setViewedUser(user);
+      } catch {
+        if (!cancelled) setViewedUser(null);
+      } finally {
+        if (!cancelled) setIsLoadingViewedUser(false);
+      }
+    };
+    void load();
+
+    return () => { cancelled = true; };
+  }, [routeUuid]);
+
   const hasFilters = useMemo(
     () => Object.values(filters).some((value) => value !== ''),
     [filters],
@@ -131,8 +162,24 @@ export const UsersPanel = () => {
     }));
   };
 
-  if (viewedUser) {
-    return <StaffUserDetailView user={viewedUser} onBack={() => setViewedUser(null)} />;
+  if (routeUuid && !viewedUser) {
+    return (
+      <div>
+        <p className="users-panel__hint">{isLoadingViewedUser ? 'Loading user...' : 'User not found.'}</p>
+        <Button variant="secondary" onClick={() => onRouteUserChange?.(null)}>Back</Button>
+      </div>
+    );
+  }
+
+  if (viewedUser && routeUuid) {
+    return (
+      <StaffUserDetailView
+        user={viewedUser}
+        tab={routeUser?.tab}
+        onTabChange={(tab: StaffUserTab) => onRouteUserChange?.({ uuid: routeUuid!, tab })}
+        onBack={() => onRouteUserChange?.(null)}
+      />
+    );
   }
 
   return (
@@ -227,7 +274,7 @@ export const UsersPanel = () => {
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={() => setViewedUser(user)}
+                  onClick={() => onRouteUserChange?.({ uuid: user.uuid })}
                 >
                   <IconEye size={16} /> View
                 </Button>

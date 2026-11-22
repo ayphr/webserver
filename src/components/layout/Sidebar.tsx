@@ -241,7 +241,7 @@ export const Sidebar: React.FC<Props> = ({
           <button
             className={`n-sidebar__menuItem ${activeTab === 'account-settings' || activeTab === 'settings' ? 'active' : ''}`}
             type="button"
-            onClick={() => onChange('account-settings')}
+            onClick={() => onChange('settings')}
             aria-label="Settings"
             aria-current={activeTab === 'settings' || activeTab === 'account-settings' ? 'page' : undefined}
             {...tooltipHandlers('Settings')}

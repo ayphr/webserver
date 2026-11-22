@@ -249,7 +249,7 @@ export const LinkPage = () => {
             {result ? (
               <div className="link-page__result">
                 <p>Your device is now linked. On your device, click "I linked it" to receive the upload token.</p>
-                <Button variant="primary" onClick={() => navigate('/dashboard?tab=devices')}>
+                <Button variant="primary" onClick={() => navigate('/dashboard/devices')}>
                   Go to devices
                 </Button>
               </div>

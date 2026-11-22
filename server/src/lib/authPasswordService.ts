@@ -15,7 +15,7 @@ export async function changeUserPassword(user: User, newPassword: string): Promi
     type: 'security',
     title: 'Your password was changed',
     message: 'The password for your account was changed and all devices were signed out.',
-    link: '/dashboard?tab=account-settings',
+    link: '/dashboard/settings',
   });
 
   if (user.email) {
