@@ -116,6 +116,7 @@ export const DashboardPage = () => {
   const safeAppealsPage = Math.min(appealsPage, appealsTotalPages);
   const [isAppealsLoading, setIsAppealsLoading] = useState(false);
   const location = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const legacyTab = searchParams.get('tab');
   const preferredDefaultTab = getStoredDefaultTab();
@@ -187,6 +188,11 @@ export const DashboardPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uuid]);
 
+  // Each tab shares one scroll container; start new views at the top.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!activeSuspension) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -251,9 +257,14 @@ export const DashboardPage = () => {
 
   const now = useDashboardClock();
   const isSuspended = activeSuspension !== null;
-  const suspensionProgress = activeSuspension?.endsAt
-    ? Math.min(100, Math.max(0, ((now - toDate(activeSuspension.issuedAt).getTime()) / (toDate(activeSuspension.endsAt).getTime() - toDate(activeSuspension.issuedAt).getTime())) * 100))
-    : null;
+  const suspensionProgress = useMemo(() => {
+    if (!activeSuspension?.endsAt) return null;
+    const start = toDate(activeSuspension.issuedAt).getTime();
+    const end = toDate(activeSuspension.endsAt).getTime();
+    const span = end - start;
+    if (!Number.isFinite(span) || span <= 0) return null;
+    return Math.min(100, Math.max(0, ((now - start) / span) * 100));
+  }, [activeSuspension, now]);
   const isStaff = user?.role === 'staff';
   const isTeamMember = Boolean(user?.teamId);
   const isTeamManager = user?.teamRole === 'manager';
@@ -494,8 +505,9 @@ export const DashboardPage = () => {
   if (!user) {
     return (
       <div className={`dashboard-layout`}>
+        <a className="sr-only skip-link" href="#main-content">Skip to content</a>
         <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} />
-        <main className="dashboard-main">
+        <main className="dashboard-main" id="main-content" ref={mainRef} tabIndex={-1}>
           <DashboardPanel title="Dashboard">
             <p>Could not load user profile.</p>
           </DashboardPanel>
@@ -506,8 +518,9 @@ export const DashboardPage = () => {
 
   return (
     <div className={`dashboard-layout`}>
+      <a className="sr-only skip-link" href="#main-content">Skip to content</a>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
-      <main className="dashboard-main">
+      <main className="dashboard-main" id="main-content" ref={mainRef}>
         {isSuspended && activePage !== 'profile' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
             <div className="dashboard-page__suspension-card">

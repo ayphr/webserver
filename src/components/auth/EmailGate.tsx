@@ -203,14 +203,18 @@ export const EmailGate = ({
             <p>Ayphr now requires a verified email address on every account. Add one to continue.</p>
           </CardHeader>
           <CardBody>
-            {error && <div className="email-gate__error">{error}</div>}
+            {error && <div className="email-gate__error" role="alert">{error}</div>}
 
             {step === 'email' && (
-              <div className="email-gate__form">
+              <form className="email-gate__form" onSubmit={(e) => { e.preventDefault(); void handleRequestCode(); }}>
                 <Input
                   label="Email address"
                   name="email"
                   type="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -221,28 +225,30 @@ export const EmailGate = ({
                   label="Current password"
                   name="password"
                   type="password"
+                  autoComplete="current-password"
+                  revealable
                   placeholder="Enter your current password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
                   fullWidth
                 />
-                <Button variant="primary" fullWidth isLoading={isLoading} onClick={handleRequestCode}>
+                <Button variant="primary" fullWidth isLoading={isLoading} type="submit">
                   Send verification code
                 </Button>
                 <Button variant="secondary" fullWidth disabled={isLoading} onClick={handleLogout}>
                   Log out
                 </Button>
-              </div>
+              </form>
             )}
 
             {step === 'code' && (
-              <div className="email-gate__form">
+              <form className="email-gate__form" onSubmit={(e) => { e.preventDefault(); void handleConfirm(); }}>
                 <p className="email-gate__hint">
                   We sent a {EMAIL_CODE_LENGTH}-digit code to <strong>{email}</strong>. Enter it to verify your email.
                 </p>
-                <CodeInput value={code} onChange={setCode} disabled={isLoading} />
-                <Button variant="primary" fullWidth isLoading={isLoading} onClick={handleConfirm}>
+                <CodeInput value={code} onChange={setCode} disabled={isLoading} autoFocus />
+                <Button variant="primary" fullWidth isLoading={isLoading} type="submit">
                   Verify email
                 </Button>
                 <div className="email-gate__resend">
@@ -256,7 +262,7 @@ export const EmailGate = ({
                 <Button variant="secondary" fullWidth disabled={isLoading} onClick={handleLogout}>
                   Log out
                 </Button>
-              </div>
+              </form>
             )}
           </CardBody>
         </Card>

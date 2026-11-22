@@ -14,7 +14,7 @@
 
   --text-primary: hsla(180, 67%, 99%, 1);
   --text-muted: hsl(180, 1%, 53%);
-  --text-dim: hsl(180, 1%, 30%);
+  --text-dim: hsl(180, 1%, 45%);
 
   --accent-green: hsla(129, 77%, 43%, 0.75);
   --accent-yellow: hsla(41, 99%, 59%, 0.75);
@@ -51,6 +51,13 @@
   --radius-md: 0.625rem;
   --radius-lg: 0.875rem;
 
+  --focus-ring: hsl(145, 80%, 65%);
+
+  --z-dropdown: 100;
+  --z-modal-backdrop: 1000;
+  --z-modal: 1001;
+  --z-tooltip: 900;
+
   --container-shadow: 0 2px 0.5rem rgba(0, 0, 0, 0.3);
 
   --font-weight-li: 400;
@@ -82,6 +89,12 @@
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-dim) transparent;
+}
+
+:root {
+  color-scheme: dark;
 }
 
 html,
@@ -98,9 +111,48 @@ body {
   font-weight: var(--font-weight-li);
   line-height: 1.4;
   overflow: hidden;
-  user-select: none;
   text-rendering: optimizeLegibility;
   background-color: var(--bg-base);
+}
+
+/* Keep text copyable everywhere; only suppress selection on app chrome. */
+button,
+.n-sidebar,
+.ui-tabs,
+.sidebar-list__item,
+.select__trigger,
+.toggle-dropdown__trigger,
+.assistant-dropdown__trigger {
+  user-select: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link:focus {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 10000;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  clip: auto;
+  overflow: visible;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--focus-ring);
+  border-radius: var(--radius-sm);
 }
 
 img.emoji {
@@ -118,28 +170,45 @@ select {
   font: inherit;
 }
 
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: none;
+/* Keyboard-only focus ring. Text fields match :focus-visible on mouse clicks
+   too, so `FocusModeWatcher` adds `.keyboard-focus` only for keyboard input.
+   `!important` is deliberate: several controls reset `outline` on :focus. */
+:where(html.keyboard-focus) :where(a[href], button, input, textarea, select, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 2px !important;
 }
 
-body::-webkit-scrollbar {
+*::-webkit-scrollbar {
   width: 0.5rem;
+  height: 0.5rem;
 }
 
-body::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
   background: var(--text-dim);
   border: 2px solid transparent;
   background-clip: padding-box;
   border-radius: 999px;
 }
 
-body::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .turbo-gradient-stop--a {

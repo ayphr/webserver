@@ -18,6 +18,88 @@ const LandingPage = lazy(() => import('./pages/landing/LandingPage').then((m) =>
 const LinkPage = lazy(() => import('./pages/link/LinkPage').then((m) => ({ default: m.LinkPage })));
 const NotFoundPage = lazy(() => import('./pages/notFound/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
+const DASHBOARD_TITLES: Record<string, string> = {
+  overview: 'Overview',
+  devices: 'Devices',
+  queries: 'Queries',
+  locations: 'Locations',
+  games: 'Games',
+  radio: 'Radio',
+  assistant: 'Iris Assistant',
+  profile: 'Profile',
+  settings: 'Settings',
+  notifications: 'Notifications',
+  credits: 'Credits',
+  users: 'Users',
+  team: 'Team',
+  integrations: 'Integrations',
+  appeal: 'Appeal',
+  appeals: 'Appeals',
+};
+
+function DocumentTitle() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname;
+    const legacyTab = new URLSearchParams(location.search).get('tab');
+    let title = 'Ayphr — Sensor data, without the plumbing';
+
+    if (path.startsWith('/auth/login')) title = 'Log in — Ayphr';
+    else if (path.startsWith('/auth/register')) title = 'Sign up — Ayphr';
+    else if (path.startsWith('/policies/terms')) title = 'Terms of Service — Ayphr';
+    else if (path.startsWith('/policies/privacy')) title = 'Privacy Policy — Ayphr';
+    else if (path.startsWith('/policies/refund')) title = 'Refund Policy — Ayphr';
+    else if (path.startsWith('/policies')) title = 'Policies — Ayphr';
+    else if (path.startsWith('/link')) title = 'Connect a device — Ayphr';
+    else if (path.startsWith('/dashboard')) {
+      const route = parseDashboardPath(path, legacyTab);
+      const label = DASHBOARD_TITLES[route.tab] ?? 'Dashboard';
+      title = route.device?.serial
+        ? `Device ${route.device.serial} — Ayphr`
+        : `${label} — Ayphr`;
+    } else if (path !== '/') title = 'Page not found — Ayphr';
+
+    document.title = title;
+  }, [location]);
+
+  return null;
+}
+
+function FocusModeWatcher() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const enable = (event: KeyboardEvent) => {
+      // Keep the visual ring for keyboard navigation only. Text fields match
+      // :focus-visible on pointer clicks too, so track the input modality.
+      if (
+        event.key === 'Tab' ||
+        event.key === 'Enter' ||
+        event.key === ' ' ||
+        event.key.startsWith('Arrow') ||
+        event.key === 'Home' ||
+        event.key === 'End' ||
+        event.key === 'PageUp' ||
+        event.key === 'PageDown'
+      ) {
+        root.classList.add('keyboard-focus');
+      }
+    };
+    const disable = () => root.classList.remove('keyboard-focus');
+
+    document.addEventListener('keydown', enable, true);
+    document.addEventListener('pointerdown', disable, true);
+    document.addEventListener('mousedown', disable, true);
+    return () => {
+      document.removeEventListener('keydown', enable, true);
+      document.removeEventListener('pointerdown', disable, true);
+      document.removeEventListener('mousedown', disable, true);
+    };
+  }, []);
+
+  return null;
+}
+
 function TooltipRouteWatcher() {
   const location = useLocation();
   const { hideTooltip } = useTooltip();
@@ -64,6 +146,8 @@ function App() {
         <RadioProvider>
           <BrowserRouter>
             <TooltipRouteWatcher />
+            <FocusModeWatcher />
+            <DocumentTitle />
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<LandingPage />} />

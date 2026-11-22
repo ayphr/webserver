@@ -120,12 +120,12 @@ export const Sidebar: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const { showTooltip, hideTooltip } = useTooltip();
 
-  const accountTooltip = `Account: ${username}`;
+  const accountTooltip = `Account menu for ${username}`;
   const notificationsLabel = unreadNotifications > 0
     ? `Notifications (${unreadNotifications} unread)`
     : 'Notifications';
 
-  // The credits and account controls keep tooltips while collapsed.
+  // Icon-only controls keep tooltips while the sidebar is collapsed.
   const tooltipHandlers = (content: string) => {
     if (pinned) return {};
 
@@ -170,10 +170,12 @@ export const Sidebar: React.FC<Props> = ({
         {isSuspended ? (
           <>
             <button
-              className={`n-sidebar__tab ${activeTab === 'appeal' ? '' : 'active'}`}
+              className={`n-sidebar__tab ${activeTab === 'overview' || activeTab === 'suspension' ? 'active' : ''}`}
               type="button"
               onClick={() => onChange('overview')}
               aria-label="Suspension"
+              aria-current={activeTab === 'overview' || activeTab === 'suspension' ? 'page' : undefined}
+              {...tooltipHandlers('Suspension')}
             >
               <span className="n-sidebar__icon">{iconFor('suspension')}</span>
               <span className="n-sidebar__label">Suspension</span>
@@ -183,6 +185,8 @@ export const Sidebar: React.FC<Props> = ({
               type="button"
               onClick={() => onChange('appeal')}
               aria-label="Appeal"
+              aria-current={activeTab === 'appeal' ? 'page' : undefined}
+              {...tooltipHandlers('Appeal')}
             >
               <span className="n-sidebar__icon">{iconFor('appeal')}</span>
               <span className="n-sidebar__label">Appeal</span>
@@ -196,6 +200,8 @@ export const Sidebar: React.FC<Props> = ({
               onClick={() => onChange(t.id)}
               type="button"
               aria-label={t.name}
+              aria-current={activeTab === t.id ? 'page' : undefined}
+              {...tooltipHandlers(t.name)}
             >
               <span className="n-sidebar__icon">{iconFor(t.id)}</span>
               <span className="n-sidebar__label">{t.name}</span>
@@ -211,6 +217,8 @@ export const Sidebar: React.FC<Props> = ({
         className={`n-sidebar__credits ${activeTab === 'credits' ? 'active' : ''}`}
         onClick={() => onChange('credits')}
         aria-label={credits ? `Credits: ${formatCredits(credits.available)} available` : 'Credits'}
+        aria-current={activeTab === 'credits' ? 'page' : undefined}
+        {...tooltipHandlers(credits ? `${formatCredits(credits.available)} credits available` : 'Credits')}
       >
         <span className="n-sidebar__creditsIcon"><IconCoin size={18} strokeWidth={1.5} /></span>
         <span className="n-sidebar__creditsAmount">{credits ? formatCredits(credits.available) : '—'}</span>
@@ -224,6 +232,8 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('profile')}
             aria-label="Profile"
+            aria-current={activeTab === 'profile' ? 'page' : undefined}
+            {...tooltipHandlers('Profile')}
           >
             <span className="n-sidebar__menuIcon"><IconUser size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Profile</span>
@@ -233,6 +243,8 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('account-settings')}
             aria-label="Settings"
+            aria-current={activeTab === 'settings' || activeTab === 'account-settings' ? 'page' : undefined}
+            {...tooltipHandlers('Settings')}
           >
             <span className="n-sidebar__menuIcon"><IconSettings size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Settings</span>
@@ -242,6 +254,8 @@ export const Sidebar: React.FC<Props> = ({
             type="button"
             onClick={() => onChange('notifications')}
             aria-label={notificationsLabel}
+            aria-current={activeTab === 'notifications' ? 'page' : undefined}
+            {...tooltipHandlers(notificationsLabel)}
           >
             <span className="n-sidebar__menuIcon">
               <IconBell size={16} strokeWidth={1.5} />

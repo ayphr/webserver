@@ -228,7 +228,7 @@ export const PolicyGate = ({
               ))}
             </ul>
 
-            {error && <div className="policy-gate__error">{error}</div>}
+            {error && <div className="policy-gate__error" role="alert">{error}</div>}
 
             <div className="policy-gate__actions">
               <Button
@@ -275,10 +275,14 @@ export const PolicyGate = ({
           undone. Confirm your password to continue.
         </p>
         <Input
+          label="Current password"
           type="password"
+          autoComplete="current-password"
+          revealable
           value={deletePassword}
           placeholder="Enter your password"
           onChange={(e) => setDeletePassword(e.target.value)}
+          fullWidth
         />
       </ConfirmDialog>
     </div>

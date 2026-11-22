@@ -203,7 +203,14 @@ const INTEGRATIONS = [
   'Discord'
 ];
 
-const LOGOS = ['Placeholder', 'Placeholder', 'Placeholder', 'Placeholder', 'Placeholder', 'Placeholder'];
+const LOGOS = [
+  'MQTT',
+  'REST API',
+  'Webhooks',
+  'CSV export',
+  'JSON export',
+  'Device tokens',
+];
 
 const FeatureVisual = ({ index }: { index: number }) => {
   if (index === 0) {
@@ -471,9 +478,9 @@ export const LandingPage = () => {
         </section>
 
         {/* Logos */}
-        <section className="landing-logos" aria-label="Trusted by">
+        <section className="landing-logos" aria-label="Platform capabilities">
           <Reveal>
-            <p className="landing-logos__label">Used by</p>
+            <p className="landing-logos__label">Works with</p>
           </Reveal>
           <div className="landing-logos__marquee">
             <div
@@ -716,15 +723,25 @@ export const LandingPage = () => {
               return (
                 <Reveal key={f.q} delay={i * 60}>
                   <div className={`landing-faq__item ${open ? 'landing-faq__item--open' : ''}`}>
-                    <button
-                      className="landing-faq__question"
-                      onClick={() => setOpenFaq(open ? null : i)}
-                      aria-expanded={open}
+                    <h3>
+                      <button
+                        className="landing-faq__question"
+                        onClick={() => setOpenFaq(open ? null : i)}
+                        aria-expanded={open}
+                        aria-controls={`faq-answer-${i}`}
+                        id={`faq-question-${i}`}
+                      >
+                        <span>{f.q}</span>
+                        {open ? <IconMinus size={18} aria-hidden="true" /> : <IconPlus size={18} aria-hidden="true" />}
+                      </button>
+                    </h3>
+                    <div
+                      className={`landing-faq__answer ${open ? 'landing-faq__answer--open' : ''}`}
+                      id={`faq-answer-${i}`}
+                      role="region"
+                      aria-labelledby={`faq-question-${i}`}
+                      aria-hidden={!open}
                     >
-                      <span>{f.q}</span>
-                      {open ? <IconMinus size={18} /> : <IconPlus size={18} />}
-                    </button>
-                    <div className={`landing-faq__answer ${open ? 'landing-faq__answer--open' : ''}`}>
                       <div className="landing-faq__answer-inner">
                         <p>{f.a}</p>
                       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { IconX } from '@tabler/icons-react';
+import { IconCheck, IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay, CodeInput } from '../../components/common';
 import { getActiveToken, getStoredAccounts, isStoredAccountExpired, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
@@ -29,13 +29,18 @@ export interface AuthPageProps {
 
 function PasswordChecklist({ checks }: Readonly<{ checks: PasswordValidationChecks }>) {
   return (
-    <ul className="auth-form__password-checklist">
-      {PASSWORD_RULES.filter((rule) => !checks[rule.key]).map((rule) => (
-        <li key={rule.key} className="is-invalid">
-          <span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>
-          {rule.label}
-        </li>
-      ))}
+    <ul className="auth-form__password-checklist" aria-live="polite">
+      {PASSWORD_RULES.map((rule) => {
+        const valid = checks[rule.key];
+        return (
+          <li key={rule.key} className={valid ? 'is-valid' : 'is-invalid'}>
+            <span className="auth-form__password-rule-icon" aria-hidden="true">
+              {valid ? <IconCheck size={14} strokeWidth={2} /> : <IconX size={14} strokeWidth={2} />}
+            </span>
+            {rule.label}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -323,20 +328,8 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
   const isSignup = mode === 'signup';
   const hasEnteredPassword = formData.password.length > 0;
-  const hasUnsatisfiedPasswordRequirements =
-    !passwordChecks.minLength ||
-    !passwordChecks.lowercase ||
-    !passwordChecks.uppercase ||
-    !passwordChecks.number ||
-    !passwordChecks.symbol;
 
   const resetPasswordChecks = getPasswordValidationChecks(resetPassword);
-  const resetHasUnsatisfied =
-    !resetPasswordChecks.minLength ||
-    !resetPasswordChecks.lowercase ||
-    !resetPasswordChecks.uppercase ||
-    !resetPasswordChecks.number ||
-    !resetPasswordChecks.symbol;
 
   let title = isSignup ? 'Sign Up' : 'Log In';
   if (isSignup && step === 'email-code') title = 'Verify Your Email';
@@ -353,7 +346,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
         <Card elevated className="auth-page__card">
           <CardHeader>
-            <h2>{title}</h2>
+            <h2 aria-live="polite">{title}</h2>
           </CardHeader>
 
           <CardBody>
@@ -377,11 +370,11 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
             )}
 
             {authError && (
-              <div className="auth-form__error-banner">{authError}</div>
+              <div className="auth-form__error-banner" role="alert">{authError}</div>
             )}
 
             {notice && (
-              <div className="auth-form__notice">{notice}</div>
+              <div className="auth-form__notice" role="status" aria-live="polite">{notice}</div>
             )}
 
             {mode === 'signup' && step === 'email-code' && (
@@ -389,7 +382,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                 <p className="auth-form__code-hint">
                   We sent a {EMAIL_CODE_LENGTH}-digit code to <strong>{formData.email}</strong>. Enter it below to verify your email and finish creating your account.
                 </p>
-                <CodeInput value={code} onChange={setCode} />
+                <CodeInput value={code} onChange={setCode} autoFocus />
                 <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
                   Verify &amp; Create Account
                 </Button>
@@ -410,9 +403,14 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   label="Email or username"
                   name="identifier"
                   type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="Enter your email or username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
+                  disabled={isLoading}
                   fullWidth
                 />
                 <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
@@ -431,26 +429,32 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                 <p className="auth-form__code-hint">
                   If an account exists for <strong>{identifier}</strong>, we've sent a {EMAIL_CODE_LENGTH}-digit code to its email address.
                 </p>
-                <CodeInput value={code} onChange={setCode} />
+                <CodeInput value={code} onChange={setCode} autoFocus />
                 <Input
                   label="New password"
                   name="resetPassword"
                   type="password"
+                  autoComplete="new-password"
+                  revealable
                   placeholder="Create a new password"
                   value={resetPassword}
                   onChange={(e) => setResetPassword(e.target.value)}
+                  disabled={isLoading}
                   fullWidth
                 />
-                {resetPassword.length > 0 && resetHasUnsatisfied && (
+                {resetPassword.length > 0 && (
                   <PasswordChecklist checks={resetPasswordChecks} />
                 )}
                 <Input
                   label="Confirm new password"
                   name="resetConfirmPassword"
                   type="password"
+                  autoComplete="new-password"
+                  revealable
                   placeholder="Re-enter the new password"
                   value={resetConfirmPassword}
                   onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  disabled={isLoading}
                   fullWidth
                 />
                 <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
@@ -472,7 +476,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                 <p className="auth-form__code-hint">
                   We noticed a sign-in from a new device. We sent a {EMAIL_CODE_LENGTH}-digit code to your email. Enter it to finish signing in.
                 </p>
-                <CodeInput value={code} onChange={setCode} />
+                <CodeInput value={code} onChange={setCode} autoFocus />
                 <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
                   Verify &amp; Sign In
                 </Button>
@@ -494,8 +498,8 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                     } finally {
                       setIsLoading(false);
                     }
-                  }} disabled={isLoading}>
-                    Resend code
+                  }} disabled={isLoading || resendCooldown > 0}>
+                    {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
                   </Button>
                   <Button variant="secondary" onClick={() => { setStep('form'); setCode(''); setAuthError(null); }} disabled={isLoading}>
                     Back to log in
@@ -510,10 +514,15 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   label={isSignup ? 'Username' : 'Email or username'}
                   name="username"
                   type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder={isSignup ? 'Enter your username' : 'Enter your email or username'}
                   value={formData.username}
                   onChange={handleInputChange}
                   error={errors.username}
+                  disabled={isLoading}
                   fullWidth
                 />
 
@@ -522,10 +531,15 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                     label="Email"
                     name="email"
                     type="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder="Enter your email"
                     value={formData.email || ''}
                     onChange={handleInputChange}
                     error={errors.email}
+                    disabled={isLoading}
                     fullWidth
                   />
                 )}
@@ -534,10 +548,13 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   label="Password"
                   name="password"
                   type="password"
+                  autoComplete={isSignup ? 'new-password' : 'current-password'}
+                  revealable
                   placeholder={isSignup ? 'Create a password' : 'Enter your password'}
                   value={formData.password}
                   onChange={handleInputChange}
                   error={errors.password}
+                  disabled={isLoading}
                   fullWidth
                 />
 
@@ -549,7 +566,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   </div>
                 )}
 
-                {isSignup && hasEnteredPassword && hasUnsatisfiedPasswordRequirements && (
+                {isSignup && hasEnteredPassword && (
                   <PasswordChecklist checks={passwordChecks} />
                 )}
 
@@ -558,10 +575,13 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                     label="Confirm Password"
                     name="confirmPassword"
                     type="password"
+                    autoComplete="new-password"
+                    revealable
                     placeholder="Confirm your password"
                     value={formData.confirmPassword || ''}
                     onChange={handleInputChange}
                     error={errors.confirmPassword}
+                    disabled={isLoading}
                     fullWidth
                   />
                 )}
@@ -619,7 +639,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
             <a href="/policies/terms" className="auth-page__link">Terms</a>
             <a href="/policies/privacy" className="auth-page__link">Privacy</a>
           </p>
-          <p>&copy; 2026 Ayphr. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Ayphr. All rights reserved.</p>
         </div>
       </div>
     </div>

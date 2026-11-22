@@ -3,14 +3,14 @@
   flex-direction: column;
   gap: 0.25rem;
 
-  :is(--full-width) {
+  &.input-wrapper--full-width {
     width: 100%;
   }
 }
 
 .input-label {
   display: block;
-  color: hsl(180, 67%, 99%, 0.6);
+  color: var(--text-muted);
   font-weight: 500;
   font-size: 0.85rem;
   text-transform: none;
@@ -18,7 +18,16 @@
   margin-bottom: 0.25rem;
 }
 
+.input-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
 .input {
+  flex: 1;
+  min-width: 0;
   background-color: hsl(0, 0%, 10%);
   border: 1px solid hsl(0, 0%, 16%);
   border-radius: var(--radius-md);
@@ -29,14 +38,17 @@
   transition: border-color 0.15s ease, background-color 0.15s ease;
 
   &::placeholder {
-    color: hsl(0, 0%, 40%);
+    color: hsl(0, 0%, 55%);
+  }
+
+  &:hover:not(:disabled) {
+    border-color: hsl(0, 0%, 22%);
   }
 
   &:focus {
     background-color: hsl(0, 0%, 12%);
-    border-color: hsl(0, 0%, 28%);
+    border-color: hsl(0, 0%, 34%);
     box-shadow: none;
-    outline: none;
   }
 
   &:disabled {
@@ -46,12 +58,34 @@
     border-color: hsl(0, 0%, 14%);
   }
 
-  :is(--error) {
+  &.input--error,
+  &.input--error:focus {
     border-color: var(--accent-red);
+  }
 
-    &:focus {
-      box-shadow: none;
-    }
+  &.input--revealable {
+    padding-right: 2.75rem;
+  }
+}
+
+.input__reveal {
+  position: absolute;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+
+  &:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-elevated);
   }
 }
 
