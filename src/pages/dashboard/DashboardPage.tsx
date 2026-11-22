@@ -634,7 +634,11 @@ export const DashboardPage = () => {
     <div className={`dashboard-layout`}>
       <a className="sr-only skip-link" href="#main-content">Skip to content</a>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
-      <main className="dashboard-main" id="main-content" ref={mainRef}>
+      <main
+        className={`dashboard-main${activePage === 'assistant' ? ' dashboard-main--assistant' : ''}`}
+        id="main-content"
+        ref={mainRef}
+      >
         {inviteToken && inviteError && dismissedInviteError !== inviteError && (
           <DashboardBanner
             title="Could not accept team invite"

@@ -588,6 +588,7 @@ export const AssistantInput = ({
         )}
         {isChat && (
           <AssistantMessages
+            key={state.activeChatId ?? 'new'}
             messages={messages}
             queuedMessages={queuedMessages}
             streamingMessageId={streamingMessageId}

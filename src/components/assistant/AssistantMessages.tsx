@@ -203,6 +203,22 @@ export const AssistantMessages = ({
   onCopy,
 }: AssistantMessagesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+
+  // Only follow new output while the user is already at the bottom, so scrolling
+  // back through a long chat is not yanked forward as tokens arrive.
+  const handleScroll = () => {
+    const element = containerRef.current;
+    if (!element) return;
+    stickToBottomRef.current =
+      element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+  };
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || !stickToBottomRef.current) return;
+    element.scrollTop = element.scrollHeight;
+  }, [messages, queuedMessages, streamingMessageId]);
 
   useDismiss(null, () => onOpenMenuChange(null), {
     enabled: openMenuId !== null,
@@ -216,7 +232,7 @@ export const AssistantMessages = ({
   });
 
   return (
-    <div className="assistant-chat__messages" ref={containerRef}>
+    <div className="assistant-chat__messages" ref={containerRef} onScroll={handleScroll}>
       {messages.map((message) => {
         const isStreaming = streamingMessageId === message.id;
         const isLatestAssistant =

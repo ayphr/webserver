@@ -72,6 +72,13 @@ function FocusModeWatcher() {
     const enable = (event: KeyboardEvent) => {
       // Keep the visual ring for keyboard navigation only. Text fields match
       // :focus-visible on pointer clicks too, so track the input modality.
+      const target = event.target;
+      const isTextField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      if (isTextField && event.key !== 'Tab') return;
+
       if (
         event.key === 'Tab' ||
         event.key === 'Enter' ||

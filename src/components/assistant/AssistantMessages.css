@@ -1,8 +1,14 @@
 .assistant-chat__messages {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 0.85rem;
-  padding-bottom: 9rem;
+  min-height: 0;
+  padding: 0 0 3.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent 100%);
 }
 
 .assistant-chat__message {

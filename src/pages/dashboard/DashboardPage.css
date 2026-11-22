@@ -23,6 +23,10 @@
   gap: 1rem;
 }
 
+.dashboard-main--assistant:has(.assistant-input--chat) {
+  overflow: hidden;
+}
+
 .dashboard-main:has(> .dashboard-page__banner) > .dashboard-panel {
   margin: auto;
 }
@@ -34,6 +38,7 @@
   gap: 2.25rem;
   width: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 .dashboard-assistant__sidebar-slot {
@@ -47,6 +52,8 @@
   flex: 1;
   max-width: 768px;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .dashboard-panel {
