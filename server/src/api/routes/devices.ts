@@ -14,6 +14,7 @@ import {
   countDataPointsForDevice,
   getDataPointStats,
   getDataPointsForDevice,
+  getDataPointsForExport,
   getDataPointsForQuery,
   deleteAllDataPointsForDevice,
   deleteDataPointsForDevice,
@@ -68,7 +69,21 @@ import { deviceQueryQueue } from '../../lib/deviceQueryQueue';
 import { linkDevice } from '../../lib/deviceLinkService';
 import { uploadDeviceTelemetry } from '../../lib/deviceUploadService';
 import { getDeviceUptime } from '../../lib/deviceUptimeService';
-import { countDeviceLogs, listDeviceLogs, queueDeviceLog } from '../../lib/deviceLogService';
+import {
+  countDeviceLogs,
+  listDeviceLogs,
+  listDeviceLogsForExport,
+  parseDeviceLogFilter,
+  queueDeviceLog,
+} from '../../lib/deviceLogService';
+import {
+  dataPointsToCsv,
+  deviceLogsToCsv,
+  fileResponse,
+  logExportCompleted,
+  parseExportFormat,
+  parseIsoTimestamp,
+} from '../../lib/deviceExportService';
 
 const pairingRequestLimiter = createRateLimiter(15 * 60 * 1000, 20, 'pairing-request');
 const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
@@ -217,6 +232,9 @@ const handleDeviceLogs = requireAuth(async (request, user: User, params) => {
   if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   const query = new URL(request.url).searchParams;
+  const parsedFilter = parseDeviceLogFilter(query);
+  if (parsedFilter.error) return json({ error: parsedFilter.error }, 400);
+
   const page = parsePositiveInt(query.get('page'), 1);
   const pageSize = Math.min(
     parsePositiveInt(query.get('pageSize'), DEFAULT_DEVICE_LOG_PAGE_SIZE),
@@ -224,9 +242,10 @@ const handleDeviceLogs = requireAuth(async (request, user: User, params) => {
   );
   const skip = (page - 1) * pageSize;
 
+  // The same filter drives both reads so pagination totals stay correct.
   const [logs, total] = await Promise.all([
-    listDeviceLogs(serial, { skip, limit: pageSize }),
-    countDeviceLogs(serial),
+    listDeviceLogs(serial, { skip, limit: pageSize, filter: parsedFilter.filter }),
+    countDeviceLogs(serial, parsedFilter.filter),
   ]);
 
   return json({
@@ -235,6 +254,70 @@ const handleDeviceLogs = requireAuth(async (request, user: User, params) => {
     page,
     pageSize,
     totalPages: Math.ceil(total / pageSize),
+  });
+});
+
+const handleExportDeviceLogs = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  const query = new URL(request.url).searchParams;
+  const format = parseExportFormat(query.get('format'));
+  if (!format) return json({ error: 'invalid format' }, 400);
+
+  const parsedFilter = parseDeviceLogFilter(query);
+  if (parsedFilter.error) return json({ error: parsedFilter.error }, 400);
+
+  const { logs, truncated } = await listDeviceLogsForExport(serial, parsedFilter.filter);
+  const body = format === 'csv' ? deviceLogsToCsv(logs) : JSON.stringify(logs);
+  logExportCompleted('logs', serial, logs.length, truncated);
+
+  return fileResponse({
+    body,
+    format,
+    filename: `device-${serial}-logs.${format}`,
+    truncated,
+  });
+});
+
+const handleExportDeviceData = requireAuth(async (request, user: User, params) => {
+  const serial = parseSerial(params.serial);
+  if (serial === null) return json({ error: 'invalid serial' }, 400);
+
+  const device = await getDeviceBySerial(serial);
+  if (!device) return json({ error: 'not found' }, 404);
+  const scopeUuid = await getTeamScopeUuid(user);
+  if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+
+  const query = new URL(request.url).searchParams;
+  const format = parseExportFormat(query.get('format'));
+  if (!format) return json({ error: 'invalid format' }, 400);
+
+  const fromParam = query.get('from');
+  const toParam = query.get('to');
+  if (!fromParam || !toParam) return json({ error: 'from and to are required' }, 400);
+
+  const from = parseIsoTimestamp(fromParam);
+  const to = parseIsoTimestamp(toParam);
+  if (!from) return json({ error: 'invalid from timestamp' }, 400);
+  if (!to) return json({ error: 'invalid to timestamp' }, 400);
+  if (from.getTime() > to.getTime()) return json({ error: 'from must be before to' }, 400);
+
+  const { points, truncated } = await getDataPointsForExport(serial, { since: from, until: to });
+  const body = format === 'csv' ? dataPointsToCsv(points) : JSON.stringify(points);
+  logExportCompleted('data', serial, points.length, truncated);
+
+  return fileResponse({
+    body,
+    format,
+    filename: `device-${serial}-data.${format}`,
+    truncated,
   });
 });
 
@@ -812,6 +895,8 @@ export {
   handleListMine,
   handleGetBySerial,
   handleDeviceLogs,
+  handleExportDeviceLogs,
+  handleExportDeviceData,
   handleDeviceUptime,
   handleGetData as handleDeviceGetData,
   handleQueryDeviceData as handleDeviceQuery,

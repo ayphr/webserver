@@ -4,6 +4,10 @@
   gap: 1rem;
 }
 
+.device-logs.is-refreshing {
+  opacity: 0.8;
+}
+
 .device-logs__status {
   margin: 0;
   color: var(--text-muted);
@@ -18,9 +22,67 @@
   flex-wrap: wrap;
 }
 
+.device-logs__toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .device-logs__summary {
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+.device-logs__filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.device-logs__filter-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 14rem;
+  min-width: 12rem;
+}
+
+.device-logs__filter-search > svg {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.device-logs__filter-search .input {
+  width: 100%;
+  padding-left: 2.1rem;
+}
+
+.device-logs__filters .select-wrapper {
+  min-width: 9rem;
+}
+
+.device-logs__date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.device-logs__date-field > span {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-md);
+}
+
+.device-logs__date-field .input {
+  color-scheme: dark;
 }
 
 .device-logs__error {
@@ -30,7 +92,7 @@
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--status-error);
   border-radius: var(--radius-md);
-  background: rgba(255, 100, 100, 0.08);
+  background: var(--status-error-bg);
   color: var(--status-error);
   font-size: 0.85rem;
 }
@@ -47,8 +109,8 @@
   color: var(--text-muted);
 }
 
-.device-logs__empty svg {
-  color: var(--status-success);
+.device-logs__empty > svg {
+  color: var(--text-muted);
 }
 
 .device-logs__empty p {
@@ -98,7 +160,7 @@
 }
 
 .device-logs__item--warning .device-logs__icon {
-  color: var(--status-warning, #f0ad4e);
+  color: var(--accent-yellow-solid);
 }
 
 .device-logs__item--error .device-logs__icon {
@@ -120,6 +182,13 @@
   gap: 0.75rem;
 }
 
+.device-logs__heading-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 .device-logs__event {
   color: var(--text-primary);
   font-size: 0.88rem;
@@ -127,9 +196,34 @@
 }
 
 .device-logs__time {
-  flex-shrink: 0;
   color: var(--text-dim);
   font-size: 0.72rem;
+}
+
+.device-logs__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.device-logs__copy:hover {
+  border-color: var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.device-logs__copy:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
 }
 
 .device-logs__message {
@@ -141,7 +235,7 @@
 
 .device-logs__details {
   color: var(--text-dim);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-family-mono);
   font-size: 0.72rem;
   line-height: 1.5;
   overflow-wrap: anywhere;

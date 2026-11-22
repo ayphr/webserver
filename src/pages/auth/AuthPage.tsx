@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { IconX } from '@tabler/icons-react';
+import { IconTrash, IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay, CodeInput } from '../../components/common';
-import { getActiveToken, getAllStoredAccounts, isStoredAccountExpired, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { getActiveToken, getStoredAccounts, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { getSafeRedirect, stripInviteParam, withInviteParam } from '../../lib/redirects';
 import { api } from '../../lib/api';
 import { ApiError } from '../../lib/api/client';
@@ -126,13 +126,13 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<AuthErrorState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getAllStoredAccounts());
+  const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [codeExpiresAt, setCodeExpiresAt] = useState<Date | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const activeToken = getActiveToken();
 
   useEffect(() => {
-    const refresh = () => setStoredAccounts(getAllStoredAccounts());
+    const refresh = () => setStoredAccounts(getStoredAccounts());
     window.addEventListener('storage', refresh);
     window.addEventListener('focus', refresh);
     window.addEventListener('ayphr-accounts-changed', refresh);
@@ -260,7 +260,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         removeStoredAccount(token);
-        setStoredAccounts(getAllStoredAccounts());
+        setStoredAccounts(getStoredAccounts());
         return;
       }
       // Transient failure: fall through and let the dashboard/gates retry.
@@ -273,7 +273,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     const wasActive = account.token === activeToken;
     removeStoredAccount(account.token);
     if (wasActive) api.users.invalidateMe();
-    setStoredAccounts(getAllStoredAccounts());
+    setStoredAccounts(getStoredAccounts());
   };
 
   const validateForm = (): boolean => {
@@ -532,41 +532,28 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
               <div className="auth-accounts">
                 <p className="auth-accounts__title">Choose an account</p>
                 <div className="auth-accounts__list">
-                  {storedAccounts.map((account) => {
-                    const isExpired = isStoredAccountExpired(account);
-                    const isActive = account.token === activeToken;
-                    const statusLabel = isExpired
-                      ? 'Expired — sign in again'
-                      : isActive
-                        ? 'Currently signed in'
-                        : null;
-                    return (
-                      <div
-                        key={account.user.uuid}
-                        className={`auth-accounts__item${isExpired ? ' auth-accounts__item--expired' : ''}`}
+                  {storedAccounts.map((account) => (
+                    <div key={account.user.uuid} className="auth-accounts__item">
+                      <button
+                        type="button"
+                        className="auth-accounts__select"
+                        onClick={() => handleChooseAccount(account.token)}
+                        disabled={isLoading}
                       >
-                        <button
-                          type="button"
-                          className="auth-accounts__select"
-                          onClick={() => handleChooseAccount(account.token)}
-                          disabled={isExpired || isLoading}
-                        >
-                          <UsernameDisplay username={account.user.username} badges={account.user.badges} country={account.user.country} avatarUrl={account.user.avatarUrl} avatarSize={28} />
-                          {statusLabel && <span className="auth-accounts__status">{statusLabel}</span>}
-                        </button>
-                        <button
-                          type="button"
-                          className="auth-accounts__remove"
-                          aria-label={`Remove ${account.user.username} from this device`}
-                          title="Remove from this device"
-                          onClick={() => handleRemoveAccount(account)}
-                          disabled={isLoading}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    );
-                  })}
+                        <UsernameDisplay username={account.user.username} badges={account.user.badges} country={account.user.country} avatarUrl={account.user.avatarUrl} avatarSize={28} />
+                      </button>
+                      <button
+                        type="button"
+                        className="auth-accounts__remove"
+                        aria-label={`Remove ${account.user.username} from this device`}
+                        title="Remove from this device"
+                        onClick={() => handleRemoveAccount(account)}
+                        disabled={isLoading}
+                      >
+                        <IconTrash size={15} strokeWidth={1.75} aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
                 <p className="auth-accounts__divider">or sign in with another account</p>
               </div>

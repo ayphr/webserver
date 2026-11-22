@@ -22,6 +22,14 @@ describe('dashboardPath', () => {
       device: { serial: 42, detailTab: 'alerts', alertId: 'alert-id', alertAction: 'edit' },
     })).toBe('/dashboard/devices/42/alerts/alert-id/edit');
   });
+
+  it('builds canonical location URLs', () => {
+    expect(dashboardPath({ tab: 'locations' })).toBe('/dashboard/locations');
+    expect(dashboardPath({ tab: 'locations', location: { id: 'home' } })).toBe('/dashboard/locations/home');
+    expect(dashboardPath({ tab: 'locations', location: { id: 'home', detailTab: 'overview' } })).toBe('/dashboard/locations/home');
+    expect(dashboardPath({ tab: 'locations', location: { id: 'home', detailTab: 'history' } })).toBe('/dashboard/locations/home/history');
+    expect(dashboardPath({ tab: 'locations', location: { id: 'my place/1', detailTab: 'settings' } })).toBe('/dashboard/locations/my%20place%2F1/settings');
+  });
 });
 
 describe('parseDashboardPath', () => {
@@ -48,6 +56,36 @@ describe('parseDashboardPath', () => {
       device: { serial: 42, detailTab: 'alerts', alertId: 'alert-id', alertAction: 'edit' },
       valid: true,
     });
+    expect(parseDashboardPath('/dashboard/locations')).toMatchObject({
+      tab: 'locations',
+      canonicalPath: '/dashboard/locations',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/locations/home')).toMatchObject({
+      tab: 'locations',
+      location: { id: 'home' },
+      canonicalPath: '/dashboard/locations/home',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/locations/home/history')).toMatchObject({
+      tab: 'locations',
+      location: { id: 'home', detailTab: 'history' },
+      canonicalPath: '/dashboard/locations/home/history',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/locations/my%20place%2F1/history')).toMatchObject({
+      tab: 'locations',
+      location: { id: 'my place/1', detailTab: 'history' },
+      canonicalPath: '/dashboard/locations/my%20place%2F1/history',
+      valid: true,
+    });
+    // Explicit default sections normalize to the shorter canonical URL.
+    expect(parseDashboardPath('/dashboard/locations/home/overview')).toMatchObject({
+      tab: 'locations',
+      location: { id: 'home', detailTab: 'overview' },
+      canonicalPath: '/dashboard/locations/home',
+      valid: true,
+    });
   });
 
   it('supports legacy query-string tabs', () => {
@@ -72,6 +110,24 @@ describe('parseDashboardPath', () => {
     expect(parseDashboardPath('/dashboard/team/unknown')).toMatchObject({
       tab: 'team',
       canonicalPath: '/dashboard/team',
+      valid: false,
+    });
+  });
+
+  it('rejects invalid location paths', () => {
+    expect(parseDashboardPath('/dashboard/locations/home/unknown')).toMatchObject({
+      tab: 'locations',
+      canonicalPath: '/dashboard/locations/home',
+      valid: false,
+    });
+    expect(parseDashboardPath('/dashboard/locations/home/history/extra')).toMatchObject({
+      tab: 'locations',
+      canonicalPath: '/dashboard/locations/home',
+      valid: false,
+    });
+    expect(parseDashboardPath('/dashboard/locations/%E0%A4%A')).toMatchObject({
+      tab: 'locations',
+      canonicalPath: '/dashboard/locations',
       valid: false,
     });
   });

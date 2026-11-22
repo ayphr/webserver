@@ -4,6 +4,7 @@ import {
   deleteDevicesForTeamId,
   deleteDomainVerificationsForUser,
   deleteNotificationsForUserUuid,
+  deletePushSubscriptionsForUserUuid,
   deletePunishmentsForUserUuid,
   deleteSessionsForUserUuid,
   deleteUser,
@@ -11,6 +12,7 @@ import {
   getDevicesForTeamId,
 } from './db';
 import { getTeamForUser } from './db/teams';
+import { deleteNotificationPreferencesForUserUuid } from './notifications';
 
 export async function deleteUserAccount(user: User): Promise<void> {
   const team = await getTeamForUser(user);
@@ -30,6 +32,8 @@ export async function deleteUserAccount(user: User): Promise<void> {
     deleteAvatar(user.uuid),
     deleteDomainVerificationsForUser(user.uuid),
     deleteNotificationsForUserUuid(user.uuid),
+    deleteNotificationPreferencesForUserUuid(user.uuid),
+    deletePushSubscriptionsForUserUuid(user.uuid),
   ]);
 
   if (scopeId) {

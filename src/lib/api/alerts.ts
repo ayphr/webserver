@@ -6,6 +6,22 @@ import type {
 } from '@common';
 import type { RequestClient } from './client';
 
+/** Mute updates accept ISO strings from datetime-local inputs alongside Date values. */
+export type AlertUpdateInput = Omit<AlertUpdateRequest, 'mutedUntil'> & {
+  mutedUntil?: Date | string | null;
+};
+
+export type AlertTestResult = {
+  integrationId: string;
+  ok: boolean;
+  status?: number;
+  error?: string;
+};
+
+export type AlertTestResponse = {
+  results: AlertTestResult[];
+};
+
 export function createAlertsApi(client: RequestClient) {
   return {
     async list(serial: number) {
@@ -19,7 +35,7 @@ export function createAlertsApi(client: RequestClient) {
       });
       return response.alert;
     },
-    async update(serial: number, id: string, input: AlertUpdateRequest) {
+    async update(serial: number, id: string, input: AlertUpdateInput) {
       const response = await client.requestJson<AlertPayload>(
         `/api/devices/${serial}/alerts/${encodeURIComponent(id)}`,
         {
@@ -33,6 +49,13 @@ export function createAlertsApi(client: RequestClient) {
       await client.requestJson(`/api/devices/${serial}/alerts/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       });
+    },
+    async testAlert(serial: number, id: string) {
+      const response = await client.requestJson<AlertTestResponse>(
+        `/api/devices/${serial}/alerts/${encodeURIComponent(id)}/test`,
+        { method: 'POST' },
+      );
+      return response.results;
     },
   };
 }

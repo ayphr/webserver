@@ -11,6 +11,8 @@ export type ApiClientConfig = {
 export type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
   auth?: boolean;
+  /** Return the response body verbatim instead of parsing JSON. */
+  raw?: boolean;
 };
 
 export class ApiError extends Error {
@@ -135,7 +137,11 @@ export function createRequestClient(config: ApiClientConfig = {}) {
       body,
     });
 
-    const responseBody = await readResponseBody(response);
+    // Raw exports are already the exact text we want to hand to the browser.
+    // Errors still go through the regular parser so messages and 429/401 handling stay intact.
+    const responseBody = response.ok && options.raw
+      ? await response.text()
+      : await readResponseBody(response);
 
     if (!response.ok) {
       const errorMessage = typeof responseBody === 'string'
@@ -171,6 +177,10 @@ export function createRequestClient(config: ApiClientConfig = {}) {
     return typeof body === 'string' ? body : '';
   }
 
+  async function requestRawText(path: string, options: RequestOptions = {}) {
+    return request<string>(path, { ...options, raw: true });
+  }
+
   return {
     baseUrl,
     getAuthToken() {
@@ -184,6 +194,7 @@ export function createRequestClient(config: ApiClientConfig = {}) {
     },
     requestJson,
     requestText,
+    requestRawText,
   };
 }
 

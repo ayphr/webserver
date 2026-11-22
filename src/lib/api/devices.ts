@@ -4,6 +4,8 @@ import type {
   DeviceForecastPayload,
   DeviceLinkPayload,
   DeviceListPayload,
+  DeviceLogEvent,
+  DeviceLogLevel,
   DeviceLogListPayload,
   DeviceLogListQuery,
   DevicePairingRequestPayload,
@@ -17,6 +19,33 @@ import type {
   DeviceUpdatePayload,
 } from '@common';
 import type { RequestClient } from './client';
+
+/** Local filter type keeps query serialization explicit for all supported params. */
+export type DeviceLogFilterQuery = DeviceLogListQuery & {
+  level?: DeviceLogLevel;
+  event?: DeviceLogEvent;
+  q?: string;
+  from?: string;
+  to?: string;
+};
+
+export type DeviceLogExportQuery = Omit<DeviceLogFilterQuery, 'page' | 'pageSize'> & {
+  format: 'csv' | 'json';
+};
+
+export type DeviceDataExportQuery = {
+  from: string;
+  to: string;
+  format: 'csv' | 'json';
+};
+
+function appendLogFilters(params: URLSearchParams, query: DeviceLogFilterQuery) {
+  if (query.level) params.set('level', query.level);
+  if (query.event) params.set('event', query.event);
+  if (query.q) params.set('q', query.q);
+  if (query.from) params.set('from', query.from);
+  if (query.to) params.set('to', query.to);
+}
 
 export function createDevicesApi(client: RequestClient) {
   return {
@@ -32,14 +61,28 @@ export function createDevicesApi(client: RequestClient) {
       const response = await client.requestJson<DeviceUptimePayload>(`/api/devices/${serial}/uptime`);
       return response.uptime;
     },
-    async listLogs(serial: number, query: DeviceLogListQuery = {}) {
+    async listLogs(serial: number, query: DeviceLogFilterQuery = {}) {
       const params = new URLSearchParams();
       if (query.page) params.set('page', String(query.page));
       if (query.pageSize) params.set('pageSize', String(query.pageSize));
+      appendLogFilters(params, query);
       const search = params.toString();
       return client.requestJson<DeviceLogListPayload>(
         `/api/devices/${serial}/logs${search ? `?${search}` : ''}`,
       );
+    },
+    async exportLogs(serial: number, query: DeviceLogExportQuery) {
+      const params = new URLSearchParams();
+      params.set('format', query.format);
+      appendLogFilters(params, query);
+      return client.requestRawText(`/api/devices/${serial}/logs/export?${params.toString()}`);
+    },
+    async exportDataPoints(serial: number, query: DeviceDataExportQuery) {
+      const params = new URLSearchParams();
+      params.set('from', query.from);
+      params.set('to', query.to);
+      params.set('format', query.format);
+      return client.requestRawText(`/api/devices/${serial}/data/export?${params.toString()}`);
     },
     async getDataPoints(serial: number, options?: { period?: string; from?: string; to?: string; countOnly?: boolean }) {
       const params = new URLSearchParams();

@@ -13,4 +13,5 @@ export * from './sessions';
 export * from './domainVerifications';
 export * from './emailCodes';
 export * from './notifications';
+export * from './pushSubscriptions';
 export * from './assistant';

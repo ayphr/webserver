@@ -15,6 +15,7 @@ import {
   IconMaximize,
   IconMinimize,
   IconRefresh,
+  IconSearch,
   IconThermometer,
   IconTrash,
   IconWifi,
@@ -24,7 +25,7 @@ import { formatDuration, getPlanFeaturesForUser, type CreditBalance, type DataPo
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
-import { Button, Card, ConfirmDialog, Input, Pagination, ToggleDropdown, Tooltip } from '../common';
+import { Button, Card, ConfirmDialog, Input, Pagination, Select, ToggleDropdown, Tooltip } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphScale } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
@@ -245,6 +246,10 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [devicePage, setDevicePage] = useState(1);
+  const [deviceSearch, setDeviceSearch] = useState('');
+  const [deviceLocationFilter, setDeviceLocationFilter] = useState('');
+  const [deviceOnlineFilter, setDeviceOnlineFilter] = useState<'all' | 'online' | 'offline'>('all');
+  const [deviceSort, setDeviceSort] = useState<'name' | 'serial' | 'lastUpload' | 'dataPoints'>('name');
   const selectedSerial = activeDevice?.serial ?? null;
   const view: 'list' | 'detail' = selectedSerial === null ? 'list' : 'detail';
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -427,11 +432,61 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     onNavigate?.({ tab: 'devices' });
   };
 
-  const deviceTotalPages = Math.max(1, Math.ceil(devices.length / PAGE_SIZE));
+  const filteredDevices = useMemo(() => {
+    const needle = deviceSearch.trim().toLowerCase();
+    const result = devices.filter((device) => {
+      if (needle) {
+        const locationName = locations.find((location) => location.id === device.locationId)?.name ?? '';
+        const haystack = [
+          deviceLabel(device),
+          String(device.serial),
+          locationName,
+          device.ownerUsername,
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(needle)) return false;
+      }
+      if (deviceLocationFilter === '__none__' && device.locationId) return false;
+      if (deviceLocationFilter && deviceLocationFilter !== '__none__' && device.locationId !== deviceLocationFilter) return false;
+      if (deviceOnlineFilter !== 'all' && isDeviceOnline(device) !== (deviceOnlineFilter === 'online')) return false;
+      return true;
+    });
+
+    result.sort((a, b) => {
+      switch (deviceSort) {
+        case 'serial':
+          return a.serial - b.serial;
+        case 'lastUpload': {
+          const left = a.lastUploadAt ? toDate(a.lastUploadAt).getTime() : 0;
+          const right = b.lastUploadAt ? toDate(b.lastUploadAt).getTime() : 0;
+          return right - left || a.serial - b.serial;
+        }
+        case 'dataPoints':
+          return b.dataPointCount - a.dataPointCount || a.serial - b.serial;
+        case 'name':
+        default:
+          return deviceLabel(a).localeCompare(deviceLabel(b)) || a.serial - b.serial;
+      }
+    });
+
+    return result;
+  }, [devices, locations, deviceSearch, deviceLocationFilter, deviceOnlineFilter, deviceSort]);
+
+  const hasDeviceFilters = Boolean(deviceSearch.trim()) || Boolean(deviceLocationFilter)
+    || deviceOnlineFilter !== 'all' || deviceSort !== 'name';
+
+  const clearDeviceFilters = () => {
+    setDeviceSearch('');
+    setDeviceLocationFilter('');
+    setDeviceOnlineFilter('all');
+    setDeviceSort('name');
+    setDevicePage(1);
+  };
+
+  const deviceTotalPages = Math.max(1, Math.ceil(filteredDevices.length / PAGE_SIZE));
   const currentDevicePage = Math.min(devicePage, deviceTotalPages);
   const visibleDevices = useMemo(
-    () => devices.slice((currentDevicePage - 1) * PAGE_SIZE, currentDevicePage * PAGE_SIZE),
-    [currentDevicePage, devices],
+    () => filteredDevices.slice((currentDevicePage - 1) * PAGE_SIZE, currentDevicePage * PAGE_SIZE),
+    [currentDevicePage, filteredDevices],
   );
 
   // Sync settings form fields when selected device changes
@@ -778,6 +833,69 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
           </div>
         </div>
 
+        {devices.length > 0 && (
+          <div className="devices__filters">
+            <div className="devices__filter-search">
+              <IconSearch size={16} strokeWidth={1.8} aria-hidden="true" />
+              <Input
+                type="search"
+                value={deviceSearch}
+                onChange={(event) => {
+                  setDeviceSearch(event.target.value);
+                  setDevicePage(1);
+                }}
+                placeholder="Search by name, serial, location or owner"
+                aria-label="Search devices"
+              />
+            </div>
+            <Select
+              value={deviceLocationFilter}
+              onChange={(event) => {
+                setDeviceLocationFilter(event.target.value);
+                setDevicePage(1);
+              }}
+              aria-label="Filter by location"
+              options={[
+                { value: '', label: 'All locations' },
+                ...locations.map((location) => ({ value: location.id, label: location.name })),
+                { value: '__none__', label: 'Unassigned' },
+              ]}
+            />
+            <Select
+              value={deviceOnlineFilter}
+              onChange={(event) => {
+                setDeviceOnlineFilter(event.target.value as 'all' | 'online' | 'offline');
+                setDevicePage(1);
+              }}
+              aria-label="Filter by connection status"
+              options={[
+                { value: 'all', label: 'All devices' },
+                { value: 'online', label: 'Online' },
+                { value: 'offline', label: 'Offline' },
+              ]}
+            />
+            <Select
+              value={deviceSort}
+              onChange={(event) => {
+                setDeviceSort(event.target.value as 'name' | 'serial' | 'lastUpload' | 'dataPoints');
+                setDevicePage(1);
+              }}
+              aria-label="Sort devices"
+              options={[
+                { value: 'name', label: 'Sort: Name' },
+                { value: 'serial', label: 'Sort: Serial' },
+                { value: 'lastUpload', label: 'Sort: Last upload' },
+                { value: 'dataPoints', label: 'Sort: Data points' },
+              ]}
+            />
+            {hasDeviceFilters && (
+              <Button variant="secondary" onClick={clearDeviceFilters}>
+                Clear filters
+              </Button>
+            )}
+          </div>
+        )}
+
         {maxDevices !== null && (
           <p className="devices__limit">
             Devices: {devices.length} / {maxDevices.toLocaleString()}
@@ -797,6 +915,13 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
             <IconDatabase size={28} strokeWidth={1.5} />
             <h3>No devices yet</h3>
             <p>Use &quot;Add device&quot; to open ayphr.com/link and enter the code shown on your device.</p>
+          </div>
+        ) : filteredDevices.length === 0 ? (
+          <div className="devices__empty">
+            <IconSearch size={28} strokeWidth={1.5} />
+            <h3>No devices match your filters</h3>
+            <p>Try a different search term or clear the filters to see all devices.</p>
+            <Button variant="secondary" onClick={clearDeviceFilters}>Clear filters</Button>
           </div>
         ) : (
           <div className="devices__grid">
@@ -906,11 +1031,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
             </Button>
           )}
           {detailTab !== 'alerts' && detailTab !== 'tokens' && detailTab !== 'logs' && (
-            <Button
-              variant="secondary"
-              onClick={() => setIsExportOpen(true)}
-              disabled={dataPoints.length === 0}
-            >
+            <Button variant="secondary" onClick={() => setIsExportOpen(true)}>
               <IconFileDownload size={16} strokeWidth={1.75} />
               Export
             </Button>
@@ -1336,10 +1457,8 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
       <DeviceExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
+        serial={selectedDevice.serial}
         deviceName={deviceLabel(selectedDevice)}
-        period={period}
-        dataPoints={dataPoints}
-        series={enabledDefs}
       />
 
       {selectedDevice && (

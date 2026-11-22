@@ -31,6 +31,9 @@ export type DeviceDetailTab = (typeof DEVICE_DETAIL_TABS)[number];
 export const TEAM_SECTIONS = ['members', 'usage', 'audit', 'settings'] as const;
 export type TeamSection = (typeof TEAM_SECTIONS)[number];
 
+export const LOCATION_DETAIL_TABS = ['overview', 'devices', 'history', 'settings'] as const;
+export type LocationDetailTab = (typeof LOCATION_DETAIL_TABS)[number];
+
 export type AlertRouteAction = 'new' | 'edit';
 
 export type DeviceRouteState = {
@@ -41,9 +44,16 @@ export type DeviceRouteState = {
   alertAction?: AlertRouteAction;
 };
 
+export type LocationRouteState = {
+  /** Locations use their UUID as the canonical URL segment. */
+  id: string;
+  detailTab?: LocationDetailTab;
+};
+
 export type DashboardTarget = {
   tab: DashboardTab;
   device?: DeviceRouteState;
+  location?: LocationRouteState;
   /** Settings section id or team section id, depending on `tab`. */
   section?: string;
 };
@@ -57,6 +67,7 @@ export type ParsedDashboardRoute = DashboardTarget & {
 const TAB_SET: ReadonlySet<string> = new Set(DASHBOARD_TABS);
 const DETAIL_TAB_SET: ReadonlySet<string> = new Set(DEVICE_DETAIL_TABS);
 const TEAM_SECTION_SET: ReadonlySet<string> = new Set(TEAM_SECTIONS);
+const LOCATION_DETAIL_TAB_SET: ReadonlySet<string> = new Set(LOCATION_DETAIL_TABS);
 
 /** Legacy query-string tabs and internal aliases mapped to canonical sections. */
 const LEGACY_TAB_PATHS: Record<string, string> = {
@@ -87,6 +98,13 @@ export function dashboardPath(target: DashboardTarget): string {
       }
     }
     return path;
+  }
+
+  if (target.tab === 'locations' && target.location) {
+    const { id, detailTab } = target.location;
+    const base = `/dashboard/locations/${encodeURIComponent(id)}`;
+    // Overview is the default section, so it keeps the shorter canonical URL.
+    return detailTab && detailTab !== 'overview' ? `${base}/${detailTab}` : base;
   }
 
   if (target.tab === 'settings' && target.section) {
@@ -148,6 +166,40 @@ function parseDeviceParts(parts: string[]): ParsedDashboardRoute {
   );
 }
 
+function parseLocationParts(parts: string[]): ParsedDashboardRoute {
+  const rawId = parts[1];
+  if (!rawId) {
+    // The plain locations tab remains a valid canonical route.
+    return { tab: 'locations', canonicalPath: '/dashboard/locations', valid: parts.length === 1 };
+  }
+
+  let id: string;
+  try {
+    id = decodeURIComponent(rawId);
+  } catch {
+    return invalid({ tab: 'locations' }, '/dashboard/locations');
+  }
+  if (!id) {
+    return invalid({ tab: 'locations' }, '/dashboard/locations');
+  }
+
+  const base: LocationRouteState = { id };
+  const baseTarget: DashboardTarget = { tab: 'locations', location: base };
+  const canonicalBase = dashboardPath(baseTarget);
+  const detail = parts[2];
+
+  if (detail === undefined) {
+    return { ...baseTarget, canonicalPath: canonicalBase, valid: true };
+  }
+  if (!LOCATION_DETAIL_TAB_SET.has(detail) || parts.length !== 3) {
+    return invalid(baseTarget, canonicalBase);
+  }
+
+  const location: LocationRouteState = { id, detailTab: detail as LocationDetailTab };
+  const target: DashboardTarget = { tab: 'locations', location };
+  return { ...target, canonicalPath: dashboardPath(target), valid: true };
+}
+
 /** Parses both canonical dashboard paths and legacy `?tab=` links. */
 export function parseDashboardPath(pathname: string, legacyTab?: string | null): ParsedDashboardRoute {
   const path = pathname.replace(/\/+$/, '') || '/dashboard';
@@ -171,6 +223,8 @@ export function parseDashboardPath(pathname: string, legacyTab?: string | null):
   const head = parts[0]!;
 
   if (head === 'devices') return parseDeviceParts(parts);
+
+  if (head === 'locations') return parseLocationParts(parts);
 
   if (head === 'settings') {
     const section = parts[1];

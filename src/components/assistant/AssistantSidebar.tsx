@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -42,6 +43,7 @@ import {
   IconMessageCircleFilled,
   IconPencil,
   IconPlus,
+  IconSearch,
   IconTrash,
   IconX,
 } from '@tabler/icons-react';
@@ -212,12 +214,14 @@ type SortableFolderSectionProps = AssistantRowProps & {
   itemId: string;
   data: Record<string, unknown>;
   children: ReactNode;
+  disabled?: boolean;
 };
 
 const SortableFolderSection = ({
   itemId,
   data,
   children,
+  disabled = false,
   rowStyle,
   isDragging = false,
   ...rowProps
@@ -230,7 +234,7 @@ const SortableFolderSection = ({
     transform,
     transition,
     isDragging: sortableIsDragging,
-  } = useSortable({ id: itemId, data: { type: 'folder', ...data } });
+  } = useSortable({ id: itemId, data: { type: 'folder', ...data }, disabled });
 
   return (
     <SidebarSection
@@ -284,8 +288,39 @@ export const AssistantSidebar = ({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
-  const visibleFolders = sortAssistantFolders(folders);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const isSearching = normalizedQuery.length > 0;
+
+  // Search is local UI state: derive every visible list from the matching chats
+  // so rendering, keyboard rows and folder sections stay in sync.
+  const { filteredChats, visibleFolders } = useMemo(() => {
+    if (!isSearching) {
+      return { filteredChats: chats, visibleFolders: sortAssistantFolders(folders) };
+    }
+    const folderNames = new Map(
+      folders.map((folder) => [folder.id, folder.name.toLocaleLowerCase()]),
+    );
+    const matches = (chat: AssistantChat) =>
+      chat.title.toLocaleLowerCase().includes(normalizedQuery) ||
+      (chat.folderId !== null &&
+        (folderNames.get(chat.folderId)?.includes(normalizedQuery) ?? false)) ||
+      chat.messages.some((message) =>
+        message.content.toLocaleLowerCase().includes(normalizedQuery),
+      );
+    const nextChats = chats.filter(matches);
+    return {
+      filteredChats: nextChats,
+      visibleFolders: sortAssistantFolders(
+        folders.filter((folder) => nextChats.some((chat) => chat.folderId === folder.id)),
+      ),
+    };
+  }, [chats, folders, isSearching, normalizedQuery]);
 
   // Folder sections contain their chats, so the default getter can pick a
   // nested chat as the next target. Walk the folder sections directly instead.
@@ -298,7 +333,7 @@ export const AssistantSidebar = ({
         return sortableKeyboardCoordinates(event, args);
       }
       event.preventDefault();
-      const folderIds = sortAssistantFolders(folders).map((folder) => folderRowId(folder.id));
+      const folderIds = visibleFolders.map((folder) => folderRowId(folder.id));
       const overId = args.context.over ? String(args.context.over.id) : folderIds[0];
       const currentIndex = folderIds.indexOf(overId);
       if (currentIndex < 0) return undefined;
@@ -313,7 +348,7 @@ export const AssistantSidebar = ({
         ?.getBoundingClientRect();
       return rect ? { x: rect.left, y: rect.top } : undefined;
     },
-    [folders],
+    [visibleFolders],
   );
 
   const sensors = useSensors(
@@ -322,10 +357,13 @@ export const AssistantSidebar = ({
   );
 
   const uncategorisedChats = sortAssistantChats(
-    chats.filter((chat) => chat.folderId === null),
+    filteredChats.filter((chat) => chat.folderId === null),
   );
   const visibleChatsIn = (folderId: string) =>
-    sortAssistantChats(chats.filter((chat) => chat.folderId === folderId));
+    sortAssistantChats(filteredChats.filter((chat) => chat.folderId === folderId));
+  // Outside search, keep the empty uncategorised section as a move target.
+  const showUncategorised =
+    uncategorisedChats.length > 0 || (!isSearching && chats.length > 0);
 
   const activeChat = chats.find((chat) => chat.id === activeChatId);
   const activeGroupKey = activeChat ? groupKeyForChat(activeChat) : null;
@@ -347,7 +385,7 @@ export const AssistantSidebar = ({
   const rowIds: string[] = [NEW_CHAT_ROW];
   // Always offer the uncategorised group as a drop target so chats can be
   // moved out of every folder, even when the group is currently empty.
-  if (chats.length > 0) {
+  if (showUncategorised) {
     rowIds.push(groupRowId(UNCATEGORISED_KEY));
     if (isGroupExpanded(UNCATEGORISED_KEY)) {
       uncategorisedChats.forEach((chat) => rowIds.push(chatRowId(chat.id)));
@@ -405,6 +443,30 @@ export const AssistantSidebar = ({
     },
     [deleteState, editState, scheduleFocus],
   );
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  };
+
+  const clearSearch = () => {
+    setQuery('');
+    searchInputRef.current?.focus();
+  };
+
+  // Escape clears the text first; only an empty field closes and blurs.
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (query) {
+      setQuery('');
+      return;
+    }
+    setSearchOpen(false);
+    event.currentTarget.blur();
+    searchButtonRef.current?.focus();
+  };
 
   const handleSidebarKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
@@ -561,7 +623,7 @@ export const AssistantSidebar = ({
         itemId={id}
         itemType="chat"
         data={{ chatId: chat.id, folderId: chat.folderId }}
-        disabled={dragState?.kind === 'folder'}
+        disabled={isSearching || dragState?.kind === 'folder'}
         icon={chatIcon(chat, isActive)}
         active={isActive}
         indented
@@ -672,6 +734,54 @@ export const AssistantSidebar = ({
       ariaLabel="Assistant sidebar"
       onKeyDown={handleSidebarKeyDown}
     >
+      <div
+        className={`assistant-sidebar__search ${searchOpen ? 'is-open' : ''}`}
+        onClick={openSearch}
+      >
+        <button
+          ref={searchButtonRef}
+          type="button"
+          className="assistant-sidebar__search-button"
+          aria-label="Search chats"
+          aria-controls="assistant-sidebar-search-input"
+          aria-expanded={searchOpen}
+          onClick={openSearch}
+        >
+          <IconSearch size={16} strokeWidth={1.75} />
+        </button>
+        <input
+          id="assistant-sidebar-search-input"
+          ref={searchInputRef}
+          className="assistant-sidebar__search-input"
+          type="text"
+          value={query}
+          placeholder="Search chats"
+          aria-label="Search chats"
+          autoComplete="off"
+          onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => setSearchOpen(true)}
+          onBlur={(event) => {
+            if (query) return;
+            const next = event.relatedTarget as Node | null;
+            if (next && event.currentTarget.closest('.assistant-sidebar__search')?.contains(next)) {
+              return;
+            }
+            setSearchOpen(false);
+          }}
+          onKeyDown={handleSearchKeyDown}
+        />
+        {query && (
+          <button
+            type="button"
+            className="assistant-sidebar__search-clear"
+            aria-label="Clear search"
+            onClick={clearSearch}
+          >
+            <IconX size={14} strokeWidth={1.75} />
+          </button>
+        )}
+      </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={assistantCollisionDetection}
@@ -687,14 +797,18 @@ export const AssistantSidebar = ({
           {...rowCommonProps(NEW_CHAT_ROW, 'New chat')}
         />
 
-        {chats.length > 0 && (
+        {isSearching && filteredChats.length === 0 && (
+          <div className="assistant-sidebar__no-results">No matching chats</div>
+        )}
+
+        {showUncategorised && (
           <UncategorisedRow
             {...rowCommonProps(groupRowId(UNCATEGORISED_KEY), 'Uncategorised')}
             icon={<IconFolders size={16} strokeWidth={1.75} />}
             onClick={() => toggleExpanded(UNCATEGORISED_KEY)}
             ariaExpanded={uncategorisedChats.length > 0 ? isGroupExpanded(UNCATEGORISED_KEY) : undefined}
             isDropTarget={dragState?.kind === 'chat' && dropTargetKey === UNCATEGORISED_KEY}
-            dropDisabled={dragState?.kind === 'folder'}
+            dropDisabled={isSearching || dragState?.kind === 'folder'}
           >
             <SortableContext
               items={uncategorisedChats.map((chat) => chatRowId(chat.id))}
@@ -719,6 +833,7 @@ export const AssistantSidebar = ({
                 {...rowCommonProps(id, folder.name)}
                 itemId={id}
                 data={{ folderId: folder.id }}
+                disabled={isSearching}
                 icon={
                   isExpanded ? (
                     <IconFolderOpen size={16} strokeWidth={1.75} />

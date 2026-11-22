@@ -1,4 +1,4 @@
-import { IconKeyboard, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconSparkle2, IconTrash, IconUser } from '@tabler/icons-react';
+import { IconBell, IconKeyboard, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconSparkle2, IconTrash, IconUser } from '@tabler/icons-react';
 import type { AssistantSendShortcut } from '../../components/common';
 import type { SettingsSection } from '../../lib/settings';
 import type { DashboardTab } from '../../lib/dashboardRoutes';
@@ -241,6 +241,16 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
           description: 'Always show the full sidebar instead of collapsing it to icons.',
           checked: sidebarPinned,
           onChange: setSidebarPinnedPref,
+        },
+        {
+          id: 'notification-preferences',
+          optionType: 'button',
+          icon: <IconBell size={18} strokeWidth={1.75} />,
+          title: 'Notifications',
+          description: 'Choose which notifications you receive in the app, by email, and in your browser.',
+          label: 'Notification preferences',
+          variant: 'secondary',
+          action: () => navigate('/dashboard/notifications'),
         },
       ],
     },

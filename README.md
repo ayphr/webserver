@@ -39,6 +39,16 @@ npm run preview
 npm run lint
 ```
 
+## Web Push setup
+
+Browser push needs a secure context: HTTPS in production (localhost works in development) and a registered `/sw.js` service worker. Generate a VAPID keypair in the server directory:
+
+```bash
+cd server && npx web-push generate-vapid-keys
+```
+
+Then set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` (a `mailto:` address or an `https://` URL) in the server environment; see `.env.example`. Until all three are present, the public-key endpoint returns `null` and the browser-push toggle stays disabled. The private key never leaves the server. Users can manage channel and per-type delivery settings from the Notifications panel. On iOS, web push only works after the site has been added to the Home Screen.
+
 ## Trademark Notice
 
 The name, logos, and composite marks associated with this project are either trademarked or are owned by us. While the underlying source code is freely available under the Apache 2.0 license, this license **does not** grant you any rights to use our brand identity, logos, or name for your own distributions or commercial spin-offs.

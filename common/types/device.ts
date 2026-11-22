@@ -76,7 +76,14 @@ export type DeviceLog = {
   createdAt: Date;
 };
 
-export type DeviceLogListQuery = PaginationQuery;
+export type DeviceLogListQuery = PaginationQuery & {
+  level?: DeviceLogLevel | 'all';
+  event?: DeviceLogEvent | 'all';
+  /** Case-insensitive text search over log messages and event names. */
+  q?: string;
+  from?: string;
+  to?: string;
+};
 
 export type DeviceLogListPayload = {
   logs: DeviceLog[];

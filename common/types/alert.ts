@@ -25,6 +25,8 @@ export type DeviceAlert = {
   firing: boolean;
   lastTriggeredAt?: Date;
   lastNotifiedAt?: Date;
+  /** Webhook delivery is suppressed until this instant. */
+  mutedUntil?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -44,9 +46,22 @@ export type AlertCreateRequest = {
   conditions: AlertCondition[];
   integrationIds: string[];
   repeatIntervalMinutes: number;
+  mutedUntil?: Date | null;
 };
 
 export type AlertUpdateRequest = Partial<AlertCreateRequest>;
+
+/** Outcome of delivering a test notification to one configured integration. */
+export type AlertTestResult = {
+  integrationId: string;
+  ok: boolean;
+  status?: number;
+  error?: string;
+};
+
+export type AlertTestPayload = {
+  results: AlertTestResult[];
+};
 
 export const ALERT_METRICS: readonly AlertMetric[] = ['temperature', 'humidity', 'airPressure'];
 

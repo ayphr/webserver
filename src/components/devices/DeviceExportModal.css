@@ -15,6 +15,33 @@
   color: var(--text-primary);
 }
 
+.device-export__range {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.device-export__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.device-export__field .input {
+  color-scheme: dark;
+}
+
+.device-export__error {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  background: var(--status-error-bg);
+  color: var(--status-error);
+  font-size: 0.82rem;
+}
+
 .device-export__summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -49,8 +76,15 @@
   white-space: nowrap;
 }
 
-.device-export__value--file {
+.device-export__value--file,
+.device-export__value--range {
   font-size: 0.75rem;
+}
+
+.device-export__value--range {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .device-export__formats {

@@ -2,7 +2,7 @@ import { Binary, Collection, Db, type Document } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type DeviceLog, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantState } from '@common';
+import { type DataPoint, type Device, type DeviceLog, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantState, type NotificationPreferences, type PushSubscriptionInput } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -22,6 +22,8 @@ import {
   DEVICE_LOG_MAX_AGE_SECONDS,
   EMAIL_CODES_COLLECTION,
   NOTIFICATIONS_COLLECTION,
+  NOTIFICATION_PREFERENCES_COLLECTION,
+  PUSH_SUBSCRIPTIONS_COLLECTION,
   ASSISTANT_STATES_COLLECTION,
   TEAMS_COLLECTION,
   TEAM_INVITES_COLLECTION,
@@ -115,8 +117,25 @@ export interface Collections {
   teamInvites: Collection<TeamInvite>;
   appeals: Collection<Appeal>;
   notifications: Collection<UserNotification>;
+  notificationPreferences: Collection<NotificationPreferencesDocument>;
+  pushSubscriptions: Collection<PushSubscriptionDocument>;
   assistantStates: Collection<AssistantStateDocument>;
 }
+
+/** One preferences document per account; user records stay untouched. */
+export type NotificationPreferencesDocument = NotificationPreferences & {
+  userUuid: string;
+  updatedAt: Date;
+};
+
+/** A browser push endpoint. Private VAPID keys are never stored here. */
+export type PushSubscriptionDocument = PushSubscriptionInput & {
+  id: string;
+  userUuid: string;
+  createdAt: Date;
+  updatedAt: Date;
+  failureCount: number;
+};
 
 export type AssistantStateDocument = AssistantState & {
   userUuid: string;
@@ -203,6 +222,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
     teamInvites: db.collection<TeamInvite>(TEAM_INVITES_COLLECTION),
     appeals: db.collection<Appeal>(APPEALS_COLLECTION),
     notifications: db.collection<UserNotification>(NOTIFICATIONS_COLLECTION),
+    notificationPreferences: db.collection<NotificationPreferencesDocument>(NOTIFICATION_PREFERENCES_COLLECTION),
+    pushSubscriptions: db.collection<PushSubscriptionDocument>(PUSH_SUBSCRIPTIONS_COLLECTION),
     assistantStates: db.collection<AssistantStateDocument>(ASSISTANT_STATES_COLLECTION),
   };
 
@@ -247,6 +268,9 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, createdAt: -1 })],
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ userUuid: 1, read: 1 })],
     [NOTIFICATIONS_COLLECTION, () => ensureCreatedAtTtlIndex(db, NOTIFICATIONS_COLLECTION, cols.notifications, 60 * 60 * 24 * 90)],
+    [NOTIFICATION_PREFERENCES_COLLECTION, () => cols.notificationPreferences.createIndex({ userUuid: 1 }, { unique: true })],
+    [PUSH_SUBSCRIPTIONS_COLLECTION, () => cols.pushSubscriptions.createIndex({ userUuid: 1, endpoint: 1 }, { unique: true })],
+    [PUSH_SUBSCRIPTIONS_COLLECTION, () => cols.pushSubscriptions.createIndex({ userUuid: 1 })],
     [ASSISTANT_STATES_COLLECTION, () => cols.assistantStates.createIndex({ userUuid: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ id: 1 }, { unique: true })],
     [ALERTS_COLLECTION, () => cols.alerts.createIndex({ serial: 1, teamId: 1, createdAt: -1 })],

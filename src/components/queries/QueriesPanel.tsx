@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, tooltips } from '@codemirror/view';
 import {
   IconAlertCircle,
+  IconArrowDown,
+  IconArrowUp,
   IconBolt,
   IconBraces,
   IconCoin,
@@ -15,6 +17,7 @@ import {
   IconExternalLink,
   IconKeyboard,
   IconPlayerPlay,
+  IconSearch,
   IconSparkle2,
   IconWand,
   IconTable,
@@ -41,13 +44,16 @@ import { formatCredits } from '../../lib/credits';
 import { downloadRows, slugifyFilename, type ExportRow } from '../../lib/export';
 import { EXTERNAL_URLS } from '../../lib/externalUrls';
 import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/tqlEditor';
-import { Button, Input, ToggleDropdown, Tooltip } from '../common';
+import { Button, Input, Pagination, Select, ToggleDropdown, Tooltip } from '../common';
 import { createQueryDraft } from './utils';
 import './QueriesPanel.css';
 
-const MAX_PREVIEW_ROWS = 250;
+const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const MAX_JSON_PREVIEW_CHARS = 100_000;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(?:[T ].*)?$/;
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+
+type SortState = { column: string; direction: 'asc' | 'desc' } | null;
 
 export interface QueriesPanelProps {
   user: SelfUser;
@@ -83,6 +89,45 @@ function displayCell(value: unknown): string {
     }
   }
   return String(value);
+}
+
+function isNullish(value: unknown): value is null | undefined {
+  return value === null || value === undefined;
+}
+
+/** Dates (including ISO date strings) compare by time; everything else falls back to text. */
+function dateTimeValue(value: unknown): number | null {
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isNaN(time) ? null : time;
+  }
+  if (typeof value === 'string' && ISO_DATE_PATTERN.test(value)) {
+    const time = Date.parse(value);
+    return Number.isNaN(time) ? null : time;
+  }
+  return null;
+}
+
+function compareNonNullValues(a: unknown, b: unknown): number {
+  const aDate = dateTimeValue(a);
+  const bDate = dateTimeValue(b);
+  if (aDate !== null || bDate !== null) {
+    if (aDate === null) return 1;
+    if (bDate === null) return -1;
+    return aDate - bDate;
+  }
+
+  const aNumeric = typeof a === 'number' || typeof a === 'bigint' || typeof a === 'boolean';
+  const bNumeric = typeof b === 'number' || typeof b === 'bigint' || typeof b === 'boolean';
+  if (aNumeric || bNumeric) {
+    if (!aNumeric) return 1;
+    if (!bNumeric) return -1;
+    const left = Number(a);
+    const right = Number(b);
+    return left < right ? -1 : left > right ? 1 : 0;
+  }
+
+  return displayCell(a).localeCompare(displayCell(b));
 }
 
 function joinColumns(rows: ExportRow[]): string[] {
@@ -225,6 +270,11 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const [result, setResult] = useState<DeviceQueryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'json'>('table');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortState>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const searchInputId = useId();
 
   const deviceOptions = useMemo(() => buildDeviceOptions(devices), [devices]);
   const selectedSerials = useMemo(
@@ -422,6 +472,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     setIsRunning(true);
     setError(null);
     setResult(null);
+    setPage(1);
     try {
       const response = await api.devices.queryDevices(selectedSerials, {
         query: trimmedQuery,
@@ -453,8 +504,39 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   };
 
   const rows = useMemo(() => (result ? resultRows(result.result) : []), [result]);
-  const columns = useMemo(() => joinColumns(rows.slice(0, MAX_PREVIEW_ROWS)), [rows]);
-  const previewRows = rows.slice(0, MAX_PREVIEW_ROWS);
+  const columns = useMemo(() => joinColumns(rows), [rows]);
+  const searchTerm = search.trim().toLowerCase();
+  const filtersActive = searchTerm.length > 0 || sort !== null;
+  const displayedRows = useMemo(() => {
+    let next = rows;
+    if (searchTerm) {
+      next = next.filter((row) => (
+        columns.some((column) => displayCell(row[column]).toLowerCase().includes(searchTerm))
+      ));
+    }
+    if (sort) {
+      const { column, direction } = sort;
+      next = [...next].sort((a, b) => {
+        const aValue = a[column];
+        const bValue = b[column];
+        const aNullish = isNullish(aValue);
+        const bNullish = isNullish(bValue);
+        // Nullish values always stay last, regardless of direction.
+        if (aNullish || bNullish) {
+          if (aNullish && bNullish) return 0;
+          return aNullish ? 1 : -1;
+        }
+        const comparison = compareNonNullValues(aValue, bValue);
+        return direction === 'asc' ? comparison : -comparison;
+      });
+    }
+    return next;
+  }, [rows, columns, searchTerm, sort]);
+  const totalPages = Math.max(1, Math.ceil(displayedRows.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startRow = displayedRows.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRow = Math.min(currentPage * pageSize, displayedRows.length);
+  const pageRows = displayedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const primaryDevice = selectedSerials.length === 1
     ? devices.find((device) => device.serial === selectedSerials[0])
     : undefined;
@@ -473,6 +555,33 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const handleExport = (format: 'csv' | 'json') => {
     if (!result || rows.length === 0) return;
     downloadRows(rows, format, exportBasename);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleSort = (column: string) => {
+    setSort((current) => {
+      if (!current || current.column !== column) return { column, direction: 'asc' };
+      if (current.direction === 'asc') return { column, direction: 'desc' };
+      return null;
+    });
+    setPage(1);
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setSort(null);
+    setPage(1);
+  };
+
+  const handlePageSizeChange = (value: string) => {
+    const nextSize = Number(value);
+    if (!PAGE_SIZE_OPTIONS.includes(nextSize)) return;
+    setPageSize(nextSize);
+    setPage(1);
   };
 
   return (
@@ -696,32 +805,105 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
               rows.length === 0 ? (
                 <div className="queries-panel__empty">The query returned no rows.</div>
               ) : (
-                <div className="queries-panel__table-wrap">
-                  <table className="queries-panel__table">
-                    <thead>
-                      <tr>
-                        {columns.map((column) => <th key={column}>{column}</th>)}
-                        <th className="queries-panel__copy-cell" aria-label="Copy row" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {previewRows.map((row, index) => (
-                        <tr key={index}>
-                          {columns.map((column) => (
-                            <td key={column} title={displayCell(row[column])}>
-                              {displayCell(row[column])}
-                            </td>
-                          ))}
-                          <td className="queries-panel__copy-cell">
-                            <CopyFeedbackButton
-                              value={JSON.stringify(row, null, 2)}
-                              label={`Copy row ${index + 1}`}
+                <div className="queries-panel__table-section">
+                  <div className="queries-panel__table-toolbar">
+                    <div className="queries-panel__search">
+                      <label className="queries-panel__search-label" htmlFor={searchInputId}>
+                        Search results
+                      </label>
+                      <div className="queries-panel__search-control">
+                        <IconSearch className="queries-panel__search-icon" size={14} strokeWidth={1.75} aria-hidden="true" />
+                        <Input
+                          id={searchInputId}
+                          className="queries-panel__search-input"
+                          type="search"
+                          placeholder="Search all columns…"
+                          value={search}
+                          onChange={(event) => handleSearchChange(event.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <span className="queries-panel__table-summary">
+                      Showing {startRow.toLocaleString()}–{endRow.toLocaleString()} of{' '}
+                      {displayedRows.length.toLocaleString()} rows{filtersActive ? ' (filtered)' : ''}
+                    </span>
+                    {filtersActive && (
+                      <Button variant="secondary" className="queries-panel__clear-filters" onClick={clearFilters}>
+                        Clear filters
+                      </Button>
+                    )}
+                  </div>
+                  {displayedRows.length === 0 ? (
+                    <div className="queries-panel__empty">
+                      No rows match your search. <IconSearch size={14} strokeWidth={1.75} aria-hidden="true" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="queries-panel__table-wrap">
+                        <table className="queries-panel__table">
+                          <thead>
+                            <tr>
+                              {columns.map((column) => {
+                                const activeSort = sort?.column === column ? sort.direction : null;
+                                return (
+                                  <th
+                                    key={column}
+                                    aria-sort={activeSort ? (activeSort === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="queries-panel__sort-button"
+                                      onClick={() => handleSort(column)}
+                                      title={`Sort by ${column}`}
+                                    >
+                                      <span>{column}</span>
+                                      {activeSort === 'asc' && <IconArrowUp size={12} strokeWidth={2} aria-hidden="true" />}
+                                      {activeSort === 'desc' && <IconArrowDown size={12} strokeWidth={2} aria-hidden="true" />}
+                                    </button>
+                                  </th>
+                                );
+                              })}
+                              <th className="queries-panel__copy-cell" aria-label="Copy row" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pageRows.map((row, index) => {
+                              const rowNumber = (currentPage - 1) * pageSize + index + 1;
+                              return (
+                                <tr key={rowNumber}>
+                                  {columns.map((column) => (
+                                    <td key={column} title={displayCell(row[column])}>
+                                      {displayCell(row[column])}
+                                    </td>
+                                  ))}
+                                  <td className="queries-panel__copy-cell">
+                                    <CopyFeedbackButton
+                                      value={JSON.stringify(row, null, 2)}
+                                      label={`Copy row ${rowNumber}`}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="queries-panel__table-footer">
+                        <div className="queries-panel__page-size">
+                          <span>Rows per page</span>
+                          <div className="queries-panel__page-size-select">
+                            <Select
+                              aria-label="Rows per page"
+                              value={String(pageSize)}
+                              onChange={(event) => handlePageSizeChange(event.target.value)}
+                              options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))}
                             />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </div>
+                        <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+                      </div>
+                    </>
+                  )}
                 </div>
               )
             ) : jsonTooLarge ? (
@@ -730,13 +912,6 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
               </div>
             ) : (
               <pre className="queries-panel__json">{jsonText}</pre>
-            )}
-
-            {viewMode === 'table' && rows.length > MAX_PREVIEW_ROWS && (
-              <p className="queries-panel__preview-note">
-                Showing the first {MAX_PREVIEW_ROWS.toLocaleString()} of {rows.length.toLocaleString()} rows.
-                Export to download the full result.
-              </p>
             )}
           </div>
         )}

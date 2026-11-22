@@ -2,6 +2,7 @@ import type {
   AlertCondition,
   AlertLogic,
   AlertMetric,
+  AlertTestResult,
   DataPoint,
   DeviceAlert,
   Integration,
@@ -29,6 +30,13 @@ const METRIC_UNITS: Record<AlertMetric, string> = {
 };
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
+
+/** A muted alert keeps its firing state but does not deliver notifications. */
+export function isAlertMuted(alert: DeviceAlert, now = Date.now()): boolean {
+  if (!alert.mutedUntil) return false;
+  const mutedUntilMs = new Date(alert.mutedUntil).getTime();
+  return Number.isFinite(mutedUntilMs) && mutedUntilMs > now;
+}
 
 export function describeAlertConditions(conditions: AlertCondition[], logic: AlertLogic): string {
   return conditions
@@ -89,12 +97,14 @@ function buildPayload(
   };
 }
 
+type DeliveryResult = Omit<AlertTestResult, 'integrationId'>;
+
 async function sendToIntegration(
   integration: Integration,
   alert: DeviceAlert,
   device: DeviceDocument,
   reading: DataPoint,
-): Promise<void> {
+): Promise<DeliveryResult> {
   // Stored integrations may predate URL validation or have a hostname that now
   // resolves to a restricted address; never fetch an unsafe destination.
   const urlCheck = await validateWebhookUrl(integration.webhookUrl);
@@ -103,7 +113,7 @@ async function sendToIntegration(
       { integrationId: integration.id, alertId: alert.id, reason: urlCheck.reason },
       'skipping unsafe alert webhook url',
     );
-    return;
+    return { ok: false, error: urlCheck.reason };
   }
 
   const controller = new AbortController();
@@ -123,15 +133,43 @@ async function sendToIntegration(
         { integrationId: integration.id, alertId: alert.id, status: response.status },
         'alert webhook returned an error status',
       );
+      return { ok: false, status: response.status };
     }
+    return { ok: true, status: response.status };
   } catch (error) {
     log.warn(
       { error, integrationId: integration.id, alertId: alert.id },
       'failed to deliver alert webhook',
     );
+    return { ok: false, error: error instanceof Error ? error.message : 'request failed' };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Sends the exact payload a real alert would send to each enabled integration
+ * configured on the alert, without changing any alert state.
+ */
+export async function sendTestAlert(
+  alert: DeviceAlert,
+  device: DeviceDocument,
+  reading: DataPoint,
+  integrations: Integration[],
+): Promise<AlertTestResult[]> {
+  const enabledById = new Map(
+    integrations.filter((integration) => integration.enabled).map((integration) => [integration.id, integration]),
+  );
+  const targets = alert.integrationIds
+    .map((id) => enabledById.get(id))
+    .filter((integration): integration is Integration => Boolean(integration));
+
+  return Promise.all(
+    targets.map(async (integration) => ({
+      integrationId: integration.id,
+      ...(await sendToIntegration(integration, alert, device, reading)),
+    })),
+  );
 }
 
 /**
@@ -171,6 +209,7 @@ export async function evaluateAlertsForDevice(
 
       const firing = evaluateAlertConditions(alert.conditions, alert.logic, latest);
       const wasFiring = alert.firing;
+      const muted = isAlertMuted(alert, now);
       const lastNotifiedAt = alert.lastNotifiedAt ? new Date(alert.lastNotifiedAt).getTime() : 0;
       const repeatMs = Math.max(1, alert.repeatIntervalMinutes) * 60_000;
 
@@ -181,6 +220,7 @@ export async function evaluateAlertsForDevice(
       // Only mark the alert as notified when there is an enabled destination to
       // deliver to, so wiring up an integration later still sends immediately.
       const due = firing
+        && !muted
         && targets.length > 0
         && (!wasFiring || !lastNotifiedAt || now - lastNotifiedAt >= repeatMs);
 

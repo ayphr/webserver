@@ -1,7 +1,11 @@
 import type {
   NotificationListPayload,
   NotificationListQuery,
+  NotificationPreferences,
+  NotificationPreferencesUpdate,
   NotificationUnreadCountPayload,
+  PushPublicKeyPayload,
+  PushSubscriptionInput,
 } from '@common';
 import type { RequestClient } from './client';
 
@@ -34,6 +38,35 @@ export function createNotificationsApi(client: RequestClient) {
         { method: 'POST' },
       );
       return response.unreadCount;
+    },
+    async getPreferences() {
+      return client.requestJson<NotificationPreferences>('/api/notifications/preferences');
+    },
+    async updatePreferences(update: NotificationPreferencesUpdate) {
+      return client.requestJson<NotificationPreferences>('/api/notifications/preferences', {
+        method: 'PATCH',
+        body: update,
+      });
+    },
+    async getPushPublicKey() {
+      const response = await client.requestJson<PushPublicKeyPayload>('/api/notifications/push/public-key');
+      return response.publicKey;
+    },
+    async subscribePush(subscription: PushSubscriptionInput) {
+      return client.requestJson<{ subscribed: boolean }>('/api/notifications/push/subscribe', {
+        method: 'POST',
+        body: subscription,
+      });
+    },
+    async unsubscribePush() {
+      return client.requestJson<{ unsubscribed: boolean }>('/api/notifications/push/subscribe', {
+        method: 'DELETE',
+      });
+    },
+    async sendTestPush() {
+      return client.requestJson<{ sent: boolean }>('/api/notifications/push/test', {
+        method: 'POST',
+      });
     },
   };
 }

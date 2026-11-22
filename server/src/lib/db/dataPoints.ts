@@ -299,6 +299,44 @@ export async function getDataPointsForQuery(
 }
 
 
+/** A materialized, unsampled read for exports; never used for the graph view. */
+export const MAX_DATA_POINT_EXPORT = 1_000_000;
+
+export async function getDataPointsForExport(
+  serial: number,
+  options: { since: Date; until: Date; maxPoints?: number },
+): Promise<{ points: DataPoint[]; totalCount: number; truncated: boolean }> {
+  const dataPoints = await getCollection('dataPoints');
+  const filter = buildDataPointFilter(serial, { since: options.since, until: options.until });
+
+  trackMongoOperation('countDocuments', DATA_POINTS_COLLECTION);
+  const totalCount = await dataPoints.countDocuments(filter);
+  if (totalCount === 0) return { points: [], totalCount: 0, truncated: false };
+
+  const max = Math.max(1, options.maxPoints ?? MAX_DATA_POINT_EXPORT);
+  const projection = { _id: 0, timestamp: 1, temperature: 1, humidity: 1, airPressure: 1 };
+
+  trackMongoOperation('find', DATA_POINTS_COLLECTION);
+  const docs = totalCount <= max
+    ? await dataPoints
+      .find(filter, { projection })
+      .sort({ timestamp: 1 })
+      .toArray()
+    : await dataPoints
+      .find(filter, { projection })
+      .sort({ timestamp: -1 })
+      .limit(max)
+      .toArray();
+
+  if (totalCount > max) docs.reverse();
+
+  return {
+    points: docs.map(toDataPoint),
+    totalCount,
+    truncated: totalCount > max,
+  };
+}
+
 export async function deleteDataPointsForDevice(serial: number, timestamps: Date[]): Promise<number> {
   if (timestamps.length === 0) return 0;
   const dataPoints = await getCollection('dataPoints');

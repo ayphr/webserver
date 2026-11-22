@@ -13,6 +13,9 @@ import {
 import type { DeviceDocument } from '../../lib/db';
 import { canManageTeam } from '../../lib/db/teams';
 import { parseName, parseSerial } from '../../lib/deviceValidation';
+import { parseIsoTimestamp } from '../../lib/deviceExportService';
+import { sendTestAlert } from '../../lib/alerts';
+import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { requireAlertsAndWebhooksPlan } from '../../lib/planAccess';
 import { getTeamContext } from '../../lib/teamContext';
 import {
@@ -33,6 +36,7 @@ import {
 } from '@common';
 
 const MAX_INTEGRATIONS_PER_ALERT = 20;
+const alertTestLimiter = createRateLimiter(60 * 1000, 5, 'alert-test');
 
 function parseLogic(value: unknown): AlertLogic | null {
   if (typeof value !== 'string') return null;
@@ -75,6 +79,14 @@ function parseRepeatInterval(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isInteger(value)) return null;
   if (value < ALERT_MIN_REPEAT_MINUTES || value > ALERT_MAX_REPEAT_MINUTES) return null;
   return value;
+}
+
+type ParsedMutedUntil = { ok: true; value: Date | null } | { ok: false };
+
+function parseMutedUntil(value: unknown): ParsedMutedUntil {
+  if (value === null) return { ok: true, value: null };
+  const parsed = parseIsoTimestamp(value);
+  return parsed ? { ok: true, value: parsed } : { ok: false };
 }
 
 type ScopedDevice = {
@@ -167,6 +179,13 @@ const handleCreateAlert = requireAuth(async (request, user: User, params) => {
   const enabled = body?.enabled === undefined ? true : body.enabled;
   if (typeof enabled !== 'boolean') return json({ error: 'invalid enabled' }, 400);
 
+  let mutedUntil: Date | null = null;
+  if (body?.mutedUntil !== undefined) {
+    const parsedMutedUntil = parseMutedUntil(body.mutedUntil);
+    if (!parsedMutedUntil.ok) return json({ error: 'invalid mutedUntil' }, 400);
+    mutedUntil = parsedMutedUntil.value;
+  }
+
   const now = new Date();
   const alert: DeviceAlert = {
     id: crypto.randomUUID(),
@@ -179,6 +198,7 @@ const handleCreateAlert = requireAuth(async (request, user: User, params) => {
     integrationIds: validIntegrationIds,
     repeatIntervalMinutes,
     firing: false,
+    mutedUntil,
     createdAt: now,
     updatedAt: now,
   };
@@ -251,6 +271,12 @@ const handleUpdateAlert = requireAuth(async (request, user: User, params) => {
     if (!body.enabled) updates.firing = false;
   }
 
+  if (body?.mutedUntil !== undefined) {
+    const parsedMutedUntil = parseMutedUntil(body.mutedUntil);
+    if (!parsedMutedUntil.ok) return json({ error: 'invalid mutedUntil' }, 400);
+    updates.mutedUntil = parsedMutedUntil.value;
+  }
+
   if (rulesChanged) updates.firing = false;
 
   const updated = await updateAlert(id, updates);
@@ -285,7 +311,38 @@ const handleDeleteAlert = requireAuth(async (_request, user: User, params) => {
   return json({ deleted: true });
 });
 
+const handleTestDeviceAlert = requireAuth(async (_request, user: User, params) => {
+  const planError = await requireAlertsAndWebhooksPlan(user);
+  if (planError) return planError;
+
+  if (!(await canManageAlerts(user))) return json({ error: 'Forbidden' }, 403);
+
+  const scope = await getScopedDevice(user, params);
+  if (scope instanceof Response) return scope;
+
+  const id = typeof params.id === 'string' ? params.id : '';
+  if (!id) return json({ error: 'invalid id' }, 400);
+
+  const rateCheck = await alertTestLimiter.check(`user:${user.uuid}:alert:${id}`);
+  if (!rateCheck.allowed) return tooManyRequests(rateCheck.retryAfterMs);
+
+  const alert = await getAlertById(id);
+  if (!alert) return json({ error: 'not found' }, 404);
+  if (alert.teamId !== scope.scopeUuid || alert.serial !== scope.serial) {
+    return json({ error: 'forbidden' }, 403);
+  }
+
+  const stats = await getDataPointStats([scope.serial]);
+  const latest = stats.get(scope.serial)?.latest ?? null;
+  if (!latest) return json({ error: 'no readings available' }, 400);
+
+  const integrations = await getIntegrationsForTeamId(scope.scopeUuid);
+  const results = await sendTestAlert(alert, scope.device, latest, integrations);
+  return json({ results });
+});
+
 export {
+  handleTestDeviceAlert,
   handleListAlerts as handleAlertsList,
   handleCreateAlert as handleAlertCreate,
   handleUpdateAlert as handleAlertUpdate,

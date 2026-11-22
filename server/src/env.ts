@@ -32,6 +32,8 @@ export const DEVICE_LOGS_COLLECTION = 'device_logs';
 /** Device activity logs are kept for one month; enforced by a MongoDB TTL index. */
 export const DEVICE_LOG_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 export const NOTIFICATIONS_COLLECTION = 'notifications';
+export const NOTIFICATION_PREFERENCES_COLLECTION = 'notification_preferences';
+export const PUSH_SUBSCRIPTIONS_COLLECTION = 'push_subscriptions';
 export const ASSISTANT_STATES_COLLECTION = 'assistant_states';
 export const TEAMS_COLLECTION = 'teams';
 export const TEAM_INVITES_COLLECTION = 'team_invites';
@@ -56,6 +58,11 @@ export const STRIPE_WEBHOOK_SECRET = Bun.env.STRIPE_WEBHOOK_SECRET || '';
 
 export const RESEND_API_KEY = Bun.env.RESEND_API_KEY || '';
 export const RESEND_FROM_EMAIL = Bun.env.RESEND_FROM_EMAIL || 'Ayphr <noreply@ayphr.com>';
+
+/** Web Push VAPID keys. All three are required before subscriptions are accepted. */
+export const VAPID_PUBLIC_KEY = Bun.env.VAPID_PUBLIC_KEY || '';
+export const VAPID_PRIVATE_KEY = Bun.env.VAPID_PRIVATE_KEY || '';
+export const VAPID_SUBJECT = Bun.env.VAPID_SUBJECT || '';
 
 export const EMAIL_CODE_TTL_MINUTES = envNumber('EMAIL_CODE_TTL_MINUTES', 10);
 export const EMAIL_CODE_TTL_MS = EMAIL_CODE_TTL_MINUTES * 60 * 1000;

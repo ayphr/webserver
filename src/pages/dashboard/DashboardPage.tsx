@@ -489,6 +489,7 @@ export const DashboardPage = () => {
             tab: parsed.tab,
             ...(parsed.section ? { section: parsed.section } : {}),
             ...(parsed.device ? { device: parsed.device } : {}),
+            ...(parsed.location ? { location: parsed.location } : {}),
           };
         })()
       : value;
@@ -798,7 +799,11 @@ export const DashboardPage = () => {
                 className="dashboard-panel--wide"
               >
                 <Suspense fallback={<DashboardContentSkeleton />}>
-                  <LocationsPanel onDeviceNavigate={openDevice} />
+                  <LocationsPanel
+                    onDeviceNavigate={openDevice}
+                    onNavigate={navigateToDashboard}
+                    locationRoute={dashboardRoute.location ?? null}
+                  />
                 </Suspense>
               </DashboardPanel>
             )}

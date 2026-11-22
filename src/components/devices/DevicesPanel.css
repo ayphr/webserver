@@ -23,6 +23,37 @@
   gap: 0.5rem;
 }
 
+.devices__filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.devices__filter-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 16rem;
+  min-width: 12rem;
+}
+
+.devices__filter-search > svg {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.devices__filter-search .input {
+  width: 100%;
+  padding-left: 2.1rem;
+}
+
+.devices__filters .select-wrapper {
+  min-width: 10rem;
+}
+
 .devices__error {
   display: flex;
   align-items: center;
