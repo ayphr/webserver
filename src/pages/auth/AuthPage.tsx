@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { IconCheck, IconX } from '@tabler/icons-react';
+import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay, CodeInput } from '../../components/common';
 import { getActiveToken, getStoredAccounts, isStoredAccountExpired, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
@@ -30,17 +30,12 @@ export interface AuthPageProps {
 function PasswordChecklist({ checks }: Readonly<{ checks: PasswordValidationChecks }>) {
   return (
     <ul className="auth-form__password-checklist" aria-live="polite">
-      {PASSWORD_RULES.map((rule) => {
-        const valid = checks[rule.key];
-        return (
-          <li key={rule.key} className={valid ? 'is-valid' : 'is-invalid'}>
-            <span className="auth-form__password-rule-icon" aria-hidden="true">
-              {valid ? <IconCheck size={14} strokeWidth={2} /> : <IconX size={14} strokeWidth={2} />}
-            </span>
-            {rule.label}
-          </li>
-        );
-      })}
+      {PASSWORD_RULES.filter((rule) => !checks[rule.key]).map((rule) => (
+        <li key={rule.key} className="is-invalid">
+          <span className="auth-form__password-rule-icon" aria-hidden="true"><IconX size={14} strokeWidth={2} /></span>
+          {rule.label}
+        </li>
+      ))}
     </ul>
   );
 }
@@ -328,8 +323,20 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
   const isSignup = mode === 'signup';
   const hasEnteredPassword = formData.password.length > 0;
+  const hasUnsatisfiedPasswordRequirements =
+    !passwordChecks.minLength ||
+    !passwordChecks.lowercase ||
+    !passwordChecks.uppercase ||
+    !passwordChecks.number ||
+    !passwordChecks.symbol;
 
   const resetPasswordChecks = getPasswordValidationChecks(resetPassword);
+  const resetHasUnsatisfied =
+    !resetPasswordChecks.minLength ||
+    !resetPasswordChecks.lowercase ||
+    !resetPasswordChecks.uppercase ||
+    !resetPasswordChecks.number ||
+    !resetPasswordChecks.symbol;
 
   let title = isSignup ? 'Sign Up' : 'Log In';
   if (isSignup && step === 'email-code') title = 'Verify Your Email';
@@ -442,7 +449,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   disabled={isLoading}
                   fullWidth
                 />
-                {resetPassword.length > 0 && (
+                {resetPassword.length > 0 && resetHasUnsatisfied && (
                   <PasswordChecklist checks={resetPasswordChecks} />
                 )}
                 <Input
@@ -566,7 +573,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   </div>
                 )}
 
-                {isSignup && hasEnteredPassword && (
+                {isSignup && hasEnteredPassword && hasUnsatisfiedPasswordRequirements && (
                   <PasswordChecklist checks={passwordChecks} />
                 )}
 

@@ -151,7 +151,7 @@ button,
   overflow: visible;
   color: var(--text-primary);
   background: var(--bg-elevated);
-  border: 1px solid var(--focus-ring);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
 }
 

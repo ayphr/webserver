@@ -38,16 +38,16 @@
   transition: border-color 0.15s ease, background-color 0.15s ease;
 
   &::placeholder {
-    color: hsl(0, 0%, 55%);
+    color: var(--text-muted);
   }
 
   &:hover:not(:disabled) {
-    border-color: hsl(0, 0%, 22%);
+    border-color: var(--border);
   }
 
   &:focus {
-    background-color: hsl(0, 0%, 12%);
-    border-color: hsl(0, 0%, 34%);
+    background-color: var(--bg-elevated);
+    border-color: var(--border-focus);
     box-shadow: none;
   }
 
