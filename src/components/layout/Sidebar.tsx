@@ -170,11 +170,11 @@ export const Sidebar: React.FC<Props> = ({
         {isSuspended ? (
           <>
             <button
-              className={`n-sidebar__tab ${activeTab === 'overview' || activeTab === 'suspension' ? 'active' : ''}`}
+              className={`n-sidebar__tab ${activeTab === 'appeal' ? '' : 'active'}`}
               type="button"
               onClick={() => onChange('overview')}
               aria-label="Suspension"
-              aria-current={activeTab === 'overview' || activeTab === 'suspension' ? 'page' : undefined}
+              aria-current={activeTab !== 'appeal' ? 'page' : undefined}
               {...tooltipHandlers('Suspension')}
             >
               <span className="n-sidebar__icon">{iconFor('suspension')}</span>

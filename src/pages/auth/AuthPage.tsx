@@ -21,6 +21,34 @@ interface FormData {
   email?: string;
 }
 
+type SignupField = 'username' | 'email' | 'password' | 'confirmPassword';
+
+const SIGNUP_FIELDS: SignupField[] = ['username', 'email', 'password', 'confirmPassword'];
+
+function getSignupFieldError(field: SignupField, data: FormData): string | undefined {
+  switch (field) {
+    case 'username': {
+      const username = data.username.trim();
+      if (!username) return 'Username is required';
+      return getUsernameValidationError(username) ?? undefined;
+    }
+    case 'email': {
+      const email = data.email?.trim() ?? '';
+      if (!email) return 'Email is required';
+      return getEmailValidationError(email) ?? undefined;
+    }
+    case 'password': {
+      if (!data.password) return 'Password is required';
+      return getPasswordValidationErrors(data.password)[0] ?? undefined;
+    }
+    case 'confirmPassword': {
+      if (!data.confirmPassword) return 'Please confirm your password';
+      if (data.password !== data.confirmPassword) return 'Passwords do not match';
+      return undefined;
+    }
+  }
+}
+
 const RESEND_COOLDOWN_SECONDS = 30;
 
 export interface AuthPageProps {
@@ -55,6 +83,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     email: '',
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+  const [touched, setTouched] = useState<Partial<Record<keyof FormData, boolean>>>({});
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -91,16 +120,47 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    if (errors[name as keyof FormData]) {
+    const field = name as keyof FormData;
+    const nextData = { ...formData, [field]: value };
+    setFormData(nextData);
+
+    if (mode === 'signup') {
+      setTouched((prev) => ({ ...prev, [field]: true }));
+      const fieldsToValidate: SignupField[] = field === 'password'
+        ? ['password', 'confirmPassword']
+        : SIGNUP_FIELDS.filter((item) => item === field);
+
+      setErrors((prev) => {
+        const next = { ...prev };
+        for (const item of fieldsToValidate) {
+          if (!touched[item] && item !== field) continue;
+          const error = getSignupFieldError(item, nextData);
+          if (error) next[item] = error;
+          else delete next[item];
+        }
+        return next;
+      });
+      return;
+    }
+
+    if (errors[field]) {
       setErrors((prev) => ({
         ...prev,
-        [name]: undefined,
+        [field]: undefined,
       }));
     }
+  };
+
+  const handleFieldBlur = (field: SignupField) => {
+    if (mode !== 'signup') return;
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const error = getSignupFieldError(field, formData);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (error) next[field] = error;
+      else delete next[field];
+      return next;
+    });
   };
 
   const handleChooseAccount = async (token: string) => {
@@ -122,36 +182,15 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};
 
-    if (!formData.username.trim()) {
-      newErrors.username = mode === 'login' ? 'Email or username is required' : 'Username is required';
-    } else if (mode === 'signup') {
-      const usernameError = getUsernameValidationError(formData.username.trim());
-      if (usernameError) newErrors.username = usernameError;
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    }
-
-    if (mode === 'signup') {
-      const passwordValidationErrors = getPasswordValidationErrors(formData.password);
-      if (passwordValidationErrors.length > 0) {
-        newErrors.password = passwordValidationErrors[0];
+    if (mode === 'login') {
+      if (!formData.username.trim()) newErrors.username = 'Email or username is required';
+      if (!formData.password) newErrors.password = 'Password is required';
+    } else {
+      for (const field of SIGNUP_FIELDS) {
+        const error = getSignupFieldError(field, formData);
+        if (error) newErrors[field] = error;
       }
-
-      if (!formData.email?.trim()) {
-        newErrors.email = 'Email is required';
-      } else {
-        const emailError = getEmailValidationError(formData.email.trim());
-        if (emailError) newErrors.email = emailError;
-      }
-
-      if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Please confirm your password';
-      } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
-      }
-
+      setTouched({ username: true, email: true, password: true, confirmPassword: true });
       setPolicyError(acceptedPolicies ? null : 'You must agree to the Terms of Service and Privacy Policy');
     }
 
@@ -170,6 +209,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const resetFormState = () => {
     setFormData({ username: '', password: '', confirmPassword: '', email: '' });
     setErrors({});
+    setTouched({});
     setAcceptedPolicies(false);
     setPolicyError(null);
     setAuthError(null);
@@ -528,6 +568,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   placeholder={isSignup ? 'Enter your username' : 'Enter your email or username'}
                   value={formData.username}
                   onChange={handleInputChange}
+                  onBlur={isSignup ? () => handleFieldBlur('username') : undefined}
                   error={errors.username}
                   disabled={isLoading}
                   fullWidth
@@ -545,6 +586,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                     placeholder="Enter your email"
                     value={formData.email || ''}
                     onChange={handleInputChange}
+                    onBlur={() => handleFieldBlur('email')}
                     error={errors.email}
                     disabled={isLoading}
                     fullWidth
@@ -560,6 +602,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   placeholder={isSignup ? 'Create a password' : 'Enter your password'}
                   value={formData.password}
                   onChange={handleInputChange}
+                  onBlur={isSignup ? () => handleFieldBlur('password') : undefined}
                   error={errors.password}
                   disabled={isLoading}
                   fullWidth
@@ -587,6 +630,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                     placeholder="Confirm your password"
                     value={formData.confirmPassword || ''}
                     onChange={handleInputChange}
+                    onBlur={() => handleFieldBlur('confirmPassword')}
                     error={errors.confirmPassword}
                     disabled={isLoading}
                     fullWidth

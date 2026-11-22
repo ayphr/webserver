@@ -12,6 +12,10 @@
   --border-focus: hsl(0, 0%, 30%);
   --border-subtle: hsl(0, 0%, 20%);
 
+  /* Original subtle overlays used by the sidebar navigation. */
+  --surface-hover-subtle: rgba(255, 255, 255, 0.015);
+  --surface-active-subtle: rgba(255, 255, 255, 0.02);
+
   --text-primary: hsla(180, 67%, 99%, 1);
   --text-muted: hsl(180, 1%, 53%);
   --text-dim: hsl(180, 1%, 45%);

@@ -85,10 +85,10 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.5rem;
+  padding: 0.5rem 0.4rem;
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-primary);
   text-align: left;
   cursor: pointer;
   border-radius: 6px;
@@ -96,12 +96,12 @@
 }
 
 .n-sidebar__tab:hover {
-  background: var(--bg-elevated);
+  background: var(--surface-hover-subtle);
   color: var(--text-primary);
 }
 
 .n-sidebar__tab.active {
-  background: var(--bg-input-off);
+  background: var(--surface-active-subtle);
   color: var(--text-primary);
   font-weight: 600;
 }
@@ -110,7 +110,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: currentColor;
+  color: var(--text-primary);
   flex-shrink: 0;
 }
 
@@ -241,14 +241,7 @@
 }
 
 .n-sidebar__menuItem:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-}
-
-.n-sidebar__menuItem.active {
-  background: var(--bg-input-off);
-  color: var(--text-primary);
-  font-weight: 600;
+  background: var(--surface-active-subtle);
 }
 
 .n-sidebar__menuIcon {
