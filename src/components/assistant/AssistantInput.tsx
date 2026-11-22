@@ -183,6 +183,10 @@ export const AssistantInput = ({
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
 
   const isChat = messages.length > 0;
+  const activeChat = state.chats.find((item) => item.id === state.activeChatId);
+  const isChatView = state.activeChatId !== null;
+  const toolbarFolderId = isChatView ? (activeChat?.folderId ?? null) : state.activeFolderId;
+  const toolbarMode = isChatView ? (activeChat?.mode ?? state.activeMode) : state.activeMode;
   const currentSubtitle = subtitles[subtitleSequence.order[subtitleSequence.position] ?? 0] ?? '';
 
   const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
@@ -730,8 +734,8 @@ export const AssistantInput = ({
         <div className="assistant-input__composer">
           <AssistantToolbar
             folders={state.folders}
-            activeFolderId={state.activeFolderId}
-            activeMode={state.activeMode}
+            activeFolderId={toolbarFolderId}
+            activeMode={toolbarMode}
             onSelectFolder={assistant.selectFolder}
             onSelectMode={assistant.selectMode}
             onCreateFolder={assistant.createFolder}
