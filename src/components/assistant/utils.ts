@@ -6,6 +6,15 @@ export const createId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+export const mergeById = <T extends { id: string }>(items: T[] | undefined, next: T): T[] => {
+  const current = items ?? [];
+  const index = current.findIndex((item) => item.id === next.id);
+  if (index === -1) return [...current, next];
+  const updated = [...current];
+  updated[index] = next;
+  return updated;
+};
+
 export const toPersistableMessage = (message: LiveAssistantMessage): AssistantMessage => {
   const { liveDurationMs, liveTokensPerSecond, ...persistable } = message;
   void liveDurationMs;

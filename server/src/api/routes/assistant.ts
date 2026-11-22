@@ -1,5 +1,7 @@
 import {
   ASSISTANT_MODES,
+  ASSISTANT_THINKING_STATUSES,
+  ASSISTANT_TOOL_STATUSES,
   ASSISTANT_VARIANTS,
   createDefaultAssistantState,
   type AssistantChat,
@@ -8,6 +10,10 @@ import {
   type AssistantMessageFeedback,
   type AssistantMode,
   type AssistantState,
+  type AssistantThinkingStep,
+  type AssistantThinkingStatus,
+  type AssistantToolCall,
+  type AssistantToolStatus,
   type AssistantVariant,
 } from '@common';
 import { getAssistantState, saveAssistantState } from '../../lib/db';
@@ -21,6 +27,10 @@ const MAX_MESSAGES_PER_CHAT = 2000;
 const MAX_TITLE_LENGTH = 200;
 const MAX_FOLDER_NAME_LENGTH = 100;
 const MAX_MESSAGE_LENGTH = 100_000;
+const MAX_THINKING_STEPS = 12;
+const MAX_TOOL_CALLS = 12;
+const MAX_STEP_LABEL_LENGTH = 200;
+const MAX_STEP_DETAIL_LENGTH = 1_000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -63,6 +73,58 @@ const requireMode = (value: unknown, label: string): AssistantMode => {
   }
   return value as AssistantMode;
 };
+
+function parseThinkingStatus(value: unknown, label: string): AssistantThinkingStatus {
+  if (typeof value !== 'string' || !ASSISTANT_THINKING_STATUSES.includes(value as AssistantThinkingStatus)) {
+    throw new Error(`invalid ${label}`);
+  }
+  return value as AssistantThinkingStatus;
+}
+
+function parseToolStatus(value: unknown, label: string): AssistantToolStatus {
+  if (typeof value !== 'string' || !ASSISTANT_TOOL_STATUSES.includes(value as AssistantToolStatus)) {
+    throw new Error(`invalid ${label}`);
+  }
+  return value as AssistantToolStatus;
+}
+
+function parseThinkingStep(value: unknown, label: string): AssistantThinkingStep {
+  if (!isRecord(value)) throw new Error(`invalid ${label}`);
+  const step: AssistantThinkingStep = {
+    id: requireId(value.id, `${label}.id`),
+    label: requireString(value.label, `${label}.label`, MAX_STEP_LABEL_LENGTH),
+    status: parseThinkingStatus(value.status, `${label}.status`),
+  };
+  if (value.detail !== undefined) {
+    step.detail = requireString(value.detail, `${label}.detail`, MAX_STEP_DETAIL_LENGTH);
+  }
+  if (value.durationMs !== undefined) {
+    step.durationMs = Math.max(0, requireNumber(value.durationMs, `${label}.durationMs`));
+  }
+  return step;
+}
+
+function parseToolCall(value: unknown, label: string): AssistantToolCall {
+  if (!isRecord(value)) throw new Error(`invalid ${label}`);
+  const tool: AssistantToolCall = {
+    id: requireId(value.id, `${label}.id`),
+    name: requireString(value.name, `${label}.name`, MAX_STEP_LABEL_LENGTH),
+    status: parseToolStatus(value.status, `${label}.status`),
+  };
+  if (value.label !== undefined) {
+    tool.label = requireString(value.label, `${label}.label`, MAX_STEP_LABEL_LENGTH);
+  }
+  if (value.detail !== undefined) {
+    tool.detail = requireString(value.detail, `${label}.detail`, MAX_STEP_DETAIL_LENGTH);
+  }
+  if (value.durationMs !== undefined) {
+    tool.durationMs = Math.max(0, requireNumber(value.durationMs, `${label}.durationMs`));
+  }
+  if (value.error !== undefined) {
+    tool.error = requireString(value.error, `${label}.error`, MAX_STEP_DETAIL_LENGTH);
+  }
+  return tool;
+}
 
 function parseMessage(value: unknown, label: string): AssistantMessage {
   if (!isRecord(value)) throw new Error(`invalid ${label}`);
@@ -108,6 +170,24 @@ function parseMessage(value: unknown, label: string): AssistantMessage {
   if (value.durationMs !== undefined) {
     const durationMs = requireNumber(value.durationMs, `${label}.durationMs`);
     message.durationMs = Math.max(0, durationMs);
+  }
+
+  if (value.thinking !== undefined) {
+    if (!Array.isArray(value.thinking) || value.thinking.length > MAX_THINKING_STEPS) {
+      throw new Error(`invalid ${label}.thinking`);
+    }
+    message.thinking = value.thinking.map((step, index) =>
+      parseThinkingStep(step, `${label}.thinking[${index}]`),
+    );
+  }
+
+  if (value.tools !== undefined) {
+    if (!Array.isArray(value.tools) || value.tools.length > MAX_TOOL_CALLS) {
+      throw new Error(`invalid ${label}.tools`);
+    }
+    message.tools = value.tools.map((tool, index) =>
+      parseToolCall(tool, `${label}.tools[${index}]`),
+    );
   }
 
   return message;

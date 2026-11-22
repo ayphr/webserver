@@ -1,19 +1,30 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   IconArrowBackUp,
   IconChevronDown,
   IconCopy,
   IconCopyCheck,
+  IconDatabase,
+  IconFileText,
   IconRefresh,
+  IconSearch,
   IconThumbDown,
   IconThumbDownFilled,
   IconThumbUp,
   IconThumbUpFilled,
+  IconTool,
+  IconWand,
 } from '@tabler/icons-react';
-import { ASSISTANT_DATA, type AssistantVariant } from '@common';
+import {
+  ASSISTANT_DATA,
+  type AssistantThinkingStep,
+  type AssistantToolCall,
+  type AssistantVariant,
+} from '@common';
 import type { LiveAssistantMessage } from './types';
 import { formatDuration, formatMessageTime } from './utils';
 import { useDismiss } from '../../hooks/useDismiss';
+import { AssistantMarkdown } from './AssistantMarkdown';
 import './AssistantMessages.css';
 
 export interface AssistantMessagesProps {
@@ -29,6 +40,154 @@ export interface AssistantMessagesProps {
   onRegenerate: (messageId: number) => void;
   onCopy: (messageId: number, content: string) => void;
 }
+
+const latestReachedIndex = <T extends { status: string }>(items: T[]) => {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (items[index]?.status !== 'pending') return index;
+  }
+  return -1;
+};
+
+const ThinkingPanel = ({
+  steps,
+  streaming,
+}: {
+  steps: AssistantThinkingStep[];
+  streaming: boolean;
+}) => {
+  const [open, setOpen] = useState(streaming);
+
+  useEffect(() => {
+    // Collapse the trace when the answer finishes, like other chat clients.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpen(streaming);
+  }, [streaming]);
+
+  const completed = steps.filter((step) => step.status === 'done').length;
+  const active = steps.find((step) => step.status === 'running');
+  const reachedIndex = latestReachedIndex(steps);
+  const activeStep = reachedIndex >= 0 ? steps[reachedIndex] : undefined;
+  const visibleSteps = streaming ? (activeStep ? [activeStep] : []) : steps;
+  const earlierCount = streaming && reachedIndex > 0 ? reachedIndex : 0;
+  const settled = !active && reachedIndex === steps.length - 1;
+
+  return (
+    <details
+      className="assistant-chat__thinking"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className="assistant-chat__disclosure-summary">
+        <span className="assistant-chat__disclosure-label">
+          {active ? active.label : settled ? 'Thought for a moment' : 'Thinking'}
+        </span>
+        <span className="assistant-chat__disclosure-meta">
+          {completed === steps.length ? `${steps.length} steps` : `${completed} of ${steps.length}`}
+        </span>
+        <IconChevronDown
+          size={13}
+          strokeWidth={2}
+          className={`assistant-chat__disclosure-chevron${open ? ' assistant-chat__disclosure-chevron--open' : ''}`}
+        />
+      </summary>
+      <div className="assistant-chat__thinking-steps">
+        {earlierCount > 0 && (
+          <div className="assistant-chat__thinking-earlier">
+            {earlierCount} earlier {earlierCount === 1 ? 'step' : 'steps'}
+          </div>
+        )}
+        {visibleSteps.map((step) => (
+          <div
+            key={step.id}
+            className={`assistant-chat__thinking-step assistant-chat__thinking-step--${step.status}`}
+          >
+            <div className="assistant-chat__thinking-copy">
+              <span className="assistant-chat__thinking-label">{step.label}</span>
+              {step.detail && (
+                <span className="assistant-chat__thinking-detail">{step.detail}</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+};
+
+const TOOL_ICON_PROPS = {
+  size: 13,
+  strokeWidth: 1.8,
+  className: 'assistant-chat__tool-line-icon',
+  'aria-hidden': true,
+} as const;
+
+const renderToolIcon = (name: string) => {
+  if (name.includes('search')) return <IconSearch {...TOOL_ICON_PROPS} />;
+  if (name.includes('query') || name.includes('data')) return <IconDatabase {...TOOL_ICON_PROPS} />;
+  if (name.includes('docs') || name.includes('lookup')) return <IconFileText {...TOOL_ICON_PROPS} />;
+  if (name.includes('format')) return <IconWand {...TOOL_ICON_PROPS} />;
+  return <IconTool {...TOOL_ICON_PROPS} />;
+};
+
+const ToolCallLine = ({ tool }: { tool: AssistantToolCall }) => (
+  <div className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}>
+    {renderToolIcon(tool.name)}
+    <span className="assistant-chat__tool-line-label">{tool.label ?? tool.name}</span>
+  </div>
+);
+
+const ToolGroup = ({ tools, active }: { tools: AssistantToolCall[]; active: boolean }) => {
+  const [open, setOpen] = useState(active);
+  const reachedIndex = latestReachedIndex(tools);
+  const latest = reachedIndex >= 0 ? tools[reachedIndex] : undefined;
+  const reachedCount = reachedIndex + 1;
+
+  useEffect(() => {
+    // Keep the newest tool visible while calls are still arriving, then fold
+    // the group away once the response finishes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpen(active);
+  }, [active, reachedCount]);
+
+  if (!latest) return null;
+
+  const earlierCount = reachedIndex;
+
+  return (
+    <div className="assistant-chat__tool-group">
+      <button
+        type="button"
+        className="assistant-chat__disclosure-summary"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <span className="assistant-chat__disclosure-label">
+          {reachedCount === 1 ? 'Used 1 tool' : `Used ${reachedCount} tools`}
+        </span>
+        {active && <span className="assistant-chat__disclosure-meta">working</span>}
+        <IconChevronDown
+          size={13}
+          strokeWidth={2}
+          className={`assistant-chat__disclosure-chevron${open ? ' assistant-chat__disclosure-chevron--open' : ''}`}
+        />
+      </button>
+      {open && (
+        <div className="assistant-chat__tool-group-items">
+          {active && earlierCount > 0 && (
+            <div className="assistant-chat__tool-group-earlier">
+              {earlierCount} earlier {earlierCount === 1 ? 'tool' : 'tools'}
+            </div>
+          )}
+          {active ? (
+            <ToolCallLine key={latest.id} tool={latest} />
+          ) : (
+            tools.map((tool) => <ToolCallLine key={tool.id} tool={tool} />)
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const AssistantMessages = ({
   messages,
@@ -66,7 +225,7 @@ export const AssistantMessages = ({
         const tokensPerSecond = isStreaming
           ? message.liveTokensPerSecond
           : message.durationMs
-            ? message.content.split(' ').filter(Boolean).length / (message.durationMs / 1000)
+            ? message.content.split(/\s+/).filter(Boolean).length / (message.durationMs / 1000)
             : undefined;
 
         return (
@@ -115,12 +274,14 @@ export const AssistantMessages = ({
               </div>
             ) : (
               <div className="assistant-chat__assistant-wrap">
+                {message.thinking && message.thinking.length > 0 && (
+                  <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
+                )}
+                {message.tools && message.tools.length > 0 && (
+                  <ToolGroup tools={message.tools} active={isStreaming} />
+                )}
                 <div className="assistant-chat__bubble">
-                  {message.content.split(' ').filter(Boolean).map((word, i) => (
-                    <span key={i} className="assistant-chat__token">
-                      {word}{' '}
-                    </span>
-                  ))}
+                  <AssistantMarkdown content={message.content} />
                 </div>
                 {message.error && <p className="assistant-chat__error">{message.error}</p>}
                 {message.interrupted && (

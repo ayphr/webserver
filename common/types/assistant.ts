@@ -5,17 +5,43 @@ export type AssistantSendShortcut = 'enter' | 'shift-enter';
 export const ASSISTANT_MODES: AssistantMode[] = ['chat', 'task'];
 export type AssistantMode = 'chat' | 'task';
 
+export const ASSISTANT_THINKING_STATUSES = ['pending', 'running', 'done'] as const;
+export type AssistantThinkingStatus = (typeof ASSISTANT_THINKING_STATUSES)[number];
+
+export type AssistantThinkingStep = {
+  id: string;
+  label: string;
+  detail?: string;
+  status: AssistantThinkingStatus;
+  durationMs?: number;
+};
+
+export const ASSISTANT_TOOL_STATUSES = ['pending', 'running', 'done', 'error'] as const;
+export type AssistantToolStatus = (typeof ASSISTANT_TOOL_STATUSES)[number];
+
+export type AssistantToolCall = {
+  id: string;
+  name: string;
+  label?: string;
+  status: AssistantToolStatus;
+  detail?: string;
+  durationMs?: number;
+  error?: string;
+};
+
 export const ASSISTANT_STREAM_PATH = '/ws/assistant';
 
 export type AssistantStreamClientMessage =
   | { type: 'auth'; token: string }
-  | { type: 'stream'; requestId: string }
+  | { type: 'stream'; requestId: string; mode?: AssistantMode; variant?: AssistantVariant }
   | { type: 'cancel'; requestId: string };
 
 export type AssistantStreamServerMessage =
   | { type: 'auth_error'; error: string }
-  | { type: 'token'; requestId: string; token: string }
-  | { type: 'done'; requestId: string }
+  | { type: 'thinking'; requestId: string; step: AssistantThinkingStep }
+  | { type: 'tool'; requestId: string; tool: AssistantToolCall }
+  | { type: 'token'; requestId: string; token: string; index?: number }
+  | { type: 'done'; requestId: string; durationMs?: number }
   | { type: 'error'; requestId: string; error: string };
 
 export type AssistantMessageFeedback = 'like' | 'dislike' | null;
@@ -30,6 +56,8 @@ export type AssistantMessage = {
   feedback?: AssistantMessageFeedback;
   variant?: AssistantVariant;
   durationMs?: number;
+  thinking?: AssistantThinkingStep[];
+  tools?: AssistantToolCall[];
 };
 
 export type AssistantFolder = {

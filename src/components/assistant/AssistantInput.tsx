@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ASSISTANT_VARIANTS, type AssistantChat, type AssistantVariant } from '@common';
+import {
+  ASSISTANT_VARIANTS,
+  type AssistantChat,
+  type AssistantThinkingStep,
+  type AssistantToolCall,
+  type AssistantVariant,
+} from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantStreamClient } from '../../lib/assistantStream';
 import { AssistantComposer } from './AssistantComposer';
@@ -7,7 +13,7 @@ import { AssistantMessages } from './AssistantMessages';
 import { AssistantToolbar } from './AssistantToolbar';
 import type { AssistantChatAction, LiveAssistantMessage } from './types';
 import type { AssistantController } from './useAssistantState';
-import { createId, toPersistableMessage } from './utils';
+import { createId, mergeById, toPersistableMessage } from './utils';
 import './AssistantInput.css';
 
 export interface AssistantInputProps {
@@ -253,10 +259,35 @@ export const AssistantInput = ({
     );
   };
 
-  const finishStream = (requestId: string, error?: string) => {
+  const handleStreamThinking = (requestId: string, step: AssistantThinkingStep) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
-    const durationMs = takeStreamDuration();
+    if (messageId === null) return;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? { ...m, thinking: mergeById(m.thinking, step) }
+          : m,
+      ),
+    );
+  };
+
+  const handleStreamTool = (requestId: string, tool: AssistantToolCall) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    if (messageId === null) return;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId && m.role === 'assistant' ? { ...m, tools: mergeById(m.tools, tool) } : m,
+      ),
+    );
+  };
+
+  const finishStream = (requestId: string, error?: string, serverDurationMs?: number) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    const elapsedMs = takeStreamDuration();
+    const durationMs = serverDurationMs ?? elapsedMs;
     const complete = streamCompleteRef.current;
     streamRequestIdRef.current = null;
     streamCompleteRef.current = null;
@@ -283,8 +314,8 @@ export const AssistantInput = ({
     else setIsGenerating(false);
   };
 
-  const handleStreamDone = (requestId: string) => {
-    finishStream(requestId);
+  const handleStreamDone = (requestId: string, durationMs?: number) => {
+    finishStream(requestId, undefined, durationMs);
   };
 
   const handleStreamError = (requestId: string, error: string) => {
@@ -295,6 +326,8 @@ export const AssistantInput = ({
     if (!streamClientRef.current) {
       streamClientRef.current = new AssistantStreamClient({
         onToken: handleStreamToken,
+        onThinking: handleStreamThinking,
+        onTool: handleStreamTool,
         onDone: handleStreamDone,
         onError: handleStreamError,
       });
@@ -418,6 +451,8 @@ export const AssistantInput = ({
               feedback: null,
               durationMs: undefined,
               variant,
+              thinking: [],
+              tools: [],
             }
           : m,
       ),
@@ -447,11 +482,17 @@ export const AssistantInput = ({
     setMessages((prev) =>
       prev.map((m) =>
         m.id === messageId && m.role === 'assistant'
-          ? { ...m, liveDurationMs: 0, liveTokensPerSecond: 0 }
+          ? {
+              ...m,
+              thinking: [],
+              tools: [],
+              liveDurationMs: 0,
+              liveTokensPerSecond: 0,
+            }
           : m,
       ),
     );
-    getStreamClient().stream(requestId);
+    getStreamClient().stream(requestId, { mode: state.activeMode, variant });
   };
 
   const appendAndStream = (text: string, onComplete?: () => void) => {
@@ -479,6 +520,8 @@ export const AssistantInput = ({
         interrupted: false,
         feedback: null,
         variant,
+        thinking: [],
+        tools: [],
       },
     ]);
     setValue('');
