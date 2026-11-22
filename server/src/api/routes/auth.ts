@@ -62,7 +62,7 @@ async function handleRegister(request: Request) {
   }
 
   const username = body.username.trim();
-  const password = body.password.trim();
+  const password = body.password;
 
   const usernameError = getUsernameValidationError(username);
   if (usernameError) {
@@ -200,7 +200,7 @@ async function handleLogin(request: Request) {
   }
 
   const username = body.username.trim();
-  const password = body.password.trim();
+  const password = body.password;
 
   const loginIdentifier = username;
   const rateLimitKey = loginIdentifier.includes('@')

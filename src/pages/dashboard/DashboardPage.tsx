@@ -1,12 +1,14 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
+import { IconAlertCircle, IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
 import { api } from '../../lib/api';
 import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
 import { formatDisplayDate, toDate } from '../../lib/date';
 import {
+  DASHBOARD_TABS,
   dashboardPath,
   parseDashboardPath,
+  type DashboardTab,
   type DashboardTarget,
   type TeamSection,
 } from '../../lib/dashboardRoutes';
@@ -76,11 +78,26 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
   return <span className="dashboard-page__countdown">{timeLeft}</span>;
 }
 
-function getStoredDefaultTab(): string {
+function getStoredDefaultTab(): DashboardTab {
   const stored = localStorage.getItem('ayphr-pref-default-tab');
-  return stored === 'overview' || stored === 'devices' || stored === 'users' || stored === 'radio'
-    ? stored
-    : 'overview';
+  return DASHBOARD_TABS.find((tab) => tab === stored) ?? 'overview';
+}
+
+function getAcceptedInviteToken(): string | null {
+  try {
+    return sessionStorage.getItem('ayphr:accepted-invite');
+  } catch {
+    return null;
+  }
+}
+
+function setAcceptedInviteToken(token: string | null): void {
+  try {
+    if (token) sessionStorage.setItem('ayphr:accepted-invite', token);
+    else sessionStorage.removeItem('ayphr:accepted-invite');
+  } catch {
+    // Ignore storage restrictions; the in-memory ref still prevents duplicate accepts.
+  }
 }
 
 type DashboardPanelProps = {
@@ -100,6 +117,44 @@ const DashboardPanel = ({ title, description, className = '', children }: Dashbo
   </section>
 );
 
+type DashboardBannerProps = {
+  title: string;
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  isActionLoading?: boolean;
+  onDismiss?: () => void;
+};
+
+const DashboardBanner = ({
+  title,
+  message,
+  actionLabel,
+  onAction,
+  isActionLoading = false,
+  onDismiss,
+}: DashboardBannerProps) => (
+  <div className="dashboard-page__banner" role="alert">
+    <IconAlertCircle size={18} strokeWidth={1.75} />
+    <div className="dashboard-page__banner-body">
+      <strong className="dashboard-page__banner-title">{title}</strong>
+      <span className="dashboard-page__banner-message">{message}</span>
+    </div>
+    <div className="dashboard-page__banner-actions">
+      {onAction && actionLabel && (
+        <Button variant="secondary" onClick={onAction} isLoading={isActionLoading} disabled={isActionLoading}>
+          {actionLabel}
+        </Button>
+      )}
+      {onDismiss && (
+        <Button variant="secondary" onClick={onDismiss} disabled={isActionLoading}>
+          Dismiss
+        </Button>
+      )}
+    </div>
+  </div>
+);
+
 export const DashboardPage = () => {
   const [user, setUser] = useState<SelfUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
@@ -110,6 +165,10 @@ export const DashboardPage = () => {
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
   const [appealError, setAppealError] = useState<string | null>(null);
   const [staffAppeals, setStaffAppeals] = useState<Appeal[]>([]);
+  const [appealsError, setAppealsError] = useState<string | null>(null);
+  const [appealsRetry, setAppealsRetry] = useState(0);
+  const [resolvingAppealId, setResolvingAppealId] = useState<string | null>(null);
+  const [appealResolveErrors, setAppealResolveErrors] = useState<Record<string, string>>({});
   const [appealsPage, setAppealsPage] = useState(1);
   const APPEALS_PAGE_SIZE = 5;
   const appealsTotalPages = Math.max(1, Math.ceil(staffAppeals.length / APPEALS_PAGE_SIZE));
@@ -119,7 +178,16 @@ export const DashboardPage = () => {
   const mainRef = useRef<HTMLElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const legacyTab = searchParams.get('tab');
-  const preferredDefaultTab = getStoredDefaultTab();
+  const inviteToken = searchParams.get('invite');
+  const storedDefaultTab = getStoredDefaultTab();
+  const isStaff = user?.role === 'staff';
+  const isTeamMember = Boolean(user?.teamId);
+  // A stored preference for a tab the account cannot open falls back to Overview.
+  const preferredDefaultTab: DashboardTab = storedDefaultTab === 'team' && !isTeamMember
+    ? 'overview'
+    : storedDefaultTab === 'users' && !isStaff
+      ? 'overview'
+      : storedDefaultTab;
   const dashboardRoute = useMemo(
     () => parseDashboardPath(location.pathname, legacyTab ?? preferredDefaultTab),
     [location.pathname, legacyTab, preferredDefaultTab],
@@ -142,6 +210,11 @@ export const DashboardPage = () => {
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [dismissedInviteError, setDismissedInviteError] = useState<string | null>(null);
+  const [inviteRetry, setInviteRetry] = useState(0);
+  const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
+  const acceptedInviteRef = useRef<string | null>(null);
+  const [dismissedAssistantSyncError, setDismissedAssistantSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -195,7 +268,6 @@ export const DashboardPage = () => {
 
   useEffect(() => {
     if (!activeSuspension) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExistingAppeal(null);
       return;
     }
@@ -207,53 +279,69 @@ export const DashboardPage = () => {
   }, [activeSuspension]);
 
   useEffect(() => {
-    if (activePage !== 'appeals' || user?.role !== 'staff') return;
+    if (activePage !== 'appeals' || !isStaff) return;
     let active = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsAppealsLoading(true);
+    setAppealsError(null);
     api.staff.appeals.list()
       .then((appeals) => { if (active) setStaffAppeals(appeals); })
-      .catch(() => { if (active) setStaffAppeals([]); })
+      .catch((err) => {
+        if (active) setAppealsError(err instanceof Error ? err.message : 'Failed to load appeals');
+      })
       .finally(() => { if (active) setIsAppealsLoading(false); });
     return () => { active = false; };
-  }, [activePage, user]);
+  }, [activePage, isStaff, user, appealsRetry]);
 
   useEffect(() => {
     if (appealsPage > appealsTotalPages) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAppealsPage(appealsTotalPages);
     }
   }, [appealsPage, appealsTotalPages]);
 
   useEffect(() => {
-    const inviteToken = searchParams.get('invite');
     if (!inviteToken || !user) return;
     let cancelled = false;
     (async () => {
+      setIsAcceptingInvite(true);
+      setInviteError(null);
       try {
-        await api.teams.acceptInvite(inviteToken);
-        if (cancelled) return;
+        // A refresh-only retry must not accept the same token a second time.
+        if (acceptedInviteRef.current !== inviteToken && getAcceptedInviteToken() !== inviteToken) {
+          await api.teams.acceptInvite(inviteToken);
+          if (cancelled) return;
+          acceptedInviteRef.current = inviteToken;
+          setAcceptedInviteToken(inviteToken);
+        }
         api.users.invalidateMe();
         const userData = await api.users.me();
         if (cancelled) return;
         setUser(userData.user);
         setCredits(userData.credits);
         setActiveSuspension(userData.activeSuspension);
+        // Only a fully successful accept/refresh clears the deep link; failures keep it for retry.
+        setAcceptedInviteToken(null);
+        acceptedInviteRef.current = null;
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('invite');
+          return next;
+        }, { replace: true });
       } catch (err) {
-        console.error('Failed to accept team invite:', err);
-        if (!cancelled) setInviteError(err instanceof Error ? err.message : 'Failed to accept team invite');
-      } finally {
         if (!cancelled) {
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev);
-            next.delete('invite');
-            return next;
-          }, { replace: true });
+          setInviteError(
+            err instanceof Error
+              ? err.message
+              : acceptedInviteRef.current === inviteToken
+                ? 'Failed to refresh your account after joining the team'
+                : 'Failed to accept team invite',
+          );
         }
+      } finally {
+        if (!cancelled) setIsAcceptingInvite(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [searchParams, setSearchParams, user]);
+  }, [searchParams, setSearchParams, user, inviteToken, inviteRetry]);
 
   const now = useDashboardClock();
   const isSuspended = activeSuspension !== null;
@@ -265,8 +353,6 @@ export const DashboardPage = () => {
     if (!Number.isFinite(span) || span <= 0) return null;
     return Math.min(100, Math.max(0, ((now - start) / span) * 100));
   }, [activeSuspension, now]);
-  const isStaff = user?.role === 'staff';
-  const isTeamMember = Boolean(user?.teamId);
   const isTeamManager = user?.teamRole === 'manager';
   const canUseAlertsAndWebhooks = user ? getPlanFeaturesForUser(user).alertsAndWebhooks : false;
 
@@ -315,14 +401,38 @@ export const DashboardPage = () => {
   };
 
   const handleResolveStaffAppeal = async (appealId: string, decision: 'lift' | 'deny') => {
+    setResolvingAppealId(appealId);
+    setAppealResolveErrors((prev) => {
+      const next = { ...prev };
+      delete next[appealId];
+      return next;
+    });
     try {
       await api.staff.appeals.resolve(appealId, decision);
       setStaffAppeals((prev) => prev.filter((a) => a.id !== appealId));
     } catch (err) {
-      console.error('Failed to resolve appeal:', err);
+      setAppealResolveErrors((prev) => ({
+        ...prev,
+        [appealId]: err instanceof Error ? err.message : 'Failed to resolve appeal',
+      }));
+    } finally {
+      setResolvingAppealId(null);
     }
   };
 
+  const retryInvite = () => {
+    setInviteError(null);
+    setDismissedInviteError(null);
+    setInviteRetry((value) => value + 1);
+  };
+
+  // Dismiss only hides the failure; the token stays in the URL so a reload can retry.
+  const dismissInvite = () => setDismissedInviteError(inviteError);
+
+  const retryAssistantSync = () => {
+    setDismissedAssistantSyncError(null);
+    assistant.retrySync();
+  };
 
   const handleSwitchAccount = async (token: string) => {
     setActiveToken(token);
@@ -439,8 +549,9 @@ export const DashboardPage = () => {
   }, [isLoading, user, activePage]);
 
   const setDefaultTabPref = (value: string) => {
-    setDefaultTab(value);
-    localStorage.setItem('ayphr-pref-default-tab', value);
+    const next = DASHBOARD_TABS.find((tab) => tab === value) ?? 'overview';
+    setDefaultTab(next);
+    localStorage.setItem('ayphr-pref-default-tab', next);
   };
 
   const setSidebarPinnedPref = (checked: boolean) => {
@@ -479,6 +590,7 @@ export const DashboardPage = () => {
         user,
         credits,
         defaultTab,
+        effectiveDefaultTab: preferredDefaultTab,
         setDefaultTabPref,
         sidebarPinned,
         setSidebarPinnedPref,
@@ -488,6 +600,7 @@ export const DashboardPage = () => {
         assistantSendShortcut,
         setAssistantSendShortcutPref,
         isStaff,
+        isTeamMember,
         now,
         navigate,
         setIsSessionsOpen,
@@ -495,7 +608,7 @@ export const DashboardPage = () => {
         setIsChangeEmailOpen,
         setIsChangeUsernameOpen,
       }),
-    [credits, defaultTab, sidebarPinned, effectiveAssistantVariant, setAssistantVariantPref, availableAssistantVariants, assistantSendShortcut, setAssistantSendShortcutPref, navigate, isStaff, user, now],
+    [credits, defaultTab, preferredDefaultTab, sidebarPinned, effectiveAssistantVariant, setAssistantVariantPref, availableAssistantVariants, assistantSendShortcut, setAssistantSendShortcutPref, navigate, isStaff, isTeamMember, user, now],
   );
 
   if (isLoading || assistant.isLoading) {
@@ -521,6 +634,25 @@ export const DashboardPage = () => {
       <a className="sr-only skip-link" href="#main-content">Skip to content</a>
       <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main className="dashboard-main" id="main-content" ref={mainRef}>
+        {inviteToken && inviteError && dismissedInviteError !== inviteError && (
+          <DashboardBanner
+            title="Could not accept team invite"
+            message={inviteError}
+            actionLabel="Try again"
+            onAction={retryInvite}
+            isActionLoading={isAcceptingInvite}
+            onDismiss={dismissInvite}
+          />
+        )}
+        {assistant.syncStatus === 'error' && assistant.syncError && dismissedAssistantSyncError !== assistant.syncError && (
+          <DashboardBanner
+            title="Iris could not sync"
+            message={assistant.syncError}
+            actionLabel="Retry"
+            onAction={retryAssistantSync}
+            onDismiss={() => setDismissedAssistantSyncError(assistant.syncError)}
+          />
+        )}
         {isSuspended && activePage !== 'profile' && activePage !== 'settings' && activePage !== 'credits' && activePage !== 'appeal' && activePage !== 'notifications' ? (
           <DashboardPanel title="Account Suspended" description="You are currently under a suspension">
             <div className="dashboard-page__suspension-card">
@@ -796,7 +928,6 @@ export const DashboardPage = () => {
 
             {activePage === 'appeal' && isSuspended && (
               <DashboardPanel title="Appeal suspension" description="You may submit one appeal per suspension" className="dashboard-panel--wide">
-                {inviteError && <p className="dashboard-page__error">{inviteError}</p>}
                 {existingAppeal ? (
                   <div className="dashboard-page__appeal-status">
                     <div className="dashboard-page__appeal-tracker" data-status={existingAppeal.status}>
@@ -845,10 +976,18 @@ export const DashboardPage = () => {
 
             {activePage === 'appeals' && isStaff && (
               <DashboardPanel title="Appeals" description="User appeals against suspensions" className="dashboard-panel--wide">
+                {appealsError && (
+                  <DashboardBanner
+                    title="Could not load appeals"
+                    message={appealsError}
+                    actionLabel="Retry"
+                    onAction={() => setAppealsRetry((value) => value + 1)}
+                  />
+                )}
                 {isAppealsLoading ? (
                   <p>Loading appeals…</p>
                 ) : staffAppeals.length === 0 ? (
-                  <p>No pending appeals.</p>
+                  !appealsError && <p>No pending appeals.</p>
                 ) : (
                   <>
                     <div className="dashboard-page__appeals-list">
@@ -860,9 +999,25 @@ export const DashboardPage = () => {
                               <span className="dashboard-page__appeal-item__user">{appeal.userUsername}</span>
                             </div>
                             <p className="dashboard-page__appeal-item__text">{appeal.text}</p>
+                            {appealResolveErrors[appeal.id] && (
+                              <p className="dashboard-page__error">{appealResolveErrors[appeal.id]}</p>
+                            )}
                             <div className="dashboard-page__appeal-item__actions">
-                              <Button variant="primary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'lift')}>Remove punishment</Button>
-                              <Button variant="secondary" onClick={() => void handleResolveStaffAppeal(appeal.id, 'deny')}>Deny</Button>
+                              <Button
+                                variant="primary"
+                                onClick={() => void handleResolveStaffAppeal(appeal.id, 'lift')}
+                                isLoading={resolvingAppealId === appeal.id}
+                                disabled={resolvingAppealId !== null}
+                              >
+                                Remove punishment
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() => void handleResolveStaffAppeal(appeal.id, 'deny')}
+                                disabled={resolvingAppealId !== null}
+                              >
+                                Deny
+                              </Button>
                             </div>
                           </div>
                         ))}

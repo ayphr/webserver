@@ -3,7 +3,8 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { IconX } from '@tabler/icons-react';
 import './AuthPage.css';
 import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay, CodeInput } from '../../components/common';
-import { getActiveToken, getStoredAccounts, isStoredAccountExpired, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { getActiveToken, getAllStoredAccounts, isStoredAccountExpired, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
+import { getSafeRedirect, stripInviteParam, withInviteParam } from '../../lib/redirects';
 import { api } from '../../lib/api';
 import { ApiError } from '../../lib/api/client';
 import { PASSWORD_RULES, getPasswordValidationChecks, getPasswordValidationErrors, type PasswordValidationChecks } from '@common/utils/password';
@@ -19,6 +20,16 @@ interface FormData {
   password: string;
   confirmPassword?: string;
   email?: string;
+}
+
+interface AuthErrorState {
+  message: string;
+  retryUntil: number | null;
+}
+
+interface AuthErrorResult {
+  error: AuthErrorState;
+  now: number;
 }
 
 type SignupField = 'username' | 'email' | 'password' | 'confirmPassword';
@@ -49,6 +60,28 @@ function getSignupFieldError(field: SignupField, data: FormData): string | undef
   }
 }
 
+/** Single place that turns API failures into user-facing auth errors. */
+function formatAuthError(error: unknown, fallback: string): AuthErrorResult {
+  const now = Date.now();
+  if (error instanceof ApiError && error.status === 429) {
+    const seconds = Math.max(1, Math.ceil(error.retryAfterSeconds ?? 1));
+    return {
+      error: { message: 'Too many requests.', retryUntil: now + seconds * 1000 },
+      now,
+    };
+  }
+  return {
+    error: { message: error instanceof Error ? error.message : fallback, retryUntil: null },
+    now,
+  };
+}
+
+function createCodeExpiry(value: Date | string | number | null | undefined) {
+  const now = Date.now();
+  const date = value === null || value === undefined ? null : (value instanceof Date ? value : new Date(value));
+  return { expiresAt: date && !Number.isNaN(date.getTime()) ? date : null, now };
+}
+
 const RESEND_COOLDOWN_SECONDS = 30;
 
 export interface AuthPageProps {
@@ -73,7 +106,11 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('invite');
-  const redirectTo = searchParams.get('redirect') || (inviteToken ? `/dashboard?invite=${encodeURIComponent(inviteToken)}` : '/dashboard');
+  const requestedRedirect = getSafeRedirect(searchParams.get('redirect'));
+  // A pending invite must travel with the user to the dashboard so it is accepted once.
+  const redirectTo = inviteToken ? withInviteParam(requestedRedirect, inviteToken) : requestedRedirect;
+  // Registration consumes the invite on the server, so never carry it forward from there.
+  const signupRedirect = stripInviteParam(redirectTo);
   const mode: AuthMode = initialMode ?? (location.pathname.includes('register') ? 'signup' : 'login');
 
   const [step, setStep] = useState<AuthStep>('form');
@@ -87,11 +124,15 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<AuthErrorState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getAllStoredAccounts());
+  const [codeExpiresAt, setCodeExpiresAt] = useState<Date | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const activeToken = getActiveToken();
+
   useEffect(() => {
-    const refresh = () => setStoredAccounts(getStoredAccounts());
+    const refresh = () => setStoredAccounts(getAllStoredAccounts());
     window.addEventListener('storage', refresh);
     window.addEventListener('focus', refresh);
     window.addEventListener('ayphr-accounts-changed', refresh);
@@ -101,10 +142,6 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
       window.removeEventListener('ayphr-accounts-changed', refresh);
     };
   }, []);
-  const eligibleAccounts = storedAccounts.filter((account) => !isStoredAccountExpired(account));
-  const visibleAccounts = eligibleAccounts.filter((account) => account.token !== getActiveToken());
-  const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : eligibleAccounts;
-  const passwordChecks = getPasswordValidationChecks(formData.password);
 
   const [code, setCode] = useState('');
   const [identifier, setIdentifier] = useState('');
@@ -117,6 +154,58 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    const retryUntil = authError?.retryUntil ?? null;
+    if (!codeExpiresAt && !retryUntil) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [codeExpiresAt, authError?.retryUntil]);
+
+  const rateLimitRemaining = authError?.retryUntil
+    ? Math.max(0, Math.ceil((authError.retryUntil - now) / 1000))
+    : 0;
+  const isRateLimited = rateLimitRemaining > 0;
+  const visibleError = authError
+    ? authError.retryUntil
+      ? isRateLimited
+        ? `Too many requests. Try again in ${rateLimitRemaining}s.`
+        : 'Too many requests. You can try again now.'
+      : authError.message
+    : null;
+  const codeSecondsRemaining = codeExpiresAt
+    ? Math.max(0, Math.ceil((codeExpiresAt.getTime() - now) / 1000))
+    : null;
+
+  const applyAuthError = (error: unknown, fallback: string) => {
+    const formatted = formatAuthError(error, fallback);
+    setNow(formatted.now);
+    setAuthError(formatted.error);
+  };
+
+  const setCodeExpiry = (value: Date | string | number | null | undefined) => {
+    const expiry = createCodeExpiry(value);
+    setNow(expiry.now);
+    setCodeExpiresAt(expiry.expiresAt);
+  };
+
+  const renderCodeExpiry = () => {
+    if (codeSecondsRemaining === null) {
+      return <p className="auth-form__code-expiry">Check your email for the code.</p>;
+    }
+    if (codeSecondsRemaining === 0) {
+      return (
+        <p className="auth-form__code-expiry auth-form__code-expiry--expired" role="status">
+          Code expired — request a new one
+        </p>
+      );
+    }
+    return (
+      <p className="auth-form__code-expiry" role="timer">
+        Code expires in {Math.floor(codeSecondsRemaining / 60)}:{String(codeSecondsRemaining % 60).padStart(2, '0')}
+      </p>
+    );
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -171,12 +260,20 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         removeStoredAccount(token);
-        setStoredAccounts(getStoredAccounts());
+        setStoredAccounts(getAllStoredAccounts());
         return;
       }
       // Transient failure: fall through and let the dashboard/gates retry.
     }
     navigate(redirectTo);
+  };
+
+  const handleRemoveAccount = (account: StoredAccount) => {
+    if (!window.confirm(`Remove ${account.user.username} from this device?`)) return;
+    const wasActive = account.token === activeToken;
+    removeStoredAccount(account.token);
+    if (wasActive) api.users.invalidateMe();
+    setStoredAccounts(getAllStoredAccounts());
   };
 
   const validateForm = (): boolean => {
@@ -219,12 +316,13 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     setResetPassword('');
     setResetConfirmPassword('');
     setResendCooldown(0);
+    setCodeExpiresAt(null);
   };
 
   const toggleMode = () => {
     resetFormState();
     setStep('form');
-    void navigate(mode === 'login' ? '/auth/register' : '/auth/login');
+    void navigate(`${mode === 'login' ? '/auth/register' : '/auth/login'}${location.search}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -233,7 +331,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
     if (mode === 'signup' && step === 'email-code') {
       if (code.length !== EMAIL_CODE_LENGTH) {
-        setAuthError(`Enter the ${EMAIL_CODE_LENGTH}-digit code sent to your email`);
+        setAuthError({ message: `Enter the ${EMAIL_CODE_LENGTH}-digit code sent to your email`, retryUntil: null });
         return;
       }
       setIsLoading(true);
@@ -246,9 +344,9 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
           acceptPolicies: acceptedPolicies,
           ...(inviteToken ? { inviteToken } : {}),
         });
-        navigate(redirectTo);
+        navigate(signupRedirect);
       } catch (error) {
-        setAuthError(error instanceof Error ? error.message : 'Registration failed. Please try again.');
+        applyAuthError(error, 'Registration failed. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -257,17 +355,18 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
     if (mode === 'login' && step === 'forgot') {
       if (!identifier.trim()) {
-        setAuthError('Email or username is required');
+        setAuthError({ message: 'Email or username is required', retryUntil: null });
         return;
       }
       setIsLoading(true);
       try {
-        await api.auth.forgotPassword({ identifier: identifier.trim() });
+        const result = await api.auth.forgotPassword({ identifier: identifier.trim() });
         setCode('');
+        setCodeExpiry(result.expiresAt);
         setResendCooldown(RESEND_COOLDOWN_SECONDS);
         setStep('forgot-code');
       } catch (error) {
-        setAuthError(error instanceof Error ? error.message : 'Failed to send reset code. Please try again.');
+        applyAuthError(error, 'Failed to send reset code. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -276,12 +375,12 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
     if (mode === 'login' && step === 'forgot-code') {
       if (code.length !== EMAIL_CODE_LENGTH) {
-        setAuthError(`Enter the ${EMAIL_CODE_LENGTH}-digit code sent to your email`);
+        setAuthError({ message: `Enter the ${EMAIL_CODE_LENGTH}-digit code sent to your email`, retryUntil: null });
         return;
       }
       const resetError = validateResetPassword();
       if (resetError) {
-        setAuthError(resetError);
+        setAuthError({ message: resetError, retryUntil: null });
         return;
       }
       setIsLoading(true);
@@ -293,7 +392,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
         // keep the notice
         setNotice('Your password has been reset. Sign in with your new password.');
       } catch (error) {
-        setAuthError(error instanceof Error ? error.message : 'Failed to reset password. Please try again.');
+        applyAuthError(error, 'Failed to reset password. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -302,7 +401,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
     if (mode === 'login' && step === 'device-code') {
       if (code.length !== EMAIL_CODE_LENGTH) {
-        setAuthError(`Enter the ${EMAIL_CODE_LENGTH}-digit code sent to your email`);
+        setAuthError({ message: `Enter the ${EMAIL_CODE_LENGTH}-digit code sent to your email`, retryUntil: null });
         return;
       }
       setIsLoading(true);
@@ -310,7 +409,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
         await api.auth.verifyDeviceLogin({ username: formData.username, code });
         navigate(redirectTo);
       } catch (error) {
-        setAuthError(error instanceof Error ? error.message : 'Failed to verify code. Please try again.');
+        applyAuthError(error, 'Failed to verify code. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -325,43 +424,75 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
         const result = await api.auth.login({ username: formData.username, password: formData.password });
         if ('requiresDeviceVerification' in result && result.requiresDeviceVerification) {
           setCode('');
+          setCodeExpiry(result.expiresAt);
           setStep('device-code');
         } else {
           navigate(redirectTo);
         }
       } else {
-        await api.auth.requestEmailCode({ email: formData.email!.trim() });
+        const result = await api.auth.requestEmailCode({ email: formData.email!.trim() });
         setCode('');
+        setCodeExpiry(result.expiresAt);
         setResendCooldown(RESEND_COOLDOWN_SECONDS);
         setStep('email-code');
       }
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Authentication failed. Please try again.');
+      applyAuthError(error, 'Authentication failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleResend = async () => {
-    if (resendCooldown > 0 || isLoading) return;
+    if (resendCooldown > 0 || isLoading || isRateLimited) return;
     setIsLoading(true);
     setAuthError(null);
     try {
       if (mode === 'signup') {
-        await api.auth.requestEmailCode({ email: formData.email!.trim() });
+        const result = await api.auth.requestEmailCode({ email: formData.email!.trim() });
+        setCodeExpiry(result.expiresAt);
       } else {
-        await api.auth.forgotPassword({ identifier: identifier.trim() });
+        const result = await api.auth.forgotPassword({ identifier: identifier.trim() });
+        setCodeExpiry(result.expiresAt);
       }
       setCode('');
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Failed to resend code. Please try again.');
+      applyAuthError(error, 'Failed to resend code. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleResendDeviceCode = async () => {
+    if (resendCooldown > 0 || isLoading || isRateLimited) return;
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      const result = await api.auth.login({ username: formData.username, password: formData.password });
+      if ('requiresDeviceVerification' in result && result.requiresDeviceVerification) {
+        setCode('');
+        setCodeExpiry(result.expiresAt);
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      } else {
+        navigate(redirectTo);
+      }
+    } catch (error) {
+      applyAuthError(error, 'Failed to resend code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const leaveCodeStep = () => {
+    setStep('form');
+    setCode('');
+    setCodeExpiresAt(null);
+    setAuthError(null);
+  };
+
   const isSignup = mode === 'signup';
+  const passwordChecks = getPasswordValidationChecks(formData.password);
   const hasEnteredPassword = formData.password.length > 0;
   const hasUnsatisfiedPasswordRequirements =
     !passwordChecks.minLength ||
@@ -397,27 +528,52 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
           </CardHeader>
 
           <CardBody>
-            {mode === 'login' && step === 'form' && accountsToShow.length > 0 && (
+            {mode === 'login' && step === 'form' && storedAccounts.length > 0 && (
               <div className="auth-accounts">
                 <p className="auth-accounts__title">Choose an account</p>
                 <div className="auth-accounts__list">
-                  {accountsToShow.map((account) => (
-                    <button
-                      key={account.user.uuid}
-                      type="button"
-                      className="auth-accounts__item"
-                      onClick={() => handleChooseAccount(account.token)}
-                    >
-                      <UsernameDisplay username={account.user.username} badges={account.user.badges} country={account.user.country} avatarUrl={account.user.avatarUrl} avatarSize={28} />
-                    </button>
-                  ))}
+                  {storedAccounts.map((account) => {
+                    const isExpired = isStoredAccountExpired(account);
+                    const isActive = account.token === activeToken;
+                    const statusLabel = isExpired
+                      ? 'Expired — sign in again'
+                      : isActive
+                        ? 'Currently signed in'
+                        : null;
+                    return (
+                      <div
+                        key={account.user.uuid}
+                        className={`auth-accounts__item${isExpired ? ' auth-accounts__item--expired' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          className="auth-accounts__select"
+                          onClick={() => handleChooseAccount(account.token)}
+                          disabled={isExpired || isLoading}
+                        >
+                          <UsernameDisplay username={account.user.username} badges={account.user.badges} country={account.user.country} avatarUrl={account.user.avatarUrl} avatarSize={28} />
+                          {statusLabel && <span className="auth-accounts__status">{statusLabel}</span>}
+                        </button>
+                        <button
+                          type="button"
+                          className="auth-accounts__remove"
+                          aria-label={`Remove ${account.user.username} from this device`}
+                          title="Remove from this device"
+                          onClick={() => handleRemoveAccount(account)}
+                          disabled={isLoading}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
                 <p className="auth-accounts__divider">or sign in with another account</p>
               </div>
             )}
 
-            {authError && (
-              <div className="auth-form__error-banner" role="alert">{authError}</div>
+            {visibleError && (
+              <div className="auth-form__error-banner" role="alert">{visibleError}</div>
             )}
 
             {notice && (
@@ -430,14 +586,15 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   We sent a {EMAIL_CODE_LENGTH}-digit code to <strong>{formData.email}</strong>. Enter it below to verify your email and finish creating your account.
                 </p>
                 <CodeInput value={code} onChange={setCode} autoFocus />
-                <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
+                {renderCodeExpiry()}
+                <Button variant="primary" fullWidth isLoading={isLoading} disabled={isRateLimited} type="submit" className="auth-form__submit">
                   Verify &amp; Create Account
                 </Button>
                 <div className="auth-form__resend">
-                  <Button variant="secondary" onClick={handleResend} disabled={resendCooldown > 0 || isLoading}>
+                  <Button variant="secondary" onClick={handleResend} disabled={resendCooldown > 0 || isLoading || isRateLimited}>
                     {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
                   </Button>
-                  <Button variant="secondary" onClick={() => { setStep('form'); setCode(''); setAuthError(null); }} disabled={isLoading}>
+                  <Button variant="secondary" onClick={leaveCodeStep} disabled={isLoading}>
                     Use a different email
                   </Button>
                 </div>
@@ -460,11 +617,11 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   disabled={isLoading}
                   fullWidth
                 />
-                <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
+                <Button variant="primary" fullWidth isLoading={isLoading} disabled={isRateLimited} type="submit" className="auth-form__submit">
                   Send Reset Code
                 </Button>
                 <div className="auth-form__resend">
-                  <Button variant="secondary" onClick={() => { setStep('form'); setIdentifier(''); setAuthError(null); }} disabled={isLoading}>
+                  <Button variant="secondary" onClick={() => { setStep('form'); setIdentifier(''); setCodeExpiresAt(null); setAuthError(null); setNotice(null); }} disabled={isLoading}>
                     Back to log in
                   </Button>
                 </div>
@@ -477,6 +634,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   If an account exists for <strong>{identifier}</strong>, we've sent a {EMAIL_CODE_LENGTH}-digit code to its email address.
                 </p>
                 <CodeInput value={code} onChange={setCode} autoFocus />
+                {renderCodeExpiry()}
                 <Input
                   label="New password"
                   name="resetPassword"
@@ -504,14 +662,14 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   disabled={isLoading}
                   fullWidth
                 />
-                <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
+                <Button variant="primary" fullWidth isLoading={isLoading} disabled={isRateLimited} type="submit" className="auth-form__submit">
                   Reset Password
                 </Button>
                 <div className="auth-form__resend">
-                  <Button variant="secondary" onClick={handleResend} disabled={resendCooldown > 0 || isLoading}>
+                  <Button variant="secondary" onClick={handleResend} disabled={resendCooldown > 0 || isLoading || isRateLimited}>
                     {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
                   </Button>
-                  <Button variant="secondary" onClick={() => { setStep('form'); setCode(''); setAuthError(null); }} disabled={isLoading}>
+                  <Button variant="secondary" onClick={leaveCodeStep} disabled={isLoading}>
                     Back to log in
                   </Button>
                 </div>
@@ -524,31 +682,15 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   We noticed a sign-in from a new device. We sent a {EMAIL_CODE_LENGTH}-digit code to your email. Enter it to finish signing in.
                 </p>
                 <CodeInput value={code} onChange={setCode} autoFocus />
-                <Button variant="primary" fullWidth isLoading={isLoading} type="submit" className="auth-form__submit">
+                {renderCodeExpiry()}
+                <Button variant="primary" fullWidth isLoading={isLoading} disabled={isRateLimited} type="submit" className="auth-form__submit">
                   Verify &amp; Sign In
                 </Button>
                 <div className="auth-form__resend">
-                  <Button variant="secondary" onClick={async () => {
-                    if (isLoading) return;
-                    setIsLoading(true);
-                    setAuthError(null);
-                    try {
-                      const result = await api.auth.login({ username: formData.username, password: formData.password });
-                      if ('requiresDeviceVerification' in result && result.requiresDeviceVerification) {
-                        setCode('');
-                        setResendCooldown(RESEND_COOLDOWN_SECONDS);
-                      } else {
-                        navigate(redirectTo);
-                      }
-                    } catch (error) {
-                      setAuthError(error instanceof Error ? error.message : 'Failed to resend code.');
-                    } finally {
-                      setIsLoading(false);
-                    }
-                  }} disabled={isLoading || resendCooldown > 0}>
+                  <Button variant="secondary" onClick={handleResendDeviceCode} disabled={isLoading || resendCooldown > 0 || isRateLimited}>
                     {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
                   </Button>
-                  <Button variant="secondary" onClick={() => { setStep('form'); setCode(''); setAuthError(null); }} disabled={isLoading}>
+                  <Button variant="secondary" onClick={leaveCodeStep} disabled={isLoading}>
                     Back to log in
                   </Button>
                 </div>
@@ -610,7 +752,12 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
 
                 {mode === 'login' && step === 'form' && (
                   <div className="auth-form__aux">
-                    <button type="button" className="auth-form__link-button" onClick={() => { setStep('forgot'); setAuthError(null); setNotice(null); }} disabled={isLoading}>
+                    <button
+                      type="button"
+                      className="auth-form__link-button"
+                      onClick={() => { setStep('forgot'); setCodeExpiresAt(null); setAuthError(null); setNotice(null); }}
+                      disabled={isLoading}
+                    >
                       Forgot password?
                     </button>
                   </div>
@@ -660,6 +807,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                   variant="primary"
                   fullWidth
                   isLoading={isLoading}
+                  disabled={isRateLimited}
                   type="submit"
                   className="auth-form__submit"
                 >

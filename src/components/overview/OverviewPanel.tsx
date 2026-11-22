@@ -76,6 +76,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
 
   const planTier = credits?.plan ?? user.subscription?.tier ?? 'free';
   const planName = PLAN_NAMES[planTier];
+  const isTeamMember = Boolean(user.teamId);
 
   const handleAcceptInvite = async (token: string) => {
     try {
@@ -139,13 +140,20 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
           <span className="overview__stat-sub">Available to spend</span>
         </button>
 
-        <button type="button" className="overview__stat" onClick={() => onNavigate('team')}>
+        <button
+          type="button"
+          className="overview__stat"
+          onClick={() => onNavigate(isTeamMember ? 'team' : 'credits')}
+          aria-label={isTeamMember ? 'Manage your team plan' : 'View plans and credits'}
+        >
           <span className="overview__stat-label">
             <IconCreditCard size={16} strokeWidth={1.75} />
             Plan
           </span>
           <span className="overview__stat-value">{planName}</span>
-          <span className="overview__stat-sub">{user.subscription ? 'Active plan' : 'Free plan'}</span>
+          <span className="overview__stat-sub">
+            {isTeamMember ? 'Manage team plan' : 'View plans & credits'}
+          </span>
         </button>
 
         <button type="button" className="overview__stat" onClick={() => onNavigate('locations')}>

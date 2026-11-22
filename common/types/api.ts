@@ -35,6 +35,7 @@ export type StaffSummary = {
 export type ApiErrorBody = {
   error?: string;
   message?: string;
+  retryAfterSeconds?: number;
   suspension?: Punishment;
 };
 

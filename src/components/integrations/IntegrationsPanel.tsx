@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Input, Select, Modal, Checkbox } from '../common';
+import { Button, Input, Select, Modal, Checkbox, Tooltip } from '../common';
 import { IconPlugConnected, IconBrandDiscord, IconBrandSlack, IconPlus, IconTrash, IconEdit, IconSend } from '@tabler/icons-react';
 import type { Integration, IntegrationProvider, IntegrationCreateRequest, IntegrationUpdateRequest } from '@common';
 import './IntegrationsPanel.css';
@@ -191,11 +191,15 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
                   </span>
                 </div>
                 <div className="integrations-panel__card-actions">
-                  <Checkbox
-                    label=""
-                    checked={item.enabled}
-                    onChange={(e) => void handleToggle(item, e.target.checked)}
-                  />
+                  <Tooltip content={isManager ? 'Enabled' : 'Manager only'}>
+                    <Checkbox
+                      label=""
+                      checked={item.enabled}
+                      disabled={!isManager}
+                      title={isManager ? 'Enabled' : 'Manager only'}
+                      onChange={(e) => void handleToggle(item, e.target.checked)}
+                    />
+                  </Tooltip>
                   <Button variant="secondary" onClick={() => void handleTest(item)} isLoading={testingId === item.id} disabled={testingId === item.id}>
                     <IconSend size={14} />
                     Test

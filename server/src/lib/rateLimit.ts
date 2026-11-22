@@ -78,7 +78,10 @@ export function tooManyRequests(retryAfterMs: number): Response {
   const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
   log.warn({ retryAfterSeconds }, 'rate limit exceeded');
 
-  const body = JSON.stringify({ error: 'Too many requests, please try again later' });
+  const body = JSON.stringify({
+    error: 'Too many requests, please try again later',
+    retryAfterSeconds,
+  });
   return new Response(body, {
     status: 429,
     headers: {

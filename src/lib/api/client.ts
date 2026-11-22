@@ -25,6 +25,16 @@ export class ApiError extends Error {
     this.body = body;
     this.url = url;
   }
+
+  /** Server-provided retry delay for 429 responses. */
+  get retryAfterSeconds(): number | undefined {
+    if (this.status !== 429) return undefined;
+    const body = this.body as (ApiErrorBody & { retryAfterSeconds?: number }) | null;
+    const seconds = body?.retryAfterSeconds;
+    return typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0
+      ? seconds
+      : undefined;
+  }
 }
 
 function normalizeBaseUrl(baseUrl?: string) {

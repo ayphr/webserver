@@ -17,6 +17,7 @@ import {
 import { getCollection } from './db/internal';
 import { CLIENT_URL } from '../env';
 import { createLogger } from './logger';
+import { subscriptionEventsTotal } from './metrics';
 import { clearTeamStripeSubscription, syncTeamStripeSubscription } from './teamBillingSync';
 export { getStripeCustomerId, processStripeEvent } from './subscriptionSync';
 
@@ -89,6 +90,7 @@ export async function createTeamCheckout(
       const updated = await changeTeamStripeSubscription(team.stripeSubscriptionId, priceId, quantity);
       if (updated) {
         await syncTeamStripeSubscription(team.id, updated);
+        subscriptionEventsTotal.inc({ event: 'auto_renew_enabled', result: 'success' });
         return { kind: 'updated', url: dashboardUrl('?tab=team&checkout=success') };
       }
     } catch (error) {
@@ -112,7 +114,9 @@ export async function createTeamCheckout(
 
   try {
     const url = await createTeamCheckoutSession(checkout);
-    return url ? { kind: 'created', url } : { kind: 'failed' };
+    if (!url) return { kind: 'failed' };
+    subscriptionEventsTotal.inc({ event: 'auto_renew_enabled', result: 'success' });
+    return { kind: 'created', url };
   } catch (error) {
     if (customerId !== team.stripeCustomerId) throw error;
 
@@ -125,7 +129,9 @@ export async function createTeamCheckout(
 
     await setTeamStripeCustomerId(team.id, replacement);
     const url = await createTeamCheckoutSession({ ...checkout, customerId: replacement });
-    return url ? { kind: 'created', url } : { kind: 'failed' };
+    if (!url) return { kind: 'failed' };
+    subscriptionEventsTotal.inc({ event: 'auto_renew_enabled', result: 'success' });
+    return { kind: 'created', url };
   }
 }
 
@@ -138,7 +144,11 @@ export async function downgradeTeamToFree(team: Team): Promise<Team | null> {
     await clearTeamStripeSubscription(team.id);
   }
 
-  return getTeamById(team.id);
+  const updated = await getTeamById(team.id);
+  if (updated) {
+    subscriptionEventsTotal.inc({ event: 'auto_renew_disabled', result: 'success' });
+  }
+  return updated;
 }
 
 export async function createTeamBillingPortal(team: Team): Promise<

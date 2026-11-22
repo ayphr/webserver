@@ -10,10 +10,15 @@
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
-  border: 1px solid hsla(4, 100%, 71%, 0.3);
-  background-color: hsla(4, 100%, 71%, 0.15);
-  color: hsl(4, 100%, 71%);
+  border: 1px solid var(--status-error);
+  background-color: var(--status-error-bg);
+  color: var(--status-error);
   font-size: 0.9rem;
+}
+
+.sessions-modal__bulk {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .sessions-modal__list {
@@ -69,8 +74,8 @@
 .sessions-modal__badge {
   padding: 0.1rem 0.5rem;
   border-radius: 999px;
-  background: hsla(129, 77%, 43%, 0.18);
-  color: var(--accent-green);
+  background: var(--accent-green);
+  color: var(--text-primary);
   font-size: 0.7rem;
   font-weight: var(--font-weight-md);
   text-transform: uppercase;

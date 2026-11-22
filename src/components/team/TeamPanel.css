@@ -17,7 +17,7 @@
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--status-error);
   border-radius: var(--radius-md);
-  background: rgba(255, 100, 100, 0.08);
+  background: var(--status-error-bg);
   color: var(--status-error);
   font-size: 0.85rem;
 }
@@ -195,6 +195,30 @@
 
 .team-panel__member-row:last-child {
   border-bottom: none;
+}
+
+.team-panel__invite-meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.team-panel__invite-expiring {
+  align-self: flex-start;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--status-error-bg);
+  color: var(--status-error);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-md);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.team-panel__invite-copy-error {
+  color: var(--status-error);
+  font-size: 0.75rem;
 }
 
 .team-panel__invite-form {

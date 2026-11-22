@@ -15,10 +15,9 @@ import { createTeamsApi } from './teams';
 import { createNotificationsApi } from './notifications';
 import { createIntegrationsApi } from './integrations';
 import { createAssistantApi } from './assistant';
+import { getSafeRedirect } from '../redirects';
 
-export const API_BASE_URL = import.meta.env.DEV
-  ? 'http://localhost:7233'
-  : 'https://api.ayphr.com';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:7233' : 'https://api.ayphr.com');
 
 export type AyphrApiClient = RequestClient & {
   getStatus: () => Promise<string>;
@@ -45,7 +44,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     onUnauthorized: () => {
       if (globalThis.window === undefined) return;
       if (!globalThis.location.pathname.startsWith('/auth')) {
-        const redirect = encodeURIComponent(globalThis.location.pathname + globalThis.location.search);
+        const redirect = encodeURIComponent(getSafeRedirect(globalThis.location.pathname + globalThis.location.search));
         globalThis.location.assign(`/auth/login?redirect=${redirect}`);
       }
     },

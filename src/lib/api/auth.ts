@@ -97,12 +97,12 @@ export function createAuthApi(client: RequestClient) {
       return response;
     },
     async forgotPassword(input: PasswordForgotRequest) {
-      const response = await client.requestJson<{ message: string }>('/api/auth/password/forgot', {
+      const response = await client.requestJson<{ message: string; expiresAt?: Date }>('/api/auth/password/forgot', {
         method: 'POST',
         auth: false,
         body: input,
       });
-      return response.message;
+      return { message: response.message, ...(response.expiresAt ? { expiresAt: response.expiresAt } : {}) };
     },
     async resetPassword(input: PasswordResetRequest) {
       await client.requestJson<null>('/api/auth/password/reset', {

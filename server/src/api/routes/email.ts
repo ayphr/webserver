@@ -44,6 +44,8 @@ function resolveUser(identifier: string): Promise<User | null> {
   return getUserFromUsername(trimmed);
 }
 
+const FORGOT_PASSWORD_MESSAGE = 'If an account exists with that email, a code has been sent to it';
+
 const emailCodeRequestLimiter = createRateLimiter(15 * 60 * 1000, 10, 'email-code-request');
 const passwordForgotLimiter = createRateLimiter(15 * 60 * 1000, 5, 'password-forgot');
 const passwordForgotUserLimiter = createRateLimiter(15 * 60 * 1000, 3, 'password-forgot-user');
@@ -116,18 +118,27 @@ async function handleForgotPassword(request: Request) {
   const user = await resolveUser(identifier);
   if (user?.email && user.emailVerifiedAt) {
     const result = await sendEmailCode({ email: user.email, purpose: 'reset', userUuid: user.uuid });
-    if (result.status === 'sent') {
-      authEventsTotal.inc({ event: 'password_forgot', result: 'sent' });
-    } else if (result.status === 'rate_limited') {
-      authEventsTotal.inc({ event: 'password_forgot', result: 'rate_limited' });
-    } else {
-      authEventsTotal.inc({ event: 'password_forgot', result: 'error' });
+    switch (result.status) {
+      case 'sent':
+        authEventsTotal.inc({ event: 'password_forgot', result: 'sent' });
+        return json({
+          message: FORGOT_PASSWORD_MESSAGE,
+          expiresAt: result.expiresAt,
+        }, 200);
+      case 'rate_limited':
+        authEventsTotal.inc({ event: 'password_forgot', result: 'rate_limited' });
+        return tooManyRequests(result.retryAfterMs);
+      case 'not_configured':
+        authEventsTotal.inc({ event: 'password_forgot', result: 'error' });
+        return json({ error: 'email delivery is not configured, please try again later' }, 503);
+      case 'send_failed':
+        authEventsTotal.inc({ event: 'password_forgot', result: 'error' });
+        return json({ error: 'failed to send email, please try again later' }, 502);
     }
-  } else {
-    authEventsTotal.inc({ event: 'password_forgot', result: 'not_found' });
   }
 
-  return json({ message: 'If an account exists with that email, a code has been sent to it' }, 200);
+  authEventsTotal.inc({ event: 'password_forgot', result: 'not_found' });
+  return json({ message: FORGOT_PASSWORD_MESSAGE }, 200);
 }
 
 async function handleResetPassword(request: Request) {

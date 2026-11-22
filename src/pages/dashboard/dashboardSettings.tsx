@@ -1,14 +1,28 @@
 import { IconKeyboard, IconLayoutDashboard, IconLayoutSidebar, IconLock, IconLogout, IconLogout2, IconMail, IconShieldLock, IconSparkle2, IconTrash, IconUser } from '@tabler/icons-react';
 import type { AssistantSendShortcut } from '../../components/common';
 import type { SettingsSection } from '../../lib/settings';
+import type { DashboardTab } from '../../lib/dashboardRoutes';
 import type { SelfUser , CreditBalance, AssistantVariant } from '@common';
 import { ASSISTANT_DATA } from '@common';
 import type { NavigateFunction } from 'react-router-dom';
+
+const DEFAULT_TAB_OPTIONS: { value: DashboardTab; label: string }[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'devices', label: 'Devices' },
+  { value: 'locations', label: 'Locations' },
+  { value: 'profile', label: 'Profile' },
+  { value: 'credits', label: 'Credits' },
+  { value: 'games', label: 'Games' },
+  { value: 'radio', label: 'Radio' },
+  { value: 'team', label: 'Team' },
+  { value: 'users', label: 'Users' },
+];
 
 export interface SettingsSectionsParams {
   user: SelfUser | null;
   credits: CreditBalance | null;
   defaultTab: string;
+  effectiveDefaultTab: string;
   setDefaultTabPref: (value: string) => void;
   sidebarPinned: boolean;
   setSidebarPinnedPref: (checked: boolean) => void;
@@ -18,6 +32,7 @@ export interface SettingsSectionsParams {
   assistantSendShortcut: AssistantSendShortcut;
   setAssistantSendShortcutPref: (value: AssistantSendShortcut) => void;
   isStaff: boolean;
+  isTeamMember: boolean;
   now: number;
   navigate: NavigateFunction;
   setIsSessionsOpen: (open: boolean) => void;
@@ -30,6 +45,7 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
   const {
     user,
     defaultTab,
+    effectiveDefaultTab,
     setDefaultTabPref,
     sidebarPinned,
     setSidebarPinnedPref,
@@ -39,6 +55,7 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
     assistantSendShortcut,
     setAssistantSendShortcutPref,
     isStaff,
+    isTeamMember,
     now,
     navigate,
     setIsSessionsOpen,
@@ -46,6 +63,15 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
     setIsChangeEmailOpen,
     setIsChangeUsernameOpen,
   } = params;
+
+  const availableDefaultTabs = DEFAULT_TAB_OPTIONS.filter(
+    (option) => (option.value !== 'team' || isTeamMember) && (option.value !== 'users' || isStaff),
+  );
+  const effectiveDefaultLabel = availableDefaultTabs.find((option) => option.value === effectiveDefaultTab)?.label ?? 'Overview';
+  const savedDefaultLabel = DEFAULT_TAB_OPTIONS.find((option) => option.value === defaultTab)?.label ?? defaultTab;
+  const defaultTabDescription = effectiveDefaultTab === defaultTab
+    ? `Choose which tab opens when you visit the dashboard. Currently: ${effectiveDefaultLabel}.`
+    : `Choose which tab opens when you visit the dashboard. Saved view (${savedDefaultLabel}) is unavailable; currently: ${effectiveDefaultLabel}.`;
 
   return [
     {
@@ -202,19 +228,9 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
           optionType: 'select',
           icon: <IconLayoutDashboard size={18} strokeWidth={1.75} />,
           title: 'Default dashboard view',
-          description: 'Choose which tab opens when you visit the dashboard.',
-          value: defaultTab,
-          options: [
-            { value: 'overview', label: 'Overview' },
-            { value: 'devices', label: 'Devices' },
-            { value: 'locations', label: 'Locations' },
-            { value: 'profile', label: 'Profile' },
-            { value: 'credits', label: 'Credits' },
-            { value: 'games', label: 'Games' },
-            { value: 'radio', label: 'Radio' },
-            { value: 'team', label: 'Team' },
-            ...(isStaff ? [{ value: 'users', label: 'Users' }] : []),
-          ],
+          description: defaultTabDescription,
+          value: effectiveDefaultTab,
+          options: availableDefaultTabs,
           onChange: setDefaultTabPref,
         },
         {

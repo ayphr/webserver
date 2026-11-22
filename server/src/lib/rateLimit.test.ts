@@ -21,9 +21,13 @@ describe('rateLimit', () => {
     expect((await limiter.check('a')).allowed).toBe(false);
   });
 
-  test('tooManyRequests returns 429 with Retry-After', () => {
+  test('tooManyRequests returns 429 with Retry-After and retryAfterSeconds', async () => {
     const res = tooManyRequests(1500);
     expect(res.status).toBe(429);
     expect(res.headers.get('Retry-After')).toBe('2');
+    expect(await res.json()).toEqual({
+      error: 'Too many requests, please try again later',
+      retryAfterSeconds: 2,
+    });
   });
 });

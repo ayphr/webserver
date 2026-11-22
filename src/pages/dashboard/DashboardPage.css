@@ -17,6 +17,16 @@
   overflow-y: auto;
 }
 
+.dashboard-main:has(> .dashboard-page__banner) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.dashboard-main:has(> .dashboard-page__banner) > .dashboard-panel {
+  margin: auto;
+}
+
 .dashboard-assistant {
   display: flex;
   align-items: stretch;
@@ -108,7 +118,7 @@
 
 .dashboard-page__field select {
   background-color: var(--bg-base);
-  border: 1px solid hsl(0, 0%, 16%);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 0.55rem 1rem;
   color: var(--text-primary);
@@ -117,7 +127,7 @@
 }
 
 .dashboard-page__field select:focus {
-  border-color: hsl(0, 0%, 28%);
+  border-color: var(--border-focus);
   outline: none;
 }
 
@@ -130,6 +140,61 @@
   color: var(--status-error);
   margin-bottom: 1rem;
   font-size: 0.9rem;
+}
+
+.dashboard-page__banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  background: var(--status-error-bg);
+  color: var(--status-error);
+  font-size: 0.9rem;
+}
+
+.dashboard-page__banner > svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.dashboard-page__banner-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.dashboard-page__banner-title {
+  font-weight: var(--font-weight-md);
+}
+
+.dashboard-page__banner-message {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.dashboard-page__banner-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 720px) {
+  .dashboard-page__banner {
+    flex-wrap: wrap;
+  }
+
+  .dashboard-page__banner-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
  .dashboard-page__suspension-card {
@@ -378,7 +443,7 @@
   background-color: var(--text-primary);
   border-color: var(--text-primary);
   color: var(--bg-base);
-  box-shadow: 0 0 0 4px hsla(180, 67%, 99%, 0.15);
+  box-shadow: 0 0 0 4px var(--divider-color);
 }
 
 .dashboard-page__appeal-step--pending .dashboard-page__appeal-step-icon {
@@ -390,13 +455,13 @@
 .dashboard-page__appeal-step--success .dashboard-page__appeal-step-icon {
   background-color: var(--accent-green-solid);
   border-color: var(--accent-green-solid);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .dashboard-page__appeal-step--danger .dashboard-page__appeal-step-icon {
   background-color: var(--status-error);
   border-color: var(--status-error);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .dashboard-page__appeal-step-label {

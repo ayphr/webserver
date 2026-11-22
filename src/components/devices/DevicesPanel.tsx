@@ -162,8 +162,27 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
 }
 
 type Period = DevicePeriod;
-type GraphMode = 'combined' | 'separate' | 'summary';
+const GRAPH_MODES = ['combined', 'separate', 'summary'] as const;
+type GraphMode = (typeof GRAPH_MODES)[number];
 type DetailTab = DeviceDetailTab;
+
+function getStoredPeriod(): Period {
+  try {
+    const raw = window.localStorage.getItem('ayphr:device:period');
+    return DEVICE_PERIODS.find((period) => period === raw) ?? '24h';
+  } catch {
+    return '24h';
+  }
+}
+
+function getStoredGraphMode(): GraphMode {
+  try {
+    const raw = window.localStorage.getItem('ayphr:device:graphMode');
+    return GRAPH_MODES.find((mode) => mode === raw) ?? 'combined';
+  } catch {
+    return 'combined';
+  }
+}
 const DETAIL_TABS: readonly DetailTab[] = ['graphs', 'forecasts', 'alerts', 'tokens', 'logs', 'settings'];
 type Props = {
   activeDevice?: DeviceRouteState | null;
@@ -245,8 +264,8 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const atDeviceLimit = maxDevices !== null && devices.length >= maxDevices;
 
   // Telemetry graph state
-  const [period, setPeriod] = useState<Period>('24h');
-  const [graphMode, setGraphMode] = useState<GraphMode>('combined');
+  const [period, setPeriod] = useState<Period>(getStoredPeriod);
+  const [graphMode, setGraphMode] = useState<GraphMode>(getStoredGraphMode);
   const [isGraphFullscreen, setIsGraphFullscreen] = useState(false);
   const { enabled: enabledSeries, setEnabled: setEnabledSeries } = useEnabledSeries();
 
@@ -311,6 +330,20 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
       // ignore
     }
   }, [showGrid]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('ayphr:device:period', period);
+    } catch {
+      // ignore
+    }
+  }, [period]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('ayphr:device:graphMode', graphMode);
+    } catch {
+      // ignore
+    }
+  }, [graphMode]);
 
   // Handle fullscreen graph overlay: escape to close and prevent background scrolling
   useEffect(() => {
@@ -708,7 +741,24 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     return <p className="devices__notice">Loading devices...</p>;
   }
 
-  // LIST VIEW
+  // A deep link to an unknown/unshared device must not silently fall back to the list.
+  if (view === 'detail' && selectedSerial !== null && !selectedDevice) {
+    return (
+      <div className="devices">
+        <div className="devices__empty devices__empty--not-found">
+          <IconAlertCircle size={28} strokeWidth={1.5} />
+          <h3>Device not found or not shared with your team</h3>
+          <p>The device may have been unlinked, or it is no longer shared with your team.</p>
+          <Button variant="secondary" onClick={closeDevice}>
+            <IconArrowLeft size={16} strokeWidth={1.75} />
+            Back to devices
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // LIST VIEW (the detail-with-missing-device case is handled above)
   if (view === 'list' || !selectedDevice) {
     return (
       <div className="devices">
@@ -901,7 +951,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
               <span
                 style={
                   planFeatures && selectedDevice.dataPointCount > planFeatures.sharedMaxDataPointsPerUser
-                    ? { color: 'red' }
+                    ? { color: 'var(--status-error)' }
                     : undefined
                 }
               >

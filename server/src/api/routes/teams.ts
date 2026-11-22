@@ -40,6 +40,7 @@ import { isTeamRole, isSubscriptionTier, isPurchasableTier, isBillingInterval } 
 import { notifyUser } from '../../lib/notifications';
 import { createTeamBillingPortal, createTeamCheckout, downgradeTeamToFree } from '../../lib/subscriptions';
 import { getTeamMemberRole, toTeamMembers } from '../../lib/teamAccess';
+import { subscriptionEventsTotal } from '../../lib/metrics';
 
 const DEFAULT_AUDIT_PAGE_SIZE = 20;
 const MAX_AUDIT_PAGE_SIZE = 100;
@@ -345,46 +346,88 @@ const handleTeamSubscription = requireAuth(async (_request, user: User) => {
 
 const handleTeamSubscriptionCheckout = requireAuth(async (request, user: User) => {
   const team = await getTeamForUser(user);
-  if (!team) return json({ error: 'No team found' }, 404);
-  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  if (!team) {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed', result: 'invalid' });
+    return json({ error: 'No team found' }, 404);
+  }
+  if (!canManageTeam(user, team)) {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed', result: 'forbidden' });
+    return json({ error: 'Forbidden' }, 403);
+  }
 
   const body = await readJsonBody(request);
   const tier = body?.tier;
   const interval = body?.interval;
   if (!isSubscriptionTier(tier)) {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed', result: 'invalid' });
     return json({ error: 'select a valid plan' }, 400);
   }
   if (!isPurchasableTier(tier)) {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed', result: 'invalid' });
     return json({ error: 'This plan is not available for purchase' }, 400);
   }
   if (!isBillingInterval(interval)) {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed', result: 'invalid' });
     return json({ error: 'interval must be "month" or "year"' }, 400);
   }
 
   const result = await createTeamCheckout(team, user, tier, interval);
-  if (result.kind === 'unavailable') return json({ error: 'Stripe is not configured' }, 503);
-  if (result.kind === 'failed') return json({ error: 'Failed to create checkout session' }, 502);
+  if (result.kind === 'unavailable') {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed', result: 'unavailable' });
+    return json({ error: 'Stripe is not configured' }, 503);
+  }
+  if (result.kind === 'failed') {
+    subscriptionEventsTotal.inc({ event: 'checkout_failed', result: 'failed' });
+    return json({ error: 'Failed to create checkout session' }, 502);
+  }
+  subscriptionEventsTotal.inc({ event: 'checkout_started', result: 'success' });
   return json({ url: result.url });
 });
 
 const handleTeamPlanFree = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
-  if (!team) return json({ error: 'No team found' }, 404);
-  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  if (!team) {
+    subscriptionEventsTotal.inc({ event: 'auto_renew_disabled', result: 'invalid' });
+    return json({ error: 'No team found' }, 404);
+  }
+  if (!canManageTeam(user, team)) {
+    subscriptionEventsTotal.inc({ event: 'auto_renew_disabled', result: 'forbidden' });
+    return json({ error: 'Forbidden' }, 403);
+  }
   const updatedTeam = await downgradeTeamToFree(team);
-  if (!updatedTeam) return json({ error: 'Unable to cancel the current Stripe subscription' }, 502);
-  if (updatedTeam) await enforceTeamMemberLimit(updatedTeam);
-  return json({ team: updatedTeam ?? { ...team, tier: 'free' } });
+  if (!updatedTeam) {
+    subscriptionEventsTotal.inc({ event: 'auto_renew_disabled', result: 'failed' });
+    return json({ error: 'Unable to cancel the current Stripe subscription' }, 502);
+  }
+  // Successful cancellation is recorded by downgradeTeamToFree.
+  await enforceTeamMemberLimit(updatedTeam);
+  return json({ team: updatedTeam });
 });
 
 const handleTeamSubscriptionPortal = requireAuth(async (_request, user: User) => {
   const team = await getTeamForUser(user);
-  if (!team) return json({ error: 'No team found' }, 404);
-  if (!canManageTeam(user, team)) return json({ error: 'Forbidden' }, 403);
+  if (!team) {
+    subscriptionEventsTotal.inc({ event: 'portal_failed', result: 'invalid' });
+    return json({ error: 'No team found' }, 404);
+  }
+  if (!canManageTeam(user, team)) {
+    subscriptionEventsTotal.inc({ event: 'portal_failed', result: 'forbidden' });
+    return json({ error: 'Forbidden' }, 403);
+  }
   const result = await createTeamBillingPortal(team);
-  if (result.kind === 'missing') return json({ error: 'No billing account found' }, 404);
-  if (result.kind === 'unavailable') return json({ error: 'Stripe is not configured' }, 503);
-  if (result.kind === 'failed') return json({ error: 'Failed to create billing portal session' }, 502);
+  if (result.kind === 'missing') {
+    subscriptionEventsTotal.inc({ event: 'portal_failed', result: 'invalid' });
+    return json({ error: 'No billing account found' }, 404);
+  }
+  if (result.kind === 'unavailable') {
+    subscriptionEventsTotal.inc({ event: 'portal_failed', result: 'unavailable' });
+    return json({ error: 'Stripe is not configured' }, 503);
+  }
+  if (result.kind === 'failed') {
+    subscriptionEventsTotal.inc({ event: 'portal_failed', result: 'failed' });
+    return json({ error: 'Failed to create billing portal session' }, 502);
+  }
+  subscriptionEventsTotal.inc({ event: 'portal_opened', result: 'success' });
   return json({ url: result.url });
 });
 

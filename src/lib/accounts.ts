@@ -31,17 +31,22 @@ export function isStoredAccountExpired(account: StoredAccount): boolean {
   return time <= Date.now();
 }
 
-export function getStoredAccounts(): StoredAccount[] {
+/** Returns every saved account, including tokens that have already expired. */
+export function getAllStoredAccounts(): StoredAccount[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(ACCOUNTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isStoredAccount).filter((account) => !isStoredAccountExpired(account));
+    return parsed.filter(isStoredAccount);
   } catch {
     return [];
   }
+}
+
+export function getStoredAccounts(): StoredAccount[] {
+  return getAllStoredAccounts().filter((account) => !isStoredAccountExpired(account));
 }
 
 export function saveStoredAccounts(accounts: StoredAccount[]) {
@@ -98,14 +103,11 @@ export function updateStoredAccount(token: string, user: PublicUser) {
 }
 
 export function removeStoredAccount(token: string) {
-  const accounts = getStoredAccounts().filter((account) => account.token !== token);
+  const accounts = getAllStoredAccounts().filter((account) => account.token !== token);
   saveStoredAccounts(accounts);
   if (getActiveToken() === token) {
-    if (accounts.length > 0) {
-      setActiveToken(accounts[0].token);
-    } else {
-      setActiveToken(null);
-    }
+    const nextActive = accounts.find((account) => !isStoredAccountExpired(account));
+    setActiveToken(nextActive?.token ?? null);
   }
 }
 

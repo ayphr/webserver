@@ -379,7 +379,10 @@ export const LandingPage = () => {
             >
               Shop
             </a>
-            <Button to="/auth/login" variant="primary">
+            <Button to="/auth/register" variant="secondary" className="landing-nav__signup">
+              <span>Create free account</span>
+            </Button>
+            <Button to="/auth/login" variant="primary" className="landing-nav__signin">
               <span>Sign In</span>
               <IconArrowRight size={16} aria-hidden="true" />
             </Button>

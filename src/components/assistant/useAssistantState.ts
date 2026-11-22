@@ -13,10 +13,15 @@ import {
 import { api } from '../../lib/api';
 import { createId, toPersistableMessage } from './utils';
 
+export type AssistantSyncStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 export type AssistantController = {
   state: AssistantState;
   preferences: AssistantPreferences;
   isLoading: boolean;
+  syncStatus: AssistantSyncStatus;
+  syncError: string | null;
+  retrySync: () => void;
   update: (updater: (current: AssistantState) => AssistantState) => void;
   updatePreferences: (patch: Partial<AssistantPreferences>) => void;
   selectFolder: (folderId: string | null) => void;
@@ -54,16 +59,38 @@ const toPersistableState = (state: AssistantState): AssistantState => ({
 export const useAssistantState = (): AssistantController => {
   const [state, setState] = useState<AssistantState>(createDefaultAssistantState);
   const [isLoading, setIsLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<AssistantSyncStatus>('idle');
+  const [syncError, setSyncError] = useState<string | null>(null);
   const stateRef = useRef(state);
   const pendingRef = useRef<AssistantState | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveGenerationRef = useRef(0);
+  const loadGenerationRef = useRef(0);
+  const retryRef = useRef<(() => void) | null>(null);
 
-  const persist = useCallback(async (next: AssistantState) => {
-    try {
-      await api.assistant.saveState(toPersistableState(next));
-    } catch {
-      // Assistant state is best-effort; keep the in-memory state usable.
-    }
+  const persist = useCallback(function persist(next: AssistantState): void {
+    const generation = ++saveGenerationRef.current;
+    setSyncStatus('saving');
+    setSyncError(null);
+    // Serialize saves so a slow request cannot overwrite a newer state.
+    const operation = saveQueueRef.current.then(async () => {
+      try {
+        await api.assistant.saveState(toPersistableState(next));
+        if (generation === saveGenerationRef.current) {
+          setSyncStatus('saved');
+          setSyncError(null);
+          retryRef.current = null;
+        }
+      } catch (err) {
+        if (generation === saveGenerationRef.current) {
+          setSyncStatus('error');
+          setSyncError(err instanceof Error ? err.message : 'Failed to save assistant data');
+          retryRef.current = () => persist(next);
+        }
+      }
+    });
+    saveQueueRef.current = operation;
   }, []);
 
   const flush = useCallback(() => {
@@ -71,8 +98,39 @@ export const useAssistantState = (): AssistantController => {
     timerRef.current = null;
     const pending = pendingRef.current;
     pendingRef.current = null;
-    if (pending) void persist(pending);
+    if (pending) persist(pending);
   }, [persist]);
+
+  const loadState = useCallback(async function loadState(isRetry = false): Promise<void> {
+    const generation = ++loadGenerationRef.current;
+    if (!isRetry) setIsLoading(true);
+    try {
+      const loaded = await api.assistant.getState();
+      if (generation !== loadGenerationRef.current || pendingRef.current) return;
+      stateRef.current = loaded;
+      setState(loaded);
+      setSyncStatus('saved');
+      setSyncError(null);
+      retryRef.current = null;
+    } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
+      setSyncStatus('error');
+      setSyncError(err instanceof Error ? err.message : 'Failed to load assistant data');
+      retryRef.current = () => {
+        // Unsaved local changes take priority over re-fetching the old state.
+        if (pendingRef.current) flush();
+        else void loadState(true);
+      };
+    } finally {
+      if (generation === loadGenerationRef.current && !isRetry) setIsLoading(false);
+    }
+  }, [flush]);
+
+  const retrySync = useCallback(() => {
+    const retry = retryRef.current;
+    retryRef.current = null;
+    retry?.();
+  }, []);
 
   const update = useCallback(
     (updater: (current: AssistantState) => AssistantState) => {
@@ -242,26 +300,12 @@ export const useAssistantState = (): AssistantController => {
   useEffect(() => {
     for (const key of LEGACY_ASSISTANT_STORAGE_KEYS) localStorage.removeItem(key);
 
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const loaded = await api.assistant.getState();
-        if (cancelled || pendingRef.current) return;
-        stateRef.current = loaded;
-        setState(loaded);
-      } catch {
-        // Fall back to empty assistant state when the API is unavailable.
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
+    void loadState();
     return () => {
-      cancelled = true;
+      loadGenerationRef.current += 1;
       flush();
     };
-  }, [flush]);
+  }, [flush, loadState]);
 
   useEffect(() => {
     const handlePageHide = () => flush();
@@ -274,6 +318,9 @@ export const useAssistantState = (): AssistantController => {
       state,
       preferences: state.preferences,
       isLoading,
+      syncStatus,
+      syncError,
+      retrySync,
       update,
       updatePreferences,
       selectFolder,
@@ -291,6 +338,9 @@ export const useAssistantState = (): AssistantController => {
     [
       state,
       isLoading,
+      syncStatus,
+      syncError,
+      retrySync,
       update,
       updatePreferences,
       selectFolder,

@@ -11,9 +11,10 @@ import { canManageTeam } from '../../lib/db/teams';
 import { parseName } from '../../lib/deviceValidation';
 import { requireAlertsAndWebhooksPlan } from '../../lib/planAccess';
 import { getTeamContext } from '../../lib/teamContext';
+import { validateWebhookUrl } from '../../lib/webhookUrl';
 import type { Integration, IntegrationProvider, User } from '@common';
 
-const MAX_URL_LENGTH = 2048;
+const WEBHOOK_TIMEOUT_MS = 10_000;
 
 const PROVIDERS: readonly IntegrationProvider[] = ['discord', 'slack', 'webhook'];
 
@@ -23,17 +24,9 @@ function parseProvider(value: unknown): IntegrationProvider | null {
   return value as IntegrationProvider;
 }
 
-function parseUrl(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const url = value.trim();
-  if (!url || url.length > MAX_URL_LENGTH) return null;
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-    return url;
-  } catch {
-    return null;
-  }
+async function parseUrl(value: unknown): Promise<string | null> {
+  const result = await validateWebhookUrl(value);
+  return result.ok ? result.url : null;
 }
 
 const handleListMine = requireAuth(async (_request, user: User) => {
@@ -59,7 +52,7 @@ const handleCreate = requireAuth(async (request, user: User) => {
   const provider = parseProvider(body?.provider);
   if (!provider) return json({ error: 'invalid provider' }, 400);
 
-  const webhookUrl = parseUrl(body?.webhookUrl);
+  const webhookUrl = await parseUrl(body?.webhookUrl);
   if (!webhookUrl) return json({ error: 'invalid webhook url' }, 400);
 
   const integration: Integration = {
@@ -120,7 +113,7 @@ const handleUpdate = requireAuth(async (request, user: User, params) => {
     updates.provider = provider;
   }
   if (body?.webhookUrl !== undefined) {
-    const webhookUrl = parseUrl(body.webhookUrl);
+    const webhookUrl = await parseUrl(body.webhookUrl);
     if (!webhookUrl) return json({ error: 'invalid webhook url' }, 400);
     updates.webhookUrl = webhookUrl;
   }
@@ -165,6 +158,11 @@ const handleTest = requireAuth(async (_request, user: User, params) => {
   if (!integration) return json({ error: 'not found' }, 404);
   if (integration.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
+  const urlCheck = await validateWebhookUrl(integration.webhookUrl);
+  if (!urlCheck.ok) {
+    return json({ ok: false, error: urlCheck.reason }, 400);
+  }
+
   const payload =
     integration.provider === 'slack'
       ? { text: `Test message from Ayphr integrations (${integration.name})` }
@@ -172,15 +170,22 @@ const handleTest = requireAuth(async (_request, user: User, params) => {
         ? { content: `Test message from Ayphr integrations (${integration.name})` }
         : { event: 'test', name: integration.name, message: 'Hello from Ayphr' };
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+
   try {
-    const response = await fetch(integration.webhookUrl, {
+    const response = await fetch(urlCheck.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: controller.signal,
+      redirect: 'error',
     });
     return json({ ok: response.ok, status: response.status });
   } catch (err) {
     return json({ ok: false, error: err instanceof Error ? err.message : 'request failed' });
+  } finally {
+    clearTimeout(timeout);
   }
 });
 

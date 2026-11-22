@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { Button, Input, Modal, Select, ProgressBar, Tooltip } from '../common';
-import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase, IconPlus, IconExternalLink } from '@tabler/icons-react';
+import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase, IconPlus, IconExternalLink, IconCopy } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance, SubscriptionTier, SubscriptionPlan, BillingInterval, TeamSubscriptionPayload } from '@common';
 import { PLAN_NAMES } from '@common';
 import { getPlanFeatures } from '@common/utils/plans';
+import { formatDisplayDate, toDate } from '../../lib/date';
 import type { TeamSection } from '../../lib/dashboardRoutes';
 import { TeamAuditPanel } from './TeamAuditPanel';
 import '../common/Tabs.css';
@@ -76,6 +77,10 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
   const [checkoutTier, setCheckoutTier] = useState<SubscriptionTier | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [showFreePlan, setShowFreePlan] = useState(false);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+  const [copyInviteError, setCopyInviteError] = useState<{ id: string; message: string } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmation, setConfirmation] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
   const load = async () => {
@@ -101,6 +106,15 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => () => {
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
   }, []);
 
   useEffect(() => {
@@ -231,6 +245,37 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke invite');
+    }
+  };
+
+  const handleCopyInviteLink = async (invite: TeamInvite) => {
+    const link = `${window.location.origin}/dashboard?invite=${encodeURIComponent(invite.token)}`;
+    setCopyInviteError(null);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        // Fallback for browsers without the async clipboard API.
+        const input = document.createElement('textarea');
+        input.value = link;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(input);
+        if (!copied) throw new Error('Copy is not supported in this browser');
+      }
+      setCopiedInviteId(invite.id);
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => setCopiedInviteId(null), 2500);
+    } catch (err) {
+      setCopiedInviteId(null);
+      setCopyInviteError({
+        id: invite.id,
+        message: err instanceof Error ? err.message : 'Failed to copy invite link',
+      });
     }
   };
 
@@ -447,19 +492,40 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
             <section className="team-panel__section">
               <h4 className="team-panel__section-title">Pending invites</h4>
               <ul className="team-panel__list team-panel__list--plain">
-                {invites.map((invite) => (
-                  <li key={invite.id} className="team-panel__member-row">
-                    <div className="team-panel__member-info">
-                      <span className="team-panel__member-name">{invite.email}</span>
-                      <span className="team-panel__member-role">{invite.role}</span>
-                    </div>
-                    {isManager && (
-                      <Button variant="secondary" onClick={() => handleRevokeInvite(invite.id)}>
-                        Revoke
-                      </Button>
-                    )}
-                  </li>
-                ))}
+                {invites.map((invite) => {
+                  const expiresAt = toDate(invite.expiresAt);
+                  const expiresSoon = expiresAt.getTime() - now <= 24 * 60 * 60 * 1000;
+                  return (
+                    <li key={invite.id} className="team-panel__member-row">
+                      <div className="team-panel__member-info">
+                        <span className="team-panel__member-name">{invite.email}</span>
+                        <span className="team-panel__member-role">{invite.role}</span>
+                        <span className="team-panel__invite-meta">
+                          Created {formatDisplayDate(invite.createdAt)} · Expires {formatDisplayDate(expiresAt)}
+                        </span>
+                        {expiresSoon && (
+                          <span className="team-panel__invite-expiring">
+                            {expiresAt.getTime() <= now ? 'Expired' : 'Expiring soon'}
+                          </span>
+                        )}
+                        {copyInviteError?.id === invite.id && (
+                          <span className="team-panel__invite-copy-error">{copyInviteError.message}</span>
+                        )}
+                      </div>
+                      <div className="team-panel__member-actions">
+                        <Button variant="secondary" onClick={() => void handleCopyInviteLink(invite)}>
+                          <IconCopy size={16} />
+                          {copiedInviteId === invite.id ? 'Copied!' : 'Copy invite link'}
+                        </Button>
+                        {isManager && (
+                          <Button variant="secondary" onClick={() => handleRevokeInvite(invite.id)}>
+                            Revoke
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}

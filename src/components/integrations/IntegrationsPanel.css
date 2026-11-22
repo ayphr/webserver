@@ -17,7 +17,7 @@
 }
 
 .integrations-panel__empty {
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .integrations-panel__list {
@@ -56,7 +56,7 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .integrations-panel__card-actions {
@@ -69,7 +69,7 @@
 .integrations-panel__test-result {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
-  color: var(--text-muted, #666);
+  color: var(--text-muted);
 }
 
 .integrations-panel__form {
@@ -79,7 +79,7 @@
 }
 
 .integrations-panel__error {
-  color: var(--status-error, #dc2626);
+  color: var(--status-error);
   font-size: 0.85rem;
   margin: 0;
 }

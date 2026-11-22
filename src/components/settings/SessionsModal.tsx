@@ -7,6 +7,7 @@ import {
   IconDeviceTv,
   IconMapPin,
   IconAlertCircle,
+  IconLogout2,
 } from '@tabler/icons-react';
 import type { SessionInfo } from '@common';
 import { api } from '../../lib/api';
@@ -50,6 +51,9 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
   const [reloadToken, setReloadToken] = useState(0);
   const [sessionToRevoke, setSessionToRevoke] = useState<SessionInfo | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [isLogoutOthersOpen, setIsLogoutOthersOpen] = useState(false);
+  const [isSigningOutOthers, setIsSigningOutOthers] = useState(false);
+  const otherSessionCount = sessions.filter((session) => !session.current).length;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -95,6 +99,21 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
     }
   };
 
+  const handleLogoutOthers = async () => {
+    setIsLogoutOthersOpen(false);
+    setIsSigningOutOthers(true);
+    setError(null);
+
+    try {
+      await api.auth.logoutOthers();
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign out other sessions');
+    } finally {
+      setIsSigningOutOthers(false);
+    }
+  };
+
   return (
     <>
       <Modal isOpen={isOpen} onClose={onClose} title="Active sessions" size="md" showCancel={false}>
@@ -109,6 +128,20 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
 
         {!isLoading && !error && sessions.length === 0 && (
           <p className="sessions-modal__status">No active sessions found.</p>
+        )}
+
+        {!isLoading && otherSessionCount > 0 && (
+          <div className="sessions-modal__bulk">
+            <Button
+              variant="secondary"
+              onClick={() => setIsLogoutOthersOpen(true)}
+              disabled={isSigningOutOthers || revokingId !== null}
+              isLoading={isSigningOutOthers}
+            >
+              <IconLogout2 size={16} strokeWidth={1.75} />
+              Sign out all other sessions
+            </Button>
+          </div>
         )}
 
         {!isLoading && !error && sessions.length > 0 && (
@@ -168,6 +201,22 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
             device will need to log in again.
           </p>
         )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        isOpen={isLogoutOthersOpen}
+        title="Sign out all other sessions"
+        confirmText="Sign out others"
+        cancelText="Cancel"
+        isDangerous
+        confirmDisabled={isSigningOutOthers}
+        onConfirm={() => void handleLogoutOthers()}
+        onCancel={() => setIsLogoutOthersOpen(false)}
+      >
+        <p>
+          This will sign out {otherSessionCount} other session{otherSessionCount === 1 ? '' : 's'}. This device will stay
+          signed in.
+        </p>
       </ConfirmDialog>
     </>
   );

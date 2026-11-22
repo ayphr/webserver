@@ -12,6 +12,7 @@ import type { DeviceDocument } from './db';
 import { getTeamById } from './db/teams';
 import { teamSupportsAlertsAndWebhooks } from './planAccess';
 import { createLogger } from './logger';
+import { validateWebhookUrl } from './webhookUrl';
 
 const log = createLogger('alerts');
 
@@ -94,15 +95,27 @@ async function sendToIntegration(
   device: DeviceDocument,
   reading: DataPoint,
 ): Promise<void> {
+  // Stored integrations may predate URL validation or have a hostname that now
+  // resolves to a restricted address; never fetch an unsafe destination.
+  const urlCheck = await validateWebhookUrl(integration.webhookUrl);
+  if (!urlCheck.ok) {
+    log.warn(
+      { integrationId: integration.id, alertId: alert.id, reason: urlCheck.reason },
+      'skipping unsafe alert webhook url',
+    );
+    return;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
 
   try {
-    const response = await fetch(integration.webhookUrl, {
+    const response = await fetch(urlCheck.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildPayload(integration, alert, device, reading)),
       signal: controller.signal,
+      redirect: 'error',
     });
 
     if (!response.ok) {

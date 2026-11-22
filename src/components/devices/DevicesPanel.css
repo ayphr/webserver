@@ -66,6 +66,15 @@
   max-width: 32rem;
 }
 
+.devices__empty--not-found {
+  border-color: var(--status-error);
+  color: var(--status-error);
+}
+
+.devices__empty--not-found h3 {
+  color: var(--text-primary);
+}
+
 /* LIST VIEW - FLEET ROWS */
 .devices__grid {
   display: flex;
@@ -215,7 +224,7 @@
     flex-basis: 100%;
     justify-content: space-between;
     padding-top: 0.45rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--border-subtle);
   }
 }
 
@@ -707,8 +716,8 @@
 
 .devices__selection-rect {
   position: absolute;
-  border: 1px solid rgba(239, 68, 68, 0.9);
-  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid var(--status-error);
+  background: var(--status-error-bg);
   pointer-events: none;
 }
 
@@ -762,7 +771,7 @@
   z-index: 6;
   pointer-events: auto;
   transform: translate(4px, -100%);
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--bg-base);
   color: var(--text-primary);
   font-size: 0.75rem;
   padding: 0.15rem 0.35rem;
