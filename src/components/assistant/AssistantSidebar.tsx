@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -290,9 +291,58 @@ export const AssistantSidebar = ({
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const measureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The sidebar grows to fit its longest visible label. Intrinsic width cannot
+  // be transitioned, so measure the text and set an explicit pixel width that
+  // CSS can animate when rows, titles or folders change.
+  const measureSidebarWidth = useCallback(() => {
+    const element = sidebarRef.current;
+    if (!element) return;
+    const canvas = (measureCanvasRef.current ??= document.createElement('canvas'));
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    const styles = getComputedStyle(element);
+    const minWidth = parseFloat(styles.minWidth) || 0;
+    const maxWidth = parseFloat(styles.maxWidth) || Number.POSITIVE_INFINITY;
+    let needed = minWidth;
+
+    element.querySelectorAll<HTMLElement>('.assistant-sidebar__label').forEach((label) => {
+      const labelStyles = getComputedStyle(label);
+      context.font = `${labelStyles.fontWeight} ${labelStyles.fontSize} ${labelStyles.fontFamily}`;
+      const textWidth = context.measureText(label.textContent ?? '').width;
+      // Keep the icon, indentation and action space the row already reserves.
+      const surrounding = element.clientWidth - label.getBoundingClientRect().width;
+      needed = Math.max(needed, textWidth + surrounding);
+    });
+
+    const target = Math.min(Math.max(needed, minWidth), maxWidth);
+    element.style.width = `${Math.round(target)}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    measureSidebarWidth();
+  }, [
+    measureSidebarWidth,
+    chats,
+    folders,
+    query,
+    searchOpen,
+    expanded,
+    editState,
+    deleteState,
+    activeChatId,
+  ]);
+
+  useEffect(() => {
+    window.addEventListener('resize', measureSidebarWidth);
+    return () => window.removeEventListener('resize', measureSidebarWidth);
+  }, [measureSidebarWidth]);
 
   const hasSavedChats = chats.length > 0;
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -739,6 +789,7 @@ export const AssistantSidebar = ({
 
   return (
     <SidebarShell
+      ref={sidebarRef}
       prefix={PREFIX}
       ariaLabel="Assistant sidebar"
       onKeyDown={handleSidebarKeyDown}

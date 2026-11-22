@@ -22,6 +22,24 @@
   min-width: 200px;
   /* Grow left into the free space without pushing the composer or overflowing. */
   max-width: clamp(200px, calc(50vw - 19.875rem), 20rem);
+  transition: width 0.24s ease;
+}
+
+/* Rows fade in as folders open, chats appear and search results change. */
+.assistant-sidebar .assistant-sidebar__row,
+.assistant-sidebar .assistant-sidebar__no-results {
+  animation: assistant-sidebar-row-in 0.18s ease both;
+}
+
+@keyframes assistant-sidebar-row-in {
+  from {
+    opacity: 0;
+    translate: 0 -0.25rem;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
 }
 
 /* Inline chat search: reuses the sidebar row layout so the icon and spacing match.
@@ -51,6 +69,7 @@
   background-color: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  animation: assistant-sidebar-row-in 0.15s ease both;
 }
 
 .assistant-sidebar__search-clear:hover {
@@ -58,14 +77,15 @@
 }
 
 .assistant-sidebar__search .assistant-sidebar__search-input {
-  width: 0;
+  width: 100%;
+  max-width: 0;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: max-width 0.24s ease, opacity 0.15s ease;
 }
 
 .assistant-sidebar__search.is-open .assistant-sidebar__search-input {
-  width: auto;
+  max-width: 100%;
   opacity: 1;
   pointer-events: auto;
 }
