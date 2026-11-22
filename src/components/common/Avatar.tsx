@@ -1,5 +1,6 @@
 import './Avatar.css';
 import { API_BASE_URL } from '../../lib/api';
+import { API_VERSION } from '../../lib/api/generated/routes';
 
 export interface AvatarProps {
   username: string;
@@ -8,8 +9,14 @@ export interface AvatarProps {
   className?: string;
 }
 
+/** Stored accounts can still hold avatar URLs from before the API was versioned. */
+function withApiVersion(url: string): string {
+  return url.replace(/^\/api\/(?!v\d+\/)/, `/api/${API_VERSION}/`);
+}
+
 function resolveAvatarUrl(avatarUrl: string): string {
-  return /^https?:\/\//i.test(avatarUrl) ? avatarUrl : `${API_BASE_URL}${avatarUrl}`;
+  const normalized = withApiVersion(avatarUrl);
+  return /^https?:\/\//i.test(normalized) ? normalized : `${API_BASE_URL}${normalized}`;
 }
 
 export const Avatar = ({ username, avatarUrl, size = 28, className = '' }: AvatarProps) => {

@@ -23,7 +23,7 @@ describe('avatars', () => {
 
   test('buildAvatarUrl includes uuid and version', () => {
     const url = buildAvatarUrl({ uuid: 'u1', avatar: { updatedAt: new Date('2026-01-01T00:00:00Z') } } as never);
-    expect(url).toContain('/api/avatars/u1?');
+    expect(url).toContain('/api/v1/avatars/u1?');
     expect(url).toContain('v=');
   });
 });

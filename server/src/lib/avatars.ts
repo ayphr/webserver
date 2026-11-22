@@ -1,4 +1,5 @@
 import type { User } from '@common';
+import { API_VERSION_PREFIX } from '../api/version';
 
 export const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
 
@@ -24,5 +25,5 @@ export function buildAvatarUrl(user: Pick<User, 'uuid' | 'avatar'>): string | un
     : new Date(user.avatar.updatedAt);
   const version = Number.isNaN(updatedAt.getTime()) ? 0 : updatedAt.getTime();
 
-  return `/api/avatars/${encodeURIComponent(user.uuid)}?v=${version}`;
+  return `${API_VERSION_PREFIX}/avatars/${encodeURIComponent(user.uuid)}?v=${version}`;
 }
