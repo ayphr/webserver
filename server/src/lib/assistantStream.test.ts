@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import {
   createAssistantMockStream,
+  generateAssistantResponse,
   splitAssistantResponseIntoTokens,
 } from './assistantStream';
 
@@ -28,4 +29,11 @@ test('mock streams expose valid thinking and tool state', () => {
 test('task responses use markdown headings', () => {
   const { content } = createAssistantMockStream('task');
   expect(content.startsWith('## ')).toBe(true);
+});
+
+test('mock responses are generated fresh instead of repeating a fixed set', () => {
+  const responses = new Set(
+    Array.from({ length: 24 }, () => generateAssistantResponse('chat')),
+  );
+  expect(responses.size).toBeGreaterThan(8);
 });
