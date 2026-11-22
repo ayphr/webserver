@@ -41,17 +41,13 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    ports:
-      - '7233:7233'
     healthcheck:
       test:
         - CMD-SHELL
         - >-
-          node -e "const req = require('http').get({hostname:'127.0.0.1',
-          port:process.env.API_PORT || 80, path:'/api/ready'}, res => { let b='';
-          res.on('data', c => b += c); res.on('end', () => { try { if
-          (res.statusCode !== 200) process.exit(1);
-          } catch { process.exit(1); } }); }); req.on('error', () => process.exit(1));"
+          bun -e "fetch('http://127.0.0.1:' + (process.env.API_PORT || 80)
+          + '/api/v1/ready').then(r => process.exit(r.ok ? 0 :
+          1)).catch(() => process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 5

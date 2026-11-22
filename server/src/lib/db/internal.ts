@@ -198,6 +198,33 @@ async function ensureCreatedAtTtlIndex<T extends Document>(
   await collection.createIndex({ createdAt: 1 }, { expireAfterSeconds });
 }
 
+/**
+ * One default location per team. Legacy locations have no teamId, which Mongo
+ * indexes as null; a partial filter on isDefault alone therefore makes every
+ * such row collide. Restrict the constraint to real team IDs and reconcile the
+ * old index definition, since createIndex cannot change options in place.
+ */
+export async function ensureDefaultLocationIndex(collection: Collection<Location>): Promise<void> {
+  trackMongoOperation('listIndexes', LOCATIONS_COLLECTION);
+  const existing = (await collection.listIndexes().toArray()).find((index) => {
+    const key = index.key as Record<string, unknown>;
+    return Object.keys(key).length === 2 && key.teamId === 1 && key.isDefault === 1;
+  });
+
+  const partialFilterExpression = { isDefault: true, teamId: { $type: 'string' } };
+
+  if (existing) {
+    const filter = existing.partialFilterExpression as Record<string, unknown> | undefined;
+    if (existing.unique === true && filter && 'teamId' in filter) return;
+
+    trackMongoOperation('dropIndex', LOCATIONS_COLLECTION);
+    await collection.dropIndex(existing.name);
+  }
+
+  trackMongoOperation('createIndex', LOCATIONS_COLLECTION);
+  await collection.createIndex({ teamId: 1, isDefault: 1 }, { unique: true, partialFilterExpression });
+}
+
 export async function setupCollections(db: Db): Promise<Collections> {
   trackMongoOperation('listCollections', '*');
   const existingCollections = await db.collections();
@@ -271,10 +298,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [EMAIL_CODES_COLLECTION, () => cols.emailCodes.createIndex({ email: 1, purpose: 1, userUuid: 1 })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ id: 1 }, { unique: true })],
     [LOCATIONS_COLLECTION, () => cols.locations.createIndex({ teamId: 1 })],
-    [LOCATIONS_COLLECTION, () => cols.locations.createIndex(
-      { teamId: 1, isDefault: 1 },
-      { unique: true, partialFilterExpression: { isDefault: true } }
-    )],
+    [LOCATIONS_COLLECTION, () => ensureDefaultLocationIndex(cols.locations)],
     [STRIPE_EVENTS_COLLECTION, () => cols.stripeEvents.createIndex({ id: 1 }, { unique: true })],
     [STRIPE_EVENTS_COLLECTION, () => ensureCreatedAtTtlIndex(db, STRIPE_EVENTS_COLLECTION, cols.stripeEvents, 60 * 60 * 24 * 30)],
     [NOTIFICATIONS_COLLECTION, () => cols.notifications.createIndex({ id: 1 }, { unique: true })],
