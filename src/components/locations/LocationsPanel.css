@@ -35,9 +35,31 @@
   align-items: flex-end;
 }
 
+.locations__filter-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.locations__filter-search > svg {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--text-dim);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.locations__filter-search .input-wrapper,
 .locations__filters .input-wrapper {
   flex: 1 1 220px;
   min-width: 180px;
+}
+
+.locations__filter-search .input {
+  width: 100%;
+  padding-left: 2.1rem;
 }
 
 .locations__empty {

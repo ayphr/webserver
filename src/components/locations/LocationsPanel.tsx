@@ -5,6 +5,7 @@ import {
   IconMapPin,
   IconPlus,
   IconRefresh,
+  IconSearch,
   IconTrash,
   IconWifi,
   IconWifiOff,
@@ -586,17 +587,20 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
         </div>
 
         <div className="locations__filters">
-          <Input
-            type="search"
-            className="locations__search"
-            value={search}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              setSearch(event.target.value);
-              setLocationPage(1);
-            }}
-            placeholder="Search locations"
-            aria-label="Search locations"
-          />
+          <div className="locations__filter-search">
+            <IconSearch size={16} strokeWidth={1.8} aria-hidden="true" />
+            <Input
+              type="search"
+              className="locations__search"
+              value={search}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                setSearch(event.target.value);
+                setLocationPage(1);
+              }}
+              placeholder="Search locations"
+              aria-label="Search locations"
+            />
+          </div>
           <Select
             aria-label="Filter locations"
             value={filter}
