@@ -1,17 +1,18 @@
 import type { SessionListPayload } from '@common';
 import type { RequestClient } from './client';
+import { API_PATHS, apiPath } from './generated/routes';
 
 export function createSessionsApi(client: RequestClient) {
   return {
     async list() {
-      const response = await client.requestJson<SessionListPayload>('/api/sessions');
+      const response = await client.requestJson<SessionListPayload>(apiPath(API_PATHS.getSessions));
       return response.sessions;
     },
     async remove(id: string) {
-      await client.requestJson<null>(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await client.requestJson<null>(apiPath(API_PATHS.deleteSessionsId, { id: id }), { method: 'DELETE' });
     },
     async removeOthers() {
-      await client.requestJson<null>('/api/auth/logout-others', { method: 'POST' });
+      await client.requestJson<null>(apiPath(API_PATHS.postAuthLogoutOthers), { method: 'POST' });
     },
   };
 }

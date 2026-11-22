@@ -8,6 +8,7 @@ import type {
   PushSubscriptionInput,
 } from '@common';
 import type { RequestClient } from './client';
+import { API_PATHS, apiPath } from './generated/routes';
 
 export function createNotificationsApi(client: RequestClient) {
   return {
@@ -18,53 +19,53 @@ export function createNotificationsApi(client: RequestClient) {
       if (query.pageSize) params.set('pageSize', String(query.pageSize));
       const search = params.toString();
       return client.requestJson<NotificationListPayload>(
-        `/api/notifications${search ? `?${search}` : ''}`,
+        apiPath(API_PATHS.getNotifications, {}, search ? `?${search}` : ''),
       );
     },
     async unreadCount() {
-      const response = await client.requestJson<NotificationUnreadCountPayload>('/api/notifications/unread-count');
+      const response = await client.requestJson<NotificationUnreadCountPayload>(apiPath(API_PATHS.getNotificationsUnreadCount));
       return response.unreadCount;
     },
     async markRead(id: string) {
       const response = await client.requestJson<{ read: boolean; unreadCount: number }>(
-        `/api/notifications/${encodeURIComponent(id)}/read`,
+        apiPath(API_PATHS.postNotificationsIdRead, { id: id }),
         { method: 'POST' },
       );
       return response.unreadCount;
     },
     async markAllRead() {
       const response = await client.requestJson<{ read: boolean; updated: number; unreadCount: number }>(
-        '/api/notifications/read-all',
+        apiPath(API_PATHS.postNotificationsReadAll),
         { method: 'POST' },
       );
       return response.unreadCount;
     },
     async getPreferences() {
-      return client.requestJson<NotificationPreferences>('/api/notifications/preferences');
+      return client.requestJson<NotificationPreferences>(apiPath(API_PATHS.getNotificationsPreferences));
     },
     async updatePreferences(update: NotificationPreferencesUpdate) {
-      return client.requestJson<NotificationPreferences>('/api/notifications/preferences', {
+      return client.requestJson<NotificationPreferences>(apiPath(API_PATHS.patchNotificationsPreferences), {
         method: 'PATCH',
         body: update,
       });
     },
     async getPushPublicKey() {
-      const response = await client.requestJson<PushPublicKeyPayload>('/api/notifications/push/public-key');
+      const response = await client.requestJson<PushPublicKeyPayload>(apiPath(API_PATHS.getNotificationsPushPublicKey));
       return response.publicKey;
     },
     async subscribePush(subscription: PushSubscriptionInput) {
-      return client.requestJson<{ subscribed: boolean }>('/api/notifications/push/subscribe', {
+      return client.requestJson<{ subscribed: boolean }>(apiPath(API_PATHS.postNotificationsPushSubscribe), {
         method: 'POST',
         body: subscription,
       });
     },
     async unsubscribePush() {
-      return client.requestJson<{ unsubscribed: boolean }>('/api/notifications/push/subscribe', {
+      return client.requestJson<{ unsubscribed: boolean }>(apiPath(API_PATHS.deleteNotificationsPushSubscribe), {
         method: 'DELETE',
       });
     },
     async sendTestPush() {
-      return client.requestJson<{ sent: boolean }>('/api/notifications/push/test', {
+      return client.requestJson<{ sent: boolean }>(apiPath(API_PATHS.postNotificationsPushTest), {
         method: 'POST',
       });
     },

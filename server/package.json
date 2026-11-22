@@ -7,7 +7,9 @@
     "start": "bun run src/index.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "api:generate": "bun run scripts/generate-api-client.ts",
+    "api:check": "bun run scripts/generate-api-client.ts --check"
   },
   "dependencies": {
     "ioredis": "^6.0.0",

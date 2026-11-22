@@ -29,7 +29,8 @@ import {
   TEAM_INVITES_COLLECTION,
   TEAM_AUDIT_LOGS_COLLECTION,
   TEAM_AUDIT_LOG_MAX_AGE_SECONDS,
-  APPEALS_COLLECTION
+  APPEALS_COLLECTION,
+  RATE_LIMITS_COLLECTION
 } from '../../env';
 export * from './serialization';
 export * from './cacheKeys';
@@ -120,7 +121,18 @@ export interface Collections {
   notificationPreferences: Collection<NotificationPreferencesDocument>;
   pushSubscriptions: Collection<PushSubscriptionDocument>;
   assistantStates: Collection<AssistantStateDocument>;
+  rateLimits: Collection<RateLimitBucket>;
 }
+
+/** Shared fixed-window bucket used when Redis is unavailable. */
+export type RateLimitBucket = {
+  _id: string;
+  count: number;
+  resetAt: Date;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 /** One preferences document per account; user records stay untouched. */
 export type NotificationPreferencesDocument = NotificationPreferences & {
@@ -225,6 +237,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     notificationPreferences: db.collection<NotificationPreferencesDocument>(NOTIFICATION_PREFERENCES_COLLECTION),
     pushSubscriptions: db.collection<PushSubscriptionDocument>(PUSH_SUBSCRIPTIONS_COLLECTION),
     assistantStates: db.collection<AssistantStateDocument>(ASSISTANT_STATES_COLLECTION),
+    rateLimits: db.collection<RateLimitBucket>(RATE_LIMITS_COLLECTION),
   };
 
   const indexSpecs: Array<[string, () => Promise<unknown>]> = [
@@ -310,6 +323,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
       cols.teamAuditLogs,
       TEAM_AUDIT_LOG_MAX_AGE_SECONDS,
     )],
+    [RATE_LIMITS_COLLECTION, () => cols.rateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
   ];
 
   await Promise.all(

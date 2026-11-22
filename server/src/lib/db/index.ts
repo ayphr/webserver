@@ -15,3 +15,4 @@ export * from './emailCodes';
 export * from './notifications';
 export * from './pushSubscriptions';
 export * from './assistant';
+export * from './rateLimits';

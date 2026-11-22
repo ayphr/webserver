@@ -128,7 +128,13 @@ import {
   handleProfileEdit,
 } from './routes/profile';
 import { handleDomainChallenge, handleDomainVerify, handleDomainReverify } from './routes/profileDomain';
-import type { ResolvedRoute, RouteHandler, RouteParams } from './types';
+import { buildOpenApiDocument } from './openapi';
+import {
+  API_VERSION_PREFIX,
+  LEGACY_API_TEMPLATE,
+  UNMATCHED_API_TEMPLATE,
+} from './version';
+import type { ResolvedRoute, RouteDefinition, RouteHandler, RouteParams } from './types';
 
 type RouteMatch = {
   template: string;
@@ -136,15 +142,16 @@ type RouteMatch = {
   handle: RouteHandler;
 };
 
-type RouteDefinition = {
-  method: string;
-  path: string;
-  handle: RouteHandler;
-};
+const VERSION_PREFIX = API_VERSION_PREFIX;
 
 const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/status', handle: handleStatusRoute },
   { method: 'GET', path: '/api/ready', handle: handleReadinessRoute },
+  {
+    method: 'GET',
+    path: '/api/openapi.json',
+    handle: () => Response.json(buildOpenApiDocument(ROUTES), { headers: { 'content-type': 'application/json; charset=utf-8' } }),
+  },
 
   { method: 'POST', path: '/api/auth/register', handle: handleAuthRegister },
   { method: 'POST', path: '/api/auth/login', handle: handleLogin },
@@ -310,7 +317,6 @@ const ROUTES: readonly RouteDefinition[] = [
 
 ];
 
-const UNMATCHED_API_TEMPLATE = '/api/other';
 const UNMATCHED_ROOT_TEMPLATE = '/other';
 
 export function cleanPathname(pathname: string): string {
@@ -318,6 +324,27 @@ export function cleanPathname(pathname: string): string {
     return pathname.slice(0, -1);
   }
   return pathname;
+}
+
+/** True for paths under the only supported API version. */
+export function isVersionedApiPath(pathname: string): boolean {
+  const clean = cleanPathname(pathname);
+  return clean === VERSION_PREFIX || clean.startsWith(`${VERSION_PREFIX}/`);
+}
+
+/** True for any /api path, including removed versions and unversioned aliases. */
+export function isLegacyApiPath(pathname: string): boolean {
+  const clean = cleanPathname(pathname);
+  return clean === '/api' || clean.startsWith('/api/');
+}
+
+/** Maps /api/v1/... onto the internal route templates. Unversioned paths are
+ * deliberately left unchanged so they cannot match any registered route. */
+export function normalizeApiPath(pathname: string): string {
+  const clean = cleanPathname(pathname);
+  if (clean === VERSION_PREFIX) return '/api';
+  if (clean.startsWith(`${VERSION_PREFIX}/`)) return `/api${clean.slice(VERSION_PREFIX.length)}`;
+  return clean;
 }
 
 function countParams(path: string): number {
@@ -350,10 +377,6 @@ const SORTED_ROUTES = [...COMPILED_ROUTES].sort((a, b) => {
   return a.declarationOrder - b.declarationOrder;
 });
 
-function isApiPath(pathname: string): boolean {
-  return pathname === '/api' || pathname.startsWith('/api/');
-}
-
 function matchPath(patternSegments: readonly string[], pathSegments: string[]): RouteParams | null {
   const params: RouteParams = {};
 
@@ -374,9 +397,8 @@ function matchPath(patternSegments: readonly string[], pathSegments: string[]): 
   return params;
 }
 
-export function matchRoute(method: string, pathname: string): RouteMatch | null {
-  const normalized = cleanPathname(pathname);
-  const pathSegments = normalized.split('/');
+function matchCanonicalRoute(method: string, pathname: string): RouteMatch | null {
+  const pathSegments = pathname.split('/');
 
   for (const route of SORTED_ROUTES) {
     if (route.method !== method) continue;
@@ -391,21 +413,34 @@ export function matchRoute(method: string, pathname: string): RouteMatch | null 
   return null;
 }
 
+export function matchRoute(method: string, pathname: string): RouteMatch | null {
+  if (isLegacyApiPath(pathname) && !isVersionedApiPath(pathname)) return null;
+  return matchCanonicalRoute(method, normalizeApiPath(pathname));
+}
+
 export function resolveRoute(request: Request): ResolvedRoute {
   const pathname = cleanPathname(new URL(request.url).pathname);
+  const legacyApi = isLegacyApiPath(pathname);
+  const versionedApi = isVersionedApiPath(pathname);
 
-  if (request.method === 'OPTIONS' && isApiPath(pathname)) {
+  if (request.method === 'OPTIONS' && (versionedApi || legacyApi)) {
     return { template: UNMATCHED_API_TEMPLATE, dispatch: () => handleOptionsRoute(request) };
   }
 
-  const match = matchRoute(request.method, pathname);
+  // Removed unversioned aliases and unknown versions get a JSON 404 so API
+  // clients get a useful signal instead of the SPA's plain-text not-found.
+  if (legacyApi && !versionedApi) {
+    return { template: LEGACY_API_TEMPLATE, dispatch: () => handleApiNotFoundRoute(request) };
+  }
+
+  const match = matchCanonicalRoute(request.method, normalizeApiPath(pathname));
 
   if (match) {
     return { template: match.template, dispatch: () => match.handle(request, match.params) };
   }
 
   return {
-    template: isApiPath(pathname) ? UNMATCHED_API_TEMPLATE : UNMATCHED_ROOT_TEMPLATE,
-    dispatch: () => (isApiPath(pathname) ? handleApiNotFoundRoute(request) : handleNotFoundRoute(request)),
+    template: versionedApi ? UNMATCHED_API_TEMPLATE : UNMATCHED_ROOT_TEMPLATE,
+    dispatch: () => (versionedApi ? handleApiNotFoundRoute(request) : handleNotFoundRoute(request)),
   };
 }

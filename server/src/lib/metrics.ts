@@ -184,6 +184,13 @@ export const rateLimitChecksTotal = new Counter({
   registers: [registry],
 });
 
+export const rateLimitBackendTotal = new Counter({
+  name: 'ayphr_rate_limit_backend_total',
+  help: 'Rate limit checks by limiter and storage backend.',
+  labelNames: ['limiter', 'backend'],
+  registers: [registry],
+});
+
 // ---------------------------------------------------------------------------
 // Staff / moderation
 // ---------------------------------------------------------------------------

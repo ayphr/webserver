@@ -1,8 +1,9 @@
 import type { UserMePayload, PublicUser, SelfUser } from '@common';
 import type { RequestClient } from './client';
+import { API_PATHS, apiPath } from './generated/routes';
 
 export function createUsersApi(client: RequestClient) {
-  // Deduplicate concurrent/shortly-repeated `/api/users/me` requests. The
+  // Deduplicate concurrent/shortly-repeated current-user requests. The
   // PolicyGate and the page it wraps both need this data, so sharing one
   // in-flight (and recently resolved) promise avoids a duplicate round trip
   // and makes the dashboard and other gated pages load faster.
@@ -24,7 +25,7 @@ export function createUsersApi(client: RequestClient) {
       }
 
       const promise = client
-        .requestJson<UserMePayload>('/api/users/me')
+        .requestJson<UserMePayload>(apiPath(API_PATHS.getUsersMe))
         .then((response) => ({
           user: response.user,
           activeSuspension: response.activeSuspension || null,
@@ -41,14 +42,14 @@ export function createUsersApi(client: RequestClient) {
     },
     invalidateMe,
     async getByUuid(uuid: string) {
-      const response = await client.requestJson<{ user: PublicUser; requestedBy: PublicUser }>(`/api/users/${uuid}`);
+      const response = await client.requestJson<{ user: PublicUser; requestedBy: PublicUser }>(apiPath(API_PATHS.getUsersUuid, { uuid: uuid }));
       return {
         user: response.user,
         requestedBy: response.requestedBy,
       };
     },
     async changeUsername(username: string, currentPassword: string) {
-      const response = await client.requestJson<{ user: SelfUser }>('/api/users/me/username', {
+      const response = await client.requestJson<{ user: SelfUser }>(apiPath(API_PATHS.patchUsersMeUsername), {
         method: 'PATCH',
         body: { username, currentPassword },
       });

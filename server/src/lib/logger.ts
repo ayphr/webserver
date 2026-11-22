@@ -1,7 +1,7 @@
 import pino from 'pino';
+import { LOG_LEVEL } from '../env';
 
-const isProduction = Bun.env.NODE_ENV === 'production';
-const level = Bun.env.LOG_LEVEL || (isProduction ? 'info' : 'debug');
+const level = LOG_LEVEL;
 
 function serializeError(value: unknown) {
   if (value instanceof Error) {

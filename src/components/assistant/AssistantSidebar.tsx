@@ -735,51 +735,53 @@ export const AssistantSidebar = ({
       onKeyDown={handleSidebarKeyDown}
     >
       <div
-        className={`assistant-sidebar__search ${searchOpen ? 'is-open' : ''}`}
+        className={`sidebar-list__row assistant-sidebar__search ${searchOpen ? 'is-open' : ''}`}
         onClick={openSearch}
       >
-        <button
-          ref={searchButtonRef}
-          type="button"
-          className="assistant-sidebar__search-button"
-          aria-label="Search chats"
-          aria-controls="assistant-sidebar-search-input"
-          aria-expanded={searchOpen}
-          onClick={openSearch}
-        >
-          <IconSearch size={16} strokeWidth={1.75} />
-        </button>
-        <input
-          id="assistant-sidebar-search-input"
-          ref={searchInputRef}
-          className="assistant-sidebar__search-input"
-          type="text"
-          value={query}
-          placeholder="Search chats"
-          aria-label="Search chats"
-          autoComplete="off"
-          onChange={(event) => setQuery(event.target.value)}
-          onFocus={() => setSearchOpen(true)}
-          onBlur={(event) => {
-            if (query) return;
-            const next = event.relatedTarget as Node | null;
-            if (next && event.currentTarget.closest('.assistant-sidebar__search')?.contains(next)) {
-              return;
-            }
-            setSearchOpen(false);
-          }}
-          onKeyDown={handleSearchKeyDown}
-        />
-        {query && (
+        <div className="sidebar-list__main assistant-sidebar__search-main">
           <button
+            ref={searchButtonRef}
             type="button"
-            className="assistant-sidebar__search-clear"
-            aria-label="Clear search"
-            onClick={clearSearch}
+            className="sidebar-list__icon assistant-sidebar__search-button"
+            aria-label="Search chats"
+            aria-controls="assistant-sidebar-search-input"
+            aria-expanded={searchOpen}
+            onClick={openSearch}
           >
-            <IconX size={14} strokeWidth={1.75} />
+            <IconSearch size={16} strokeWidth={1.75} />
           </button>
-        )}
+          <input
+            id="assistant-sidebar-search-input"
+            ref={searchInputRef}
+            className="sidebar-list__edit assistant-sidebar__search-input"
+            type="text"
+            value={query}
+            placeholder="Search chats"
+            aria-label="Search chats"
+            autoComplete="off"
+            onChange={(event) => setQuery(event.target.value)}
+            onFocus={() => setSearchOpen(true)}
+            onBlur={(event) => {
+              if (query) return;
+              const next = event.relatedTarget as Node | null;
+              if (next && event.currentTarget.closest('.assistant-sidebar__search')?.contains(next)) {
+                return;
+              }
+              setSearchOpen(false);
+            }}
+            onKeyDown={handleSearchKeyDown}
+          />
+          {query && (
+            <button
+              type="button"
+              className="assistant-sidebar__search-clear"
+              aria-label="Clear search"
+              onClick={clearSearch}
+            >
+              <IconX size={14} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
       </div>
 
       <DndContext

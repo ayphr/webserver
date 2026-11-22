@@ -1,6 +1,7 @@
 import { createLogger } from './logger';
 import { redisFixedWindow } from './redis';
-import { rateLimitChecksTotal } from './metrics';
+import { mongoFixedWindow } from './db/rateLimits';
+import { rateLimitBackendTotal, rateLimitChecksTotal } from './metrics';
 
 const log = createLogger('rate-limit');
 
@@ -24,7 +25,9 @@ const NAMESPACE = 'ayphr:cache:ratelimit';
 
 export function createRateLimiter(windowMs: number, max: number, name = 'default'): RateLimiter {
   const buckets = new Map<string, Bucket>();
-  const prefix = `${NAMESPACE}:${windowMs}:${max}`;
+  // Include the limiter name so unrelated routes with the same window and
+  // threshold never share a Redis bucket.
+  const prefix = `${NAMESPACE}:${name}:${windowMs}:${max}`;
 
   const cleanup = setInterval(() => {
     const now = Date.now();
@@ -55,20 +58,28 @@ export function createRateLimiter(windowMs: number, max: number, name = 'default
   return {
     async check(key: string): Promise<RateLimitResult> {
       let result: RateLimitResult;
+      let backend: 'redis' | 'mongo' | 'memory' = 'memory';
 
       try {
         const { count, retryAfterMs } = await redisFixedWindow(`${prefix}:${key}`, windowMs);
-
-        if (count > max) {
-          result = { allowed: false, retryAfterMs };
-        } else {
-          result = { allowed: true, retryAfterMs: 0 };
-        }
+        backend = 'redis';
+        result = count > max
+          ? { allowed: false, retryAfterMs }
+          : { allowed: true, retryAfterMs: 0 };
       } catch {
-        result = checkLocal(key);
+        try {
+          const { count, retryAfterMs } = await mongoFixedWindow(`${prefix}:${key}`, windowMs, max);
+          backend = 'mongo';
+          result = count > max
+            ? { allowed: false, retryAfterMs }
+            : { allowed: true, retryAfterMs: 0 };
+        } catch {
+          result = checkLocal(key);
+        }
       }
 
       rateLimitChecksTotal.inc({ limiter: name, result: result.allowed ? 'allowed' : 'blocked' });
+      rateLimitBackendTotal.inc({ limiter: name, backend });
       return result;
     },
   };

@@ -16,6 +16,7 @@ import { createNotificationsApi } from './notifications';
 import { createIntegrationsApi } from './integrations';
 import { createAssistantApi } from './assistant';
 import { getSafeRedirect } from '../redirects';
+import { API_PATHS, apiPath } from './generated/routes';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:7233' : 'https://api.ayphr.com');
 
@@ -54,7 +55,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
   return {
     ...client,
     async getStatus() {
-      return client.requestText('/api/status', { auth: false });
+      return client.requestText(apiPath(API_PATHS.getStatus), { auth: false });
     },
     auth: createAuthApi(client),
     users: createUsersApi(client),

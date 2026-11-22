@@ -2,10 +2,14 @@ import { setupMetricsServer, setupServer } from './api/server';
 import { disconnect } from './lib/db';
 import { getRedis, closeRedis } from './lib/redis';
 import { createLogger } from './lib/logger';
-import { API_PORT, METRICS_PORT, REDIS_URL } from './env';
+import { API_PORT, assertValidEnvironment, METRICS_PORT, REDIS_URL } from './env';
 import { startServerLifecycle } from './lib/serverLifecycle';
 
 const log = createLogger('server');
+const envValidation = assertValidEnvironment();
+for (const warning of envValidation.warnings) {
+  log.warn({}, warning);
+}
 
 if (REDIS_URL) {
   if (getRedis()) {

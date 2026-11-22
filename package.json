@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api:generate": "bun run server/scripts/generate-api-client.ts",
+    "api:check": "bun run server/scripts/generate-api-client.ts --check"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",

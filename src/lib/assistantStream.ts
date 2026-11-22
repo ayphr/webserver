@@ -1,4 +1,4 @@
-import type { AssistantStreamClientMessage, AssistantStreamServerMessage } from '@common';
+import { ASSISTANT_STREAM_PATH, type AssistantStreamClientMessage, type AssistantStreamServerMessage } from '@common';
 import { API_BASE_URL, api } from './api';
 
 export type AssistantStreamHandlers = {
@@ -27,7 +27,7 @@ export class AssistantStreamClient {
   constructor(handlers: AssistantStreamHandlers) {
     this.handlers = handlers;
     const base = API_BASE_URL.replace(/^http/, 'ws');
-    this.url = `${base}/ws/assistant`;
+    this.url = `${base}${ASSISTANT_STREAM_PATH}`;
   }
 
   private connect() {

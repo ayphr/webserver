@@ -3,6 +3,8 @@ import { ASSISTANT_STREAM_PATH } from '@common';
 import { resolveRoute } from './router';
 import { assistantWebSocket, type AssistantSocketData } from './websocket';
 import { addCorsHeaders, SECURITY_HEADERS } from './routes/util';
+import { applyGlobalRateLimit } from './globalRateLimit';
+import { bufferRequestBody, RequestBodyTooLargeError } from '../lib/bodyLimit';
 import { setClientIp } from '../lib/requestContext';
 import { createLogger } from '../lib/logger';
 import { TRUST_PROXY } from '../env';
@@ -60,19 +62,13 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
   const server: Server<AssistantSocketData> = Bun.serve<AssistantSocketData>({
     port,
     websocket: assistantWebSocket,
+    // Coarse backstop; the precise 10 MB limit is enforced while reading below.
+    maxRequestBodySize: MAX_REQUEST_BODY_BYTES + 64 * 1024,
 
     async fetch(request) {
-      const contentLength = request.headers.get('content-length');
-      if (contentLength) {
-        const size = Number(contentLength);
-        if (Number.isFinite(size) && size > MAX_REQUEST_BODY_BYTES) {
-          const tooLarge = Response.json({ error: 'Request body too large' }, { status: 413, headers: SECURITY_HEADERS });
-          return addCorsHeaders(tooLarge, request);
-        }
-      }
-
       const normalized = normalizeRequest(request);
-      setClientIp(normalized, resolveClientIp(request, server.requestIP(request)?.address ?? null));
+      const clientIp = resolveClientIp(request, server.requestIP(request)?.address ?? null);
+      setClientIp(normalized, clientIp);
 
       const url = new URL(normalized.url);
       if (
@@ -90,13 +86,18 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
       }
 
       const method = normalized.method;
-      const { template, dispatch } = resolveRoute(normalized);
+      const { template } = resolveRoute(normalized);
 
       const endTimer = httpRequestDuration.startTimer({ method, route: template });
       httpRequestsInFlight.inc();
 
       try {
-        const response = await dispatch();
+        const bounded = await bufferRequestBody(normalized, MAX_REQUEST_BODY_BYTES);
+        setClientIp(bounded, clientIp);
+        const { dispatch } = resolveRoute(bounded);
+
+        const rateLimited = await applyGlobalRateLimit(bounded, method, url.pathname, template);
+        const response = rateLimited ?? await dispatch();
 
         httpRequestsTotal.inc({ method, route: template, status: response.status.toString() });
 
@@ -114,6 +115,14 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
 
         return addCorsHeaders(response, request);
       } catch (error) {
+        if (error instanceof RequestBodyTooLargeError) {
+          httpRequestsTotal.inc({ method, route: template, status: '413' });
+          return addCorsHeaders(
+            Response.json({ error: 'Request body too large' }, { status: 413, headers: SECURITY_HEADERS }),
+            request,
+          );
+        }
+
         httpRequestsTotal.inc({ method, route: template, status: '500' });
         log.error({ error, method, route: template }, 'unhandled request error');
         const response = Response.json(

@@ -24,74 +24,47 @@
   max-width: clamp(200px, calc(50vw - 19.875rem), 20rem);
 }
 
-/* Inline chat search: only the icon is visible until the row is opened. */
+/* Inline chat search: reuses the sidebar row layout so the icon and spacing match.
+   The input has no visible field chrome; opening it just reveals a typeable placeholder. */
 .assistant-sidebar__search {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
   flex: 0 0 auto;
-  min-height: 2rem;
-  padding: 0 0.55rem;
-  border-radius: 0.55rem;
-  color: var(--text-muted);
   cursor: pointer;
-  transition: background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
 
-.assistant-sidebar__search:hover,
-.assistant-sidebar__search:focus-within,
-.assistant-sidebar__search.is-open {
-  color: var(--text-primary);
+.assistant-sidebar__search-button {
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+  outline: none;
 }
 
-.assistant-sidebar__search.is-open {
-  background-color: var(--surface-active-subtle);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
-}
-
-.assistant-sidebar__search-button,
 .assistant-sidebar__search-clear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1rem;
+  height: 1rem;
   padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
+  border: 0;
   background-color: transparent;
-  color: inherit;
+  color: var(--text-muted);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.assistant-sidebar__search-button:hover,
 .assistant-sidebar__search-clear:hover {
-  background-color: var(--surface-hover-subtle);
+  color: var(--text-primary);
 }
 
-.assistant-sidebar__search-input {
-  flex: 0 1 0;
+.assistant-sidebar__search .assistant-sidebar__search-input {
   width: 0;
-  min-width: 0;
-  height: 1.75rem;
-  padding: 0;
-  border: none;
-  outline: none;
-  background-color: transparent;
-  color: var(--text-primary);
-  caret-color: var(--text-primary);
-  font-family: var(--font-family-base);
-  font-size: 0.82rem;
-  font-weight: var(--font-weight-md);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
 }
 
 .assistant-sidebar__search.is-open .assistant-sidebar__search-input {
-  flex: 1 1 auto;
   width: auto;
   opacity: 1;
   pointer-events: auto;
@@ -103,7 +76,7 @@
 }
 
 .assistant-sidebar__no-results {
-  padding: 0.35rem 0.55rem 0.35rem 1.75rem;
+  padding: 0.35rem 0.55rem 0.35rem 2.1rem;
   color: var(--text-dim);
   font-family: var(--font-family-base);
   font-size: 0.78rem;
