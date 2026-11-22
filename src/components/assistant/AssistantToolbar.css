@@ -85,6 +85,33 @@
   margin-left: auto;
 }
 
+.assistant-toolbar__sidebar-toggle {
+  display: none;
+}
+
+.assistant-toolbar__context {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: var(--font-weight-md);
+}
+
+.assistant-toolbar__context span:not(.assistant-toolbar__context-separator) {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-toolbar__context-separator {
+  width: 1px;
+  height: 0.85rem;
+  background-color: var(--border-subtle);
+}
+
 .assistant-menu {
   position: absolute;
   bottom: calc(100% + 0.4rem);

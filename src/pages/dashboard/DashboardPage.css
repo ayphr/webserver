@@ -29,7 +29,7 @@
 
 .dashboard-main--assistant:has(.assistant-input--chat) {
   padding-top: 1rem;
-  padding-bottom: 1rem;
+  padding-bottom: 1.5rem;
   overflow: hidden;
 }
 
@@ -52,6 +52,10 @@
   width: 200px;
   flex-shrink: 0;
   min-width: 0;
+}
+
+.dashboard-assistant__sidebar-backdrop {
+  display: none;
 }
 
 .dashboard-assistant > .assistant-input {
@@ -558,6 +562,46 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-assistant {
+    gap: 0.75rem;
+  }
+  .dashboard-assistant__sidebar-slot {
+    display: none;
+  }
+  .dashboard-assistant__sidebar-slot--open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    width: auto;
+    padding: 0.75rem;
+  }
+  .dashboard-assistant__sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border: none;
+    background: var(--bg-base);
+    opacity: 0.85;
+    cursor: default;
+  }
+  .dashboard-assistant__sidebar-slot--open > .assistant-sidebar {
+    position: relative;
+    inset: auto;
+    z-index: 1;
+    width: min(18rem, 85vw);
+    max-width: none;
+    max-height: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-base);
+    box-shadow: var(--container-shadow);
+  }
+  .assistant-toolbar__sidebar-toggle {
+    display: inline-flex;
+  }
   .dashboard-layout {
     flex-direction: column;
     height: 100dvh;

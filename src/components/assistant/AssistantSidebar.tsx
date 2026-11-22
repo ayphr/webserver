@@ -62,6 +62,7 @@ import {
   SidebarShell,
   type SidebarRowProps,
 } from '../common';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import './AssistantSidebar.css';
 
 const PREFIX = 'assistant-sidebar' as const;
@@ -283,6 +284,7 @@ export const AssistantSidebar = ({
   onReorderChat,
   onMoveChat,
 }: AssistantSidebarProps) => {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editState, setEditState] = useState<EditState | null>(null);
   const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
@@ -380,6 +382,24 @@ export const AssistantSidebar = ({
       ),
     };
   }, [chats, folders, isSearching, normalizedQuery]);
+
+  useEffect(() => {
+    if (!isSearching) return;
+    // Search results inside collapsed folders would otherwise be invisible.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      let changed = false;
+      filteredChats.forEach((chat) => {
+        const key = groupKeyForChat(chat);
+        if (!next.has(key)) {
+          next.add(key);
+          changed = true;
+        }
+      });
+      return changed ? next : previous;
+    });
+  }, [filteredChats, isSearching]);
 
   // Folder sections contain their chats, so the default getter can pick a
   // nested chat as the next target. Walk the folder sections directly instead.
@@ -835,6 +855,11 @@ export const AssistantSidebar = ({
               }}
               onKeyDown={handleSearchKeyDown}
             />
+            {isSearching && (
+              <span className="assistant-sidebar__search-count" aria-live="polite">
+                {filteredChats.length}
+              </span>
+            )}
             {query && (
               <button
                 type="button"
@@ -934,7 +959,9 @@ export const AssistantSidebar = ({
 
         {createPortal(
           <DragOverlay
-            dropAnimation={{ duration: 180, easing: 'ease' }}
+            dropAnimation={
+              prefersReducedMotion ? { duration: 0, easing: 'linear' } : { duration: 180, easing: 'ease' }
+            }
             style={{ pointerEvents: 'none' }}
           >
             {dragState && (

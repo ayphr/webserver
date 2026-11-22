@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   IconArrowBackUp,
+  IconArrowDown,
+  IconArrowUp,
   IconChevronDown,
   IconCopy,
   IconCopyCheck,
@@ -14,6 +17,7 @@ import {
   IconThumbUpFilled,
   IconTool,
   IconWand,
+  IconX,
 } from '@tabler/icons-react';
 import {
   ASSISTANT_DATA,
@@ -31,6 +35,7 @@ export interface AssistantMessagesProps {
   messages: LiveAssistantMessage[];
   queuedMessages: string[];
   streamingMessageId: number | null;
+  followSignal: number;
   openMenuId: number | null;
   onOpenMenuChange: (id: number | null) => void;
   copiedId: number | null;
@@ -39,6 +44,8 @@ export interface AssistantMessagesProps {
   onFeedback: (messageId: number, feedback: 'like' | 'dislike') => void;
   onRegenerate: (messageId: number) => void;
   onCopy: (messageId: number, content: string) => void;
+  onRemoveQueued: (index: number) => void;
+  onMoveQueued: (index: number, direction: -1 | 1) => void;
 }
 
 const latestReachedIndex = <T extends { status: string }>(items: T[]) => {
@@ -56,19 +63,29 @@ const ThinkingPanel = ({
   streaming: boolean;
 }) => {
   const [open, setOpen] = useState(streaming);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     // Collapse the trace when the answer finishes, like other chat clients.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpen(streaming);
+    if (!streaming) {
+      setShowHistory(false);
+    }
   }, [streaming]);
 
   const completed = steps.filter((step) => step.status === 'done').length;
   const active = steps.find((step) => step.status === 'running');
   const reachedIndex = latestReachedIndex(steps);
   const activeStep = reachedIndex >= 0 ? steps[reachedIndex] : undefined;
-  const visibleSteps = streaming ? (activeStep ? [activeStep] : []) : steps;
-  const earlierCount = streaming && reachedIndex > 0 ? reachedIndex : 0;
+  const earlierSteps = streaming ? steps.slice(0, reachedIndex) : [];
+  const visibleSteps = streaming
+    ? showHistory
+      ? [...earlierSteps, ...(activeStep ? [activeStep] : [])]
+      : activeStep
+        ? [activeStep]
+        : []
+    : steps;
   const settled = !active && reachedIndex === steps.length - 1;
 
   return (
@@ -91,10 +108,17 @@ const ThinkingPanel = ({
         />
       </summary>
       <div className="assistant-chat__thinking-steps">
-        {earlierCount > 0 && (
-          <div className="assistant-chat__thinking-earlier">
-            {earlierCount} earlier {earlierCount === 1 ? 'step' : 'steps'}
-          </div>
+        {earlierSteps.length > 0 && (
+          <button
+            type="button"
+            className="assistant-chat__history-toggle"
+            onClick={() => setShowHistory((value) => !value)}
+            aria-expanded={showHistory}
+          >
+            {showHistory
+              ? 'Hide earlier steps'
+              : `${earlierSteps.length} earlier ${earlierSteps.length === 1 ? 'step' : 'steps'}`}
+          </button>
         )}
         {visibleSteps.map((step) => (
           <div
@@ -133,11 +157,15 @@ const ToolCallLine = ({ tool }: { tool: AssistantToolCall }) => (
   <div className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}>
     {renderToolIcon(tool.name)}
     <span className="assistant-chat__tool-line-label">{tool.label ?? tool.name}</span>
+    {(tool.error || tool.detail) && (
+      <span className="assistant-chat__tool-line-detail">{tool.error ?? tool.detail}</span>
+    )}
   </div>
 );
 
 const ToolGroup = ({ tools, active }: { tools: AssistantToolCall[]; active: boolean }) => {
   const [open, setOpen] = useState(active);
+  const [showHistory, setShowHistory] = useState(false);
   const reachedIndex = latestReachedIndex(tools);
   const latest = reachedIndex >= 0 ? tools[reachedIndex] : undefined;
   const reachedCount = reachedIndex + 1;
@@ -147,11 +175,14 @@ const ToolGroup = ({ tools, active }: { tools: AssistantToolCall[]; active: bool
     // the group away once the response finishes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpen(active);
+    if (!active) {
+      setShowHistory(false);
+    }
   }, [active, reachedCount]);
 
   if (!latest) return null;
 
-  const earlierCount = reachedIndex;
+  const earlierTools = active ? tools.slice(0, reachedIndex) : [];
 
   return (
     <div className="assistant-chat__tool-group">
@@ -173,13 +204,24 @@ const ToolGroup = ({ tools, active }: { tools: AssistantToolCall[]; active: bool
       </button>
       {open && (
         <div className="assistant-chat__tool-group-items">
-          {active && earlierCount > 0 && (
-            <div className="assistant-chat__tool-group-earlier">
-              {earlierCount} earlier {earlierCount === 1 ? 'tool' : 'tools'}
-            </div>
+          {earlierTools.length > 0 && (
+            <button
+              type="button"
+              className="assistant-chat__history-toggle"
+              onClick={() => setShowHistory((value) => !value)}
+              aria-expanded={showHistory}
+            >
+              {showHistory
+                ? 'Hide earlier tools'
+                : `${earlierTools.length} earlier ${earlierTools.length === 1 ? 'tool' : 'tools'}`}
+            </button>
           )}
           {active ? (
-            <ToolCallLine key={latest.id} tool={latest} />
+            <>
+              {showHistory &&
+                earlierTools.map((tool) => <ToolCallLine key={tool.id} tool={tool} />)}
+              <ToolCallLine key={latest.id} tool={latest} />
+            </>
           ) : (
             tools.map((tool) => <ToolCallLine key={tool.id} tool={tool} />)
           )}
@@ -193,6 +235,7 @@ export const AssistantMessages = ({
   messages,
   queuedMessages,
   streamingMessageId,
+  followSignal,
   openMenuId,
   onOpenMenuChange,
   copiedId,
@@ -201,12 +244,17 @@ export const AssistantMessages = ({
   onFeedback,
   onRegenerate,
   onCopy,
+  onRemoveQueued,
+  onMoveQueued,
 }: AssistantMessagesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const scrollFrameRef = useRef<number | null>(null);
   const scrollbarTimeoutRef = useRef<number | null>(null);
+  const menuTriggerRef = useRef<HTMLElement | null>(null);
+  const [showJump, setShowJump] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
   // Batch follow-along scrolling into one write per frame. Streaming tokens can
   // arrive faster than the browser paints, which otherwise makes the view jump.
@@ -215,6 +263,7 @@ export const AssistantMessages = ({
     const element = containerRef.current;
     if (!element || !stickToBottomRef.current) return;
     element.scrollTop = element.scrollHeight;
+    setShowJump(false);
   }, []);
 
   const scheduleScrollToBottom = useCallback(() => {
@@ -228,8 +277,9 @@ export const AssistantMessages = ({
   const handleScroll = () => {
     const element = containerRef.current;
     if (!element) return;
-    stickToBottomRef.current =
-      element.scrollHeight - element.scrollTop - element.clientHeight <= 24;
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    stickToBottomRef.current = distanceFromBottom <= 24;
+    setShowJump(distanceFromBottom > 160);
 
     element.classList.add('assistant-chat__messages--scrolling');
     if (scrollbarTimeoutRef.current !== null) window.clearTimeout(scrollbarTimeoutRef.current);
@@ -261,20 +311,85 @@ export const AssistantMessages = ({
     return () => observer.disconnect();
   }, [scheduleScrollToBottom]);
 
-  useDismiss(null, () => onOpenMenuChange(null), {
+  useEffect(() => {
+    stickToBottomRef.current = true;
+    scheduleScrollToBottom();
+  }, [followSignal, scheduleScrollToBottom]);
+
+  const jumpToLatest = () => {
+    stickToBottomRef.current = true;
+    scheduleScrollToBottom();
+  };
+
+  const lastMenuIdRef = useRef<number | null>(null);
+  const closeMenu = useCallback(() => onOpenMenuChange(null), [onOpenMenuChange]);
+
+  useEffect(() => {
+    if (openMenuId !== null) {
+      lastMenuIdRef.current = openMenuId;
+      return;
+    }
+    if (lastMenuIdRef.current !== null) {
+      menuTriggerRef.current?.focus();
+      lastMenuIdRef.current = null;
+    }
+  }, [openMenuId]);
+
+  useDismiss(null, closeMenu, {
     enabled: openMenuId !== null,
-    escape: false,
+    escape: true,
     isInside: (target) => {
-      const menu = containerRef.current?.querySelector('.assistant-chat__menu');
-      if (!menu) return true;
-      const chevron = containerRef.current?.querySelector(`[data-menu-id="${openMenuId}"]`);
-      return menu.contains(target) || Boolean(chevron?.contains(target));
+      const menu = document.querySelector('.assistant-chat__menu');
+      const chevron = menuTriggerRef.current;
+      return Boolean(menu?.contains(target) || chevron?.contains(target));
     },
   });
 
+  useLayoutEffect(() => {
+    if (openMenuId === null) return;
+    const container = containerRef.current;
+    const trigger = container?.querySelector<HTMLElement>(`[data-menu-id="${openMenuId}"]`);
+    menuTriggerRef.current = trigger ?? null;
+    const place = () => {
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = 180;
+      const estimatedHeight = 140;
+      const top =
+        rect.bottom + estimatedHeight + 8 > window.innerHeight
+          ? Math.max(8, rect.top - estimatedHeight - 8)
+          : rect.bottom + 6;
+      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+      setMenuPosition({ top, left });
+    };
+    place();
+    window.addEventListener('resize', place);
+    container?.addEventListener('scroll', place, { passive: true });
+    return () => {
+      window.removeEventListener('resize', place);
+      container?.removeEventListener('scroll', place);
+    };
+  }, [openMenuId]);
+
+  useEffect(() => {
+    if (openMenuId === null) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>('.assistant-chat__menu-item')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [openMenuId]);
+
   return (
-    <div className="assistant-chat__messages" ref={containerRef} onScroll={handleScroll}>
-      <div className="assistant-chat__messages-inner" ref={innerRef}>
+    <div className="assistant-chat__viewport">
+      <div
+        className="assistant-chat__messages"
+        ref={containerRef}
+        onScroll={handleScroll}
+        role="log"
+        aria-live="polite"
+        aria-busy={streamingMessageId !== null}
+      >
+        <div className="assistant-chat__messages-inner" ref={innerRef}>
         {messages.map((message) => {
           const isStreaming = streamingMessageId === message.id;
           const isLatestAssistant =
@@ -300,35 +415,11 @@ export const AssistantMessages = ({
                     className={`assistant-chat__chevron ${openMenuId === message.id ? 'assistant-chat__chevron--open' : ''}`}
                     onClick={() => onOpenMenuChange(openMenuId === message.id ? null : message.id)}
                     aria-label="Message options"
+                    aria-haspopup="menu"
+                    aria-expanded={openMenuId === message.id}
                   >
                     <IconChevronDown size={14} strokeWidth={2} />
                   </button>
-                  {openMenuId === message.id && (
-                    <div className="assistant-chat__menu">
-                      <div className="assistant-chat__menu-time">
-                        {formatMessageTime(message.createdAt)}
-                      </div>
-                      <button
-                        type="button"
-                        className="assistant-chat__menu-item"
-                        onClick={() => onUndo(message.id)}
-                      >
-                        <IconArrowBackUp size={14} strokeWidth={2} />
-                        <span>Undo</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="assistant-chat__menu-item"
-                        onClick={() => {
-                          void onCopy(message.id, message.content);
-                          onOpenMenuChange(null);
-                        }}
-                      >
-                        <IconCopy size={14} strokeWidth={2} />
-                        <span>Copy message</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="assistant-chat__assistant-wrap">
@@ -339,7 +430,15 @@ export const AssistantMessages = ({
                     <ToolGroup tools={message.tools} active={isStreaming} />
                   )}
                   <div className="assistant-chat__bubble">
-                    <AssistantMarkdown content={message.content} />
+                    {message.content ? (
+                      <AssistantMarkdown content={message.content} />
+                    ) : (
+                      isStreaming && (
+                        <span className="assistant-chat__pending" role="status">
+                          Working…
+                        </span>
+                      )
+                    )}
                   </div>
                   {message.error && <p className="assistant-chat__error">{message.error}</p>}
                   {message.interrupted && (
@@ -352,6 +451,7 @@ export const AssistantMessages = ({
                       onClick={() => onFeedback(message.id, 'like')}
                       aria-label="Like response"
                       aria-pressed={message.feedback === 'like'}
+                      disabled={isStreaming}
                     >
                       {message.feedback === 'like' ? (
                         <IconThumbUpFilled size={15} strokeWidth={1.75} />
@@ -365,6 +465,7 @@ export const AssistantMessages = ({
                       onClick={() => onFeedback(message.id, 'dislike')}
                       aria-label="Dislike response"
                       aria-pressed={message.feedback === 'dislike'}
+                      disabled={isStreaming}
                     >
                       {message.feedback === 'dislike' ? (
                         <IconThumbDownFilled size={15} strokeWidth={1.75} />
@@ -372,7 +473,7 @@ export const AssistantMessages = ({
                         <IconThumbDown size={15} strokeWidth={1.75} />
                       )}
                     </button>
-                    {isLatestAssistant && (
+                    {isLatestAssistant && !isStreaming && (
                       <button
                         type="button"
                         className="assistant-chat__tool"
@@ -408,18 +509,95 @@ export const AssistantMessages = ({
             </div>
           );
         })}
-        {queuedMessages.map((text, index) => (
-          <div
-            key={`queued-${index}`}
-            className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
-          >
-            <div className="assistant-chat__user-wrap">
-              <div className="assistant-chat__bubble">{text}</div>
-              <span className="assistant-chat__queued-label">Queued</span>
+          {queuedMessages.map((text, index) => (
+            <div
+              key={`queued-${index}`}
+              className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
+            >
+              <div className="assistant-chat__user-wrap">
+                <div className="assistant-chat__bubble">{text}</div>
+                <div className="assistant-chat__queued-row">
+                  <span className="assistant-chat__queued-label">Queued</span>
+                  <div className="assistant-chat__queued-actions">
+                    <button
+                      type="button"
+                      onClick={() => onMoveQueued(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Move queued message earlier"
+                    >
+                      <IconArrowUp size={12} strokeWidth={2} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onMoveQueued(index, 1)}
+                      disabled={index === queuedMessages.length - 1}
+                      aria-label="Move queued message later"
+                    >
+                      <IconArrowDown size={12} strokeWidth={2} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveQueued(index)}
+                      aria-label="Remove queued message"
+                    >
+                      <IconX size={12} strokeWidth={2} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+      {showJump && (
+        <button type="button" className="assistant-chat__jump" onClick={jumpToLatest}>
+          Jump to latest
+        </button>
+      )}
+      {openMenuId !== null &&
+        (() => {
+          const menuMessage = messages.find((message) => message.id === openMenuId);
+          if (!menuMessage) return null;
+          return createPortal(
+            <div
+              className="assistant-chat__menu assistant-chat__menu--portal"
+              style={{
+                top: menuPosition?.top ?? -9999,
+                left: menuPosition?.left ?? -9999,
+              }}
+              role="menu"
+            >
+              <div className="assistant-chat__menu-time">
+                {formatMessageTime(menuMessage.createdAt)}
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                className="assistant-chat__menu-item"
+                onClick={() => {
+                  onUndo(menuMessage.id);
+                  closeMenu();
+                }}
+              >
+                <IconArrowBackUp size={14} strokeWidth={2} />
+                <span>Undo</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="assistant-chat__menu-item"
+                onClick={() => {
+                  void onCopy(menuMessage.id, menuMessage.content);
+                  closeMenu();
+                }}
+              >
+                <IconCopy size={14} strokeWidth={2} />
+                <span>Copy message</span>
+              </button>
+            </div>,
+            document.body,
+          );
+        })()}
     </div>
   );
 };

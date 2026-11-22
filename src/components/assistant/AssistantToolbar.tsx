@@ -5,6 +5,7 @@ import {
   IconFolderFilled,
   IconFolders,
   IconFoldersFilled,
+  IconMenu2,
   IconMessageCircle,
   IconPlayerPause,
   IconPlayerPlay,
@@ -24,6 +25,7 @@ export interface AssistantToolbarProps {
   onSelectMode: (mode: AssistantMode) => void;
   onCreateFolder: (name: string) => void;
   showControls?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const AssistantToolbar = ({
@@ -34,6 +36,7 @@ export const AssistantToolbar = ({
   onSelectMode,
   onCreateFolder,
   showControls = true,
+  onToggleSidebar,
 }: AssistantToolbarProps) => {
   const { isPlaying: isRadioPlaying, toggle: toggleRadio } = useRadio();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -65,6 +68,16 @@ export const AssistantToolbar = ({
 
   return (
     <div className="assistant-toolbar" ref={toolbarRef}>
+      {onToggleSidebar && (
+        <button
+          type="button"
+          className="assistant-toolbar__mode-button assistant-toolbar__sidebar-toggle"
+          onClick={onToggleSidebar}
+          aria-label="Toggle chat list"
+        >
+          <IconMenu2 size={16} strokeWidth={1.75} />
+        </button>
+      )}
       <div className="assistant-toolbar__group" hidden={!showControls}>
         <button
           type="button"
@@ -175,6 +188,22 @@ export const AssistantToolbar = ({
           <span>Task</span>
         </button>
       </div>
+      {!showControls && (
+        <div
+          className="assistant-toolbar__context"
+          title="Folder and mode shown here apply to new chats"
+        >
+          <IconFolder size={13} strokeWidth={1.75} />
+          <span>{activeFolder?.name ?? 'Uncategorised'}</span>
+          <span className="assistant-toolbar__context-separator" aria-hidden="true" />
+          {activeMode === 'task' ? (
+            <IconClipboardList size={13} strokeWidth={1.75} />
+          ) : (
+            <IconMessageCircle size={13} strokeWidth={1.75} />
+          )}
+          <span>{activeMode === 'task' ? 'Task' : 'Chat'}</span>
+        </div>
+      )}
       <div className="assistant-toolbar__radio">
         <Tooltip content={isRadioPlaying ? 'Pause radio' : 'Play radio'}>
           <button

@@ -91,8 +91,10 @@ export const AssistantComposer = ({
           <span
             className="assistant-input__queue-hint"
             title={isMac ? 'Queue with ⌘ + Enter' : 'Queue with Ctrl + Enter'}
-            aria-label={isMac ? 'Queue with Command Enter' : 'Queue with Control Enter'}
           >
+            <span className="sr-only">
+              {isMac ? 'Queue with Command Enter' : 'Queue with Control Enter'}
+            </span>
             {isMac ? (
               <IconCommand size={13} strokeWidth={1.75} />
             ) : (

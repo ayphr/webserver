@@ -51,3 +51,14 @@ export const formatDuration = (ms?: number) => {
   if (ms == null) return '—';
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 };
+
+export const createChatTitle = (text: string, fallback: string) => {
+  const firstLine = text
+    .trim()
+    .split('\n')[0]
+    ?.replace(/^[#>*\s-]+/, '')
+    .replace(/[*_`~]/g, '')
+    .trim();
+  if (!firstLine) return fallback;
+  return firstLine.length > 42 ? `${firstLine.slice(0, 42).trimEnd()}…` : firstLine;
+};

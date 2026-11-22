@@ -13,6 +13,10 @@
   overflow-x: hidden;
 }
 
+.dashboard-main--assistant:has(.assistant-input--chat) .assistant-sidebar {
+  transform: none;
+}
+
 .dashboard-assistant__sidebar-slot > .assistant-sidebar {
   position: absolute;
   top: 0;
@@ -74,6 +78,13 @@
 
 .assistant-sidebar__search-clear:hover {
   color: var(--text-primary);
+}
+
+.assistant-sidebar__search-count {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  animation: assistant-sidebar-row-in 0.15s ease both;
 }
 
 .assistant-sidebar__search .assistant-sidebar__search-input {

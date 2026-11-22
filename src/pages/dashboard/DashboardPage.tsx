@@ -207,6 +207,7 @@ export const DashboardPage = () => {
   );
   const assistant = useAssistantState();
   const [chatAction, setChatAction] = useState<AssistantChatAction | null>(null);
+  const [isAssistantSidebarOpen, setIsAssistantSidebarOpen] = useState(false);
   const chatActionTokenRef = useRef(0);
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -585,6 +586,11 @@ export const DashboardPage = () => {
   }, [activePage, assistant, isLoading, navigate, routeChatId]);
 
   useEffect(() => {
+    // Opening a chat from the drawer should reveal the conversation underneath.
+    setIsAssistantSidebarOpen(false);
+  }, [routeChatId]);
+
+  useEffect(() => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
       navigateToDashboard('overview', { replace: true });
     }
@@ -767,7 +773,13 @@ export const DashboardPage = () => {
           <>
             {activePage === 'assistant' && (
               <div className="dashboard-assistant">
-                <div className="dashboard-assistant__sidebar-slot">
+                <div className={`dashboard-assistant__sidebar-slot${isAssistantSidebarOpen ? ' dashboard-assistant__sidebar-slot--open' : ''}`}>
+                  <button
+                    type="button"
+                    className="dashboard-assistant__sidebar-backdrop"
+                    aria-label="Close chat list"
+                    onClick={() => setIsAssistantSidebarOpen(false)}
+                  />
                   <AssistantSidebar
                     folders={assistant.state.folders}
                     chats={assistant.state.chats}
@@ -793,6 +805,7 @@ export const DashboardPage = () => {
                   assistant={assistant}
                   chatAction={chatAction}
                   onChatCreated={handleChatCreated}
+                  onToggleSidebar={() => setIsAssistantSidebarOpen((open) => !open)}
                 />
               </div>
             )}

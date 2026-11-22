@@ -8,12 +8,13 @@ import {
 } from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantStreamClient } from '../../lib/assistantStream';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import { AssistantComposer } from './AssistantComposer';
 import { AssistantMessages } from './AssistantMessages';
 import { AssistantToolbar } from './AssistantToolbar';
 import type { AssistantChatAction, LiveAssistantMessage } from './types';
 import type { AssistantController } from './useAssistantState';
-import { createId, mergeById, toPersistableMessage } from './utils';
+import { createChatTitle, createId, mergeById, toPersistableMessage } from './utils';
 import './AssistantInput.css';
 
 export interface AssistantInputProps {
@@ -27,6 +28,7 @@ export interface AssistantInputProps {
   assistant: AssistantController;
   chatAction?: AssistantChatAction | null;
   onChatCreated?: (chatId: string) => void;
+  onToggleSidebar?: () => void;
 }
 
 const CHAT_SUBTITLE_TEXTS = (displayName: string) => [
@@ -114,8 +116,10 @@ export const AssistantInput = ({
   assistant,
   chatAction = null,
   onChatCreated,
+  onToggleSidebar,
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
+  const prefersReducedMotion = usePrefersReducedMotion();
   const { state } = assistant;
   const subtitles =
     state.activeMode === 'task'
@@ -140,11 +144,15 @@ export const AssistantInput = ({
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+  const [followSignal, setFollowSignal] = useState(0);
 
-  const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform);
+  const isMac =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const messagesRef = useRef(messages);
+  const currentChatIdRef = useRef(state.activeChatId);
   const queuedMessagesRef = useRef<string[]>([]);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamClientRef = useRef<AssistantStreamClient | null>(null);
@@ -152,11 +160,42 @@ export const AssistantInput = ({
   const streamCompleteRef = useRef<(() => void) | null>(null);
   const streamMessageIdRef = useRef<number | null>(null);
   const streamStartRef = useRef<number | null>(null);
+  const processQueueRef = useRef<() => void>(() => {});
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
 
   const isChat = messages.length > 0;
 
   const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
+
+  const commitMessages = useCallback(
+    (updater: (previous: LiveAssistantMessage[]) => LiveAssistantMessage[]) => {
+      setMessages((previous) => {
+        const next = updater(previous);
+        messagesRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
+  const persistMessages = useCallback(
+    (chatId: string | null, nextMessages: LiveAssistantMessage[]) => {
+      if (!chatId) return;
+      updateAssistant((current) => ({
+        ...current,
+        chats: current.chats.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                messages: nextMessages.map(toPersistableMessage),
+                updatedAt: Date.now(),
+              }
+            : chat,
+        ),
+      }));
+    },
+    [updateAssistant],
+  );
 
   useEffect(() => {
     if (!availableVariants.includes(variant)) {
@@ -166,61 +205,67 @@ export const AssistantInput = ({
   }, [availableVariants, fallbackVariant, variant]);
 
   useEffect(() => {
+    if (prefersReducedMotion) return;
     const id = setInterval(() => {
+      if (document.hidden) return;
       setSubtitleIndex((i) => (i + 1) % subtitles.length);
     }, 4000);
     return () => clearInterval(id);
-  }, [subtitles.length]);
+  }, [prefersReducedMotion, subtitles.length]);
 
   useEffect(() => {
     if (isGenerating) return;
     const chat = state.chats.find((item) => item.id === state.activeChatId);
+    currentChatIdRef.current = state.activeChatId;
     nextIdRef.current = Math.max(
       nextIdRef.current,
       (chat?.messages ?? []).reduce((max, message) => Math.max(max, message.id), 0) + 1,
     );
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMessages(chat?.messages ?? []);
+    commitMessages(() => chat?.messages ?? []);
     // Sync only when opening or leaving a chat; local message changes are persisted below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeChatId]);
 
   useEffect(() => {
-    if (!state.activeChatId || isGenerating) return;
-    updateAssistant((current) => ({
-      ...current,
-      chats: current.chats.map((chat) =>
-        chat.id === state.activeChatId
-          ? {
-              ...chat,
-              messages: messages.map(toPersistableMessage),
-              updatedAt: Date.now(),
-            }
-          : chat,
-      ),
-    }));
-  }, [updateAssistant, isGenerating, messages, state.activeChatId]);
+    if (isGenerating) return;
+    persistMessages(currentChatIdRef.current, messages);
+  }, [isGenerating, messages, persistMessages]);
 
   useEffect(() => {
-    if (isChat) return;
+    if (isChat || prefersReducedMotion) return;
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = 0;
     void video.play().catch(() => {
       // Autoplay can be blocked; the muted video element will still display its first frame.
     });
-  }, [isChat, state.activeMode]);
+  }, [isChat, prefersReducedMotion, state.activeMode]);
+
+  const setQueue = (next: string[]) => {
+    queuedMessagesRef.current = next;
+    setQueuedMessages(next);
+  };
 
   const enqueueMessage = (text: string) => {
-    queuedMessagesRef.current = [...queuedMessagesRef.current, text];
-    setQueuedMessages(queuedMessagesRef.current);
+    setQueue([...queuedMessagesRef.current, text]);
   };
 
   const dequeueMessage = () => {
     const [next, ...rest] = queuedMessagesRef.current;
-    queuedMessagesRef.current = rest;
-    setQueuedMessages(rest);
+    setQueue(rest);
     return next;
+  };
+
+  const removeQueuedMessage = (index: number) => {
+    setQueue(queuedMessagesRef.current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const moveQueuedMessage = (index: number, direction: -1 | 1) => {
+    const next = [...queuedMessagesRef.current];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target]!, next[index]!];
+    setQueue(next);
   };
 
   const takeStreamDuration = () => {
@@ -246,8 +291,8 @@ export const AssistantInput = ({
     if (messageId === null) return;
 
     const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
-    setMessages((prev) =>
-      prev.map((m) => {
+    commitMessages((previous) =>
+      previous.map((m) => {
         if (m.id !== messageId) return m;
         const content = m.content + token;
         const tokenCount = content.split(/\s+/).filter(Boolean).length;
@@ -265,8 +310,8 @@ export const AssistantInput = ({
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     if (messageId === null) return;
-    setMessages((prev) =>
-      prev.map((m) =>
+    commitMessages((previous) =>
+      previous.map((m) =>
         m.id === messageId && m.role === 'assistant'
           ? { ...m, thinking: mergeById(m.thinking, step) }
           : m,
@@ -278,8 +323,8 @@ export const AssistantInput = ({
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     if (messageId === null) return;
-    setMessages((prev) =>
-      prev.map((m) =>
+    commitMessages((previous) =>
+      previous.map((m) =>
         m.id === messageId && m.role === 'assistant' ? { ...m, tools: mergeById(m.tools, tool) } : m,
       ),
     );
@@ -297,19 +342,19 @@ export const AssistantInput = ({
     setStreamingMessageId(null);
 
     if (messageId !== null) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? {
-                ...m,
-                durationMs: m.durationMs ?? durationMs,
-                liveDurationMs: undefined,
-                liveTokensPerSecond: undefined,
-                ...(error ? { error } : {}),
-              }
-            : m,
-        ),
+      const next = messagesRef.current.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              durationMs: m.durationMs ?? durationMs,
+              liveDurationMs: undefined,
+              liveTokensPerSecond: undefined,
+              ...(error ? { error } : {}),
+            }
+          : m,
       );
+      commitMessages(() => next);
+      persistMessages(currentChatIdRef.current, next);
     }
 
     if (complete) complete();
@@ -337,19 +382,30 @@ export const AssistantInput = ({
     return streamClientRef.current;
   };
 
-  const stopGeneration = () => {
+  const stopGeneration = (options: { continueQueue?: boolean } = {}) => {
     const messageId = streamMessageIdRef.current;
     const durationMs = takeStreamDuration();
     cancelStream();
+
+    let next = messagesRef.current;
     if (messageId !== null) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId && m.role === 'assistant'
-            ? { ...m, interrupted: true, durationMs: m.durationMs ?? durationMs }
-            : m,
-        ),
+      next = next.map((m) =>
+        m.id === messageId && m.role === 'assistant'
+          ? {
+              ...m,
+              interrupted: true,
+              durationMs: m.durationMs ?? durationMs,
+              liveDurationMs: undefined,
+              liveTokensPerSecond: undefined,
+            }
+          : m,
       );
+      commitMessages(() => next);
+      persistMessages(currentChatIdRef.current, next);
     }
+
+    if (options.continueQueue && queuedMessagesRef.current.length > 0) processQueueRef.current();
+    else setIsGenerating(false);
   };
 
   const createChat = (folderId: string | null, mode: AssistantChat['mode']) => {
@@ -359,10 +415,10 @@ export const AssistantInput = ({
   };
 
   const handleNewChat = () => {
-    cancelStream();
-    queuedMessagesRef.current = [];
-    setQueuedMessages([]);
-    setMessages([]);
+    stopGeneration();
+    setQueue([]);
+    commitMessages(() => []);
+    currentChatIdRef.current = null;
     setValue('');
     setOpenMenuId(null);
     assistant.update((current) => ({ ...current, activeChatId: null }));
@@ -372,11 +428,10 @@ export const AssistantInput = ({
   const handleOpenChat = (id: string) => {
     const chat = state.chats.find((item) => item.id === id);
     if (!chat) return;
-    cancelStream();
-    queuedMessagesRef.current = [];
-    setQueuedMessages([]);
-    setValue('');
-    setMessages(chat.messages);
+    stopGeneration();
+    setQueue([]);
+    commitMessages(() => chat.messages);
+    currentChatIdRef.current = chat.id;
     nextIdRef.current = chat.messages.reduce((max, message) => Math.max(max, message.id), 0) + 1;
     assistant.update((current) => ({ ...current, activeChatId: chat.id }));
     setOpenMenuId(null);
@@ -404,8 +459,8 @@ export const AssistantInput = ({
   }, [chatAction]);
 
   const handleFeedback = (messageId: number, feedback: 'like' | 'dislike') => {
-    setMessages((prev) =>
-      prev.map((m) =>
+    commitMessages((previous) =>
+      previous.map((m) =>
         m.id === messageId && m.role === 'assistant'
           ? { ...m, feedback: m.feedback === feedback ? null : feedback }
           : m,
@@ -424,44 +479,41 @@ export const AssistantInput = ({
 
     const removedIds = new Set(messages.slice(index).map((m) => m.id));
     if (streamMessageIdRef.current !== null && removedIds.has(streamMessageIdRef.current)) {
-      cancelStream();
+      stopGeneration();
     }
     if (assistantMessage?.variant) {
       setVariant(assistantMessage.variant);
     }
     setValue(userMessage.content);
-    if (textareaRef.current) textareaRef.current.value = userMessage.content;
-    queuedMessagesRef.current = [];
-    setQueuedMessages([]);
+    setQueue([]);
 
-    setMessages((prev) => {
-      const i = prev.findIndex((m) => m.id === messageId);
-      return i === -1 ? prev : prev.slice(0, i);
-    });
+    const trimmed = messages.slice(0, index);
+    commitMessages(() => trimmed);
+    persistMessages(currentChatIdRef.current, trimmed);
     setOpenMenuId(null);
     textareaRef.current?.focus();
   };
 
   const handleRegenerate = (messageId: number) => {
     if (messages[messages.length - 1]?.id !== messageId) return;
-    cancelStream();
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId && m.role === 'assistant'
-          ? {
-              ...m,
-              content: '',
-              interrupted: false,
-              error: undefined,
-              feedback: null,
-              durationMs: undefined,
-              variant,
-              thinking: [],
-              tools: [],
-            }
-          : m,
-      ),
+    stopGeneration();
+    const reset = messagesRef.current.map((m) =>
+      m.id === messageId && m.role === 'assistant'
+        ? {
+            ...m,
+            content: '',
+            interrupted: false,
+            error: undefined,
+            feedback: null,
+            durationMs: undefined,
+            variant,
+            thinking: [],
+            tools: [],
+          }
+        : m,
     );
+    commitMessages(() => reset);
+    persistMessages(currentChatIdRef.current, reset);
     startStreaming(messageId, processQueue);
   };
 
@@ -484,8 +536,8 @@ export const AssistantInput = ({
     streamStartRef.current = Date.now();
     setStreamingMessageId(messageId);
     setIsGenerating(true);
-    setMessages((prev) =>
-      prev.map((m) =>
+    commitMessages((previous) =>
+      previous.map((m) =>
         m.id === messageId && m.role === 'assistant'
           ? {
               ...m,
@@ -504,7 +556,16 @@ export const AssistantInput = ({
     const trimmed = text.trim();
     if (!trimmed) return false;
 
-    if (!state.activeChatId) createChat(state.activeFolderId, state.activeMode);
+    let chatId = state.activeChatId;
+    if (!chatId) {
+      const chat = createChat(state.activeFolderId, state.activeMode);
+      chatId = chat.id;
+      assistant.renameChat(
+        chat.id,
+        createChatTitle(trimmed, state.activeMode === 'task' ? 'New task' : 'New chat'),
+      );
+    }
+    currentChatIdRef.current = chatId;
 
     const now = Date.now();
     const userMessage: LiveAssistantMessage = {
@@ -514,8 +575,8 @@ export const AssistantInput = ({
       createdAt: now,
     };
     const assistantId = nextIdRef.current++;
-    setMessages((prev) => [
-      ...prev,
+    commitMessages((previous) => [
+      ...previous,
       userMessage,
       {
         id: assistantId,
@@ -530,17 +591,24 @@ export const AssistantInput = ({
       },
     ]);
     setValue('');
-    if (textareaRef.current) textareaRef.current.value = '';
+    setFollowSignal((signal) => signal + 1);
 
     startStreaming(assistantId, onComplete);
     return true;
   };
 
+  // processQueue is intentionally refreshed every render so queued sends always
+  // see the latest stream/variant state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const processQueue = () => {
     const next = dequeueMessage();
     if (next) appendAndStream(next, processQueue);
     else setIsGenerating(false);
   };
+
+  useEffect(() => {
+    processQueueRef.current = processQueue;
+  }, [processQueue]);
 
   const sendMessageText = (text: string) => {
     if (appendAndStream(text, processQueue)) {
@@ -550,7 +618,7 @@ export const AssistantInput = ({
 
   const handleSend = () => {
     if (isGenerating) {
-      stopGeneration();
+      stopGeneration({ continueQueue: true });
       return;
     }
     const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
@@ -563,7 +631,6 @@ export const AssistantInput = ({
     if (!trimmed) return;
     enqueueMessage(trimmed);
     setValue('');
-    if (textareaRef.current) textareaRef.current.value = '';
     if (!isGenerating) processQueue();
     textareaRef.current?.focus();
   };
@@ -577,7 +644,7 @@ export const AssistantInput = ({
               ref={videoRef}
               className="assistant-input__animation"
               src={irisAnimation}
-              autoPlay
+              autoPlay={!prefersReducedMotion}
               muted
               playsInline
               preload="auto"
@@ -597,6 +664,7 @@ export const AssistantInput = ({
             messages={messages}
             queuedMessages={queuedMessages}
             streamingMessageId={streamingMessageId}
+            followSignal={followSignal}
             openMenuId={openMenuId}
             onOpenMenuChange={handleOpenMenuChange}
             copiedId={copiedId}
@@ -605,6 +673,8 @@ export const AssistantInput = ({
             onFeedback={handleFeedback}
             onRegenerate={handleRegenerate}
             onCopy={copyMessage}
+            onRemoveQueued={removeQueuedMessage}
+            onMoveQueued={moveQueuedMessage}
           />
         )}
         <div className="assistant-input__composer">
@@ -616,6 +686,7 @@ export const AssistantInput = ({
             onSelectMode={assistant.selectMode}
             onCreateFolder={assistant.createFolder}
             showControls={!state.activeChatId}
+            onToggleSidebar={onToggleSidebar}
           />
           <AssistantComposer
             placeholder={placeholder}
