@@ -194,6 +194,7 @@ export const DashboardPage = () => {
   );
   const activePage = dashboardRoute.tab;
   const activeDevice = dashboardRoute.device;
+  const routeChatId = dashboardRoute.assistant?.chatId ?? null;
   const [isLoading, setIsLoading] = useState(true);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
@@ -490,6 +491,7 @@ export const DashboardPage = () => {
             ...(parsed.section ? { section: parsed.section } : {}),
             ...(parsed.device ? { device: parsed.device } : {}),
             ...(parsed.location ? { location: parsed.location } : {}),
+            ...(parsed.assistant ? { assistant: parsed.assistant } : {}),
           };
         })()
       : value;
@@ -508,14 +510,11 @@ export const DashboardPage = () => {
     assistant.update((current) => ({ ...current, activeChatId: null }));
     chatActionTokenRef.current += 1;
     setChatAction({ type: 'new', token: chatActionTokenRef.current });
-    changeTab('assistant');
+    navigateToDashboard({ tab: 'assistant' });
   };
 
   const handleSidebarOpenChat = (id: string) => {
-    assistant.update((current) => ({ ...current, activeChatId: id }));
-    chatActionTokenRef.current += 1;
-    setChatAction({ type: 'open', token: chatActionTokenRef.current, chatId: id });
-    changeTab('assistant');
+    navigateToDashboard({ tab: 'assistant', assistant: { chatId: id } });
   };
 
   const handleSidebarDeleteChat = (id: string) => {
@@ -524,7 +523,15 @@ export const DashboardPage = () => {
     if (wasActive) {
       chatActionTokenRef.current += 1;
       setChatAction({ type: 'new', token: chatActionTokenRef.current });
+      navigateToDashboard({ tab: 'assistant' }, { replace: true });
     }
+  };
+
+  const pendingChatIdRef = useRef<string | null>(null);
+
+  const handleChatCreated = (chatId: string) => {
+    pendingChatIdRef.current = chatId;
+    navigateToDashboard({ tab: 'assistant', assistant: { chatId } }, { replace: true });
   };
 
   const openDevice = (serial: number) => {
@@ -541,6 +548,41 @@ export const DashboardPage = () => {
       navigate(next, { replace: true });
     }
   }, [dashboardRoute.canonicalPath, location.pathname, location.search, navigate, searchParams]);
+
+  // The URL is the source of truth for which chat is open. Deep links, browser
+  // back/forward and sidebar clicks all converge here before reaching the UI.
+  useEffect(() => {
+    if (isLoading || assistant.isLoading || activePage !== 'assistant') return;
+
+    if (routeChatId && pendingChatIdRef.current === routeChatId) {
+      pendingChatIdRef.current = null;
+    }
+
+    if (!routeChatId) {
+      // A chat created by sending the first message wins over a stale new-chat URL.
+      if (assistant.state.activeChatId && pendingChatIdRef.current === assistant.state.activeChatId) {
+        pendingChatIdRef.current = null;
+        return;
+      }
+      if (assistant.state.activeChatId !== null) {
+        assistant.update((current) => ({ ...current, activeChatId: null }));
+        chatActionTokenRef.current += 1;
+        setChatAction({ type: 'new', token: chatActionTokenRef.current });
+      }
+      return;
+    }
+
+    if (!assistant.state.chats.some((chat) => chat.id === routeChatId)) {
+      navigate('/dashboard/assistant', { replace: true });
+      return;
+    }
+
+    if (assistant.state.activeChatId !== routeChatId) {
+      assistant.update((current) => ({ ...current, activeChatId: routeChatId }));
+      chatActionTokenRef.current += 1;
+      setChatAction({ type: 'open', token: chatActionTokenRef.current, chatId: routeChatId });
+    }
+  }, [activePage, assistant, isLoading, navigate, routeChatId]);
 
   useEffect(() => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
@@ -750,6 +792,7 @@ export const DashboardPage = () => {
                   sendShortcut={assistantSendShortcut}
                   assistant={assistant}
                   chatAction={chatAction}
+                  onChatCreated={handleChatCreated}
                 />
               </div>
             )}

@@ -4,11 +4,39 @@
   flex: 1 1 auto;
   gap: 0.85rem;
   min-height: 0;
-  padding: 0 0 3.5rem;
+  padding: 0 1rem 3.5rem 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent 100%);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent 100%);
+}
+
+.assistant-chat__messages:hover,
+.assistant-chat__messages:focus-within,
+.assistant-chat__messages--scrolling {
+  scrollbar-color: var(--text-dim) transparent;
+}
+
+.assistant-chat__messages::-webkit-scrollbar {
+  width: 0.65rem;
+}
+
+.assistant-chat__messages::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.assistant-chat__messages:hover::-webkit-scrollbar-thumb,
+.assistant-chat__messages:focus-within::-webkit-scrollbar-thumb,
+.assistant-chat__messages--scrolling::-webkit-scrollbar-thumb {
+  background-color: var(--text-dim);
+}
+
+.assistant-chat__messages::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
 }
 
 .assistant-chat__message {

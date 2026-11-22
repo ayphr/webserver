@@ -50,10 +50,16 @@ export type LocationRouteState = {
   detailTab?: LocationDetailTab;
 };
 
+export type AssistantRouteState = {
+  /** Assistant chats are addressed by their persisted id. */
+  chatId: string;
+};
+
 export type DashboardTarget = {
   tab: DashboardTab;
   device?: DeviceRouteState;
   location?: LocationRouteState;
+  assistant?: AssistantRouteState;
   /** Settings section id or team section id, depending on `tab`. */
   section?: string;
 };
@@ -105,6 +111,10 @@ export function dashboardPath(target: DashboardTarget): string {
     const base = `/dashboard/locations/${encodeURIComponent(id)}`;
     // Overview is the default section, so it keeps the shorter canonical URL.
     return detailTab && detailTab !== 'overview' ? `${base}/${detailTab}` : base;
+  }
+
+  if (target.tab === 'assistant' && target.assistant) {
+    return `/dashboard/assistant/chat/${encodeURIComponent(target.assistant.chatId)}`;
   }
 
   if (target.tab === 'settings' && target.section) {
@@ -200,6 +210,28 @@ function parseLocationParts(parts: string[]): ParsedDashboardRoute {
   return { ...target, canonicalPath: dashboardPath(target), valid: true };
 }
 
+function parseAssistantParts(parts: string[]): ParsedDashboardRoute {
+  if (parts.length === 1) {
+    return { tab: 'assistant', canonicalPath: '/dashboard/assistant', valid: true };
+  }
+  if (parts[1] !== 'chat' || parts.length !== 3) {
+    return invalid({ tab: 'assistant' }, '/dashboard/assistant');
+  }
+
+  let chatId: string;
+  try {
+    chatId = decodeURIComponent(parts[2]!);
+  } catch {
+    return invalid({ tab: 'assistant' }, '/dashboard/assistant');
+  }
+  if (!chatId) {
+    return invalid({ tab: 'assistant' }, '/dashboard/assistant');
+  }
+
+  const target: DashboardTarget = { tab: 'assistant', assistant: { chatId } };
+  return { ...target, canonicalPath: dashboardPath(target), valid: true };
+}
+
 /** Parses both canonical dashboard paths and legacy `?tab=` links. */
 export function parseDashboardPath(pathname: string, legacyTab?: string | null): ParsedDashboardRoute {
   const path = pathname.replace(/\/+$/, '') || '/dashboard';
@@ -225,6 +257,8 @@ export function parseDashboardPath(pathname: string, legacyTab?: string | null):
   if (head === 'devices') return parseDeviceParts(parts);
 
   if (head === 'locations') return parseLocationParts(parts);
+
+  if (head === 'assistant') return parseAssistantParts(parts);
 
   if (head === 'settings') {
     const section = parts[1];

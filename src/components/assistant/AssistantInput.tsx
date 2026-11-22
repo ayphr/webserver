@@ -26,6 +26,7 @@ export interface AssistantInputProps {
   sendShortcut?: 'enter' | 'shift-enter';
   assistant: AssistantController;
   chatAction?: AssistantChatAction | null;
+  onChatCreated?: (chatId: string) => void;
 }
 
 const CHAT_SUBTITLE_TEXTS = (displayName: string) => [
@@ -112,6 +113,7 @@ export const AssistantInput = ({
   sendShortcut = 'enter',
   assistant,
   chatAction = null,
+  onChatCreated,
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
   const { state } = assistant;
@@ -350,8 +352,11 @@ export const AssistantInput = ({
     }
   };
 
-  const createChat = (folderId: string | null, mode: AssistantChat['mode']) =>
-    assistant.createChat(folderId, mode);
+  const createChat = (folderId: string | null, mode: AssistantChat['mode']) => {
+    const chat = assistant.createChat(folderId, mode);
+    onChatCreated?.(chat.id);
+    return chat;
+  };
 
   const handleNewChat = () => {
     cancelStream();

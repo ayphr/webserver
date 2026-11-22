@@ -204,6 +204,7 @@ export const AssistantMessages = ({
 }: AssistantMessagesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const scrollbarTimeoutRef = useRef<number | null>(null);
 
   // Only follow new output while the user is already at the bottom, so scrolling
   // back through a long chat is not yanked forward as tokens arrive.
@@ -212,7 +213,23 @@ export const AssistantMessages = ({
     if (!element) return;
     stickToBottomRef.current =
       element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+
+    element.classList.add('assistant-chat__messages--scrolling');
+    if (scrollbarTimeoutRef.current !== null) window.clearTimeout(scrollbarTimeoutRef.current);
+    scrollbarTimeoutRef.current = window.setTimeout(() => {
+      element.classList.remove('assistant-chat__messages--scrolling');
+      scrollbarTimeoutRef.current = null;
+    }, 700);
   };
+
+  useEffect(
+    () => () => {
+      if (scrollbarTimeoutRef.current !== null) {
+        window.clearTimeout(scrollbarTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const element = containerRef.current;

@@ -30,6 +30,12 @@ describe('dashboardPath', () => {
     expect(dashboardPath({ tab: 'locations', location: { id: 'home', detailTab: 'history' } })).toBe('/dashboard/locations/home/history');
     expect(dashboardPath({ tab: 'locations', location: { id: 'my place/1', detailTab: 'settings' } })).toBe('/dashboard/locations/my%20place%2F1/settings');
   });
+
+  it('builds assistant chat URLs', () => {
+    expect(dashboardPath({ tab: 'assistant' })).toBe('/dashboard/assistant');
+    expect(dashboardPath({ tab: 'assistant', assistant: { chatId: 'chat-1' } })).toBe('/dashboard/assistant/chat/chat-1');
+    expect(dashboardPath({ tab: 'assistant', assistant: { chatId: 'my chat/1' } })).toBe('/dashboard/assistant/chat/my%20chat%2F1');
+  });
 });
 
 describe('parseDashboardPath', () => {
@@ -86,6 +92,22 @@ describe('parseDashboardPath', () => {
       canonicalPath: '/dashboard/locations/home',
       valid: true,
     });
+    expect(parseDashboardPath('/dashboard/assistant')).toMatchObject({
+      tab: 'assistant',
+      canonicalPath: '/dashboard/assistant',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/assistant/chat/chat-1')).toMatchObject({
+      tab: 'assistant',
+      assistant: { chatId: 'chat-1' },
+      canonicalPath: '/dashboard/assistant/chat/chat-1',
+      valid: true,
+    });
+    expect(parseDashboardPath('/dashboard/assistant/chat/my%20chat%2F1')).toMatchObject({
+      tab: 'assistant',
+      assistant: { chatId: 'my chat/1' },
+      valid: true,
+    });
   });
 
   it('supports legacy query-string tabs', () => {
@@ -128,6 +150,24 @@ describe('parseDashboardPath', () => {
     expect(parseDashboardPath('/dashboard/locations/%E0%A4%A')).toMatchObject({
       tab: 'locations',
       canonicalPath: '/dashboard/locations',
+      valid: false,
+    });
+  });
+
+  it('rejects invalid assistant paths', () => {
+    expect(parseDashboardPath('/dashboard/assistant/unknown')).toMatchObject({
+      tab: 'assistant',
+      canonicalPath: '/dashboard/assistant',
+      valid: false,
+    });
+    expect(parseDashboardPath('/dashboard/assistant/chat')).toMatchObject({
+      tab: 'assistant',
+      canonicalPath: '/dashboard/assistant',
+      valid: false,
+    });
+    expect(parseDashboardPath('/dashboard/assistant/chat/chat-1/extra')).toMatchObject({
+      tab: 'assistant',
+      canonicalPath: '/dashboard/assistant',
       valid: false,
     });
   });
