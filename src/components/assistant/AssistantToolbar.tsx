@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import {
+  IconArrowDown,
   IconClipboardList,
   IconFolder,
   IconFolderFilled,
@@ -26,6 +27,8 @@ export interface AssistantToolbarProps {
   onCreateFolder: (name: string) => void;
   showControls?: boolean;
   onToggleSidebar?: () => void;
+  showJumpToLatest?: boolean;
+  onJumpToLatest?: () => void;
 }
 
 export const AssistantToolbar = ({
@@ -37,6 +40,8 @@ export const AssistantToolbar = ({
   onCreateFolder,
   showControls = true,
   onToggleSidebar,
+  showJumpToLatest = false,
+  onJumpToLatest,
 }: AssistantToolbarProps) => {
   const { isPlaying: isRadioPlaying, toggle: toggleRadio } = useRadio();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -189,13 +194,9 @@ export const AssistantToolbar = ({
         </button>
       </div>
       {!showControls && (
-        <div
-          className="assistant-toolbar__context"
-          title="Folder and mode shown here apply to new chats"
-        >
+        <div className="assistant-toolbar__context">
           <IconFolder size={13} strokeWidth={1.75} />
           <span>{activeFolder?.name ?? 'Uncategorised'}</span>
-          <span className="assistant-toolbar__context-separator" aria-hidden="true" />
           {activeMode === 'task' ? (
             <IconClipboardList size={13} strokeWidth={1.75} />
           ) : (
@@ -203,6 +204,16 @@ export const AssistantToolbar = ({
           )}
           <span>{activeMode === 'task' ? 'Task' : 'Chat'}</span>
         </div>
+      )}
+      {showJumpToLatest && onJumpToLatest && (
+        <button
+          type="button"
+          className="assistant-toolbar__jump"
+          onClick={onJumpToLatest}
+        >
+          <IconArrowDown size={14} strokeWidth={1.75} />
+          <span>Jump to latest</span>
+        </button>
       )}
       <div className="assistant-toolbar__radio">
         <Tooltip content={isRadioPlaying ? 'Pause radio' : 'Play radio'}>

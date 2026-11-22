@@ -10,7 +10,7 @@ import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantStreamClient } from '../../lib/assistantStream';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import { AssistantComposer } from './AssistantComposer';
-import { AssistantMessages } from './AssistantMessages';
+import { AssistantMessages, type AssistantMessagesHandle } from './AssistantMessages';
 import { AssistantToolbar } from './AssistantToolbar';
 import type { AssistantChatAction, LiveAssistantMessage } from './types';
 import type { AssistantController } from './useAssistantState';
@@ -105,6 +105,18 @@ const TASK_SUBTITLE_TEXTS = (displayName: string) => [
   'What’s the long game?',
 ];
 
+const createShuffledOrder = (length: number, excludeFirst?: number): number[] => {
+  const order = Array.from({ length }, (_, index) => index);
+  for (let index = length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [order[index], order[randomIndex]] = [order[randomIndex], order[index]];
+  }
+  if (excludeFirst !== undefined && length > 1 && order[0] === excludeFirst) {
+    [order[0], order[1]] = [order[1], order[0]];
+  }
+  return order;
+};
+
 export const AssistantInput = ({
   placeholder = 'Ask Iris',
   className = '',
@@ -140,17 +152,24 @@ export const AssistantInput = ({
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
-  const [subtitleIndex, setSubtitleIndex] = useState(0);
+  const [subtitleSequence, setSubtitleSequence] = useState(() => ({
+    mode: state.activeMode,
+    order: createShuffledOrder(subtitles.length),
+    position: 0,
+    cycle: 0,
+  }));
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
   const [followSignal, setFollowSignal] = useState(0);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   const isMac =
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const assistantMessagesRef = useRef<AssistantMessagesHandle>(null);
   const messagesRef = useRef(messages);
   const currentChatIdRef = useRef(state.activeChatId);
   const queuedMessagesRef = useRef<string[]>([]);
@@ -164,8 +183,13 @@ export const AssistantInput = ({
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
 
   const isChat = messages.length > 0;
+  const currentSubtitle = subtitles[subtitleSequence.order[subtitleSequence.position] ?? 0] ?? '';
 
   const handleOpenMenuChange = useCallback((id: number | null) => setOpenMenuId(id), []);
+  const handleJumpToLatest = useCallback(() => {
+    assistantMessagesRef.current?.jumpToLatest();
+    setShowJumpToLatest(false);
+  }, []);
 
   const commitMessages = useCallback(
     (updater: (previous: LiveAssistantMessage[]) => LiveAssistantMessage[]) => {
@@ -208,13 +232,37 @@ export const AssistantInput = ({
     if (prefersReducedMotion) return;
     const id = setInterval(() => {
       if (document.hidden) return;
-      setSubtitleIndex((i) => (i + 1) % subtitles.length);
+      setSubtitleSequence((current) => {
+        const nextPosition = current.position + 1;
+        if (nextPosition < current.order.length) {
+          return { ...current, position: nextPosition };
+        }
+        return {
+          mode: current.mode,
+          order: createShuffledOrder(current.order.length, current.order[current.order.length - 1]),
+          position: 0,
+          cycle: current.cycle + 1,
+        };
+      });
     }, 4000);
     return () => clearInterval(id);
-  }, [prefersReducedMotion, subtitles.length]);
+  }, [prefersReducedMotion]);
+
+  useEffect(() => {
+    if (subtitleSequence.mode === state.activeMode) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSubtitleSequence({
+      mode: state.activeMode,
+      order: createShuffledOrder(subtitles.length),
+      position: 0,
+      cycle: 0,
+    });
+  }, [state.activeMode, subtitles.length, subtitleSequence.mode]);
 
   useEffect(() => {
     if (isGenerating) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowJumpToLatest(false);
     const chat = state.chats.find((item) => item.id === state.activeChatId);
     currentChatIdRef.current = state.activeChatId;
     nextIdRef.current = Math.max(
@@ -651,16 +699,17 @@ export const AssistantInput = ({
               aria-hidden="true"
             />
             <p
-              key={`${state.activeMode}-${subtitleIndex}`}
+              key={`${state.activeMode}-${subtitleSequence.cycle}-${subtitleSequence.position}`}
               className="assistant-input__subtitle"
             >
-              {subtitles[subtitleIndex % subtitles.length]}
+              {currentSubtitle}
             </p>
           </div>
         )}
         {isChat && (
           <AssistantMessages
             key={state.activeChatId ?? 'new'}
+            ref={assistantMessagesRef}
             messages={messages}
             queuedMessages={queuedMessages}
             streamingMessageId={streamingMessageId}
@@ -675,6 +724,7 @@ export const AssistantInput = ({
             onCopy={copyMessage}
             onRemoveQueued={removeQueuedMessage}
             onMoveQueued={moveQueuedMessage}
+            onJumpVisibilityChange={setShowJumpToLatest}
           />
         )}
         <div className="assistant-input__composer">
@@ -687,6 +737,8 @@ export const AssistantInput = ({
             onCreateFolder={assistant.createFolder}
             showControls={!state.activeChatId}
             onToggleSidebar={onToggleSidebar}
+            showJumpToLatest={showJumpToLatest}
+            onJumpToLatest={handleJumpToLatest}
           />
           <AssistantComposer
             placeholder={placeholder}

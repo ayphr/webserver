@@ -33,28 +33,6 @@
   min-height: 100%;
 }
 
-.assistant-chat__jump {
-  position: absolute;
-  left: 50%;
-  bottom: 1rem;
-  transform: translateX(-50%);
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background-color: var(--bg-elevated);
-  color: var(--text-muted);
-  font-family: var(--font-family-base);
-  font-size: 0.76rem;
-  cursor: pointer;
-  box-shadow: var(--container-shadow);
-  z-index: 4;
-  animation: assistant-menu-in 0.18s ease both;
-}
-
-.assistant-chat__jump:hover {
-  color: var(--text-primary);
-}
-
 @keyframes assistant-chat-grow {
   from {
     flex-grow: 0;

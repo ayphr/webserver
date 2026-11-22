@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import {
   IconArrowBackUp,
@@ -28,6 +36,7 @@ import {
 import type { LiveAssistantMessage } from './types';
 import { formatDuration, formatMessageTime } from './utils';
 import { useDismiss } from '../../hooks/useDismiss';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import { AssistantMarkdown } from './AssistantMarkdown';
 import './AssistantMessages.css';
 
@@ -46,6 +55,11 @@ export interface AssistantMessagesProps {
   onCopy: (messageId: number, content: string) => void;
   onRemoveQueued: (index: number) => void;
   onMoveQueued: (index: number, direction: -1 | 1) => void;
+  onJumpVisibilityChange: (visible: boolean) => void;
+}
+
+export interface AssistantMessagesHandle {
+  jumpToLatest: () => void;
 }
 
 const latestReachedIndex = <T extends { status: string }>(items: T[]) => {
@@ -231,29 +245,36 @@ const ToolGroup = ({ tools, active }: { tools: AssistantToolCall[]; active: bool
   );
 };
 
-export const AssistantMessages = ({
-  messages,
-  queuedMessages,
-  streamingMessageId,
-  followSignal,
-  openMenuId,
-  onOpenMenuChange,
-  copiedId,
-  fallbackVariant,
-  onUndo,
-  onFeedback,
-  onRegenerate,
-  onCopy,
-  onRemoveQueued,
-  onMoveQueued,
-}: AssistantMessagesProps) => {
+export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMessagesProps>(
+  function AssistantMessages(
+    {
+      messages,
+      queuedMessages,
+      streamingMessageId,
+      followSignal,
+      openMenuId,
+      onOpenMenuChange,
+      copiedId,
+      fallbackVariant,
+      onUndo,
+      onFeedback,
+      onRegenerate,
+      onCopy,
+      onRemoveQueued,
+      onMoveQueued,
+      onJumpVisibilityChange,
+    },
+    ref,
+  ) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const scrollFrameRef = useRef<number | null>(null);
   const scrollbarTimeoutRef = useRef<number | null>(null);
+  const jumpTimeoutRef = useRef<number | null>(null);
+  const isJumpingRef = useRef(false);
   const menuTriggerRef = useRef<HTMLElement | null>(null);
-  const [showJump, setShowJump] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
   // Batch follow-along scrolling into one write per frame. Streaming tokens can
@@ -263,12 +284,12 @@ export const AssistantMessages = ({
     const element = containerRef.current;
     if (!element || !stickToBottomRef.current) return;
     element.scrollTop = element.scrollHeight;
-    setShowJump(false);
-  }, []);
+    onJumpVisibilityChange(false);
+  }, [onJumpVisibilityChange]);
 
   const scheduleScrollToBottom = useCallback(() => {
     if (scrollFrameRef.current !== null) return;
-    scrollFrameRef.current = window.requestAnimationFrame(scrollToBottom);
+    scrollFrameRef.current = window.requestAnimationFrame(() => scrollToBottom());
   }, [scrollToBottom]);
 
   // Only follow new output while the user is at the bottom. A small tolerance
@@ -278,8 +299,13 @@ export const AssistantMessages = ({
     const element = containerRef.current;
     if (!element) return;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    stickToBottomRef.current = distanceFromBottom <= 24;
-    setShowJump(distanceFromBottom > 160);
+    if (distanceFromBottom <= 24) {
+      stickToBottomRef.current = true;
+      onJumpVisibilityChange(false);
+    } else if (!isJumpingRef.current) {
+      stickToBottomRef.current = false;
+      onJumpVisibilityChange(distanceFromBottom > 160);
+    }
 
     element.classList.add('assistant-chat__messages--scrolling');
     if (scrollbarTimeoutRef.current !== null) window.clearTimeout(scrollbarTimeoutRef.current);
@@ -293,6 +319,7 @@ export const AssistantMessages = ({
     () => () => {
       if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
       if (scrollbarTimeoutRef.current !== null) window.clearTimeout(scrollbarTimeoutRef.current);
+      if (jumpTimeoutRef.current !== null) window.clearTimeout(jumpTimeoutRef.current);
     },
     [],
   );
@@ -316,10 +343,33 @@ export const AssistantMessages = ({
     scheduleScrollToBottom();
   }, [followSignal, scheduleScrollToBottom]);
 
-  const jumpToLatest = () => {
+  const jumpToLatest = useCallback(() => {
+    const element = containerRef.current;
+    if (!element) return;
     stickToBottomRef.current = true;
-    scheduleScrollToBottom();
-  };
+    isJumpingRef.current = true;
+    onJumpVisibilityChange(false);
+    if (jumpTimeoutRef.current !== null) window.clearTimeout(jumpTimeoutRef.current);
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    });
+    if (prefersReducedMotion) {
+      isJumpingRef.current = false;
+      return;
+    }
+    jumpTimeoutRef.current = window.setTimeout(() => {
+      isJumpingRef.current = false;
+      jumpTimeoutRef.current = null;
+      const current = containerRef.current;
+      if (!current) return;
+      const distance = current.scrollHeight - current.scrollTop - current.clientHeight;
+      stickToBottomRef.current = distance <= 24;
+      onJumpVisibilityChange(distance > 160);
+    }, 600);
+  }, [onJumpVisibilityChange, prefersReducedMotion]);
+
+  useImperativeHandle(ref, () => ({ jumpToLatest }), [jumpToLatest]);
 
   const lastMenuIdRef = useRef<number | null>(null);
   const closeMenu = useCallback(() => onOpenMenuChange(null), [onOpenMenuChange]);
@@ -549,11 +599,6 @@ export const AssistantMessages = ({
           ))}
         </div>
       </div>
-      {showJump && (
-        <button type="button" className="assistant-chat__jump" onClick={jumpToLatest}>
-          Jump to latest
-        </button>
-      )}
       {openMenuId !== null &&
         (() => {
           const menuMessage = messages.find((message) => message.id === openMenuId);
@@ -600,4 +645,5 @@ export const AssistantMessages = ({
         })()}
     </div>
   );
-};
+  },
+);

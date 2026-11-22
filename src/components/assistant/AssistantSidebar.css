@@ -4,17 +4,12 @@
   box-sizing: border-box;
   padding: 0;
   justify-content: center;
-  transform: translateY(-8rem);
   max-height: calc(100vh - 4rem);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-.dashboard-main--assistant:has(.assistant-input--chat) .assistant-sidebar {
-  transform: none;
 }
 
 .dashboard-assistant__sidebar-slot > .assistant-sidebar {
@@ -46,19 +41,14 @@
   }
 }
 
-/* Inline chat search: reuses the sidebar row layout so the icon and spacing match.
-   The input has no visible field chrome; opening it just reveals a typeable placeholder. */
+/* Inline chat search: reuses the sidebar row layout so the icon and spacing match. */
 .assistant-sidebar__search {
   flex: 0 0 auto;
-  cursor: pointer;
+  cursor: text;
 }
 
-.assistant-sidebar__search-button {
-  padding: 0;
-  border: 0;
-  background-color: transparent;
-  color: inherit;
-  outline: none;
+.assistant-sidebar__search-icon {
+  color: var(--text-muted);
 }
 
 .assistant-sidebar__search-clear {
@@ -85,20 +75,6 @@
   color: var(--text-dim);
   font-size: 0.72rem;
   animation: assistant-sidebar-row-in 0.15s ease both;
-}
-
-.assistant-sidebar__search .assistant-sidebar__search-input {
-  width: 100%;
-  max-width: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: max-width 0.24s ease, opacity 0.15s ease;
-}
-
-.assistant-sidebar__search.is-open .assistant-sidebar__search-input {
-  max-width: 100%;
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .assistant-sidebar__search-input::placeholder {

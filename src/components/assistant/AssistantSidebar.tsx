@@ -292,12 +292,10 @@ export const AssistantSidebar = ({
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [focusedRowId, setFocusedRowId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const measureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
 
   // The sidebar grows to fit its longest visible label. Intrinsic width cannot
   // be transitioned, so measure the text and set an explicit pixel width that
@@ -334,7 +332,6 @@ export const AssistantSidebar = ({
     chats,
     folders,
     query,
-    searchOpen,
     expanded,
     editState,
     deleteState,
@@ -355,7 +352,6 @@ export const AssistantSidebar = ({
     // Reset local search state so it does not reappear when a chat is saved.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuery('');
-    setSearchOpen(false);
   }, [hasSavedChats]);
 
   // Search is local UI state: derive every visible list from the matching chats
@@ -523,28 +519,16 @@ export const AssistantSidebar = ({
     [deleteState, editState, scheduleFocus],
   );
 
-  const openSearch = () => {
-    setSearchOpen(true);
-    requestAnimationFrame(() => searchInputRef.current?.focus());
-  };
-
   const clearSearch = () => {
     setQuery('');
     searchInputRef.current?.focus();
   };
 
-  // Escape clears the text first; only an empty field closes and blurs.
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Escape') return;
     event.preventDefault();
     event.stopPropagation();
-    if (query) {
-      setQuery('');
-      return;
-    }
-    setSearchOpen(false);
-    event.currentTarget.blur();
-    searchButtonRef.current?.focus();
+    setQuery('');
   };
 
   const handleSidebarKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -815,22 +799,11 @@ export const AssistantSidebar = ({
       onKeyDown={handleSidebarKeyDown}
     >
       {hasSavedChats && (
-        <div
-          className={`sidebar-list__row assistant-sidebar__search ${searchOpen ? 'is-open' : ''}`}
-          onClick={openSearch}
-        >
+        <div className="sidebar-list__row assistant-sidebar__search">
           <div className="sidebar-list__main assistant-sidebar__search-main">
-            <button
-              ref={searchButtonRef}
-              type="button"
-              className="sidebar-list__icon assistant-sidebar__search-button"
-              aria-label="Search chats"
-              aria-controls="assistant-sidebar-search-input"
-              aria-expanded={searchOpen}
-              onClick={openSearch}
-            >
+            <span className="sidebar-list__icon assistant-sidebar__search-icon" aria-hidden="true">
               <IconSearch size={16} strokeWidth={1.75} />
-            </button>
+            </span>
             <input
               id="assistant-sidebar-search-input"
               ref={searchInputRef}
@@ -841,18 +814,6 @@ export const AssistantSidebar = ({
               aria-label="Search chats"
               autoComplete="off"
               onChange={(event) => setQuery(event.target.value)}
-              onFocus={() => setSearchOpen(true)}
-              onBlur={(event) => {
-                if (query) return;
-                const next = event.relatedTarget as Node | null;
-                if (
-                  next &&
-                  event.currentTarget.closest('.assistant-sidebar__search')?.contains(next)
-                ) {
-                  return;
-                }
-                setSearchOpen(false);
-              }}
               onKeyDown={handleSearchKeyDown}
             />
             {isSearching && (

@@ -18,42 +18,57 @@
   flex: 1 1 auto;
 }
 
-.assistant-input__animation {
+.assistant-input__intro {
   position: absolute;
   left: 50%;
-  top: 50%;
-  width: clamp(50px, 7vh, 75px);
-  height: auto;
-  aspect-ratio: 1;
-  object-fit: contain;
-  transform: translate(-50%, calc(-100% - 7.5rem));
+  bottom: calc(50% + 5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: min(90vw, 34rem);
+  transform: translateX(-50%);
   pointer-events: none;
   z-index: 1;
 }
 
+.assistant-input__animation {
+  width: clamp(50px, 7vh, 75px);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
 .assistant-input__subtitle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -300%);
   margin: 0;
+  max-width: 100%;
   text-align: center;
+  text-wrap: balance;
   color: var(--text-primary);
   font-size: 1.5rem;
   font-weight: 600;
-  max-width: min(90vw, 34rem);
   animation: assistant-subtitle-in 0.45s ease;
-  z-index: 2;
 }
 
 @keyframes assistant-subtitle-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -300%) translateY(6px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -300%) translateY(0);
+    transform: translateY(0);
+  }
+}
+
+@media (max-height: 520px) {
+  .assistant-input__intro {
+    bottom: calc(50% + 3.5rem);
+    gap: 0.5rem;
+  }
+
+  .assistant-input__subtitle {
+    font-size: 1.15rem;
   }
 }
 .assistant-input__composer {
@@ -75,7 +90,7 @@
   height: 100%;
   min-height: 0;
   padding-top: 1rem;
-  padding-bottom: 2.75rem;
+  padding-bottom: 4rem;
   overflow: hidden;
 }
 
@@ -84,7 +99,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .assistant-input--chat .assistant-input__composer {
