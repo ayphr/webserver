@@ -1,18 +1,38 @@
 .assistant-chat__messages {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  gap: 0.85rem;
+  /* Grow from zero so the reading area opens up while the composer stays put. */
+  flex: 0 0 0%;
   min-height: 0;
-  padding: 0 1rem 3.5rem 0;
+  padding: 0 1rem 2.75rem 0;
   overflow-y: auto;
+  overflow-anchor: none;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s ease;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent 100%);
+  animation: assistant-chat-grow 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.75rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.75rem), transparent 100%);
+}
+
+.assistant-chat__messages-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 100%;
+}
+
+@keyframes assistant-chat-grow {
+  from {
+    flex-grow: 0;
+    opacity: 0;
+  }
+  to {
+    flex-grow: 1;
+    opacity: 1;
+  }
 }
 
 .assistant-chat__messages:hover,

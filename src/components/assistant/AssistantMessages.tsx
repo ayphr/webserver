@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   IconArrowBackUp,
   IconChevronDown,
@@ -203,16 +203,33 @@ export const AssistantMessages = ({
   onCopy,
 }: AssistantMessagesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const scrollFrameRef = useRef<number | null>(null);
   const scrollbarTimeoutRef = useRef<number | null>(null);
 
-  // Only follow new output while the user is already at the bottom, so scrolling
-  // back through a long chat is not yanked forward as tokens arrive.
+  // Batch follow-along scrolling into one write per frame. Streaming tokens can
+  // arrive faster than the browser paints, which otherwise makes the view jump.
+  const scrollToBottom = useCallback(() => {
+    scrollFrameRef.current = null;
+    const element = containerRef.current;
+    if (!element || !stickToBottomRef.current) return;
+    element.scrollTop = element.scrollHeight;
+  }, []);
+
+  const scheduleScrollToBottom = useCallback(() => {
+    if (scrollFrameRef.current !== null) return;
+    scrollFrameRef.current = window.requestAnimationFrame(scrollToBottom);
+  }, [scrollToBottom]);
+
+  // Only follow new output while the user is at the bottom. A small tolerance
+  // keeps programmatic scrolls from turning off follow-along, while any real
+  // scroll away from the bottom hands control back to the user.
   const handleScroll = () => {
     const element = containerRef.current;
     if (!element) return;
     stickToBottomRef.current =
-      element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+      element.scrollHeight - element.scrollTop - element.clientHeight <= 24;
 
     element.classList.add('assistant-chat__messages--scrolling');
     if (scrollbarTimeoutRef.current !== null) window.clearTimeout(scrollbarTimeoutRef.current);
@@ -224,18 +241,25 @@ export const AssistantMessages = ({
 
   useEffect(
     () => () => {
-      if (scrollbarTimeoutRef.current !== null) {
-        window.clearTimeout(scrollbarTimeoutRef.current);
-      }
+      if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
+      if (scrollbarTimeoutRef.current !== null) window.clearTimeout(scrollbarTimeoutRef.current);
     },
     [],
   );
 
+  useLayoutEffect(() => {
+    scheduleScrollToBottom();
+  }, [messages, queuedMessages, streamingMessageId, scheduleScrollToBottom]);
+
+  // Markdown, thinking panels and tool groups can change height after a token
+  // lands. Keep following as the inner content grows.
   useEffect(() => {
-    const element = containerRef.current;
-    if (!element || !stickToBottomRef.current) return;
-    element.scrollTop = element.scrollHeight;
-  }, [messages, queuedMessages, streamingMessageId]);
+    const inner = innerRef.current;
+    if (!inner || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(scheduleScrollToBottom);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [scheduleScrollToBottom]);
 
   useDismiss(null, () => onOpenMenuChange(null), {
     enabled: openMenuId !== null,
@@ -250,150 +274,152 @@ export const AssistantMessages = ({
 
   return (
     <div className="assistant-chat__messages" ref={containerRef} onScroll={handleScroll}>
-      {messages.map((message) => {
-        const isStreaming = streamingMessageId === message.id;
-        const isLatestAssistant =
-          message.role === 'assistant' && messages[messages.length - 1]?.id === message.id;
-        const displayedDurationMs = isStreaming ? message.liveDurationMs : message.durationMs;
-        const tokensPerSecond = isStreaming
-          ? message.liveTokensPerSecond
-          : message.durationMs
-            ? message.content.split(/\s+/).filter(Boolean).length / (message.durationMs / 1000)
-            : undefined;
+      <div className="assistant-chat__messages-inner" ref={innerRef}>
+        {messages.map((message) => {
+          const isStreaming = streamingMessageId === message.id;
+          const isLatestAssistant =
+            message.role === 'assistant' && messages[messages.length - 1]?.id === message.id;
+          const displayedDurationMs = isStreaming ? message.liveDurationMs : message.durationMs;
+          const tokensPerSecond = isStreaming
+            ? message.liveTokensPerSecond
+            : message.durationMs
+              ? message.content.split(/\s+/).filter(Boolean).length / (message.durationMs / 1000)
+              : undefined;
 
-        return (
-          <div
-            key={message.id}
-            className={`assistant-chat__message assistant-chat__message--${message.role}`}
-          >
-            {message.role === 'user' ? (
-              <div className="assistant-chat__user-wrap">
-                <div className="assistant-chat__bubble">{message.content}</div>
-                <button
-                  type="button"
-                  data-menu-id={message.id}
-                  className={`assistant-chat__chevron ${openMenuId === message.id ? 'assistant-chat__chevron--open' : ''}`}
-                  onClick={() => onOpenMenuChange(openMenuId === message.id ? null : message.id)}
-                  aria-label="Message options"
-                >
-                  <IconChevronDown size={14} strokeWidth={2} />
-                </button>
-                {openMenuId === message.id && (
-                  <div className="assistant-chat__menu">
-                    <div className="assistant-chat__menu-time">
-                      {formatMessageTime(message.createdAt)}
+          return (
+            <div
+              key={message.id}
+              className={`assistant-chat__message assistant-chat__message--${message.role}`}
+            >
+              {message.role === 'user' ? (
+                <div className="assistant-chat__user-wrap">
+                  <div className="assistant-chat__bubble">{message.content}</div>
+                  <button
+                    type="button"
+                    data-menu-id={message.id}
+                    className={`assistant-chat__chevron ${openMenuId === message.id ? 'assistant-chat__chevron--open' : ''}`}
+                    onClick={() => onOpenMenuChange(openMenuId === message.id ? null : message.id)}
+                    aria-label="Message options"
+                  >
+                    <IconChevronDown size={14} strokeWidth={2} />
+                  </button>
+                  {openMenuId === message.id && (
+                    <div className="assistant-chat__menu">
+                      <div className="assistant-chat__menu-time">
+                        {formatMessageTime(message.createdAt)}
+                      </div>
+                      <button
+                        type="button"
+                        className="assistant-chat__menu-item"
+                        onClick={() => onUndo(message.id)}
+                      >
+                        <IconArrowBackUp size={14} strokeWidth={2} />
+                        <span>Undo</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="assistant-chat__menu-item"
+                        onClick={() => {
+                          void onCopy(message.id, message.content);
+                          onOpenMenuChange(null);
+                        }}
+                      >
+                        <IconCopy size={14} strokeWidth={2} />
+                        <span>Copy message</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="assistant-chat__menu-item"
-                      onClick={() => onUndo(message.id)}
-                    >
-                      <IconArrowBackUp size={14} strokeWidth={2} />
-                      <span>Undo</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="assistant-chat__menu-item"
-                      onClick={() => {
-                        void onCopy(message.id, message.content);
-                        onOpenMenuChange(null);
-                      }}
-                    >
-                      <IconCopy size={14} strokeWidth={2} />
-                      <span>Copy message</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="assistant-chat__assistant-wrap">
-                {message.thinking && message.thinking.length > 0 && (
-                  <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
-                )}
-                {message.tools && message.tools.length > 0 && (
-                  <ToolGroup tools={message.tools} active={isStreaming} />
-                )}
-                <div className="assistant-chat__bubble">
-                  <AssistantMarkdown content={message.content} />
-                </div>
-                {message.error && <p className="assistant-chat__error">{message.error}</p>}
-                {message.interrupted && (
-                  <p className="assistant-chat__interrupted">You interrupted this response.</p>
-                )}
-                <div className="assistant-chat__toolbar">
-                  <button
-                    type="button"
-                    className={`assistant-chat__tool ${message.feedback === 'like' ? 'assistant-chat__tool--active' : ''}`}
-                    onClick={() => onFeedback(message.id, 'like')}
-                    aria-label="Like response"
-                    aria-pressed={message.feedback === 'like'}
-                  >
-                    {message.feedback === 'like' ? (
-                      <IconThumbUpFilled size={15} strokeWidth={1.75} />
-                    ) : (
-                      <IconThumbUp size={15} strokeWidth={1.75} />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className={`assistant-chat__tool ${message.feedback === 'dislike' ? 'assistant-chat__tool--active' : ''}`}
-                    onClick={() => onFeedback(message.id, 'dislike')}
-                    aria-label="Dislike response"
-                    aria-pressed={message.feedback === 'dislike'}
-                  >
-                    {message.feedback === 'dislike' ? (
-                      <IconThumbDownFilled size={15} strokeWidth={1.75} />
-                    ) : (
-                      <IconThumbDown size={15} strokeWidth={1.75} />
-                    )}
-                  </button>
-                  {isLatestAssistant && (
-                    <button
-                      type="button"
-                      className="assistant-chat__tool"
-                      onClick={() => onRegenerate(message.id)}
-                      aria-label="Regenerate response"
-                    >
-                      <IconRefresh size={15} strokeWidth={1.75} />
-                    </button>
                   )}
-                  <button
-                    type="button"
-                    className={`assistant-chat__tool assistant-chat__tool--copy ${copiedId === message.id ? 'assistant-chat__tool--copied' : ''}`}
-                    onClick={() => onCopy(message.id, message.content)}
-                    aria-label={copiedId === message.id ? 'Copied' : 'Copy response'}
-                  >
-                    <span className="assistant-chat__copy-icons">
-                      <IconCopy size={15} strokeWidth={1.75} className="assistant-chat__copy-icon" />
-                      <IconCopyCheck size={15} strokeWidth={1.75} className="assistant-chat__copied-icon" />
-                    </span>
-                  </button>
-                  <span className="assistant-chat__meta">
-                    <span>{ASSISTANT_DATA[message.variant ?? fallbackVariant].variantLabel}</span>
-                    <span>{formatDuration(displayedDurationMs)}</span>
-                    <span>
-                      {tokensPerSecond == null
-                        ? '— tok/s'
-                        : `${tokensPerSecond.toFixed(1)} tok/s`}
-                    </span>
-                  </span>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="assistant-chat__assistant-wrap">
+                  {message.thinking && message.thinking.length > 0 && (
+                    <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
+                  )}
+                  {message.tools && message.tools.length > 0 && (
+                    <ToolGroup tools={message.tools} active={isStreaming} />
+                  )}
+                  <div className="assistant-chat__bubble">
+                    <AssistantMarkdown content={message.content} />
+                  </div>
+                  {message.error && <p className="assistant-chat__error">{message.error}</p>}
+                  {message.interrupted && (
+                    <p className="assistant-chat__interrupted">You interrupted this response.</p>
+                  )}
+                  <div className="assistant-chat__toolbar">
+                    <button
+                      type="button"
+                      className={`assistant-chat__tool ${message.feedback === 'like' ? 'assistant-chat__tool--active' : ''}`}
+                      onClick={() => onFeedback(message.id, 'like')}
+                      aria-label="Like response"
+                      aria-pressed={message.feedback === 'like'}
+                    >
+                      {message.feedback === 'like' ? (
+                        <IconThumbUpFilled size={15} strokeWidth={1.75} />
+                      ) : (
+                        <IconThumbUp size={15} strokeWidth={1.75} />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={`assistant-chat__tool ${message.feedback === 'dislike' ? 'assistant-chat__tool--active' : ''}`}
+                      onClick={() => onFeedback(message.id, 'dislike')}
+                      aria-label="Dislike response"
+                      aria-pressed={message.feedback === 'dislike'}
+                    >
+                      {message.feedback === 'dislike' ? (
+                        <IconThumbDownFilled size={15} strokeWidth={1.75} />
+                      ) : (
+                        <IconThumbDown size={15} strokeWidth={1.75} />
+                      )}
+                    </button>
+                    {isLatestAssistant && (
+                      <button
+                        type="button"
+                        className="assistant-chat__tool"
+                        onClick={() => onRegenerate(message.id)}
+                        aria-label="Regenerate response"
+                      >
+                        <IconRefresh size={15} strokeWidth={1.75} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={`assistant-chat__tool assistant-chat__tool--copy ${copiedId === message.id ? 'assistant-chat__tool--copied' : ''}`}
+                      onClick={() => onCopy(message.id, message.content)}
+                      aria-label={copiedId === message.id ? 'Copied' : 'Copy response'}
+                    >
+                      <span className="assistant-chat__copy-icons">
+                        <IconCopy size={15} strokeWidth={1.75} className="assistant-chat__copy-icon" />
+                        <IconCopyCheck size={15} strokeWidth={1.75} className="assistant-chat__copied-icon" />
+                      </span>
+                    </button>
+                    <span className="assistant-chat__meta">
+                      <span>{ASSISTANT_DATA[message.variant ?? fallbackVariant].variantLabel}</span>
+                      <span>{formatDuration(displayedDurationMs)}</span>
+                      <span>
+                        {tokensPerSecond == null
+                          ? '— tok/s'
+                          : `${tokensPerSecond.toFixed(1)} tok/s`}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {queuedMessages.map((text, index) => (
+          <div
+            key={`queued-${index}`}
+            className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
+          >
+            <div className="assistant-chat__user-wrap">
+              <div className="assistant-chat__bubble">{text}</div>
+              <span className="assistant-chat__queued-label">Queued</span>
+            </div>
           </div>
-        );
-      })}
-      {queuedMessages.map((text, index) => (
-        <div
-          key={`queued-${index}`}
-          className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
-        >
-          <div className="assistant-chat__user-wrap">
-            <div className="assistant-chat__bubble">{text}</div>
-            <span className="assistant-chat__queued-label">Queued</span>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };

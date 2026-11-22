@@ -23,7 +23,13 @@
   gap: 1rem;
 }
 
+.dashboard-main--assistant {
+  transition: padding 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .dashboard-main--assistant:has(.assistant-input--chat) {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
   overflow: hidden;
 }
 
