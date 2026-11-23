@@ -545,13 +545,19 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   {message.thinking && message.thinking.length > 0 && (
                     <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
                   )}
-                  {message.tools && message.tools.length > 0 && (
+                  {(message.toolGroups && message.toolGroups.length > 0
+                    ? message.toolGroups
+                    : message.tools && message.tools.length > 0
+                      ? [message.tools]
+                      : []
+                  ).map((group, index) => (
                     <ToolGroup
-                      tools={message.tools}
-                      active={isStreaming}
+                      key={`tool-group-${index}-${group.map((tool) => tool.id).join(',')}`}
+                      tools={group}
+                      active={isStreaming && index === (message.toolGroups?.length ?? 1) - 1}
                       onToolPermission={onToolPermission}
                     />
-                  )}
+                  ))}
                   <div className="assistant-chat__bubble">
                     {message.content ? (
                       <AssistantMarkdown content={message.content} />

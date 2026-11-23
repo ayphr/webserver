@@ -183,6 +183,7 @@ export const AssistantInput = ({
   const streamCompleteRef = useRef<(() => void) | null>(null);
   const streamMessageIdRef = useRef<number | null>(null);
   const streamStartRef = useRef<number | null>(null);
+  const streamLastEventWasToolRef = useRef(false);
   const processQueueRef = useRef<() => void>(() => {});
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
 
@@ -327,6 +328,7 @@ export const AssistantInput = ({
 
   const cancelStream = () => {
     clearServerRefresh();
+    streamLastEventWasToolRef.current = false;
     const requestId = streamRequestIdRef.current;
     if (requestId) streamClientRef.current?.cancel(requestId);
     streamRequestIdRef.current = null;
@@ -342,6 +344,7 @@ export const AssistantInput = ({
     const messageId = streamMessageIdRef.current;
     if (messageId === null) return;
 
+    streamLastEventWasToolRef.current = false;
     const elapsedMs = Math.max(1, Date.now() - (streamStartRef.current ?? Date.now()));
     commitMessages((previous) =>
       previous.map((m) => {
@@ -362,6 +365,7 @@ export const AssistantInput = ({
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     if (messageId === null) return;
+    streamLastEventWasToolRef.current = false;
     commitMessages((previous) =>
       previous.map((m) =>
         m.id === messageId && m.role === 'assistant'
@@ -375,10 +379,31 @@ export const AssistantInput = ({
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     if (messageId === null) return;
+    const consecutive = streamLastEventWasToolRef.current;
+    streamLastEventWasToolRef.current = true;
     commitMessages((previous) =>
-      previous.map((m) =>
-        m.id === messageId && m.role === 'assistant' ? { ...m, tools: mergeById(m.tools, tool) } : m,
-      ),
+      previous.map((m) => {
+        if (m.id !== messageId || m.role !== 'assistant') return m;
+        const tools = mergeById(m.tools, tool);
+        const groups = (m.toolGroups ?? []).map((group) => [...group]);
+        let placed = false;
+        for (const group of groups) {
+          const index = group.findIndex((item) => item.id === tool.id);
+          if (index !== -1) {
+            group[index] = tool;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          if (consecutive && groups.length > 0) {
+            groups[groups.length - 1] = [...groups[groups.length - 1], tool];
+          } else {
+            groups.push([tool]);
+          }
+        }
+        return { ...m, tools, toolGroups: groups };
+      }),
     );
   };
 
@@ -645,6 +670,7 @@ export const AssistantInput = ({
     streamCompleteRef.current = onComplete ?? null;
     streamMessageIdRef.current = messageId;
     streamStartRef.current = Date.now();
+    streamLastEventWasToolRef.current = false;
     setStreamingMessageId(messageId);
     setIsGenerating(true);
     commitMessages((previous) =>
@@ -654,6 +680,7 @@ export const AssistantInput = ({
               ...m,
               thinking: [],
               tools: [],
+              toolGroups: [],
               liveDurationMs: 0,
               liveTokensPerSecond: 0,
             }
