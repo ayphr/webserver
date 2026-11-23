@@ -1,5 +1,6 @@
 import {
   ASSISTANT_LOCATIONS,
+  ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_STREAM_PATH,
   ASSISTANT_THINKING_STATUSES,
@@ -8,6 +9,7 @@ import {
   ASSISTANT_TOOL_STATUSES,
   type AssistantLocation,
   type AssistantMode,
+  type AssistantNotificationLevel,
   type AssistantPermissionLevel,
   type AssistantStreamClientMessage,
   type AssistantStreamServerMessage,
@@ -39,6 +41,7 @@ export type AssistantStreamOptions = {
   chatId?: string;
   messageId?: number;
   prompt?: string;
+  notificationLevel?: AssistantNotificationLevel;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -210,6 +213,9 @@ export class AssistantStreamClient {
           ? options.messageId
           : undefined,
       prompt: options.prompt || undefined,
+      notificationLevel: isOneOf(ASSISTANT_NOTIFICATION_LEVELS, options.notificationLevel)
+        ? options.notificationLevel
+        : undefined,
     });
   }
 

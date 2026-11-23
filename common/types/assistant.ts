@@ -11,6 +11,9 @@ export type AssistantLocation = (typeof ASSISTANT_LOCATIONS)[number];
 export const ASSISTANT_PERMISSION_LEVELS = ['always-ask', 'sometimes-ask', 'never-ask'] as const;
 export type AssistantPermissionLevel = (typeof ASSISTANT_PERMISSION_LEVELS)[number];
 
+export const ASSISTANT_NOTIFICATION_LEVELS = ['always', 'sometimes', 'never'] as const;
+export type AssistantNotificationLevel = (typeof ASSISTANT_NOTIFICATION_LEVELS)[number];
+
 export const ASSISTANT_TOOL_PERMISSION_DECISIONS = ['allow_once', 'allow_always', 'deny'] as const;
 export type AssistantToolPermissionDecision = (typeof ASSISTANT_TOOL_PERMISSION_DECISIONS)[number];
 
@@ -71,6 +74,7 @@ export type AssistantStreamClientMessage =
       chatId?: string;
       messageId?: number;
       prompt?: string;
+      notificationLevel?: AssistantNotificationLevel;
     }
   | {
       type: 'tool_permission';
@@ -130,6 +134,8 @@ export type AssistantPreferences = {
   sendShortcut: AssistantSendShortcut;
   taskLocation: AssistantLocation;
   permissionLevel: AssistantPermissionLevel;
+  /** Controls how much cloud-task progress is reported as notifications. */
+  notificationLevel: AssistantNotificationLevel;
   /** Tool names the user chose to always allow, persisted across sessions. */
   allowedTools: string[];
 };
@@ -148,6 +154,7 @@ export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
   sendShortcut: 'enter',
   taskLocation: 'local',
   permissionLevel: 'always-ask',
+  notificationLevel: 'always',
   allowedTools: [],
 };
 

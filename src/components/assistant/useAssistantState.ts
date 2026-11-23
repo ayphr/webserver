@@ -8,6 +8,7 @@ import {
   type AssistantChat,
   type AssistantLocation,
   type AssistantMode,
+  type AssistantNotificationLevel,
   type AssistantPermissionLevel,
   type AssistantPreferences,
   type AssistantState,
@@ -30,6 +31,7 @@ export type AssistantController = {
   selectMode: (mode: AssistantMode) => void;
   selectTaskLocation: (location: AssistantLocation) => void;
   selectPermissionLevel: (level: AssistantPermissionLevel) => void;
+  selectNotificationLevel: (level: AssistantNotificationLevel) => void;
   allowTool: (name: string) => void;
   createFolder: (name: string) => void;
   createChat: (folderId: string | null, mode: AssistantMode) => AssistantChat;
@@ -189,6 +191,13 @@ export const useAssistantState = (): AssistantController => {
   const selectPermissionLevel = useCallback(
     (level: AssistantPermissionLevel) => {
       updatePreferences({ permissionLevel: level });
+    },
+    [updatePreferences],
+  );
+
+  const selectNotificationLevel = useCallback(
+    (level: AssistantNotificationLevel) => {
+      updatePreferences({ notificationLevel: level });
     },
     [updatePreferences],
   );
@@ -366,6 +375,7 @@ export const useAssistantState = (): AssistantController => {
       selectMode,
       selectTaskLocation,
       selectPermissionLevel,
+      selectNotificationLevel,
       allowTool,
       createFolder,
       createChat,
@@ -389,6 +399,7 @@ export const useAssistantState = (): AssistantController => {
       selectMode,
       selectTaskLocation,
       selectPermissionLevel,
+      selectNotificationLevel,
       allowTool,
       createFolder,
       createChat,

@@ -2,6 +2,7 @@ import type { ServerWebSocket, WebSocketHandler } from 'bun';
 import {
   ASSISTANT_LOCATIONS,
   ASSISTANT_MODES,
+  ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_VARIANTS,
@@ -9,6 +10,7 @@ import {
   type AssistantLocation,
   type AssistantMessage,
   type AssistantMode,
+  type AssistantNotificationLevel,
   type AssistantPermissionLevel,
   type AssistantStreamClientMessage,
   type AssistantStreamServerMessage,
@@ -37,6 +39,7 @@ type ActiveStream = {
   timers: Set<Timer>;
   cloudKey?: string;
   notificationLink?: string;
+  notificationLevel?: AssistantNotificationLevel;
   orphaned?: boolean;
   onOrphaned?: () => void;
 };
@@ -46,6 +49,7 @@ type ToolPermissionHandler = (
   decision: AssistantToolPermissionDecision,
 ) => void;
 type CloudTask = { timers: Set<Timer> };
+type CloudNotifyKind = 'progress' | 'finish' | 'error';
 
 const MAX_CONCURRENT_STREAMS = 8;
 const AUTH_TIMEOUT_MS = 10_000;
@@ -93,7 +97,12 @@ const notifyCloudUser = (
   title: string,
   message: string,
   link: string = DEFAULT_CLOUD_LINK,
+  notificationLevel: AssistantNotificationLevel = 'always',
+  kind: CloudNotifyKind = 'progress',
 ) => {
+  if (notificationLevel === 'never') return;
+  if (notificationLevel === 'sometimes' && kind === 'progress') return;
+
   void runBackgroundTask('assistant-cloud-progress', () =>
     notifyUser({
       userUuid,
@@ -116,6 +125,8 @@ type CloudResultInput = {
   thinking: NonNullable<AssistantMessage['thinking']>;
   tools: NonNullable<AssistantMessage['tools']>;
   durationMs: number;
+  notificationLevel: AssistantNotificationLevel;
+  link: string;
 };
 
 /** Persist a cloud result when its original client connection is gone. */
@@ -181,6 +192,14 @@ const persistCloudResult = async (input: CloudResultInput): Promise<void> => {
     await saveAssistantState(input.userUuid, state);
   } catch (error) {
     log.warn({ error, userUuid: input.userUuid, chatId: input.chatId }, 'failed to persist cloud task result');
+    notifyCloudUser(
+      input.userUuid,
+      'Cloud task could not be saved',
+      'The task finished, but its result could not be saved to the chat.',
+      input.link,
+      input.notificationLevel,
+      'error',
+    );
   }
 };
 
@@ -197,6 +216,7 @@ const startCloudTask = (
   requestId: string,
   steps: string[],
   link: string,
+  notificationLevel: AssistantNotificationLevel,
 ) => {
   clearCloudTask(key);
   const task: CloudTask = { timers: new Set() };
@@ -207,13 +227,15 @@ const startCloudTask = (
     'Cloud task started',
     `Task ${requestId.slice(-6)} is running on the server.`,
     link,
+    notificationLevel,
+    'progress',
   );
 
   steps.slice(0, 3).forEach((step, index) => {
     const timer = setTimeout(() => {
       task.timers.delete(timer);
       if (!cloudTasks.has(key)) return;
-      notifyCloudUser(userUuid, 'Cloud task is working', `${step}…`, link);
+      notifyCloudUser(userUuid, 'Cloud task is working', `${step}…`, link, notificationLevel, 'progress');
     }, CLOUD_FIRST_PROGRESS_MS + index * CLOUD_PROGRESS_STEP_MS);
     task.timers.add(timer);
     timer.unref?.();
@@ -243,6 +265,8 @@ const cancelStream = (
         'Cloud task stopped',
         'The task was cancelled.',
         stream.notificationLink ?? DEFAULT_CLOUD_LINK,
+        stream.notificationLevel ?? 'always',
+        'error',
       );
     }
   }
@@ -262,6 +286,7 @@ const startStream = (
   location: AssistantLocation,
   permissionLevel: AssistantPermissionLevel,
   allowedTools: string[],
+  notificationLevel: AssistantNotificationLevel,
   chatId: string | undefined,
   messageId: number | undefined,
   prompt: string | undefined,
@@ -270,9 +295,20 @@ const startStream = (
   const streams = activeStreams.get(ws);
   if (!streams) return;
 
+  const notificationLink = assistantChatLink(chatId);
   cancelStream(ws, requestId);
   if (streams.size >= MAX_CONCURRENT_STREAMS) {
     send(ws, { type: 'error', requestId, error: 'Too many active streams' });
+    if (location === 'cloud' && userUuid) {
+      notifyCloudUser(
+        userUuid,
+        'Cloud task could not start',
+        'Too many assistant tasks are already running.',
+        notificationLink,
+        notificationLevel,
+        'error',
+      );
+    }
     return;
   }
 
@@ -283,11 +319,11 @@ const startStream = (
   const toolSignatures = new Map<string, string>();
   const permissionDecisions = new Map<string, AssistantToolPermissionDecision>();
   const allowedToolNames = new Set(allowedTools);
-  const notificationLink = assistantChatLink(chatId);
   const stream: ActiveStream = {
     cancelled: false,
     timers: new Set(),
     notificationLink,
+    notificationLevel,
   };
   let index = 0;
   let completed = false;
@@ -487,6 +523,8 @@ const startStream = (
             thinking: mock.thinking.map((step) => ({ ...step, status: 'done' as const })),
             tools: finalTools,
             durationMs,
+            notificationLevel,
+            link: notificationLink,
           });
         }
 
@@ -495,6 +533,8 @@ const startStream = (
           'Cloud task completed',
           'Your task is finished. Open the assistant to review the result.',
           notificationLink,
+          notificationLevel,
+          'finish',
         );
       }
     }
@@ -532,7 +572,7 @@ const startStream = (
       ...mock.thinking.map((step) => step.label),
       ...mock.tools.map((tool) => tool.label ?? tool.name),
     ];
-    startCloudTask(cloudKey, userUuid, requestId, progressSteps, notificationLink);
+    startCloudTask(cloudKey, userUuid, requestId, progressSteps, notificationLink, notificationLevel);
   }
 
   emitThinking();
@@ -597,6 +637,12 @@ const isClientMessage = (value: unknown): value is AssistantStreamClientMessage 
     return false;
   }
   if (
+    message.notificationLevel !== undefined &&
+    !isOneOf(ASSISTANT_NOTIFICATION_LEVELS, message.notificationLevel)
+  ) {
+    return false;
+  }
+  if (
     message.allowedTools !== undefined &&
     (!Array.isArray(message.allowedTools) ||
       message.allowedTools.length > 100 ||
@@ -653,6 +699,7 @@ const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayB
       parsed.location ?? 'local',
       parsed.permissionLevel ?? 'always-ask',
       parsed.allowedTools ?? [],
+      parsed.notificationLevel ?? 'always',
       parsed.chatId,
       parsed.messageId,
       parsed.prompt,

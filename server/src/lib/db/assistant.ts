@@ -1,9 +1,11 @@
 import {
   ASSISTANT_LOCATIONS,
+  ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_VARIANTS,
   DEFAULT_ASSISTANT_PREFERENCES,
   type AssistantLocation,
+  type AssistantNotificationLevel,
   type AssistantPermissionLevel,
   type AssistantPreferences,
   type AssistantState,
@@ -31,12 +33,17 @@ const normalizePreferences = (
     value?.permissionLevel && ASSISTANT_PERMISSION_LEVELS.includes(value.permissionLevel)
       ? value.permissionLevel
       : DEFAULT_ASSISTANT_PREFERENCES.permissionLevel;
+  const notificationLevel =
+    value?.notificationLevel && ASSISTANT_NOTIFICATION_LEVELS.includes(value.notificationLevel)
+      ? value.notificationLevel
+      : DEFAULT_ASSISTANT_PREFERENCES.notificationLevel;
 
   return {
     defaultVariant: defaultVariant as AssistantVariant,
     sendShortcut: value?.sendShortcut ?? DEFAULT_ASSISTANT_PREFERENCES.sendShortcut,
     taskLocation: taskLocation as AssistantLocation,
     permissionLevel: permissionLevel as AssistantPermissionLevel,
+    notificationLevel: notificationLevel as AssistantNotificationLevel,
     allowedTools: Array.isArray(value?.allowedTools)
       ? value.allowedTools.filter((tool): tool is string => typeof tool === 'string')
       : [],

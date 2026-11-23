@@ -1,6 +1,7 @@
 import {
   ASSISTANT_LOCATIONS,
   ASSISTANT_MODES,
+  ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_THINKING_STATUSES,
   ASSISTANT_TOOL_PERMISSIONS,
@@ -14,6 +15,7 @@ import {
   type AssistantMessage,
   type AssistantMessageFeedback,
   type AssistantMode,
+  type AssistantNotificationLevel,
   type AssistantPermissionLevel,
   type AssistantPreferences,
   type AssistantState,
@@ -98,6 +100,16 @@ const requirePermissionLevel = (value: unknown, label: string): AssistantPermiss
     throw new Error(`invalid ${label}`);
   }
   return value as AssistantPermissionLevel;
+};
+
+const requireNotificationLevel = (value: unknown, label: string): AssistantNotificationLevel => {
+  if (
+    typeof value !== 'string' ||
+    !ASSISTANT_NOTIFICATION_LEVELS.includes(value as AssistantNotificationLevel)
+  ) {
+    throw new Error(`invalid ${label}`);
+  }
+  return value as AssistantNotificationLevel;
 };
 
 function parseToolPermission(value: unknown, label: string): AssistantToolPermission {
@@ -294,6 +306,10 @@ function parseAssistantPreferences(value: unknown): AssistantPreferences {
       value.permissionLevel === undefined
         ? DEFAULT_ASSISTANT_PREFERENCES.permissionLevel
         : requirePermissionLevel(value.permissionLevel, 'permissionLevel'),
+    notificationLevel:
+      value.notificationLevel === undefined
+        ? DEFAULT_ASSISTANT_PREFERENCES.notificationLevel
+        : requireNotificationLevel(value.notificationLevel, 'notificationLevel'),
     allowedTools,
   };
 }

@@ -1,6 +1,11 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
   IconArrowDown,
+  IconBell,
+  IconBellFilled,
+  IconBellMinus,
+  IconBellMinusFilled,
+  IconBellOff,
   IconClipboardList,
   IconClipboardListFilled,
   IconCloud,
@@ -25,6 +30,7 @@ import {
   type AssistantFolder,
   type AssistantLocation,
   type AssistantMode,
+  type AssistantNotificationLevel,
   type AssistantPermissionLevel,
 } from '@common';
 import { Tooltip } from '../common/Tooltip';
@@ -38,10 +44,12 @@ export interface AssistantToolbarProps {
   activeMode: AssistantMode;
   taskLocation: AssistantLocation;
   permissionLevel: AssistantPermissionLevel;
+  notificationLevel: AssistantNotificationLevel;
   onSelectFolder: (folderId: string | null) => void;
   onSelectMode: (mode: AssistantMode) => void;
   onSelectTaskLocation: (location: AssistantLocation) => void;
   onSelectPermissionLevel: (level: AssistantPermissionLevel) => void;
+  onSelectNotificationLevel: (level: AssistantNotificationLevel) => void;
   onCreateFolder: (name: string) => void;
   showControls?: boolean;
   onToggleSidebar?: () => void;
@@ -50,7 +58,7 @@ export interface AssistantToolbarProps {
   onJumpToLatest?: () => void;
 }
 
-type MenuName = 'folder' | 'mode' | 'location' | 'permissions';
+type MenuName = 'folder' | 'mode' | 'location' | 'permissions' | 'notifications';
 
 type ToolbarOption<T extends string> = {
   value: T;
@@ -166,16 +174,38 @@ const PERMISSION_OPTIONS: readonly ToolbarOption<AssistantPermissionLevel>[] = [
   },
 ];
 
+const NOTIFICATION_OPTIONS: readonly ToolbarOption<AssistantNotificationLevel>[] = [
+  {
+    value: 'always',
+    label: 'Always notify',
+    icon: <IconBell size={16} strokeWidth={1.75} />,
+    selectedIcon: <IconBellFilled size={16} strokeWidth={1.75} />,
+  },
+  {
+    value: 'sometimes',
+    label: 'Sometimes notify',
+    icon: <IconBellMinus size={16} strokeWidth={1.75} />,
+    selectedIcon: <IconBellMinusFilled size={16} strokeWidth={1.75} />,
+  },
+  {
+    value: 'never',
+    label: 'Never notify',
+    icon: <IconBellOff size={16} strokeWidth={1.75} />,
+  },
+];
+
 export const AssistantToolbar = ({
   folders,
   activeFolderId,
   activeMode,
   taskLocation,
   permissionLevel,
+  notificationLevel,
   onSelectFolder,
   onSelectMode,
   onSelectTaskLocation,
   onSelectPermissionLevel,
+  onSelectNotificationLevel,
   onCreateFolder,
   showControls = true,
   onToggleSidebar,
@@ -361,6 +391,18 @@ export const AssistantToolbar = ({
         onToggle={() => toggleMenu('permissions')}
         onSelect={(level) => {
           onSelectPermissionLevel(level);
+          closeMenu();
+        }}
+      />
+      <ToolbarSelect
+        ariaLabel="Cloud notifications"
+        options={NOTIFICATION_OPTIONS}
+        value={notificationLevel}
+        isOpen={openMenu === 'notifications'}
+        hidden={!isTask || taskLocation !== 'cloud'}
+        onToggle={() => toggleMenu('notifications')}
+        onSelect={(level) => {
+          onSelectNotificationLevel(level);
           closeMenu();
         }}
       />

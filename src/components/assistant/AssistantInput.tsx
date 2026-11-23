@@ -636,6 +636,7 @@ export const AssistantInput = ({
       chatId: currentChatIdRef.current ?? undefined,
       messageId,
       prompt,
+      notificationLevel: assistant.preferences.notificationLevel,
     });
   };
 
@@ -774,10 +775,12 @@ export const AssistantInput = ({
             activeMode={toolbarMode}
             taskLocation={assistant.preferences.taskLocation}
             permissionLevel={assistant.preferences.permissionLevel}
+            notificationLevel={assistant.preferences.notificationLevel}
             onSelectFolder={assistant.selectFolder}
             onSelectMode={assistant.selectMode}
             onSelectTaskLocation={assistant.selectTaskLocation}
             onSelectPermissionLevel={assistant.selectPermissionLevel}
+            onSelectNotificationLevel={assistant.selectNotificationLevel}
             onCreateFolder={assistant.createFolder}
             showControls={!state.activeChatId}
             onToggleSidebar={onToggleSidebar}
