@@ -171,3 +171,44 @@
 .assistant-input__disclaimer a:hover {
   color: var(--text-primary);
 }
+.assistant-input__mic,
+.assistant-input__stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.assistant-input__mic:hover,
+.assistant-input__stop:hover {
+  background: var(--surface-hover-subtle);
+}
+.assistant-input__listening {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.assistant-input__visualizer {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 1rem;
+}
+.assistant-input__visualizer span {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent-blue-solid);
+  animation: assistant-visualizer 0.9s ease-in-out infinite;
+}
+.assistant-input__visualizer span:nth-child(2) { animation-delay: 0.15s; }
+.assistant-input__visualizer span:nth-child(3) { animation-delay: 0.3s; }
+.assistant-input__visualizer span:nth-child(4) { animation-delay: 0.45s; }
+@keyframes assistant-visualizer {
+  0%, 100% { height: 0.25rem; }
+  50% { height: 1rem; }
+}
