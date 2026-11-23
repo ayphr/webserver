@@ -310,16 +310,55 @@ export const useAssistantState = (): AssistantController => {
     [update],
   );
 
+  const deleteChatRef = useRef<(id: string) => void>(() => {});
+
   const deleteChat = useCallback(
     (id: string) => {
+      // Optimistically remove the chat from the local state. The server is the
+      // source of truth for stream results, so also ask it to delete the chat and
+      // any server-authored results that would otherwise resurrect it on reload.
       update((current) => ({
         ...current,
         chats: current.chats.filter((chat) => chat.id !== id),
         activeChatId: current.activeChatId === id ? null : current.activeChatId,
       }));
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+
+      const operation = saveQueueRef.current.then(async () => {
+        try {
+          if (pending) {
+            setSyncStatus('saving');
+            setSyncError(null);
+            await persist(pending);
+          }
+
+          setSyncStatus('saving');
+          setSyncError(null);
+          const saved = await api.assistant.deleteChat(id);
+          stateRef.current = saved;
+          setState(saved);
+          setSyncStatus('saved');
+          setSyncError(null);
+          retryRef.current = null;
+        } catch (err) {
+          setSyncStatus('error');
+          setSyncError(err instanceof Error ? err.message : 'Failed to delete assistant chat');
+          retryRef.current = () => deleteChatRef.current(id);
+        }
+      });
+
+      saveQueueRef.current = operation;
     },
-    [update],
+    [persist, update],
   );
+
+  deleteChatRef.current = deleteChat;
 
   const reorderFolders = useCallback(
     (fromId: string, toId: string) => {

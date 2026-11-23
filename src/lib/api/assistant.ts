@@ -15,5 +15,12 @@ export function createAssistantApi(client: RequestClient) {
       });
       return response.state;
     },
+    async deleteChat(chatId: string): Promise<AssistantState> {
+      const response = await client.requestJson<AssistantStatePayload>(
+        apiPath(API_PATHS.deleteAssistantChatsId, { id: chatId }),
+        { method: 'DELETE' },
+      );
+      return response.state;
+    },
   };
 }

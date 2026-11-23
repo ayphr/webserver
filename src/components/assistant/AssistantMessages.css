@@ -22,8 +22,6 @@
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s ease;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
 }
 
 .assistant-chat__messages-inner {

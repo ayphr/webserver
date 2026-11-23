@@ -113,3 +113,10 @@
   background: linear-gradient(to bottom, transparent, var(--bg-base) 0.75rem);
   z-index: 3;
 }
+
+/* In chat view the composer is in flow, so keep the disclaimer in flow with it
+   instead of letting it get clipped by the chat container's overflow. */
+.assistant-input--chat .assistant-input__disclaimer {
+  position: static;
+  margin-top: 0.15rem;
+}

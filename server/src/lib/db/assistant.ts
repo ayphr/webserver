@@ -181,3 +181,39 @@ export async function saveStreamResult(
     { upsert: true },
   );
 }
+
+export async function deleteAssistantChat(userUuid: string, chatId: string): Promise<AssistantState> {
+  const assistantStates = await getCollection('assistantStates');
+  trackMongoOperation('findOne', ASSISTANT_STATES_COLLECTION);
+  const document = await assistantStates.findOne(
+    { userUuid },
+    { projection: { _id: 0, userUuid: 0, updatedAt: 0 } },
+  );
+  const state = document
+    ? stripStoredFields(document as AssistantStateDocument)
+    : createDefaultAssistantState();
+  const next: AssistantState = {
+    ...state,
+    chats: state.chats.filter((chat) => chat.id !== chatId),
+    activeChatId: state.activeChatId === chatId ? null : state.activeChatId,
+  };
+  const remainingStreamResults = Object.fromEntries(
+    Object.entries((document as AssistantStateDocument | null)?.streamResults ?? {}).filter(
+      ([, record]) => record.chatId !== chatId,
+    ),
+  );
+  trackMongoOperation('updateOne', ASSISTANT_STATES_COLLECTION);
+  await assistantStates.updateOne(
+    { userUuid },
+    {
+      $set: {
+        ...next,
+        userUuid,
+        updatedAt: new Date(),
+        streamResults: remainingStreamResults,
+      },
+    },
+    { upsert: true },
+  );
+  return mergeStreamResults(next, remainingStreamResults);
+}

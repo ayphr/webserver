@@ -71,50 +71,52 @@ export const AssistantComposer = ({
   };
 
   return (
-    <div className="assistant-input__box assistant-input__box--multiline">
-      <textarea
-        ref={textareaRef}
-        className="assistant-input__textarea"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onValueChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        rows={1}
-      />
-      <div className="assistant-input__footer">
-        <AssistantDropdown
-          value={variant}
-          onChange={onVariantChange}
-          availableVariants={availableVariants}
+    <>
+      <div className="assistant-input__box assistant-input__box--multiline">
+        <textarea
+          ref={textareaRef}
+          className="assistant-input__textarea"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
         />
-        {isChat && isGenerating && value.trim() && (
-          <span
-            className="assistant-input__queue-hint"
-            title={isMac ? 'Queue with ⌘ + Enter' : 'Queue with Ctrl + Enter'}
-          >
-            <span className="sr-only">
-              {isMac ? 'Queue with Command Enter' : 'Queue with Control Enter'}
+        <div className="assistant-input__footer">
+          <AssistantDropdown
+            value={variant}
+            onChange={onVariantChange}
+            availableVariants={availableVariants}
+          />
+          {isChat && isGenerating && value.trim() && (
+            <span
+              className="assistant-input__queue-hint"
+              title={isMac ? 'Queue with ⌘ + Enter' : 'Queue with Ctrl + Enter'}
+            >
+              <span className="sr-only">
+                {isMac ? 'Queue with Command Enter' : 'Queue with Control Enter'}
+              </span>
+              {isMac ? (
+                <IconCommand size={13} strokeWidth={1.75} />
+              ) : (
+                <IconKey size={13} strokeWidth={1.75} />
+              )}
+              <IconCornerDownLeft size={13} strokeWidth={1.75} />
             </span>
-            {isMac ? (
-              <IconCommand size={13} strokeWidth={1.75} />
-            ) : (
-              <IconKey size={13} strokeWidth={1.75} />
-            )}
-            <IconCornerDownLeft size={13} strokeWidth={1.75} />
-          </span>
-        )}
-        <button
-          type="button"
-          className={`assistant-input__send ${isGenerating ? 'assistant-input__send--stop' : ''}`}
-          aria-label={isGenerating ? 'Stop' : 'Send'}
-          onClick={onSend}
-        >
-          {isGenerating ? (
-            <IconPlayerStop size={16} strokeWidth={2} />
-          ) : (
-            <IconArrowUp size={18} strokeWidth={2} />
           )}
-        </button>
+          <button
+            type="button"
+            className={`assistant-input__send ${isGenerating ? 'assistant-input__send--stop' : ''}`}
+            aria-label={isGenerating ? 'Stop' : 'Send'}
+            onClick={onSend}
+          >
+            {isGenerating ? (
+              <IconPlayerStop size={16} strokeWidth={2} />
+            ) : (
+              <IconArrowUp size={18} strokeWidth={2} />
+            )}
+          </button>
+        </div>
       </div>
       <p className="assistant-input__disclaimer">
         Iris is AI. By using it, you agree to our{' '}
@@ -124,6 +126,6 @@ export const AssistantComposer = ({
           ? 'Chats may be reviewed and used to improve our AI models and enforce the Terms.'
           : 'Chats may be reviewed to enforce the Terms.'}
       </p>
-    </div>
+    </>
   );
 };

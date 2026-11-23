@@ -24,7 +24,7 @@ import {
   type AssistantToolStatus,
   type AssistantVariant,
 } from '@common';
-import { getAssistantState, saveAssistantState } from '../../lib/db';
+import { deleteAssistantChat, getAssistantState, saveAssistantState } from '../../lib/db';
 import { json, readJsonBody } from '../../lib/http';
 import { requireAuth } from '../auth';
 import type { User } from '@common';
@@ -363,3 +363,13 @@ export const handleSaveState = requireAuth(async (request, user: User) => {
     return json({ error: message }, 400);
   }
 });
+
+const handleDeleteChat = requireAuth(async (_request, user: User, params) => {
+  const chatId = typeof params.id === 'string' ? params.id : '';
+  if (!chatId) return json({ error: 'invalid id' }, 400);
+
+  const state = await deleteAssistantChat(user.uuid, chatId);
+  return json({ state });
+});
+
+export { handleDeleteChat as handleAssistantDeleteChat };

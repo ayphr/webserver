@@ -124,6 +124,11 @@ export const API_ROUTES = [
     operationId: 'putAssistant',
   },
   {
+    method: 'DELETE',
+    path: '/api/v1/assistant/chats/:id',
+    operationId: 'deleteAssistantChatsId',
+  },
+  {
     method: 'GET',
     path: '/api/v1/users/:uuid',
     operationId: 'getUsersUuid',
@@ -776,6 +781,7 @@ export const API_PATHS = {
   postGamesBests: '/api/v1/games/bests',
   getAssistant: '/api/v1/assistant',
   putAssistant: '/api/v1/assistant',
+  deleteAssistantChatsId: '/api/v1/assistant/chats/:id',
   getUsersUuid: '/api/v1/users/:uuid',
   patchUsersMeUsername: '/api/v1/users/me/username',
   getAvatarsUuid: '/api/v1/avatars/:uuid',
