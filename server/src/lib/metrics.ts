@@ -337,3 +337,91 @@ export function observeTelemetryValues(
 export async function metricsText(): Promise<string> {
   return registry.metrics();
 }
+
+// ---------------------------------------------------------------------------
+// Assistant
+// ---------------------------------------------------------------------------
+
+export const assistantStreamsTotal = new Counter({
+  name: 'ayphr_assistant_streams_total',
+  help: 'Total assistant streams started.',
+  labelNames: ['mode', 'variant', 'result'],
+  registers: [registry],
+});
+
+export const assistantStreamDuration = new Histogram({
+  name: 'ayphr_assistant_stream_duration_seconds',
+  help: 'Assistant stream duration in seconds.',
+  labelNames: ['mode', 'variant'],
+  buckets: DURATION_BUCKETS,
+  registers: [registry],
+});
+
+export const assistantStreamTokensTotal = new Counter({
+  name: 'ayphr_assistant_stream_tokens_total',
+  help: 'Total tokens streamed by the assistant.',
+  labelNames: ['variant'],
+  registers: [registry],
+});
+
+export const assistantMessagesTotal = new Counter({
+  name: 'ayphr_assistant_messages_total',
+  help: 'Total assistant messages persisted.',
+  labelNames: ['role'],
+  registers: [registry],
+});
+
+export const assistantFeedbackTotal = new Counter({
+  name: 'ayphr_assistant_feedback_total',
+  help: 'Assistant message feedback counts.',
+  labelNames: ['feedback'],
+  registers: [registry],
+});
+
+export const assistantToolCallsTotal = new Counter({
+  name: 'ayphr_assistant_tool_calls_total',
+  help: 'Assistant tool calls by name and status.',
+  labelNames: ['name', 'status'],
+  registers: [registry],
+});
+
+export const assistantThinkingStepsTotal = new Counter({
+  name: 'ayphr_assistant_thinking_steps_total',
+  help: 'Assistant thinking steps by status.',
+  labelNames: ['status'],
+  registers: [registry],
+});
+
+export const assistantStreamErrorsTotal = new Counter({
+  name: 'ayphr_assistant_stream_errors_total',
+  help: 'Assistant stream errors by code.',
+  labelNames: ['code'],
+  registers: [registry],
+});
+
+export const assistantWebsocketEventsTotal = new Counter({
+  name: 'ayphr_assistant_websocket_events_total',
+  help: 'Assistant websocket events.',
+  labelNames: ['event', 'result'],
+  registers: [registry],
+});
+
+export const assistantActiveStreams = new Gauge({
+  name: 'ayphr_assistant_active_streams',
+  help: 'Currently active assistant streams.',
+  registers: [registry],
+});
+
+export const assistantRateLimitedTotal = new Counter({
+  name: 'ayphr_assistant_rate_limited_total',
+  help: 'Assistant requests rejected by rate limiting.',
+  labelNames: ['limiter'],
+  registers: [registry],
+});
+
+export const assistantResumeTotal = new Counter({
+  name: 'ayphr_assistant_resume_total',
+  help: 'Assistant stream resume attempts.',
+  labelNames: ['result'],
+  registers: [registry],
+});

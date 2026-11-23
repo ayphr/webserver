@@ -312,6 +312,13 @@ export const AssistantInput = ({
     setQueue(queuedMessagesRef.current.filter((_, itemIndex) => itemIndex !== index));
   };
 
+  const editQueuedMessage = (index: number, text: string) => {
+    const next = [...queuedMessagesRef.current];
+    if (index < 0 || index >= next.length) return;
+    next[index] = text;
+    setQueue(next);
+  };
+
   const moveQueuedMessage = (index: number, direction: -1 | 1) => {
     const next = [...queuedMessagesRef.current];
     const target = index + direction;
@@ -384,22 +391,24 @@ export const AssistantInput = ({
     commitMessages((previous) =>
       previous.map((m) => {
         if (m.id !== messageId || m.role !== 'assistant') return m;
-        const tools = mergeById(m.tools, tool);
+        const offset = m.content.length;
+        const toolWithOffset = { ...tool, contentOffset: offset };
+        const tools = mergeById(m.tools, toolWithOffset);
         const groups = (m.toolGroups ?? []).map((group) => [...group]);
         let placed = false;
         for (const group of groups) {
           const index = group.findIndex((item) => item.id === tool.id);
           if (index !== -1) {
-            group[index] = tool;
+            group[index] = toolWithOffset;
             placed = true;
             break;
           }
         }
         if (!placed) {
           if (consecutive && groups.length > 0) {
-            groups[groups.length - 1] = [...groups[groups.length - 1], tool];
+            groups[groups.length - 1] = [...groups[groups.length - 1], toolWithOffset];
           } else {
-            groups.push([tool]);
+            groups.push([toolWithOffset]);
           }
         }
         return { ...m, tools, toolGroups: groups };
@@ -832,6 +841,7 @@ export const AssistantInput = ({
             onCopy={copyMessage}
             onRemoveQueued={removeQueuedMessage}
             onMoveQueued={moveQueuedMessage}
+            onEditQueued={editQueuedMessage}
             onJumpVisibilityChange={setShowJumpToLatest}
           />
         )}

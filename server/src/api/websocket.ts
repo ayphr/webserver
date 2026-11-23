@@ -22,6 +22,16 @@ import { runBackgroundTask } from '../lib/backgroundTasks';
 import { createAssistantMockStream, splitAssistantResponseIntoTokens } from '../lib/assistantStream';
 import { saveStreamResult } from '../lib/db/assistant';
 import { createLogger } from '../lib/logger';
+import {
+  assistantActiveStreams,
+  assistantMessagesTotal,
+  assistantStreamDuration,
+  assistantStreamsTotal,
+  assistantStreamTokensTotal,
+  assistantThinkingStepsTotal,
+  assistantToolCallsTotal,
+  assistantWebsocketEventsTotal,
+} from '../lib/metrics';
 import { notifyUser } from '../lib/notifications';
 import { getUserFromToken } from './auth';
 
@@ -157,6 +167,12 @@ const persistStreamResult = async (input: StreamResultInput): Promise<void> => {
       }
     : undefined;
 
+  if (input.content !== undefined) {
+    assistantMessagesTotal.labels('assistant').inc();
+  }
+  if (input.content === undefined && input.prompt) {
+    assistantMessagesTotal.labels('user').inc();
+  }
   try {
     await saveStreamResult(input.userUuid, {
       chatId: input.chatId,
@@ -183,6 +199,8 @@ const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
   if (!stream || !streams) return;
 
   stream.cancelled = true;
+  assistantActiveStreams.dec();
+  assistantWebsocketEventsTotal.labels('cancel', 'ok').inc();
   clearTimers(stream.timers);
   streams.delete(requestId);
   toolPermissionHandlers.delete(requestId);
@@ -391,6 +409,7 @@ const startStream = (
     toolPermissionHandlers.delete(requestId);
 
     const durationMs = Math.max(1, Date.now() - startedAt);
+    assistantActiveStreams.dec();
     const finalTools: AssistantToolCall[] = mock.tools.map((base) => {
       const decision = permissionDecisions.get(base.id);
       if (decision === 'deny') {
@@ -411,6 +430,16 @@ const startStream = (
       }
       return { ...base, status: 'done' as const };
     });
+
+    assistantStreamsTotal.labels(mode, variant, 'success').inc();
+    assistantStreamDuration.labels(mode, variant).observe(durationMs / 1000);
+    assistantStreamTokensTotal.labels(variant).inc(tokens.length);
+    for (const _ of mock.thinking) {
+      assistantThinkingStepsTotal.labels('done').inc();
+    }
+    for (const tool of finalTools) {
+      assistantToolCallsTotal.labels(tool.name, tool.status).inc();
+    }
 
     if (chatId && messageId !== undefined) {
       if (stream.persistStart) await stream.persistStart;
@@ -457,6 +486,8 @@ const startStream = (
   };
 
   streams.set(requestId, stream);
+  assistantActiveStreams.inc();
+  assistantWebsocketEventsTotal.labels('stream', 'started').inc();
 
   if (chatId) {
     stream.persistStart = persistStreamResult({

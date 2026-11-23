@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  type ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -60,6 +61,7 @@ export interface AssistantMessagesProps {
   onCopy: (messageId: number, content: string) => void;
   onRemoveQueued: (index: number) => void;
   onMoveQueued: (index: number, direction: -1 | 1) => void;
+  onEditQueued: (index: number, text: string) => void;
   onJumpVisibilityChange: (visible: boolean) => void;
 }
 
@@ -331,11 +333,14 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
       onCopy,
       onRemoveQueued,
       onMoveQueued,
+      onEditQueued,
       onJumpVisibilityChange,
     },
     ref,
   ) {
   const prefersReducedMotion = usePrefersReducedMotion();
+  const [editingQueuedIndex, setEditingQueuedIndex] = useState<number | null>(null);
+  const [editingQueuedText, setEditingQueuedText] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -509,6 +514,12 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
         aria-busy={streamingMessageId !== null}
       >
         <div className="assistant-chat__messages-inner" ref={innerRef}>
+        {messages.length === 0 && (
+          <div className="assistant-chat__empty-state" role="status">
+            <h3>Start a conversation</h3>
+            <p>Ask a question or describe a task. Iris will stream the response here.</p>
+          </div>
+        )}
         {messages.map((message) => {
           const isStreaming = streamingMessageId === message.id;
           const isLatestAssistant =
@@ -545,30 +556,100 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   {message.thinking && message.thinking.length > 0 && (
                     <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
                   )}
-                  {(message.toolGroups && message.toolGroups.length > 0
-                    ? message.toolGroups
-                    : message.tools && message.tools.length > 0
-                      ? [message.tools]
-                      : []
-                  ).map((group, index) => (
-                    <ToolGroup
-                      key={`tool-group-${index}-${group.map((tool) => tool.id).join(',')}`}
-                      tools={group}
-                      active={isStreaming && index === (message.toolGroups?.length ?? 1) - 1}
-                      onToolPermission={onToolPermission}
-                    />
-                  ))}
-                  <div className="assistant-chat__bubble">
-                    {message.content ? (
-                      <AssistantMarkdown content={message.content} />
-                    ) : (
-                      isStreaming && (
-                        <span className="assistant-chat__pending" role="status">
-                          Working…
-                        </span>
-                      )
-                    )}
-                  </div>
+                  {(() => {
+                    const groups =
+                      message.toolGroups && message.toolGroups.length > 0
+                        ? message.toolGroups
+                        : message.tools && message.tools.length > 0
+                          ? [message.tools]
+                          : [];
+                    const hasOffsets = groups.some((group) =>
+                      group.some((tool) => typeof tool.contentOffset === 'number'),
+                    );
+                    if (!hasOffsets) {
+                      return (
+                        <>
+                          {groups.map((group, index) => (
+                            <ToolGroup
+                              key={`tool-group-${index}-${group.map((tool) => tool.id).join(',')}`}
+                              tools={group}
+                              active={isStreaming && index === groups.length - 1}
+                              onToolPermission={onToolPermission}
+                            />
+                          ))}
+                          <div className="assistant-chat__bubble">
+                            {message.content ? (
+                              <AssistantMarkdown content={message.content} />
+                            ) : (
+                              isStreaming && (
+                                <span className="assistant-chat__pending" role="status">
+                                  <span className="assistant-chat__skeleton-line" />
+                                  <span className="assistant-chat__skeleton-line" />
+                                  <span className="assistant-chat__skeleton-line assistant-chat__skeleton-line--short" />
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </>
+                      );
+                    }
+                    const ordered = groups
+                      .map((group, index) => ({
+                        group,
+                        index,
+                        offset: Math.max(
+                          0,
+                          Math.min(
+                            group.find((tool) => typeof tool.contentOffset === 'number')?.contentOffset ??
+                              0,
+                            message.content.length,
+                          ),
+                        ),
+                      }))
+                      .sort((a, b) => a.offset - b.offset);
+                    const nodes: ReactNode[] = [];
+                    let cursor = 0;
+                    ordered.forEach(({ group, index, offset }) => {
+                      const safeOffset = Math.max(cursor, Math.min(offset, message.content.length));
+                      if (safeOffset > cursor) {
+                        nodes.push(
+                          <div className="assistant-chat__bubble" key={`md-${cursor}`}>
+                            <AssistantMarkdown content={message.content.slice(cursor, safeOffset)} />
+                          </div>,
+                        );
+                      }
+                      nodes.push(
+                        <ToolGroup
+                          key={`tool-group-${index}-${group.map((tool) => tool.id).join(',')}`}
+                          tools={group}
+                          active={isStreaming && index === groups.length - 1}
+                          onToolPermission={onToolPermission}
+                        />,
+                      );
+                      cursor = safeOffset;
+                    });
+                    if (cursor < message.content.length) {
+                      nodes.push(
+                        <div className="assistant-chat__bubble" key={`md-${cursor}`}>
+                          <AssistantMarkdown content={message.content.slice(cursor)} />
+                        </div>,
+                      );
+                    }
+                    if (nodes.length === 0) {
+                      nodes.push(
+                        <div className="assistant-chat__bubble" key="pending">
+                          {isStreaming && (
+                            <span className="assistant-chat__pending" role="status">
+                              <span className="assistant-chat__skeleton-line" />
+                              <span className="assistant-chat__skeleton-line" />
+                              <span className="assistant-chat__skeleton-line assistant-chat__skeleton-line--short" />
+                            </span>
+                          )}
+                        </div>,
+                      );
+                    }
+                    return nodes;
+                  })()}
                   {message.error && <p className="assistant-chat__error">{message.error}</p>}
                   {message.interrupted && (
                     <p className="assistant-chat__interrupted">You interrupted this response.</p>
@@ -644,10 +725,51 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
               className="assistant-chat__message assistant-chat__message--user assistant-chat__message--queued"
             >
               <div className="assistant-chat__user-wrap">
-                <div className="assistant-chat__bubble">{text}</div>
+            {editingQueuedIndex === index ? (
+              <div className="assistant-chat__queued-edit">
+                <textarea
+                  className="assistant-chat__queued-input"
+                  value={editingQueuedText}
+                  onChange={(event) => setEditingQueuedText(event.target.value)}
+                  rows={2}
+                />
+                <div className="assistant-chat__queued-edit-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = editingQueuedText.trim();
+                      if (trimmed) onEditQueued(index, trimmed);
+                      setEditingQueuedIndex(null);
+                    }}
+                    aria-label="Save queued message"
+                  >
+                    <IconCheck size={12} strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingQueuedIndex(null)}
+                    aria-label="Cancel editing queued message"
+                  >
+                    <IconX size={12} strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="assistant-chat__bubble">{text}</div>
+            )}
                 <div className="assistant-chat__queued-row">
                   <span className="assistant-chat__queued-label">Queued</span>
                   <div className="assistant-chat__queued-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingQueuedIndex(index);
+                        setEditingQueuedText(text);
+                      }}
+                      aria-label="Edit queued message"
+                    >
+                      <IconTool size={12} strokeWidth={2} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => onMoveQueued(index, -1)}

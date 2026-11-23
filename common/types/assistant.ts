@@ -52,6 +52,8 @@ export type AssistantToolCall = {
   detail?: string;
   durationMs?: number;
   error?: string;
+  /** Character offset in the assistant message content where this tool run occurred. */
+  contentOffset?: number;
   /** Records how a permission-gated tool was resolved. */
   permission?: AssistantToolPermission;
 };
@@ -103,6 +105,8 @@ export type AssistantMessage = {
   durationMs?: number;
   thinking?: AssistantThinkingStep[];
   tools?: AssistantToolCall[];
+  /** Persisted grouping of tool calls by consecutive runs in the stream. */
+  toolGroups?: AssistantToolCall[][];
 };
 
 export type AssistantFolder = {

@@ -1,4 +1,4 @@
-import { isValidElement, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
+import { isValidElement, memo, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { IconCheck, IconCopy } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -56,9 +56,10 @@ const CodeBlock = ({ children, ...props }: HTMLAttributes<HTMLPreElement>) => {
   );
 };
 
-export const AssistantMarkdown = ({ content }: AssistantMarkdownProps) => (
+export const AssistantMarkdown = memo(({ content }: AssistantMarkdownProps) => (
   <div className="assistant-markdown">
     <ReactMarkdown
+      skipHtml
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeHighlight]}
       components={{
@@ -76,4 +77,4 @@ export const AssistantMarkdown = ({ content }: AssistantMarkdownProps) => (
       {content}
     </ReactMarkdown>
   </div>
-);
+));
