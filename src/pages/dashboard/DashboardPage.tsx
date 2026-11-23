@@ -210,7 +210,9 @@ export const DashboardPage = () => {
   );
   const assistant = useAssistantState();
   const [chatAction, setChatAction] = useState<AssistantChatAction | null>(null);
-  const [isAssistantSidebarOpen, setIsAssistantSidebarOpen] = useState(false);
+  const [isAssistantSidebarOpen, setIsAssistantSidebarOpen] = useState(
+    () => typeof window !== 'undefined' && !window.matchMedia('(max-width: 768px)').matches,
+  );
   const chatActionTokenRef = useRef(0);
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -589,8 +591,17 @@ export const DashboardPage = () => {
   }, [activePage, assistant, isLoading, navigate, routeChatId]);
 
   useEffect(() => {
-    // Opening a chat from the drawer should reveal the conversation underneath.
-    setIsAssistantSidebarOpen(false);
+    const mobile = window.matchMedia('(max-width: 768px)');
+    const handleChange = (event: MediaQueryListEvent) => setIsAssistantSidebarOpen(!event.matches);
+    mobile.addEventListener('change', handleChange);
+    return () => mobile.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    // On mobile the chat list is an overlay; opening a chat reveals the conversation.
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      setIsAssistantSidebarOpen(false);
+    }
   }, [routeChatId]);
 
   useEffect(() => {
@@ -776,7 +787,10 @@ export const DashboardPage = () => {
           <>
             {activePage === 'assistant' && (
               <div className="dashboard-assistant">
-                <div className={`dashboard-assistant__sidebar-slot${isAssistantSidebarOpen ? ' dashboard-assistant__sidebar-slot--open' : ''}`}>
+                <div
+                  id="assistant-chat-list"
+                  className={`dashboard-assistant__sidebar-slot${isAssistantSidebarOpen ? ' dashboard-assistant__sidebar-slot--open' : ''}`}
+                >
                   <button
                     type="button"
                     className="dashboard-assistant__sidebar-backdrop"
@@ -809,6 +823,7 @@ export const DashboardPage = () => {
                   chatAction={chatAction}
                   onChatCreated={handleChatCreated}
                   onToggleSidebar={() => setIsAssistantSidebarOpen((open) => !open)}
+                  isSidebarOpen={isAssistantSidebarOpen}
                 />
               </div>
             )}

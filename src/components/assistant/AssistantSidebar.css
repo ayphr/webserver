@@ -1,5 +1,5 @@
 .assistant-sidebar {
-  width: 200px;
+  width: 100%;
   flex-shrink: 0;
   box-sizing: border-box;
   padding: 0;
@@ -17,11 +17,9 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: max-content;
-  min-width: 200px;
-  /* Grow left into the free space without pushing the composer or overflowing. */
-  max-width: clamp(200px, calc(50vw - 19.875rem), 20rem);
-  transition: width 0.24s ease;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 
 /* Rows fade in as folders open, chats appear and search results change. */

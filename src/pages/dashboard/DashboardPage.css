@@ -45,13 +45,40 @@
   width: 100%;
   min-width: 0;
   min-height: 0;
+  transition: gap 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dashboard-assistant__sidebar-slot {
+  --assistant-sidebar-width: clamp(200px, calc(50vw - 19.875rem), 20rem);
   position: relative;
-  width: 200px;
+  width: var(--assistant-sidebar-width);
   flex-shrink: 0;
   min-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition:
+    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease,
+    visibility 0s linear 0.32s;
+}
+
+.dashboard-assistant:not(:has(> .dashboard-assistant__sidebar-slot--open)) {
+  gap: 0;
+}
+
+.dashboard-assistant__sidebar-slot:not(.dashboard-assistant__sidebar-slot--open) {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dashboard-assistant__sidebar-slot--open {
+  width: var(--assistant-sidebar-width);
+  visibility: visible;
+  transition:
+    width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease,
+    visibility 0s;
 }
 
 .dashboard-assistant__sidebar-backdrop {
@@ -566,15 +593,31 @@
     gap: 0.75rem;
   }
   .dashboard-assistant__sidebar-slot {
-    display: none;
-  }
-  .dashboard-assistant__sidebar-slot--open {
     display: block;
     position: fixed;
     inset: 0;
     z-index: 50;
     width: auto;
     padding: 0.75rem;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-0.75rem);
+    transition:
+      opacity 0.2s ease,
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s linear 0.28s;
+  }
+  .dashboard-assistant__sidebar-slot:not(.dashboard-assistant__sidebar-slot--open) {
+    width: auto;
+  }
+  .dashboard-assistant__sidebar-slot--open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+    transition:
+      opacity 0.2s ease,
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s;
   }
   .dashboard-assistant__sidebar-backdrop {
     display: block;
@@ -598,9 +641,6 @@
     border-radius: var(--radius-md);
     background: var(--bg-base);
     box-shadow: var(--container-shadow);
-  }
-  .assistant-toolbar__sidebar-toggle {
-    display: inline-flex;
   }
   .dashboard-layout {
     flex-direction: column;

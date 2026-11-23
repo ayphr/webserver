@@ -117,7 +117,7 @@
 }
 
 .assistant-toolbar__sidebar-toggle {
-  display: none;
+  display: inline-flex;
 }
 
 .assistant-toolbar__context {

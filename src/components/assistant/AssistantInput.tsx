@@ -29,6 +29,7 @@ export interface AssistantInputProps {
   chatAction?: AssistantChatAction | null;
   onChatCreated?: (chatId: string) => void;
   onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
 }
 
 const CHAT_SUBTITLE_TEXTS = (displayName: string) => [
@@ -129,6 +130,7 @@ export const AssistantInput = ({
   chatAction = null,
   onChatCreated,
   onToggleSidebar,
+  isSidebarOpen = false,
 }: AssistantInputProps) => {
   const displayName = username?.trim() || 'there';
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -741,6 +743,7 @@ export const AssistantInput = ({
             onCreateFolder={assistant.createFolder}
             showControls={!state.activeChatId}
             onToggleSidebar={onToggleSidebar}
+            isSidebarOpen={isSidebarOpen}
             showJumpToLatest={showJumpToLatest}
             onJumpToLatest={handleJumpToLatest}
           />

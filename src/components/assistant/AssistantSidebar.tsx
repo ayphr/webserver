@@ -297,19 +297,20 @@ export const AssistantSidebar = ({
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // The sidebar grows to fit its longest visible label. Intrinsic width cannot
-  // be transitioned, so measure the text and set an explicit pixel width that
-  // CSS can animate when rows, titles or folders change.
+  // The sidebar grows to fit its longest visible label. Keep that measurement
+  // on the wrapper's CSS variable so the wrapper can animate its width while
+  // the child simply fills it.
   const measureSidebarWidth = useCallback(() => {
     const element = sidebarRef.current;
-    if (!element) return;
+    const slot = element?.parentElement;
+    if (!element || !slot) return;
     const canvas = (measureCanvasRef.current ??= document.createElement('canvas'));
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    const styles = getComputedStyle(element);
-    const minWidth = parseFloat(styles.minWidth) || 0;
-    const maxWidth = parseFloat(styles.maxWidth) || Number.POSITIVE_INFINITY;
+    const minWidth = 200;
+    const maxWidth = Math.min(320, Math.max(minWidth, window.innerWidth / 2 - 318));
+    const availableWidth = element.clientWidth || 200;
     let needed = minWidth;
 
     element.querySelectorAll<HTMLElement>('.assistant-sidebar__label').forEach((label) => {
@@ -317,12 +318,12 @@ export const AssistantSidebar = ({
       context.font = `${labelStyles.fontWeight} ${labelStyles.fontSize} ${labelStyles.fontFamily}`;
       const textWidth = context.measureText(label.textContent ?? '').width;
       // Keep the icon, indentation and action space the row already reserves.
-      const surrounding = element.clientWidth - label.getBoundingClientRect().width;
+      const surrounding = availableWidth - label.getBoundingClientRect().width;
       needed = Math.max(needed, textWidth + surrounding);
     });
 
     const target = Math.min(Math.max(needed, minWidth), maxWidth);
-    element.style.width = `${Math.round(target)}px`;
+    slot.style.setProperty('--assistant-sidebar-width', `${Math.round(target)}px`);
   }, []);
 
   useLayoutEffect(() => {

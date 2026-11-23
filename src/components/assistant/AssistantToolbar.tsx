@@ -27,6 +27,7 @@ export interface AssistantToolbarProps {
   onCreateFolder: (name: string) => void;
   showControls?: boolean;
   onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
   showJumpToLatest?: boolean;
   onJumpToLatest?: () => void;
 }
@@ -40,6 +41,7 @@ export const AssistantToolbar = ({
   onCreateFolder,
   showControls = true,
   onToggleSidebar,
+  isSidebarOpen = false,
   showJumpToLatest = false,
   onJumpToLatest,
 }: AssistantToolbarProps) => {
@@ -76,9 +78,11 @@ export const AssistantToolbar = ({
       {onToggleSidebar && (
         <button
           type="button"
-          className="assistant-toolbar__mode-button assistant-toolbar__sidebar-toggle"
+          className={`assistant-toolbar__mode-button assistant-toolbar__sidebar-toggle${isSidebarOpen ? ' assistant-toolbar__mode-button--active' : ''}`}
           onClick={onToggleSidebar}
-          aria-label="Toggle chat list"
+          aria-label={isSidebarOpen ? 'Hide chat list' : 'Show chat list'}
+          aria-expanded={isSidebarOpen}
+          aria-controls="assistant-chat-list"
         >
           <IconMenu2 size={16} strokeWidth={1.75} />
         </button>
