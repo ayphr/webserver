@@ -1,6 +1,5 @@
 import type { ServerWebSocket, WebSocketHandler } from 'bun';
 import {
-  ASSISTANT_DATA,
   ASSISTANT_CONTEXT_SUMMARY_TOKEN_BUDGET,
   ASSISTANT_MODES,
   ASSISTANT_NOTIFICATION_LEVELS,
@@ -32,12 +31,13 @@ import {
 } from '@common';
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { splitAssistantResponseIntoTokens } from '../lib/assistantStream';
+import { summarizeAssistantContext } from '../lib/assistantContextSummary';
 import {
   getAssistantModelAdapter,
   type AssistantModelDraft,
   type AssistantModelToolResult,
 } from '../lib/assistantModel';
-import { buildAssistantSystemPrompt, isLiveAiPrompt } from '../lib/geminiAdapter';
+import { buildAssistantSystemPrompt } from '../lib/geminiAdapter';
 import { executeAssistantTool } from '../lib/assistantTools';
 import { detectSafetyCategories, redactPII } from '@common';
 import { getAssistantState, saveStreamResult, updateAssistantChatContext } from '../lib/db/assistant';
@@ -292,8 +292,8 @@ type PreparedContext = {
 
 /**
  * Loads the authoritative chat, estimates its context usage and compacts old
- * messages when needed. A real model adapter can later replace the summary
- * generator without changing this flow.
+ * messages when needed. Compaction is local; only response generation uses the
+ * model provider.
  */
 const prepareContext = async (
   userUuid: string,
@@ -312,11 +312,10 @@ const prepareContext = async (
       const summaryMessages: AssistantContextMessage[] = summary
         ? [{ role: 'system', content: summary }]
         : [];
-      const generated = await getAssistantModelAdapter().summarize({
-        modelId: ASSISTANT_DATA[variant].model,
-        messages: [...summaryMessages, ...toContextMessages(plan.olderMessages)],
-        maxTokens: ASSISTANT_CONTEXT_SUMMARY_TOKEN_BUDGET,
-      });
+      const generated = summarizeAssistantContext(
+        [...summaryMessages, ...toContextMessages(plan.olderMessages)],
+        ASSISTANT_CONTEXT_SUMMARY_TOKEN_BUDGET,
+      );
       if (generated.trim()) {
         summary = generated;
         const compactedThroughMessageId = plan.olderMessages[plan.olderMessages.length - 1]?.id;
@@ -380,7 +379,7 @@ const startStream = async (
   });
 
   const modelId = context.usage.modelId;
-  const useLiveAI = isLiveAiPrompt(prompt);
+  const systemPromptTokens = estimateTokens(buildAssistantSystemPrompt());
   const rejectInsufficientCredits = () => {
     send(ws, { type: 'error', requestId, error: 'insufficient credits' });
     notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
@@ -389,9 +388,7 @@ const startStream = async (
   // Reserve enough credits for the first request before any model work happens.
   // Each continuation round reserves its own estimate before the provider call.
   let reservedCredits = estimateAssistantUsageCredits(modelId, {
-    inputTokens:
-      context.usage.usedTokens +
-      (useLiveAI ? estimateTokens(buildAssistantSystemPrompt()) : 0),
+    inputTokens: context.usage.usedTokens + systemPromptTokens,
     outputTokens: Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
   });
   const creditBalance = await getCreditBalanceFromUuid(userUuid);
@@ -433,7 +430,6 @@ const startStream = async (
       modelId,
       messages: context.contextMessages,
       usage: context.usage,
-      useLiveAI,
       ...options,
     });
 
@@ -504,9 +500,9 @@ const startStream = async (
     return Boolean(notice);
   };
 
-  let mock: AssistantModelDraft;
+  let currentDraft: AssistantModelDraft;
   try {
-    mock = await generateDraft({});
+    currentDraft = await generateDraft({});
   } catch (error) {
     await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
       log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
@@ -523,10 +519,10 @@ const startStream = async (
     return;
   }
 
-  let stopAfterRound = applyDraftSafety(mock);
+  let stopAfterRound = applyDraftSafety(currentDraft);
   if (safetyNotice) send(ws, { type: 'safety', requestId, notice: safetyNotice });
 
-  let tokens = splitAssistantResponseIntoTokens(mock.content);
+  let tokens = splitAssistantResponseIntoTokens(currentDraft.content);
   const startedAt = Date.now();
   const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
   const toolSignatures = new Map<string, string>();
@@ -561,7 +557,7 @@ const startStream = async (
     allUsage.outputTokens += usage.outputTokens;
     projectedCost += estimateAssistantUsageCredits(modelId, usage);
   };
-  addDraftToTotals(mock);
+  addDraftToTotals(currentDraft);
 
   // A provider can report more usage than the preflight estimate. Reserve the
   // difference before streaming so the running-cost guard stays meaningful.
@@ -625,8 +621,8 @@ const startStream = async (
   };
 
   const emitThinking = (forceDone = false) => {
-    const active = stageIndexFor(mock.thinking.length);
-    mock.thinking.forEach((base, stageIndex) => {
+    const active = stageIndexFor(currentDraft.thinking.length);
+    currentDraft.thinking.forEach((base, stageIndex) => {
       const status: AssistantThinkingStatus = forceDone
         ? 'done'
         : stageIndex < active
@@ -649,7 +645,7 @@ const startStream = async (
   };
 
   const emitTool = (
-    tool: (typeof mock.tools)[number],
+    tool: (typeof currentDraft.tools)[number],
     status: AssistantToolStatus,
     permission?: AssistantToolPermission,
     detail?: string,
@@ -695,7 +691,7 @@ const startStream = async (
     });
 
   const recordToolResult = (
-    base: (typeof mock.tools)[number],
+    base: (typeof currentDraft.tools)[number],
     result: AssistantToolResult,
     permission?: AssistantToolPermission,
   ) => {
@@ -714,7 +710,7 @@ const startStream = async (
   };
 
   const runTool = (
-    base: (typeof mock.tools)[number],
+    base: (typeof currentDraft.tools)[number],
     permission?: AssistantToolPermission,
   ) => {
     void executeAssistantTool(base.name, {
@@ -739,7 +735,7 @@ const startStream = async (
         if (stream.cancelled) return;
         pendingToolId = null;
         toolCursor += 1;
-        if (tokens.length === 0 && toolCursor < mock.tools.length) {
+        if (tokens.length === 0 && toolCursor < currentDraft.tools.length) {
           emitTools();
         } else {
           schedule(emitToken, TOKEN_DELAY_MIN_MS);
@@ -748,7 +744,7 @@ const startStream = async (
   };
 
   const denyTool = (
-    base: (typeof mock.tools)[number],
+    base: (typeof currentDraft.tools)[number],
     permission: AssistantToolPermission,
   ) => {
     emitTool(base, 'denied', permission, 'Denied by you');
@@ -764,9 +760,9 @@ const startStream = async (
   const emitTools = (forceDone = false) => {
     const active =
       tokens.length === 0
-        ? Math.min(toolCursor, mock.tools.length - 1)
-        : stageIndexFor(mock.tools.length);
-    mock.tools.forEach((base, stageIndex) => {
+        ? Math.min(toolCursor, currentDraft.tools.length - 1)
+        : stageIndexFor(currentDraft.tools.length);
+    currentDraft.tools.forEach((base, stageIndex) => {
       if (pendingToolId !== null && base.id !== pendingToolId) return;
 
       if (forceDone) {
@@ -834,7 +830,7 @@ const startStream = async (
           if (decision === 'deny') {
             denyTool(base, 'denied');
             toolCursor += 1;
-            if (tokens.length === 0 && toolCursor < mock.tools.length) {
+            if (tokens.length === 0 && toolCursor < currentDraft.tools.length) {
               emitTools();
             } else {
               schedule(emitToken, TOKEN_DELAY_MIN_MS);
@@ -996,8 +992,8 @@ const startStream = async (
   };
 
   /** Starts a fresh model round with its own token and tool cursors. */
-  function startRound(draft: AssistantModelDraft, nextRound: number) {
-    mock = draft;
+  function startRound(nextDraft: AssistantModelDraft, nextRound: number) {
+    currentDraft = nextDraft;
     round = nextRound;
     index = 0;
     toolCursor = 0;
@@ -1005,10 +1001,10 @@ const startStream = async (
 
     // Keep the boundary between rounds in both the live feed and the persisted
     // content, since the client simply appends tokens in arrival order.
-    const separator = emittedText && draft.content && !emittedText.endsWith('\n') ? '\n\n' : '';
+    const separator = emittedText && nextDraft.content && !emittedText.endsWith('\n') ? '\n\n' : '';
     tokens = [
       ...(separator ? [separator] : []),
-      ...splitAssistantResponseIntoTokens(draft.content),
+      ...splitAssistantResponseIntoTokens(nextDraft.content),
     ];
 
     emitThinking();
@@ -1024,7 +1020,7 @@ const startStream = async (
     // with a fresh set of steps and cursors.
     emitThinking(true);
 
-    const roundToolResults: AssistantModelToolResult[] = mock.tools.flatMap((base) => {
+    const roundToolResults: AssistantModelToolResult[] = currentDraft.tools.flatMap((base) => {
       const result = toolResults.get(base.id);
       if (!result) return [];
       let content: string;
@@ -1050,7 +1046,7 @@ const startStream = async (
     const limit = maxToolRounds(mode);
     const canContinue =
       !stopAfterRound &&
-      mock.tools.length > 0 &&
+      currentDraft.tools.length > 0 &&
       roundToolResults.length > 0 &&
       round + 1 < limit;
 
@@ -1064,7 +1060,7 @@ const startStream = async (
       context.usage.usedTokens +
       estimateTokens(emittedText) +
       estimateTokens(roundToolResults.map((result) => result.content).join('\n')) +
-      (useLiveAI ? estimateTokens(buildAssistantSystemPrompt()) : 0);
+      systemPromptTokens;
     const nextCost = estimateRoundCredits(
       nextInputTokens,
       Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
@@ -1077,7 +1073,7 @@ const startStream = async (
     let nextDraft: AssistantModelDraft;
     try {
       nextDraft = await generateDraft({
-        continuation: mock.continuation,
+        continuation: currentDraft.continuation,
         toolResults: roundToolResults,
         // On the last allowed round, force the model to answer with what it has.
         disableTools: nextRound + 1 >= limit,
@@ -1112,7 +1108,7 @@ const startStream = async (
       // Tool-only responses (or a trailing tool run) must not complete while
       // tools are still pending or running. Emit the next tool (if any) so
       // multi-tool responses continue instead of stalling after the first call.
-      if (mock.tools.length > 0 && toolCursor < mock.tools.length) {
+      if (currentDraft.tools.length > 0 && toolCursor < currentDraft.tools.length) {
         emitTools();
         return;
       }

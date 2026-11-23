@@ -2,12 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import {
   buildAssistantSystemPrompt,
   buildGeminiRequestBody,
-  createAssistantModelRouter,
-  isLiveAiPrompt,
+  geminiAdapter,
   readGeminiEventStream,
-  stripAiPrefix,
 } from './geminiAdapter';
-import type { AssistantModelAdapter, AssistantModelRequest } from './assistantModel';
+import { getAssistantModelAdapter } from './assistantModel';
 
 const sseResponse = (frames: string[]) => new Response(frames.join(''));
 
@@ -21,21 +19,9 @@ const frame = (eventType: string, payload: Record<string, unknown>, crlf = false
 };
 
 describe('Gemini adapter', () => {
-  it('strips the ai: opt-in prefix before sending content', () => {
-    expect(stripAiPrefix('ai: hello')).toBe('hello');
-    expect(stripAiPrefix('  AI:   hello')).toBe('hello');
-    expect(stripAiPrefix('hello ai: world')).toBe('hello ai: world');
-  });
-
-  it('detects the ai: opt-in with the same rules it strips with', () => {
-    expect(isLiveAiPrompt('ai: hello')).toBe(true);
-    expect(isLiveAiPrompt('  AI:   hello')).toBe(true);
-    expect(isLiveAiPrompt('ai:')).toBe(true);
-    expect(isLiveAiPrompt('hello ai: world')).toBe(false);
-    expect(isLiveAiPrompt(undefined)).toBe(false);
-    expect(isLiveAiPrompt('')).toBe(false);
-    // Regression: a doubled escape matched a literal backslash instead.
-    expect(isLiveAiPrompt('\\sai: hello')).toBe(false);
+  it('is the only registered assistant model adapter', () => {
+    expect(geminiAdapter.id).toBe('gemini');
+    expect(getAssistantModelAdapter()).toBe(geminiAdapter);
   });
 
   it('builds a multi-line system prompt with real newlines', () => {
@@ -52,8 +38,8 @@ describe('Gemini adapter', () => {
   it('builds a stateless request without unsupported step fields', () => {
     const body = buildGeminiRequestBody('gemini-4-hydrogen', [
       { role: 'system', content: 'Be brief' },
-      { role: 'user', content: 'ai: Hello' },
-      { role: 'assistant', content: 'ai: Hi' },
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: 'Hi' },
     ]);
 
     expect(body.input).toEqual([
@@ -71,7 +57,7 @@ describe('Gemini adapter', () => {
   it('appends continuation steps and function results to the stateless input', () => {
     const body = buildGeminiRequestBody(
       'gemini-4-hydrogen',
-      [{ role: 'user', content: 'ai: What devices do I have?' }],
+      [{ role: 'user', content: 'What devices do I have?' }],
       {
         steps: [{ type: 'function_call', id: 'call-1', name: 'devices.list', arguments: {} }],
       },
@@ -102,7 +88,7 @@ describe('Gemini adapter', () => {
   it('can omit tools on a forced final round', () => {
     const body = buildGeminiRequestBody(
       'gemini-4-hydrogen',
-      [{ role: 'user', content: 'ai: hi' }],
+      [{ role: 'user', content: 'hi' }],
       undefined,
       undefined,
       true,
@@ -176,79 +162,4 @@ describe('Gemini adapter', () => {
     await expect(readGeminiEventStream(response)).rejects.toThrow('quota exceeded');
   });
 
-  it('forwards continuation state and tool results through the router', async () => {
-    let received: AssistantModelRequest | undefined;
-    const mock: AssistantModelAdapter = {
-      id: 'mock',
-      async generate(request) {
-        received = request;
-        return { content: 'final', thinking: [], tools: [] };
-      },
-      async summarize() {
-        return '';
-      },
-    };
-    const gemini: AssistantModelAdapter = {
-      id: 'gemini',
-      async generate() {
-        throw new Error('unused');
-      },
-      async summarize() {
-        return '';
-      },
-    };
-    const continuation = { steps: [{ type: 'function_call', id: 'c1', name: 'devices.list' }] };
-    const toolResults = [{ toolId: 'c1', name: 'devices.list', content: '{}' }];
-
-    await createAssistantModelRouter(mock, gemini).generate({
-      mode: 'task',
-      variant: 'standard',
-      modelId: 'gemini-4-hydrogen',
-      messages: [],
-      usage: {} as AssistantModelRequest['usage'],
-      useLiveAI: false,
-      continuation,
-      toolResults,
-      disableTools: true,
-    });
-
-    expect(received?.continuation).toBe(continuation);
-    expect(received?.toolResults).toBe(toolResults);
-    expect(received?.disableTools).toBe(true);
-  });
-
-  it('routes ai: prompts to Gemini and everything else to the mock', async () => {
-    let mockCalls = 0;
-    let geminiCalls = 0;
-    const mock: AssistantModelAdapter = {
-      id: 'mock',
-      async generate() {
-        mockCalls += 1;
-        return { content: 'mock', thinking: [], tools: [] };
-      },
-      async summarize() {
-        return 'summary';
-      },
-    };
-    const gemini: AssistantModelAdapter = {
-      id: 'gemini',
-      async generate() {
-        geminiCalls += 1;
-        return { content: 'live', thinking: [], tools: [] };
-      },
-      async summarize() {
-        throw new Error('unused');
-      },
-    };
-    const router = createAssistantModelRouter(mock, gemini);
-    const request = { useLiveAI: true } as AssistantModelRequest;
-
-    await router.generate(request);
-    expect(geminiCalls).toBe(1);
-    expect(mockCalls).toBe(0);
-
-    await router.generate({ ...request, useLiveAI: false });
-    expect(geminiCalls).toBe(1);
-    expect(mockCalls).toBe(1);
-  });
 });

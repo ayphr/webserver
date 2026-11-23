@@ -13,7 +13,6 @@ import type {
   AssistantModelDraft,
   AssistantModelRequest,
   AssistantModelToolResult,
-  AssistantSummaryRequest,
 } from './assistantModel';
 
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
@@ -47,16 +46,6 @@ export const buildAssistantSystemPrompt = (): string => {
     'When you use a tool, summarize the returned data plainly and cite what came from it; do not invent device readings or team data.',
   ].join('\n\n');
 };
-
-/** The opt-in marker is stripped before anything is sent to Gemini. */
-export const stripAiPrefix = (content: string) => content.replace(/^\s*ai:\s*/i, '');
-
-/**
- * True when a prompt opted into the live provider with an `ai:` prefix. Kept
- * next to `stripAiPrefix` so detection and stripping can never disagree.
- */
-export const isLiveAiPrompt = (content: string | undefined): boolean =>
-  /^\s*ai:/i.test(content ?? '');
 
 type GeminiUsage = {
   total_input_tokens?: number;
@@ -106,7 +95,7 @@ const toGeminiSteps = (messages: AssistantContextMessage[]): Array<Record<string
   messages
     .filter((message) => message.role !== 'system')
     .flatMap((message) => {
-      const text = stripAiPrefix(message.content).trim();
+      const text = message.content.trim();
       if (!text) return [];
       return [
         {
@@ -131,7 +120,7 @@ const toSystemInstruction = (messages: AssistantContextMessage[]) => {
   const parts = [buildAssistantSystemPrompt()];
   const summary = messages
     .filter((message) => message.role === 'system')
-    .map((message) => stripAiPrefix(message.content).trim())
+    .map((message) => message.content.trim())
     .filter(Boolean)
     .join('\n\n');
   if (summary) parts.push(summary);
@@ -346,9 +335,9 @@ export async function readGeminiEventStream(response: Response): Promise<GeminiE
 };
 
 /**
- * Builds the stateless request body, stripped of the `ai:` opt-in marker.
- * Continuation steps and function results are replayed after the base context
- * because `store: false` keeps no server-side conversation state.
+ * Builds the stateless request body. Continuation steps and function results
+ * are replayed after the base context because `store: false` keeps no
+ * server-side conversation state.
  */
 export function buildGeminiRequestBody(
   modelId: string,
@@ -395,7 +384,7 @@ async function requestGemini(request: AssistantModelRequest, apiKey: string): Pr
 
   const { content, usage, toolCalls, steps } = await readGeminiEventStream(response);
   const inputText = [
-    ...messages.map((message) => stripAiPrefix(message.content)),
+    ...messages.map((message) => message.content),
     ...(continuation?.steps ?? []).map((step) => JSON.stringify(step)),
     ...(toolResults ?? []).map((result) => result.content),
   ].join('\n');
@@ -449,34 +438,4 @@ export const geminiAdapter: AssistantModelAdapter = {
     if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
     return requestGemini(request, GEMINI_API_KEY);
   },
-
-  async summarize(_request: AssistantSummaryRequest) {
-    // Compaction stays local: the `ai:` opt-in applies only to user messages.
-    throw new Error('Gemini adapter does not perform summarization');
-  },
 };
-
-/** Routes `ai:` prompts to Gemini and everything else to the local mock. */
-export function createAssistantModelRouter(
-  mock: AssistantModelAdapter,
-  gemini: AssistantModelAdapter,
-): AssistantModelAdapter {
-  return {
-    id: 'router',
-
-    generate(request) {
-      // An `ai:` prompt always opts into Gemini. If the key is missing, surface
-      // the configuration error rather than silently answering with mock data.
-      if (request.useLiveAI) return gemini.generate(request);
-      return mock.generate(request);
-    },
-
-    summarize(request) {
-      return mock.summarize(request);
-    },
-
-    countTokens(text) {
-      return mock.countTokens?.(text) ?? Promise.resolve(estimateTokens(text));
-    },
-  };
-}

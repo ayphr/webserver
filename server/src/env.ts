@@ -84,7 +84,7 @@ export const STRIPE_WEBHOOK_SECRET = Bun.env.STRIPE_WEBHOOK_SECRET || '';
 export const RESEND_API_KEY = Bun.env.RESEND_API_KEY || '';
 export const RESEND_FROM_EMAIL = Bun.env.RESEND_FROM_EMAIL || 'Ayphr <noreply@ayphr.com>';
 
-/** Enables real Gemini responses for prompts that start with `ai:`. */
+/** API key used for every Iris response. */
 export const GEMINI_API_KEY = Bun.env.GEMINI_API_KEY || '';
 
 /** Web Push VAPID keys. All three are required before subscriptions are accepted. */
