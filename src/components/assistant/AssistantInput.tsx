@@ -806,7 +806,10 @@ export const AssistantInput = ({
         : m,
     );
     commitMessages(() => reset);
-    startStreaming(messageId, processQueue);
+    const previousUserMessage = messagesRef.current
+      .filter((message) => message.role === 'user' && message.id < messageId)
+      .pop();
+    startStreaming(messageId, processQueue, previousUserMessage?.content);
   };
 
   const copyMessage = async (messageId: number, content: string) => {
