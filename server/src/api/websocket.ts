@@ -20,7 +20,7 @@ import {
 } from '@common';
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { createAssistantMockStream, splitAssistantResponseIntoTokens } from '../lib/assistantStream';
-import { detectSafetyCategories, SUICIDE_SUPPORT_MESSAGE } from '@common';
+import { detectSafetyCategories, SUICIDE_SUPPORT_MESSAGE, SAFETY_REFUSAL_MESSAGE, CSAM_ZERO_TOLERANCE_MESSAGE, redactPII } from '@common';
 import { saveStreamResult } from '../lib/db/assistant';
 import { createLogger } from '../lib/logger';
 import {
@@ -247,14 +247,28 @@ const startStream = (
       assistantSafetyEventsTotal.labels(category, 'user').inc();
     }
   }
+  const redactedPrompt = prompt ? redactPII(prompt) : undefined;
 
   const assistantCategories = detectSafetyCategories(mock.content);
   for (const category of assistantCategories) {
     assistantSafetyEventsTotal.labels(category, 'assistant').inc();
   }
-  if (promptCategories.includes('suicidal') || assistantCategories.includes('suicidal')) {
+
+  const combinedCategories = [...new Set([...promptCategories, ...assistantCategories])];
+  const highRiskCategories = combinedCategories.filter((category) => category !== 'suicidal');
+  if (highRiskCategories.includes('csam') || highRiskCategories.includes('child_abuse')) {
+    mock.content = CSAM_ZERO_TOLERANCE_MESSAGE;
+  } else if (highRiskCategories.length > 0) {
+    mock.content = SAFETY_REFUSAL_MESSAGE;
+  }
+  if (
+    (promptCategories.includes('suicidal') || assistantCategories.includes('suicidal')) &&
+    !highRiskCategories.includes('csam') &&
+    !highRiskCategories.includes('child_abuse')
+  ) {
     mock.content = `${mock.content}\n\n---\n\n${SUICIDE_SUPPORT_MESSAGE}`;
   }
+  mock.content = redactPII(mock.content);
 
   const tokens = splitAssistantResponseIntoTokens(mock.content);
   const startedAt = Date.now();
@@ -465,7 +479,7 @@ const startStream = (
         userUuid,
         chatId,
         messageId,
-        prompt,
+        prompt: redactedPrompt,
         mode,
         variant,
         content: mock.content,
@@ -512,7 +526,7 @@ const startStream = (
       userUuid,
       chatId,
       messageId: messageId ?? 2,
-      prompt,
+      prompt: redactedPrompt,
       mode,
       variant,
       notificationLevel: effectiveNotificationLevel,

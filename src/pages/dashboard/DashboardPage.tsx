@@ -631,6 +631,8 @@ export const DashboardPage = () => {
 
   const assistantVariant = assistant.preferences.defaultVariant;
   const assistantSendShortcut = assistant.preferences.sendShortcut;
+  const chatRetentionDays = assistant.preferences.chatRetentionDays ?? 0;
+  const piiRedactionEnabled = assistant.preferences.piiRedactionEnabled ?? true;
 
   const updateAssistantPreferences = assistant.updatePreferences;
   const setAssistantVariantPref = useCallback(
@@ -640,6 +642,16 @@ export const DashboardPage = () => {
 
   const setAssistantSendShortcutPref = useCallback(
     (value: AssistantSendShortcut) => updateAssistantPreferences({ sendShortcut: value }),
+    [updateAssistantPreferences],
+  );
+
+  const setChatRetentionDaysPref = useCallback(
+    (value: number) => updateAssistantPreferences({ chatRetentionDays: value }),
+    [updateAssistantPreferences],
+  );
+
+  const setPiiRedactionPref = useCallback(
+    (value: boolean) => updateAssistantPreferences({ piiRedactionEnabled: value }),
     [updateAssistantPreferences],
   );
 
@@ -669,6 +681,10 @@ export const DashboardPage = () => {
         availableAssistantVariants,
         assistantSendShortcut,
         setAssistantSendShortcutPref,
+        chatRetentionDays,
+        setChatRetentionDaysPref,
+        piiRedactionEnabled,
+        setPiiRedactionPref,
         isStaff,
         isTeamMember,
         now,
@@ -678,7 +694,7 @@ export const DashboardPage = () => {
         setIsChangeEmailOpen,
         setIsChangeUsernameOpen,
       }),
-    [credits, defaultTab, preferredDefaultTab, sidebarPinned, effectiveAssistantVariant, setAssistantVariantPref, availableAssistantVariants, assistantSendShortcut, setAssistantSendShortcutPref, navigate, isStaff, isTeamMember, user, now],
+    [credits, defaultTab, preferredDefaultTab, sidebarPinned, effectiveAssistantVariant, setAssistantVariantPref, availableAssistantVariants, assistantSendShortcut, setAssistantSendShortcutPref, chatRetentionDays, setChatRetentionDaysPref, piiRedactionEnabled, setPiiRedactionPref, navigate, isStaff, isTeamMember, user, now],
   );
 
   if (isLoading || assistant.isLoading) {

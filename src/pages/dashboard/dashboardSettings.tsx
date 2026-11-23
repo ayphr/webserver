@@ -31,6 +31,10 @@ export interface SettingsSectionsParams {
   availableAssistantVariants: readonly AssistantVariant[];
   assistantSendShortcut: AssistantSendShortcut;
   setAssistantSendShortcutPref: (value: AssistantSendShortcut) => void;
+  chatRetentionDays: number;
+  setChatRetentionDaysPref: (value: number) => void;
+  piiRedactionEnabled: boolean;
+  setPiiRedactionPref: (value: boolean) => void;
   isStaff: boolean;
   isTeamMember: boolean;
   now: number;
@@ -54,6 +58,10 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
     availableAssistantVariants,
     assistantSendShortcut,
     setAssistantSendShortcutPref,
+    chatRetentionDays,
+    setChatRetentionDaysPref,
+    piiRedactionEnabled,
+    setPiiRedactionPref,
     isStaff,
     isTeamMember,
     now,
@@ -283,6 +291,36 @@ export function buildSettingsSections(params: SettingsSectionsParams): SettingsS
             { value: 'shift-enter', label: 'Shift + Enter' },
           ],
           onChange: (value) => setAssistantSendShortcutPref(value as AssistantSendShortcut),
+        },
+      ],
+    },
+    {
+      id: 'privacy',
+      title: 'Privacy',
+      options: [
+        {
+          id: 'chat-retention',
+          optionType: 'select',
+          icon: <IconShieldLock size={18} strokeWidth={1.75} />,
+          title: 'Chat retention',
+          description: 'Automatically remove chats older than the selected period. 0 keeps everything.',
+          value: String(chatRetentionDays),
+          options: [
+            { value: '0', label: 'Keep all' },
+            { value: '7', label: '7 days' },
+            { value: '30', label: '30 days' },
+            { value: '90', label: '90 days' },
+          ],
+          onChange: (value) => setChatRetentionDaysPref(Number(value)),
+        },
+        {
+          id: 'pii-redaction',
+          optionType: 'checkbox',
+          icon: <IconLock size={18} strokeWidth={1.75} />,
+          title: 'PII redaction',
+          description: 'Redact emails, phone numbers, and other personal data from stored messages and logs.',
+          checked: piiRedactionEnabled,
+          onChange: (checked) => setPiiRedactionPref(checked),
         },
       ],
     },

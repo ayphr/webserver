@@ -137,6 +137,10 @@ export type AssistantPreferences = {
   notificationLevel: AssistantNotificationLevel;
   /** Tool names the user chose to always allow, persisted across sessions. */
   allowedTools: string[];
+  /** Delete chats older than this many days. 0 keeps everything. */
+  chatRetentionDays?: number;
+  /** Redact PII from stored assistant messages and logs. */
+  piiRedactionEnabled?: boolean;
 };
 
 export type AssistantState = {
@@ -154,6 +158,8 @@ export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
   permissionLevel: 'always-ask',
   notificationLevel: 'always',
   allowedTools: [],
+  chatRetentionDays: 0,
+  piiRedactionEnabled: true,
 };
 
 export const createDefaultAssistantState = (): AssistantState => ({
