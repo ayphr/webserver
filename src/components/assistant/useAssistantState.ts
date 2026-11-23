@@ -323,15 +323,17 @@ export const useAssistantState = (): AssistantController => {
         activeChatId: current.activeChatId === id ? null : current.activeChatId,
       }));
 
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-
-      const operation = saveQueueRef.current.then(async () => {
+      const operation = (async () => {
         try {
+          await saveQueueRef.current;
+
+          if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+          }
+          const pending = pendingRef.current;
+          pendingRef.current = null;
+
           if (pending) {
             setSyncStatus('saving');
             setSyncError(null);
@@ -351,7 +353,7 @@ export const useAssistantState = (): AssistantController => {
           setSyncError(err instanceof Error ? err.message : 'Failed to delete assistant chat');
           retryRef.current = () => deleteChatRef.current(id);
         }
-      });
+      })();
 
       saveQueueRef.current = operation;
     },
