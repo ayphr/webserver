@@ -824,7 +824,9 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                           ? '— tok/s'
                           : `${tokensPerSecond.toFixed(1)} tok/s`}
                       </span>
-                      <span>{formatCreditCost(displayedCreditCost ?? 0)}</span>
+                      {displayedCreditCost != null && (
+                        <span>{formatCreditCost(displayedCreditCost)}</span>
+                      )}
                     </span>
                   </div>
                   )}

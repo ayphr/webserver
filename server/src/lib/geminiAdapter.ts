@@ -199,7 +199,7 @@ export async function readGeminiEventStream(
       boundary = buffer.indexOf('\n\n');
     }
   }
-  buffer += decoder.decode();
+  buffer += decoder.decode().replace(/\r\n/g, '\n');
   if (buffer.trim()) handleFrame(buffer);
 
   for (const [pendingIndex, entry] of pendingCalls) {

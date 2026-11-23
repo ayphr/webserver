@@ -888,9 +888,12 @@ const startStream = async (
     const token = tokens[index];
     if (token === undefined) {
       // Tool-only responses (or a trailing tool run) must not complete while
-      // tools are still pending or running. The tool's completion callback
-      // schedules another pass once it finishes.
-      if (mock.tools.length > 0 && toolCursor < mock.tools.length) return;
+      // tools are still pending or running. Emit the next tool (if any) so
+      // multi-tool responses continue instead of stalling after the first call.
+      if (mock.tools.length > 0 && toolCursor < mock.tools.length) {
+        emitTools();
+        return;
+      }
       void complete();
       return;
     }
