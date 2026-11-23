@@ -323,9 +323,10 @@ export const useAssistantState = (): AssistantController => {
         activeChatId: current.activeChatId === id ? null : current.activeChatId,
       }));
 
+      const previousQueue = saveQueueRef.current;
       const operation = (async () => {
         try {
-          await saveQueueRef.current;
+          await previousQueue;
 
           if (timerRef.current) {
             clearTimeout(timerRef.current);
