@@ -13,15 +13,21 @@ export const SAFETY_CATEGORIES = [
 export type SafetyCategory = (typeof SAFETY_CATEGORIES)[number];
 
 const CATEGORY_PATTERNS: Record<SafetyCategory, RegExp[]> = {
-  violence: [/\b(kill|murder|assault|stab|shoot|attack|beat up|bloodshed)\b/i],
-  terrorism: [/\b(terrorist|terrorism|bomb|explosive|mass shooting|jihad)\b/i],
-  abuse: [/\b(abuse|abusive|torture|molest)\b/i],
-  sexual_offences: [/\b(rape|sexual assault|sexually assault|molest)\b/i],
-  harassment: [/\b(harass|harassment|stalk|stalking|threaten)\b/i],
-  csam: [/\b(csam|child sexual abuse material|child porn|cp)\b/i],
-  child_abuse: [/\b(child abuse|abuse a child|hurt a child)\b/i],
-  suicidal: [/\b(suicide|suicidal|kill myself|end my life|self[- ]harm|want to die)\b/i],
-  homicidal: [/\b(kill (him|her|them|someone)|murder (him|her|them|someone))\b/i],
+  violence: [
+    /\b(kill|murder|assault|stab|shoot|attack|beat(?:\s+up)?|bloodshed|harm|hurt|wound|maim|slaughter)\b/i,
+  ],
+  terrorism: [
+    /\b(terror(?:ist|ism)?|bomb(?:ing)?|explosive|mass\s+shooting|jihad|extremist)\b/i,
+  ],
+  abuse: [/\b(abuse|abusive|torture|molest(?:ation)?|cruelty)\b/i],
+  sexual_offences: [/\b(rape|sexual\s+assault|sexually\s+assault|molest(?:ation)?)\b/i],
+  harassment: [/\b(harass(?:ment)?|stalk(?:ing)?|threaten(?:ing)?|bully(?:ing)?|intimidat(?:e|ion))\b/i],
+  csam: [/\b(csam|child\s+sexual\s+abuse\s+material|child\s+porn(?:ography)?|\bcp\b)\b/i],
+  child_abuse: [/\b(child\s+abuse|abuse\s+(?:a|the)\s+child|hurt\s+(?:a|the)\s+child|molest\s+(?:a|the)\s+child)\b/i],
+  suicidal: [
+    /\b(suicid(?:e|al)|kill\s+myself|end\s+my\s+life|end\s+it\s+all|want\s+to\s+die|don'?t\s+want\s+to\s+live|no\s+reason\s+to\s+live|self[-\s]?harm|take\s+my\s+own\s+life|better\s+off\s+dead|can'?t\s+go\s+on)\b/i,
+  ],
+  homicidal: [/\b(kill\s+(?:him|her|them|someone|people)|murder\s+(?:him|her|them|someone|people))\b/i],
 };
 
 export const isSafeForContext = (text: string): boolean => {
