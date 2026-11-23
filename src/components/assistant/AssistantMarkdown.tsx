@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 
 export interface AssistantMarkdownProps {
@@ -9,6 +10,7 @@ export const AssistantMarkdown = ({ content }: AssistantMarkdownProps) => (
   <div className="assistant-markdown">
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeHighlight]}
       components={{
         a: (props) => {
           const { node, ...anchorProps } = props;

@@ -478,6 +478,76 @@
   line-height: 1.55;
 }
 
+/* Syntax tokens emitted by rehype-highlight (highlight.js classes). */
+.assistant-markdown pre .hljs-keyword,
+.assistant-markdown pre .hljs-literal,
+.assistant-markdown pre .hljs-selector-tag {
+  color: var(--accent-purple);
+}
+
+.assistant-markdown pre .hljs-built_in,
+.assistant-markdown pre .hljs-type,
+.assistant-markdown pre .hljs-title.class_ {
+  color: var(--accent-cyan);
+}
+
+.assistant-markdown pre .hljs-string,
+.assistant-markdown pre .hljs-regexp,
+.assistant-markdown pre .hljs-addition,
+.assistant-markdown pre .hljs-attr {
+  color: var(--accent-green);
+}
+
+.assistant-markdown pre .hljs-number,
+.assistant-markdown pre .hljs-symbol,
+.assistant-markdown pre .hljs-bullet,
+.assistant-markdown pre .hljs-meta {
+  color: var(--accent-amber);
+}
+
+.assistant-markdown pre .hljs-comment,
+.assistant-markdown pre .hljs-quote {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.assistant-markdown pre .hljs-title,
+.assistant-markdown pre .hljs-title.function_,
+.assistant-markdown pre .hljs-section {
+  color: var(--accent-blue);
+}
+
+.assistant-markdown pre .hljs-variable,
+.assistant-markdown pre .hljs-template-variable,
+.assistant-markdown pre .hljs-params {
+  color: var(--accent-orange);
+}
+
+.assistant-markdown pre .hljs-tag,
+.assistant-markdown pre .hljs-name,
+.assistant-markdown pre .hljs-attribute {
+  color: var(--accent-pink);
+}
+
+.assistant-markdown pre .hljs-selector-id,
+.assistant-markdown pre .hljs-selector-class,
+.assistant-markdown pre .hljs-selector-attr,
+.assistant-markdown pre .hljs-selector-pseudo {
+  color: var(--accent-teal);
+}
+
+.assistant-markdown pre .hljs-deletion {
+  color: var(--accent-red);
+}
+
+.assistant-markdown pre .hljs-emphasis {
+  font-style: italic;
+}
+
+.assistant-markdown pre .hljs-strong {
+  font-weight: var(--font-weight-md);
+}
+
 .assistant-markdown table {
   width: 100%;
   margin: 0.6rem 0;
