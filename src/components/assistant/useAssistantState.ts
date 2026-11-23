@@ -338,7 +338,11 @@ export const useAssistantState = (): AssistantController => {
           if (pending) {
             setSyncStatus('saving');
             setSyncError(null);
-            await persist(pending);
+            const savedState = await api.assistant.saveState(toPersistableState(pending));
+            stateRef.current = savedState;
+            setState(savedState);
+            setSyncStatus('saved');
+            setSyncError(null);
           }
 
           setSyncStatus('saving');
@@ -358,7 +362,7 @@ export const useAssistantState = (): AssistantController => {
 
       saveQueueRef.current = operation;
     },
-    [persist, update],
+    [update],
   );
 
   deleteChatRef.current = deleteChat;
