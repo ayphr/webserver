@@ -179,8 +179,8 @@
   width: 2rem;
   height: 2rem;
   border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
+  border: none;
+  background: transparent;
   color: var(--text-primary);
   cursor: pointer;
 }
@@ -202,7 +202,7 @@
 .assistant-input__visualizer span {
   width: 3px;
   border-radius: 2px;
-  background: var(--accent-blue-solid);
+  background: var(--text-primary);
   animation: assistant-visualizer 0.9s ease-in-out infinite;
 }
 .assistant-input__visualizer span:nth-child(2) { animation-delay: 0.15s; }
