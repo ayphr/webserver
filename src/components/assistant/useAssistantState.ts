@@ -6,7 +6,6 @@ import {
   prependAssistantChat,
   reorderAssistantFolders,
   type AssistantChat,
-  type AssistantLocation,
   type AssistantMode,
   type AssistantNotificationLevel,
   type AssistantPermissionLevel,
@@ -25,11 +24,12 @@ export type AssistantController = {
   syncStatus: AssistantSyncStatus;
   syncError: string | null;
   retrySync: () => void;
+  /** Flush local saves and reload the authoritative state from the server. */
+  refresh: () => Promise<AssistantState>;
   update: (updater: (current: AssistantState) => AssistantState) => void;
   updatePreferences: (patch: Partial<AssistantPreferences>) => void;
   selectFolder: (folderId: string | null) => void;
   selectMode: (mode: AssistantMode) => void;
-  selectTaskLocation: (location: AssistantLocation) => void;
   selectPermissionLevel: (level: AssistantPermissionLevel) => void;
   selectNotificationLevel: (level: AssistantNotificationLevel) => void;
   allowTool: (name: string) => void;
@@ -76,7 +76,7 @@ export const useAssistantState = (): AssistantController => {
   const loadGenerationRef = useRef(0);
   const retryRef = useRef<(() => void) | null>(null);
 
-  const persist = useCallback(function persist(next: AssistantState): void {
+  const persist = useCallback(function persist(next: AssistantState): Promise<void> {
     const generation = ++saveGenerationRef.current;
     setSyncStatus('saving');
     setSyncError(null);
@@ -98,40 +98,53 @@ export const useAssistantState = (): AssistantController => {
       }
     });
     saveQueueRef.current = operation;
+    return operation;
   }, []);
 
-  const flush = useCallback(() => {
+  const flush = useCallback((): Promise<void> => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
     const pending = pendingRef.current;
     pendingRef.current = null;
-    if (pending) persist(pending);
+    return pending ? persist(pending) : Promise.resolve();
   }, [persist]);
 
-  const loadState = useCallback(async function loadState(isRetry = false): Promise<void> {
+  const loadState = useCallback(async function loadState(
+    isRetry = false,
+    force = false,
+  ): Promise<AssistantState> {
     const generation = ++loadGenerationRef.current;
     if (!isRetry) setIsLoading(true);
     try {
       const loaded = await api.assistant.getState();
-      if (generation !== loadGenerationRef.current || pendingRef.current) return;
+      if (generation !== loadGenerationRef.current || (!force && pendingRef.current)) {
+        return stateRef.current;
+      }
       stateRef.current = loaded;
       setState(loaded);
       setSyncStatus('saved');
       setSyncError(null);
       retryRef.current = null;
+      return loaded;
     } catch (err) {
-      if (generation !== loadGenerationRef.current) return;
+      if (generation !== loadGenerationRef.current) return stateRef.current;
       setSyncStatus('error');
       setSyncError(err instanceof Error ? err.message : 'Failed to load assistant data');
       retryRef.current = () => {
         // Unsaved local changes take priority over re-fetching the old state.
-        if (pendingRef.current) flush();
+        if (pendingRef.current) void flush();
         else void loadState(true);
       };
+      return stateRef.current;
     } finally {
       if (generation === loadGenerationRef.current && !isRetry) setIsLoading(false);
     }
   }, [flush]);
+
+  const refresh = useCallback(async (): Promise<AssistantState> => {
+    await flush();
+    return loadState(true, true);
+  }, [flush, loadState]);
 
   const retrySync = useCallback(() => {
     const retry = retryRef.current;
@@ -179,13 +192,6 @@ export const useAssistantState = (): AssistantController => {
       update((current) => ({ ...current, activeMode: mode }));
     },
     [update],
-  );
-
-  const selectTaskLocation = useCallback(
-    (location: AssistantLocation) => {
-      updatePreferences({ taskLocation: location });
-    },
-    [updatePreferences],
   );
 
   const selectPermissionLevel = useCallback(
@@ -351,12 +357,12 @@ export const useAssistantState = (): AssistantController => {
     void loadState();
     return () => {
       loadGenerationRef.current += 1;
-      flush();
+      void flush();
     };
   }, [flush, loadState]);
 
   useEffect(() => {
-    const handlePageHide = () => flush();
+    const handlePageHide = () => void flush();
     window.addEventListener('pagehide', handlePageHide);
     return () => window.removeEventListener('pagehide', handlePageHide);
   }, [flush]);
@@ -369,11 +375,11 @@ export const useAssistantState = (): AssistantController => {
       syncStatus,
       syncError,
       retrySync,
+      refresh,
       update,
       updatePreferences,
       selectFolder,
       selectMode,
-      selectTaskLocation,
       selectPermissionLevel,
       selectNotificationLevel,
       allowTool,
@@ -393,11 +399,11 @@ export const useAssistantState = (): AssistantController => {
       syncStatus,
       syncError,
       retrySync,
+      refresh,
       update,
       updatePreferences,
       selectFolder,
       selectMode,
-      selectTaskLocation,
       selectPermissionLevel,
       selectNotificationLevel,
       allowTool,

@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { GentleLofiEngine, RADIO_STYLES, type RadioStyle } from '../lib/radio/GentleLofiEngine';
+import { GentleLofiEngine } from '../lib/radio/GentleLofiEngine';
 import { RadioContext } from './RadioContext';
 
 const RADIO_VOLUME_STORAGE_KEY = 'ayphr-pref-radio-volume';
-const RADIO_STYLE_STORAGE_KEY = 'ayphr-pref-radio-style';
 const DEFAULT_VOLUME = 0.7;
-const DEFAULT_STYLE: RadioStyle = 'gentle';
 
 function readStoredVolume(): number {
   try {
@@ -19,15 +17,6 @@ function readStoredVolume(): number {
   }
 }
 
-function readStoredStyle(): RadioStyle {
-  try {
-    const raw = localStorage.getItem(RADIO_STYLE_STORAGE_KEY);
-    return RADIO_STYLES.includes(raw as RadioStyle) ? (raw as RadioStyle) : DEFAULT_STYLE;
-  } catch {
-    return DEFAULT_STYLE;
-  }
-}
-
 /**
  * Owns the single audio engine for the whole app. Mounted above the router so the
  * music continues when the dashboard tab — or even the route — changes.
@@ -36,15 +25,14 @@ export const RadioProvider = ({ children }: { children: ReactNode }) => {
   const engineRef = useRef<GentleLofiEngine | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(readStoredVolume);
-  const [style, setStyleState] = useState(readStoredStyle);
 
   const toggle = useCallback(async () => {
     if (!engineRef.current) {
-      engineRef.current = new GentleLofiEngine(volume, style);
+      engineRef.current = new GentleLofiEngine(volume);
     }
     const playing = await engineRef.current.toggle();
     setIsPlaying(playing);
-  }, [volume, style]);
+  }, [volume]);
 
   const setVolume = useCallback((value: number) => {
     const clamped = Math.min(1, Math.max(0, value));
@@ -57,23 +45,13 @@ export const RadioProvider = ({ children }: { children: ReactNode }) => {
     engineRef.current?.setVolume(clamped);
   }, []);
 
-  const setStyle = useCallback((value: RadioStyle) => {
-    setStyleState(value);
-    try {
-      localStorage.setItem(RADIO_STYLE_STORAGE_KEY, value);
-    } catch {
-      // Storage can be unavailable; the style still applies to playback.
-    }
-    engineRef.current?.setStyle(value);
-  }, []);
-
   useEffect(() => () => {
     engineRef.current?.dispose();
     engineRef.current = null;
   }, []);
 
   return (
-    <RadioContext.Provider value={{ isPlaying, volume, style, toggle, setVolume, setStyle }}>
+    <RadioContext.Provider value={{ isPlaying, volume, toggle, setVolume }}>
       {children}
     </RadioContext.Provider>
   );

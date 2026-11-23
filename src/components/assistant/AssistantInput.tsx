@@ -177,6 +177,7 @@ export const AssistantInput = ({
   const currentChatIdRef = useRef(state.activeChatId);
   const queuedMessagesRef = useRef<string[]>([]);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const serverRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamClientRef = useRef<AssistantStreamClient | null>(null);
   const streamRequestIdRef = useRef<string | null>(null);
   const streamCompleteRef = useRef<(() => void) | null>(null);
@@ -277,14 +278,9 @@ export const AssistantInput = ({
       (chat?.messages ?? []).reduce((max, message) => Math.max(max, message.id), 0) + 1,
     );
     commitMessages(() => chat?.messages ?? []);
-    // Sync only when opening or leaving a chat; local message changes are persisted below.
+    // Sync only when opening or leaving a chat; message content is persisted by the server.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeChatId]);
-
-  useEffect(() => {
-    if (isGenerating) return;
-    persistMessages(currentChatIdRef.current, messages);
-  }, [isGenerating, messages, persistMessages]);
 
   useEffect(() => {
     if (isChat || prefersReducedMotion) return;
@@ -330,6 +326,7 @@ export const AssistantInput = ({
   };
 
   const cancelStream = () => {
+    clearServerRefresh();
     const requestId = streamRequestIdRef.current;
     if (requestId) streamClientRef.current?.cancel(requestId);
     streamRequestIdRef.current = null;
@@ -403,12 +400,42 @@ export const AssistantInput = ({
     getStreamClient().respondToToolPermission(requestId, toolId, decision);
   };
 
+  const clearServerRefresh = () => {
+    if (serverRefreshTimerRef.current) clearTimeout(serverRefreshTimerRef.current);
+    serverRefreshTimerRef.current = null;
+  };
+
+  /**
+   * A disconnected socket only stops the live feed; the server keeps running and
+   * persists the final response. Poll the authoritative state until it appears.
+   */
+  const waitForServerResult = (chatId: string, messageId: number, attempt = 0) => {
+    clearServerRefresh();
+    const delays = [1000, 2000, 4000, 8000, 12000];
+    const delay = delays[Math.min(attempt, delays.length - 1)] ?? 12000;
+    serverRefreshTimerRef.current = setTimeout(async () => {
+      serverRefreshTimerRef.current = null;
+      if (streamRequestIdRef.current !== null || currentChatIdRef.current !== chatId) return;
+      const latest = await assistant.refresh();
+      const chat = latest.chats.find((item) => item.id === chatId);
+      const result = chat?.messages.find(
+        (item) => item.id === messageId && item.role === 'assistant' && Boolean(item.content),
+      );
+      if (result) {
+        commitMessages(() => chat?.messages ?? []);
+        return;
+      }
+      waitForServerResult(chatId, messageId, attempt + 1);
+    }, delay);
+  };
+
   const finishStream = (requestId: string, error?: string, serverDurationMs?: number) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     const elapsedMs = takeStreamDuration();
     const durationMs = serverDurationMs ?? elapsedMs;
     const complete = streamCompleteRef.current;
+    const isDisconnect = error === 'Stream disconnected';
     streamRequestIdRef.current = null;
     streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
@@ -422,14 +449,21 @@ export const AssistantInput = ({
               durationMs: m.durationMs ?? durationMs,
               liveDurationMs: undefined,
               liveTokensPerSecond: undefined,
-              ...(error ? { error } : {}),
+              ...(error && !isDisconnect ? { error } : {}),
             }
           : m,
       );
+      // Streamed content is display-only. The server persists the authoritative
+      // response, so do not write local messages back into assistant state.
       commitMessages(() => next);
-      persistMessages(currentChatIdRef.current, next);
     }
 
+    // Every stream runs on the server; reload its authoritative result once done.
+    if (!error) {
+      void assistant.refresh();
+    } else if (isDisconnect && currentChatIdRef.current && messageId !== null) {
+      waitForServerResult(currentChatIdRef.current, messageId);
+    }
     if (complete) complete();
     else setIsGenerating(false);
   };
@@ -475,7 +509,6 @@ export const AssistantInput = ({
           : m,
       );
       commitMessages(() => next);
-      persistMessages(currentChatIdRef.current, next);
     }
 
     if (options.continueQueue && queuedMessagesRef.current.length > 0) processQueueRef.current();
@@ -537,13 +570,13 @@ export const AssistantInput = ({
   }, [chatAction]);
 
   const handleFeedback = (messageId: number, feedback: 'like' | 'dislike') => {
-    commitMessages((previous) =>
-      previous.map((m) =>
-        m.id === messageId && m.role === 'assistant'
-          ? { ...m, feedback: m.feedback === feedback ? null : feedback }
-          : m,
-      ),
+    const next = messagesRef.current.map((m) =>
+      m.id === messageId && m.role === 'assistant'
+        ? { ...m, feedback: m.feedback === feedback ? null : feedback }
+        : m,
     );
+    commitMessages(() => next);
+    persistMessages(currentChatIdRef.current, next);
   };
 
   const handleUndo = (messageId: number) => {
@@ -591,7 +624,6 @@ export const AssistantInput = ({
         : m,
     );
     commitMessages(() => reset);
-    persistMessages(currentChatIdRef.current, reset);
     startStreaming(messageId, processQueue);
   };
 
@@ -607,6 +639,7 @@ export const AssistantInput = ({
   };
 
   const startStreaming = (messageId: number, onComplete?: () => void, prompt?: string) => {
+    clearServerRefresh();
     const requestId = createId();
     streamRequestIdRef.current = requestId;
     streamCompleteRef.current = onComplete ?? null;
@@ -630,7 +663,6 @@ export const AssistantInput = ({
     getStreamClient().stream(requestId, {
       mode: state.activeMode,
       variant,
-      location: assistant.preferences.taskLocation,
       permissionLevel: assistant.preferences.permissionLevel,
       allowedTools: assistant.preferences.allowedTools,
       chatId: currentChatIdRef.current ?? undefined,
@@ -723,6 +755,14 @@ export const AssistantInput = ({
     textareaRef.current?.focus();
   };
 
+  useEffect(
+    () => () => {
+      if (serverRefreshTimerRef.current) clearTimeout(serverRefreshTimerRef.current);
+      streamClientRef.current?.close();
+    },
+    [],
+  );
+
   return (
     <div className={`assistant-input ${isChat ? 'assistant-input--chat' : 'assistant-input--new-chat'} ${className}`}>
       <div className="assistant-input__stack">
@@ -773,12 +813,10 @@ export const AssistantInput = ({
             folders={state.folders}
             activeFolderId={toolbarFolderId}
             activeMode={toolbarMode}
-            taskLocation={assistant.preferences.taskLocation}
             permissionLevel={assistant.preferences.permissionLevel}
             notificationLevel={assistant.preferences.notificationLevel}
             onSelectFolder={assistant.selectFolder}
             onSelectMode={assistant.selectMode}
-            onSelectTaskLocation={assistant.selectTaskLocation}
             onSelectPermissionLevel={assistant.selectPermissionLevel}
             onSelectNotificationLevel={assistant.selectNotificationLevel}
             onCreateFolder={assistant.createFolder}

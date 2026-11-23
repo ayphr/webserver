@@ -13,12 +13,12 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 0 1rem 0.75rem 0;
+  padding: 0 1rem 3.5rem 0;
   overflow-y: auto;
   overflow-anchor: none;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scroll-padding-bottom: 0.75rem;
+  scroll-padding-bottom: 3.5rem;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s ease;
@@ -461,6 +461,72 @@
   background-color: var(--bg-elevated);
   font-family: var(--font-family-mono);
   font-size: 0.85em;
+}
+
+.assistant-markdown .assistant-code-block {
+  position: relative;
+  margin: 0.65rem 0;
+}
+
+.assistant-markdown .assistant-code-block pre {
+  margin: 0;
+  padding-top: 2.25rem;
+  padding-right: 2.5rem;
+}
+
+.assistant-code-block__copy {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--hljs-comment, var(--text-muted));
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.assistant-code-block__copy:hover {
+  color: var(--hljs-fg, var(--text-primary));
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #383e4a;
+}
+
+.assistant-code-block__copy:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.assistant-code-block__copy--copied {
+  color: var(--hljs-green, var(--accent-green));
+}
+
+.assistant-code-block__copy-icons {
+  position: relative;
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+}
+
+.assistant-code-block__copy-icons svg {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.2s ease;
+}
+
+.assistant-code-block__copied-icon,
+.assistant-code-block__copy--copied .assistant-code-block__copy-icon {
+  opacity: 0;
+}
+
+.assistant-code-block__copy--copied .assistant-code-block__copied-icon {
+  opacity: 1;
 }
 
 .assistant-markdown pre {

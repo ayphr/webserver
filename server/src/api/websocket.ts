@@ -1,13 +1,10 @@
 import type { ServerWebSocket, WebSocketHandler } from 'bun';
 import {
-  ASSISTANT_LOCATIONS,
   ASSISTANT_MODES,
   ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_VARIANTS,
-  createDefaultAssistantState,
-  type AssistantLocation,
   type AssistantMessage,
   type AssistantMode,
   type AssistantNotificationLevel,
@@ -23,7 +20,7 @@ import {
 } from '@common';
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { createAssistantMockStream, splitAssistantResponseIntoTokens } from '../lib/assistantStream';
-import { getAssistantState, saveAssistantState } from '../lib/db/assistant';
+import { saveStreamResult } from '../lib/db/assistant';
 import { createLogger } from '../lib/logger';
 import { notifyUser } from '../lib/notifications';
 import { getUserFromToken } from './auth';
@@ -37,9 +34,8 @@ type Timer = ReturnType<typeof setTimeout>;
 type ActiveStream = {
   cancelled: boolean;
   timers: Set<Timer>;
-  cloudKey?: string;
-  notificationLink?: string;
-  notificationLevel?: AssistantNotificationLevel;
+  /** Serializes the initial prompt write ahead of the final response write. */
+  persistStart?: Promise<void>;
   orphaned?: boolean;
   onOrphaned?: () => void;
 };
@@ -48,22 +44,24 @@ type ToolPermissionHandler = (
   toolId: string,
   decision: AssistantToolPermissionDecision,
 ) => void;
-type CloudTask = { timers: Set<Timer> };
-type CloudNotifyKind = 'progress' | 'finish' | 'error';
 
 const MAX_CONCURRENT_STREAMS = 8;
 const AUTH_TIMEOUT_MS = 10_000;
 const FIRST_TOKEN_DELAY_MS = 300;
 const TOKEN_DELAY_MIN_MS = 70;
 const TOKEN_DELAY_VARY_MS = 50;
-const CLOUD_FIRST_PROGRESS_MS = 900;
-const CLOUD_PROGRESS_STEP_MS = 1_400;
-const DEFAULT_CLOUD_LINK = '/dashboard';
+const DEFAULT_TASK_LINK = '/dashboard';
 
 const assistantChatLink = (chatId?: string) =>
   chatId
     ? `/dashboard/assistant/chat/${encodeURIComponent(chatId)}`
-    : DEFAULT_CLOUD_LINK;
+    : DEFAULT_TASK_LINK;
+
+/** Notifications are a task feature; chats stay quiet even while running. */
+const notificationLevelFor = (
+  mode: AssistantMode,
+  level: AssistantNotificationLevel,
+): AssistantNotificationLevel => (mode === 'task' ? level : 'never');
 
 /** Example tools that need approval under "Sometimes ask". */
 const SENSITIVE_TOOLS = new Set(['data.query', 'docs.lookup']);
@@ -72,7 +70,6 @@ const activeStreams = new Map<AssistantWebSocket, ActiveStreams>();
 const authTimers = new Map<AssistantWebSocket, Timer>();
 const messageQueues = new Map<AssistantWebSocket, Promise<void>>();
 const toolPermissionHandlers = new Map<string, ToolPermissionHandler>();
-const cloudTasks = new Map<string, CloudTask>();
 
 const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
   typeof value === 'string' && values.includes(value as T);
@@ -92,161 +89,95 @@ const clearTimers = (timers: Set<Timer>) => {
   timers.clear();
 };
 
-const notifyCloudUser = (
+/** Assistant notifications are deliberately generic across chats and tasks. */
+const notifyTaskUser = (
   userUuid: string,
-  title: string,
-  message: string,
-  link: string = DEFAULT_CLOUD_LINK,
-  notificationLevel: AssistantNotificationLevel = 'always',
-  kind: CloudNotifyKind = 'progress',
+  link: string,
+  notificationLevel: AssistantNotificationLevel,
+  succeeded: boolean,
 ) => {
   if (notificationLevel === 'never') return;
-  if (notificationLevel === 'sometimes' && kind === 'progress') return;
 
-  void runBackgroundTask('assistant-cloud-progress', () =>
+  void runBackgroundTask('assistant-task-notification', () =>
     notifyUser({
       userUuid,
       type: 'assistant_task',
-      title,
-      message,
+      title: 'Iris',
+      message: succeeded
+        ? 'Iris has finished responding.'
+        : "There was an error in Iris' response.",
       link,
     }),
   );
 };
 
-type CloudResultInput = {
+type StreamResultInput = {
   userUuid: string;
-  chatId?: string;
-  messageId?: number;
+  chatId: string;
+  messageId: number;
   prompt?: string;
   mode: AssistantMode;
   variant: AssistantVariant;
-  content: string;
-  thinking: NonNullable<AssistantMessage['thinking']>;
-  tools: NonNullable<AssistantMessage['tools']>;
-  durationMs: number;
+  /** Omitted for the initial prompt write; set once the response is complete. */
+  content?: string;
+  thinking?: NonNullable<AssistantMessage['thinking']>;
+  tools?: NonNullable<AssistantMessage['tools']>;
+  durationMs?: number;
   notificationLevel: AssistantNotificationLevel;
   link: string;
 };
 
-/** Persist a cloud result when its original client connection is gone. */
-const persistCloudResult = async (input: CloudResultInput): Promise<void> => {
-  if (!input.chatId) return;
+/**
+ * Persist the server's version of a stream. Called once when the stream starts
+ * (to save the prompt) and again when it completes (to save the response).
+ * This is the only writer of chat message content; clients only render the
+ * live stream and reload the authoritative state afterwards.
+ */
+const persistStreamResult = async (input: StreamResultInput): Promise<void> => {
+  const now = Date.now();
+  const assistantMessage: AssistantMessage | undefined =
+    input.content === undefined
+      ? undefined
+      : {
+          id: input.messageId,
+          role: 'assistant',
+          content: input.content,
+          createdAt: now,
+          variant: input.variant,
+          durationMs: input.durationMs,
+          thinking: (input.thinking ?? []).map((step) => ({ ...step, status: 'done' })),
+          tools: input.tools ?? [],
+        };
+  const userMessage: AssistantMessage | undefined = input.prompt
+    ? {
+        id: Math.max(1, input.messageId - 1),
+        role: 'user',
+        content: input.prompt,
+        createdAt: now - 1,
+      }
+    : undefined;
 
   try {
-    const state = (await getAssistantState(input.userUuid)) ?? createDefaultAssistantState();
-    const now = Date.now();
-    const assistantMessage: AssistantMessage = {
-      id: input.messageId && input.messageId > 0 ? input.messageId : 2,
-      role: 'assistant',
-      content: input.content,
+    await saveStreamResult(input.userUuid, {
+      chatId: input.chatId,
+      messageId: input.messageId,
+      chatTitle: input.prompt?.trim().slice(0, 60) || 'Assistant chat',
+      mode: input.mode,
+      userMessage,
+      assistantMessage,
       createdAt: now,
-      variant: input.variant,
-      durationMs: input.durationMs,
-      thinking: (input.thinking ?? []).map((step) => ({ ...step, status: 'done' })),
-      tools: input.tools ?? [],
-    };
-
-    let chat = state.chats.find((item) => item.id === input.chatId);
-    if (!chat) {
-      const userMessage: AssistantMessage = {
-        id: Math.max(1, assistantMessage.id - 1),
-        role: 'user',
-        content: input.prompt ?? '',
-        createdAt: now - 1,
-      };
-      const created: AssistantMessage[] = [userMessage, assistantMessage];
-      chat = {
-        id: input.chatId,
-        title: input.prompt?.trim().slice(0, 60) || 'Cloud task',
-        folderId: null,
-        mode: input.mode,
-        messages: created,
-        createdAt: now,
-        updatedAt: now,
-      };
-      state.chats = [chat, ...state.chats];
-    } else {
-      const messages = [...chat.messages];
-      const exactIndex = messages.findIndex(
-        (message) => message.id === assistantMessage.id && message.role === 'assistant',
-      );
-      const fallbackIndex = messages.map((message) => message.role).lastIndexOf('assistant');
-      const index = exactIndex >= 0 ? exactIndex : fallbackIndex;
-      if (index >= 0) {
-        const existing = messages[index]!;
-        messages[index] = {
-          ...existing,
-          ...assistantMessage,
-          createdAt: existing.createdAt || assistantMessage.createdAt,
-        };
-      } else {
-        messages.push(assistantMessage);
-      }
-      chat.messages = messages;
-      chat.updatedAt = now;
-      const updatedChat = chat;
-      state.chats = state.chats.map((item) => (item.id === updatedChat.id ? updatedChat : item));
-    }
-
-    await saveAssistantState(input.userUuid, state);
+      updatedAt: now,
+    });
   } catch (error) {
-    log.warn({ error, userUuid: input.userUuid, chatId: input.chatId }, 'failed to persist cloud task result');
-    notifyCloudUser(
-      input.userUuid,
-      'Cloud task could not be saved',
-      'The task finished, but its result could not be saved to the chat.',
-      input.link,
-      input.notificationLevel,
-      'error',
+    log.warn(
+      { error, userUuid: input.userUuid, chatId: input.chatId },
+      'failed to persist assistant stream result',
     );
+    notifyTaskUser(input.userUuid, input.link, input.notificationLevel, false);
   }
 };
 
-const clearCloudTask = (key: string) => {
-  const task = cloudTasks.get(key);
-  if (!task) return;
-  clearTimers(task.timers);
-  cloudTasks.delete(key);
-};
-
-const startCloudTask = (
-  key: string,
-  userUuid: string,
-  requestId: string,
-  steps: string[],
-  link: string,
-  notificationLevel: AssistantNotificationLevel,
-) => {
-  clearCloudTask(key);
-  const task: CloudTask = { timers: new Set() };
-  cloudTasks.set(key, task);
-
-  notifyCloudUser(
-    userUuid,
-    'Cloud task started',
-    `Task ${requestId.slice(-6)} is running on the server.`,
-    link,
-    notificationLevel,
-    'progress',
-  );
-
-  steps.slice(0, 3).forEach((step, index) => {
-    const timer = setTimeout(() => {
-      task.timers.delete(timer);
-      if (!cloudTasks.has(key)) return;
-      notifyCloudUser(userUuid, 'Cloud task is working', `${step}…`, link, notificationLevel, 'progress');
-    }, CLOUD_FIRST_PROGRESS_MS + index * CLOUD_PROGRESS_STEP_MS);
-    task.timers.add(timer);
-    timer.unref?.();
-  });
-};
-
-const cancelStream = (
-  ws: AssistantWebSocket,
-  requestId: string,
-  options: { stopCloudTask?: boolean } = {},
-) => {
+const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
   const streams = activeStreams.get(ws);
   const stream = streams?.get(requestId);
   if (!stream || !streams) return;
@@ -255,21 +186,6 @@ const cancelStream = (
   clearTimers(stream.timers);
   streams.delete(requestId);
   toolPermissionHandlers.delete(requestId);
-
-  if (stream.cloudKey) {
-    const [userUuid] = stream.cloudKey.split(':', 2);
-    clearCloudTask(stream.cloudKey);
-    if (options.stopCloudTask && userUuid) {
-      notifyCloudUser(
-        userUuid,
-        'Cloud task stopped',
-        'The task was cancelled.',
-        stream.notificationLink ?? DEFAULT_CLOUD_LINK,
-        stream.notificationLevel ?? 'always',
-        'error',
-      );
-    }
-  }
 };
 
 const isMode = (value: unknown): value is AssistantMode =>
@@ -283,7 +199,6 @@ const startStream = (
   requestId: string,
   mode: AssistantMode,
   variant: AssistantVariant,
-  location: AssistantLocation,
   permissionLevel: AssistantPermissionLevel,
   allowedTools: string[],
   notificationLevel: AssistantNotificationLevel,
@@ -296,19 +211,11 @@ const startStream = (
   if (!streams) return;
 
   const notificationLink = assistantChatLink(chatId);
+  const effectiveNotificationLevel = notificationLevelFor(mode, notificationLevel);
   cancelStream(ws, requestId);
   if (streams.size >= MAX_CONCURRENT_STREAMS) {
     send(ws, { type: 'error', requestId, error: 'Too many active streams' });
-    if (location === 'cloud' && userUuid) {
-      notifyCloudUser(
-        userUuid,
-        'Cloud task could not start',
-        'Too many assistant tasks are already running.',
-        notificationLink,
-        notificationLevel,
-        'error',
-      );
-    }
+    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
     return;
   }
 
@@ -322,8 +229,6 @@ const startStream = (
   const stream: ActiveStream = {
     cancelled: false,
     timers: new Set(),
-    notificationLink,
-    notificationLevel,
   };
   let index = 0;
   let completed = false;
@@ -486,58 +391,46 @@ const startStream = (
     toolPermissionHandlers.delete(requestId);
 
     const durationMs = Math.max(1, Date.now() - startedAt);
-
-    if (stream.cloudKey) {
-      clearCloudTask(stream.cloudKey);
-      const [completedUserUuid] = stream.cloudKey.split(':', 2);
-      if (completedUserUuid) {
-        if (stream.orphaned && chatId) {
-          const finalTools: AssistantToolCall[] = mock.tools.map((base) => {
-            const decision = permissionDecisions.get(base.id);
-            if (decision === 'deny') {
-              return {
-                ...base,
-                status: 'denied' as const,
-                permission: 'denied' as const,
-                detail: 'Denied by you',
-              };
-            }
-            if (decision) {
-              return {
-                ...base,
-                status: 'done' as const,
-                permission: decision === 'allow_always' ? ('allowed_always' as const) : ('allowed_once' as const),
-              };
-            }
-            return { ...base, status: 'done' as const };
-          });
-
-          await persistCloudResult({
-            userUuid: completedUserUuid,
-            chatId,
-            messageId,
-            prompt,
-            mode,
-            variant,
-            content: mock.content,
-            thinking: mock.thinking.map((step) => ({ ...step, status: 'done' as const })),
-            tools: finalTools,
-            durationMs,
-            notificationLevel,
-            link: notificationLink,
-          });
-        }
-
-        notifyCloudUser(
-          completedUserUuid,
-          'Cloud task completed',
-          'Your task is finished. Open the assistant to review the result.',
-          notificationLink,
-          notificationLevel,
-          'finish',
-        );
+    const finalTools: AssistantToolCall[] = mock.tools.map((base) => {
+      const decision = permissionDecisions.get(base.id);
+      if (decision === 'deny') {
+        return {
+          ...base,
+          status: 'denied' as const,
+          permission: 'denied' as const,
+          detail: 'Denied by you',
+        };
       }
+      if (decision) {
+        return {
+          ...base,
+          status: 'done' as const,
+          permission:
+            decision === 'allow_always' ? ('allowed_always' as const) : ('allowed_once' as const),
+        };
+      }
+      return { ...base, status: 'done' as const };
+    });
+
+    if (chatId && messageId !== undefined) {
+      if (stream.persistStart) await stream.persistStart;
+      await persistStreamResult({
+        userUuid,
+        chatId,
+        messageId,
+        prompt,
+        mode,
+        variant,
+        content: mock.content,
+        thinking: mock.thinking.map((step) => ({ ...step, status: 'done' as const })),
+        tools: finalTools,
+        durationMs,
+        notificationLevel: effectiveNotificationLevel,
+        link: notificationLink,
+      });
     }
+
+    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, true);
 
     send(ws, {
       type: 'done',
@@ -565,14 +458,17 @@ const startStream = (
 
   streams.set(requestId, stream);
 
-  if (location === 'cloud') {
-    const cloudKey = `${userUuid}:${requestId}`;
-    stream.cloudKey = cloudKey;
-    const progressSteps = [
-      ...mock.thinking.map((step) => step.label),
-      ...mock.tools.map((tool) => tool.label ?? tool.name),
-    ];
-    startCloudTask(cloudKey, userUuid, requestId, progressSteps, notificationLink, notificationLevel);
+  if (chatId) {
+    stream.persistStart = persistStreamResult({
+      userUuid,
+      chatId,
+      messageId: messageId ?? 2,
+      prompt,
+      mode,
+      variant,
+      notificationLevel: effectiveNotificationLevel,
+      link: notificationLink,
+    });
   }
 
   emitThinking();
@@ -627,9 +523,6 @@ const isClientMessage = (value: unknown): value is AssistantStreamClientMessage 
   if (message.type !== 'stream') return false;
   if (message.mode !== undefined && !isMode(message.mode)) return false;
   if (message.variant !== undefined && !isVariant(message.variant)) return false;
-  if (message.location !== undefined && !isOneOf(ASSISTANT_LOCATIONS, message.location)) {
-    return false;
-  }
   if (
     message.permissionLevel !== undefined &&
     !isOneOf(ASSISTANT_PERMISSION_LEVELS, message.permissionLevel)
@@ -696,7 +589,6 @@ const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayB
       parsed.requestId,
       parsed.mode ?? 'chat',
       parsed.variant ?? 'standard',
-      parsed.location ?? 'local',
       parsed.permissionLevel ?? 'always-ask',
       parsed.allowedTools ?? [],
       parsed.notificationLevel ?? 'always',
@@ -752,17 +644,12 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
     const streams = activeStreams.get(ws);
     if (streams) {
       for (const [requestId, stream] of [...streams.entries()]) {
-        if (stream.cloudKey) {
-          // Cloud tasks deliberately keep running after a socket closes. Mark
-          // the stream so completion can persist the result for the deep link.
-          stream.orphaned = true;
-          // Outstanding permission requests are auto-denied so the task finishes.
-          stream.onOrphaned?.();
-          stream.onOrphaned = undefined;
-          streams.delete(requestId);
-          continue;
-        }
-        cancelStream(ws, requestId);
+        // Every stream runs on the server. A closed socket only stops the live
+        // feed; timers, persistence and notifications continue in the background.
+        stream.orphaned = true;
+        stream.onOrphaned?.();
+        stream.onOrphaned = undefined;
+        streams.delete(requestId);
       }
       activeStreams.delete(ws);
     }

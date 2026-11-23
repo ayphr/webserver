@@ -1,5 +1,4 @@
 import {
-  ASSISTANT_LOCATIONS,
   ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_STREAM_PATH,
@@ -7,7 +6,6 @@ import {
   ASSISTANT_TOOL_PERMISSIONS,
   ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_TOOL_STATUSES,
-  type AssistantLocation,
   type AssistantMode,
   type AssistantNotificationLevel,
   type AssistantPermissionLevel,
@@ -35,7 +33,6 @@ export type AssistantStreamHandlers = {
 export type AssistantStreamOptions = {
   mode?: AssistantMode;
   variant?: AssistantVariant;
-  location?: AssistantLocation;
   permissionLevel?: AssistantPermissionLevel;
   allowedTools?: string[];
   chatId?: string;
@@ -200,7 +197,6 @@ export class AssistantStreamClient {
       requestId,
       mode: options.mode,
       variant: options.variant,
-      location: isOneOf(ASSISTANT_LOCATIONS, options.location) ? options.location : undefined,
       permissionLevel: isOneOf(ASSISTANT_PERMISSION_LEVELS, options.permissionLevel)
         ? options.permissionLevel
         : undefined,

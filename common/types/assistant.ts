@@ -5,9 +5,6 @@ export type AssistantSendShortcut = 'enter' | 'shift-enter';
 export const ASSISTANT_MODES: AssistantMode[] = ['chat', 'task'];
 export type AssistantMode = 'chat' | 'task';
 
-export const ASSISTANT_LOCATIONS = ['local', 'cloud'] as const;
-export type AssistantLocation = (typeof ASSISTANT_LOCATIONS)[number];
-
 export const ASSISTANT_PERMISSION_LEVELS = ['always-ask', 'sometimes-ask', 'never-ask'] as const;
 export type AssistantPermissionLevel = (typeof ASSISTANT_PERMISSION_LEVELS)[number];
 
@@ -68,7 +65,6 @@ export type AssistantStreamClientMessage =
       requestId: string;
       mode?: AssistantMode;
       variant?: AssistantVariant;
-      location?: AssistantLocation;
       permissionLevel?: AssistantPermissionLevel;
       allowedTools?: string[];
       chatId?: string;
@@ -132,7 +128,6 @@ export type AssistantChat = {
 export type AssistantPreferences = {
   defaultVariant: AssistantVariant;
   sendShortcut: AssistantSendShortcut;
-  taskLocation: AssistantLocation;
   permissionLevel: AssistantPermissionLevel;
   /** Controls how much cloud-task progress is reported as notifications. */
   notificationLevel: AssistantNotificationLevel;
@@ -152,7 +147,6 @@ export type AssistantState = {
 export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
   defaultVariant: 'standard',
   sendShortcut: 'enter',
-  taskLocation: 'local',
   permissionLevel: 'always-ask',
   notificationLevel: 'always',
   allowedTools: [],

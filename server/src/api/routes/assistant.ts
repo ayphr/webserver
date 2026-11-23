@@ -1,5 +1,4 @@
 import {
-  ASSISTANT_LOCATIONS,
   ASSISTANT_MODES,
   ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
@@ -11,7 +10,6 @@ import {
   createDefaultAssistantState,
   type AssistantChat,
   type AssistantFolder,
-  type AssistantLocation,
   type AssistantMessage,
   type AssistantMessageFeedback,
   type AssistantMode,
@@ -83,13 +81,6 @@ const requireMode = (value: unknown, label: string): AssistantMode => {
     throw new Error(`invalid ${label}`);
   }
   return value as AssistantMode;
-};
-
-const requireLocation = (value: unknown, label: string): AssistantLocation => {
-  if (typeof value !== 'string' || !ASSISTANT_LOCATIONS.includes(value as AssistantLocation)) {
-    throw new Error(`invalid ${label}`);
-  }
-  return value as AssistantLocation;
 };
 
 const requirePermissionLevel = (value: unknown, label: string): AssistantPermissionLevel => {
@@ -298,10 +289,6 @@ function parseAssistantPreferences(value: unknown): AssistantPreferences {
   return {
     defaultVariant: requireVariant(value.defaultVariant, 'defaultVariant'),
     sendShortcut,
-    taskLocation:
-      value.taskLocation === undefined
-        ? DEFAULT_ASSISTANT_PREFERENCES.taskLocation
-        : requireLocation(value.taskLocation, 'taskLocation'),
     permissionLevel:
       value.permissionLevel === undefined
         ? DEFAULT_ASSISTANT_PREFERENCES.permissionLevel

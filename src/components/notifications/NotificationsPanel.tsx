@@ -47,7 +47,7 @@ const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   punishment: 'Punishments',
   appeal: 'Appeals',
   subscription: 'Subscriptions & billing',
-  assistant_task: 'Assistant tasks',
+  assistant_task: 'Iris',
   system: 'System messages',
 };
 

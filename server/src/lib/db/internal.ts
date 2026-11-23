@@ -2,7 +2,7 @@ import { Binary, Collection, Db, type Document } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type DeviceLog, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantState, type NotificationPreferences, type PushSubscriptionInput } from '@common';
+import { type DataPoint, type Device, type DeviceLog, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantMessage, type AssistantMode, type AssistantState, type NotificationPreferences, type PushSubscriptionInput } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -149,9 +149,28 @@ export type PushSubscriptionDocument = PushSubscriptionInput & {
   failureCount: number;
 };
 
+/**
+ * Server-authored assistant stream output. Stored separately from `chats` so
+ * stale client state saves cannot overwrite results the server produced.
+ * `getAssistantState` merges these into the chats it returns, and client saves
+ * leave them untouched. Used by both local and cloud streams: the client only
+ * renders live stream data and refreshes the authoritative state afterwards.
+ */
+export type StreamResultRecord = {
+  chatId: string;
+  messageId: number;
+  chatTitle: string;
+  mode: AssistantMode;
+  userMessage?: AssistantMessage;
+  assistantMessage?: AssistantMessage;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type AssistantStateDocument = AssistantState & {
   userUuid: string;
   updatedAt: Date;
+  streamResults?: Record<string, StreamResultRecord>;
 };
 
 export interface StoredAvatar {

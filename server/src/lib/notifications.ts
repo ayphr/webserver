@@ -215,13 +215,8 @@ function ensureVapidConfigured(): boolean {
  * Fans a notification out to every subscription of the user. Push failures are
  * contained here and prune dead endpoints; callers never see them.
  */
-async function sendWebPushToUser(input: CreateNotificationInput): Promise<void> {
-  if (!ensureVapidConfigured()) return;
-
-  const subscriptions = await listPushSubscriptions(input.userUuid);
-  if (subscriptions.length === 0) return;
-
-  const payload = JSON.stringify({
+export const buildPushPayload = (input: CreateNotificationInput): string =>
+  JSON.stringify({
     title: input.title,
     body: input.message,
     icon: PUSH_ICON,
@@ -229,6 +224,14 @@ async function sendWebPushToUser(input: CreateNotificationInput): Promise<void> 
     tag: `ayphr-${input.type}`,
     url: toInternalPushUrl(input.link),
   });
+
+async function sendWebPushToUser(input: CreateNotificationInput): Promise<void> {
+  if (!ensureVapidConfigured()) return;
+
+  const subscriptions = await listPushSubscriptions(input.userUuid);
+  if (subscriptions.length === 0) return;
+
+  const payload = buildPushPayload(input);
 
   await Promise.all(subscriptions.map(async (subscription) => {
     try {

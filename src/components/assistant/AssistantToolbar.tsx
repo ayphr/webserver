@@ -8,8 +8,6 @@ import {
   IconBellOff,
   IconClipboardList,
   IconClipboardListFilled,
-  IconCloud,
-  IconDeviceDesktop,
   IconFolder,
   IconFolderFilled,
   IconFolders,
@@ -28,7 +26,6 @@ import {
 import {
   sortAssistantFolders,
   type AssistantFolder,
-  type AssistantLocation,
   type AssistantMode,
   type AssistantNotificationLevel,
   type AssistantPermissionLevel,
@@ -42,12 +39,10 @@ export interface AssistantToolbarProps {
   folders: AssistantFolder[];
   activeFolderId: string | null;
   activeMode: AssistantMode;
-  taskLocation: AssistantLocation;
   permissionLevel: AssistantPermissionLevel;
   notificationLevel: AssistantNotificationLevel;
   onSelectFolder: (folderId: string | null) => void;
   onSelectMode: (mode: AssistantMode) => void;
-  onSelectTaskLocation: (location: AssistantLocation) => void;
   onSelectPermissionLevel: (level: AssistantPermissionLevel) => void;
   onSelectNotificationLevel: (level: AssistantNotificationLevel) => void;
   onCreateFolder: (name: string) => void;
@@ -58,7 +53,7 @@ export interface AssistantToolbarProps {
   onJumpToLatest?: () => void;
 }
 
-type MenuName = 'folder' | 'mode' | 'location' | 'permissions' | 'notifications';
+type MenuName = 'folder' | 'mode' | 'permissions' | 'notifications';
 
 type ToolbarOption<T extends string> = {
   value: T;
@@ -143,19 +138,6 @@ const MODE_OPTIONS: readonly ToolbarOption<AssistantMode>[] = [
   },
 ];
 
-const LOCATION_OPTIONS: readonly ToolbarOption<AssistantLocation>[] = [
-  {
-    value: 'local',
-    label: 'Local',
-    icon: <IconDeviceDesktop size={16} strokeWidth={1.75} />,
-  },
-  {
-    value: 'cloud',
-    label: 'Cloud',
-    icon: <IconCloud size={16} strokeWidth={1.75} />,
-  },
-];
-
 const PERMISSION_OPTIONS: readonly ToolbarOption<AssistantPermissionLevel>[] = [
   {
     value: 'always-ask',
@@ -198,12 +180,10 @@ export const AssistantToolbar = ({
   folders,
   activeFolderId,
   activeMode,
-  taskLocation,
   permissionLevel,
   notificationLevel,
   onSelectFolder,
   onSelectMode,
-  onSelectTaskLocation,
   onSelectPermissionLevel,
   onSelectNotificationLevel,
   onCreateFolder,
@@ -372,18 +352,6 @@ export const AssistantToolbar = ({
         }}
       />
       <ToolbarSelect
-        ariaLabel="Task location"
-        options={LOCATION_OPTIONS}
-        value={taskLocation}
-        isOpen={openMenu === 'location'}
-        hidden={!showControls || !isTask}
-        onToggle={() => toggleMenu('location')}
-        onSelect={(location) => {
-          onSelectTaskLocation(location);
-          closeMenu();
-        }}
-      />
-      <ToolbarSelect
         ariaLabel="Tool permissions"
         options={PERMISSION_OPTIONS}
         value={permissionLevel}
@@ -395,11 +363,11 @@ export const AssistantToolbar = ({
         }}
       />
       <ToolbarSelect
-        ariaLabel="Cloud notifications"
+        ariaLabel="Task notifications"
         options={NOTIFICATION_OPTIONS}
         value={notificationLevel}
         isOpen={openMenu === 'notifications'}
-        hidden={!isTask || taskLocation !== 'cloud'}
+        hidden={!isTask}
         onToggle={() => toggleMenu('notifications')}
         onSelect={(level) => {
           onSelectNotificationLevel(level);
@@ -410,14 +378,10 @@ export const AssistantToolbar = ({
         <div className="assistant-toolbar__context">
           <IconFolder size={13} strokeWidth={1.75} />
           <span>{activeFolder?.name ?? 'Uncategorised'}</span>
-          {isTask ? (
-            taskLocation === 'cloud'
-              ? <IconCloud size={13} strokeWidth={1.75} />
-              : <IconDeviceDesktop size={13} strokeWidth={1.75} />
-          ) : (
-            <IconMessageCircle size={13} strokeWidth={1.75} />
-          )}
-          <span>{isTask ? (taskLocation === 'cloud' ? 'Cloud task' : 'Local task') : 'Chat'}</span>
+          {isTask
+            ? <IconClipboardList size={13} strokeWidth={1.75} />
+            : <IconMessageCircle size={13} strokeWidth={1.75} />}
+          <span>{isTask ? 'Task' : 'Chat'}</span>
         </div>
       )}
       {showJumpToLatest && onJumpToLatest && (

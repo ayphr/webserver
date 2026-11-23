@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from '@common';
 import {
+  buildPushPayload,
   coerceNotificationPreferences,
   isNotificationEnabled,
   mergeNotificationPreferences,
@@ -91,5 +92,19 @@ describe('push payload URLs', () => {
     expect(toInternalPushUrl(undefined)).toBe('/dashboard/notifications');
     expect(toInternalPushUrl('https://example.com/phish')).toBe('/dashboard/notifications');
     expect(toInternalPushUrl('//example.com/phish')).toBe('/dashboard/notifications');
+  });
+
+  test('uses the notification title and message for push display', () => {
+    const payload = JSON.parse(buildPushPayload({
+      userUuid: 'user-1',
+      type: 'assistant_task',
+      title: 'Iris',
+      message: 'Iris has finished responding.',
+      link: '/dashboard/assistant/chat/chat-1',
+    }));
+
+    expect(payload.title).toBe('Iris');
+    expect(payload.body).toBe('Iris has finished responding.');
+    expect(payload.url).toBe('/dashboard/assistant/chat/chat-1');
   });
 });
