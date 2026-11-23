@@ -887,6 +887,10 @@ const startStream = async (
   const emitToken = () => {
     const token = tokens[index];
     if (token === undefined) {
+      // Tool-only responses (or a trailing tool run) must not complete while
+      // tools are still pending or running. The tool's completion callback
+      // schedules another pass once it finishes.
+      if (mock.tools.length > 0 && toolCursor < mock.tools.length) return;
       void complete();
       return;
     }
