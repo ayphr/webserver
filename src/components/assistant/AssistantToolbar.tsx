@@ -6,7 +6,8 @@ import {
   IconFolderFilled,
   IconFolders,
   IconFoldersFilled,
-  IconMenu2,
+  IconLayoutSidebar,
+  IconLayoutSidebarFilled,
   IconMessageCircle,
   IconPlayerPause,
   IconPlayerPlay,
@@ -84,7 +85,9 @@ export const AssistantToolbar = ({
           aria-expanded={isSidebarOpen}
           aria-controls="assistant-chat-list"
         >
-          <IconMenu2 size={16} strokeWidth={1.75} />
+          {isSidebarOpen
+            ? <IconLayoutSidebarFilled size={16} strokeWidth={1.75} />
+            : <IconLayoutSidebar size={16} strokeWidth={1.75} />}
         </button>
       )}
       <div className="assistant-toolbar__group" hidden={!showControls}>
