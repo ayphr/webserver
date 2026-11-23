@@ -735,7 +735,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   {message.interrupted && (
                     <p className="assistant-chat__interrupted">You interrupted this response.</p>
                   )}
-                  {!message.safetyNotice && (
+                  {!message.safetyNotice && !(!message.content && !(message.tools && message.tools.length) && !isStreaming) && (
                     <div className="assistant-chat__toolbar">
                     <button
                       type="button"
