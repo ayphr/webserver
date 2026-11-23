@@ -68,6 +68,9 @@ export type AssistantStreamClientMessage =
       location?: AssistantLocation;
       permissionLevel?: AssistantPermissionLevel;
       allowedTools?: string[];
+      chatId?: string;
+      messageId?: number;
+      prompt?: string;
     }
   | {
       type: 'tool_permission';

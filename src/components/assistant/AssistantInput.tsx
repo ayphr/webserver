@@ -606,7 +606,7 @@ export const AssistantInput = ({
     }
   };
 
-  const startStreaming = (messageId: number, onComplete?: () => void) => {
+  const startStreaming = (messageId: number, onComplete?: () => void, prompt?: string) => {
     const requestId = createId();
     streamRequestIdRef.current = requestId;
     streamCompleteRef.current = onComplete ?? null;
@@ -633,6 +633,9 @@ export const AssistantInput = ({
       location: assistant.preferences.taskLocation,
       permissionLevel: assistant.preferences.permissionLevel,
       allowedTools: assistant.preferences.allowedTools,
+      chatId: currentChatIdRef.current ?? undefined,
+      messageId,
+      prompt,
     });
   };
 
@@ -677,7 +680,7 @@ export const AssistantInput = ({
     setValue('');
     setFollowSignal((signal) => signal + 1);
 
-    startStreaming(assistantId, onComplete);
+    startStreaming(assistantId, onComplete, trimmed);
     return true;
   };
 

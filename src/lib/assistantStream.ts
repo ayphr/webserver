@@ -36,6 +36,9 @@ export type AssistantStreamOptions = {
   location?: AssistantLocation;
   permissionLevel?: AssistantPermissionLevel;
   allowedTools?: string[];
+  chatId?: string;
+  messageId?: number;
+  prompt?: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -201,6 +204,12 @@ export class AssistantStreamClient {
       allowedTools: Array.isArray(options.allowedTools)
         ? options.allowedTools.filter((tool): tool is string => typeof tool === 'string')
         : undefined,
+      chatId: options.chatId || undefined,
+      messageId:
+        typeof options.messageId === 'number' && Number.isInteger(options.messageId)
+          ? options.messageId
+          : undefined,
+      prompt: options.prompt || undefined,
     });
   }
 

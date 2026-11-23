@@ -358,7 +358,6 @@ export const AssistantToolbar = ({
         options={PERMISSION_OPTIONS}
         value={permissionLevel}
         isOpen={openMenu === 'permissions'}
-        hidden={!showControls || !isTask}
         onToggle={() => toggleMenu('permissions')}
         onSelect={(level) => {
           onSelectPermissionLevel(level);
