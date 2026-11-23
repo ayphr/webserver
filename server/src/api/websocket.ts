@@ -33,7 +33,7 @@ import {
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { splitAssistantResponseIntoTokens } from '../lib/assistantStream';
 import { getAssistantModelAdapter } from '../lib/assistantModel';
-import { buildAssistantSystemPrompt } from '../lib/geminiAdapter';
+import { buildAssistantSystemPrompt, isLiveAiPrompt } from '../lib/geminiAdapter';
 import { executeAssistantTool } from '../lib/assistantTools';
 import { detectSafetyCategories, redactPII } from '@common';
 import { getAssistantState, saveStreamResult, updateAssistantChatContext } from '../lib/db/assistant';
@@ -379,7 +379,7 @@ const startStream = async (
   });
 
   const modelId = context.usage.modelId;
-  const useLiveAI = /^\\s*ai:/i.test(prompt ?? '');
+  const useLiveAI = isLiveAiPrompt(prompt);
   const rejectInsufficientCredits = () => {
     send(ws, { type: 'error', requestId, error: 'insufficient credits' });
     notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);

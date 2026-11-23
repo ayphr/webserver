@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  buildAssistantSystemPrompt,
   buildGeminiRequestBody,
   createAssistantModelRouter,
+  isLiveAiPrompt,
   readGeminiEventStream,
   stripAiPrefix,
 } from './geminiAdapter';
@@ -25,6 +27,26 @@ describe('Gemini adapter', () => {
     expect(stripAiPrefix('hello ai: world')).toBe('hello ai: world');
   });
 
+  it('detects the ai: opt-in with the same rules it strips with', () => {
+    expect(isLiveAiPrompt('ai: hello')).toBe(true);
+    expect(isLiveAiPrompt('  AI:   hello')).toBe(true);
+    expect(isLiveAiPrompt('ai:')).toBe(true);
+    expect(isLiveAiPrompt('hello ai: world')).toBe(false);
+    expect(isLiveAiPrompt(undefined)).toBe(false);
+    expect(isLiveAiPrompt('')).toBe(false);
+    // Regression: a doubled escape matched a literal backslash instead.
+    expect(isLiveAiPrompt('\\sai: hello')).toBe(false);
+  });
+
+  it('builds a multi-line system prompt with real newlines', () => {
+    const prompt = buildAssistantSystemPrompt();
+    expect(prompt).toContain('You are Iris');
+    expect(prompt).toContain('\n');
+    expect(prompt).not.toContain('\\n');
+    expect(prompt).toContain('devices.list');
+    expect(prompt).toContain('user.question');
+  });
+
   it('builds a stateless request without unsupported step fields', () => {
     const body = buildGeminiRequestBody('gemini-4-hydrogen', [
       { role: 'system', content: 'Be brief' },
@@ -40,6 +62,7 @@ describe('Gemini adapter', () => {
     expect(body.system_instruction).toContain('Be brief');
     expect(body.store).toBe(false);
     expect(body.stream).toBe(true);
+    expect(body.tools?.some((tool) => tool.name === 'devices.list')).toBe(true);
     expect('status' in body.input[0]!).toBe(false);
   });
 

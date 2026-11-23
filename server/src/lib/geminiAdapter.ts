@@ -29,7 +29,7 @@ const GEMINI_TOOLS = Object.values(ASSISTANT_TOOL_DEFINITIONS).map((definition) 
 export const buildAssistantSystemPrompt = (): string => {
   const toolLines = Object.values(ASSISTANT_TOOL_DEFINITIONS)
     .map((definition) => `- ${definition.name}: ${definition.description}`)
-    .join('\\n');
+    .join('\n');
   return [
     'You are Iris, the AI assistant built into the Ayphr web application.',
     'You help users understand their devices, locations, team settings, and team members, and you can ask them clarifying questions when needed.',
@@ -40,11 +40,18 @@ export const buildAssistantSystemPrompt = (): string => {
     'How the user controls you: they choose the model variant, permission level, allowed tools, and notification level; sensitive or unallowed tools require explicit approval; they can compact long conversations.',
     'Safety: never provide instructions for self-harm, violence, abuse, or sexual content involving minors; for suicidal intent, respond with crisis support and localized resources; refuse other harmful requests clearly.',
     'When you use a tool, summarize the returned data plainly and cite what came from it; do not invent device readings or team data.',
-  ].join('\\n\\n');
+  ].join('\n\n');
 };
 
 /** The opt-in marker is stripped before anything is sent to Gemini. */
 export const stripAiPrefix = (content: string) => content.replace(/^\s*ai:\s*/i, '');
+
+/**
+ * True when a prompt opted into the live provider with an `ai:` prefix. Kept
+ * next to `stripAiPrefix` so detection and stripping can never disagree.
+ */
+export const isLiveAiPrompt = (content: string | undefined): boolean =>
+  /^\s*ai:/i.test(content ?? '');
 
 type GeminiUsage = {
   total_input_tokens?: number;
