@@ -210,7 +210,7 @@ function parseToolResult(value: unknown, label: string): AssistantToolResult {
     status: value.status,
     summary: requireString(value.summary, `${label}.summary`, MAX_STEP_DETAIL_LENGTH),
   };
-  if (value.error !== undefined) {
+  if (value.error !== undefined && value.error !== null) {
     result.error = requireString(value.error, `${label}.error`, MAX_STEP_DETAIL_LENGTH);
   }
   if (value.data !== undefined) {
@@ -236,13 +236,13 @@ function parseToolCall(value: unknown, label: string): AssistantToolCall {
   if (value.label !== undefined) {
     tool.label = requireString(value.label, `${label}.label`, MAX_STEP_LABEL_LENGTH);
   }
-  if (value.detail !== undefined) {
+  if (value.detail !== undefined && value.detail !== null) {
     tool.detail = requireString(value.detail, `${label}.detail`, MAX_STEP_DETAIL_LENGTH);
   }
   if (value.durationMs !== undefined) {
     tool.durationMs = Math.max(0, requireNumber(value.durationMs, `${label}.durationMs`));
   }
-  if (value.error !== undefined) {
+  if (value.error !== undefined && value.error !== null) {
     tool.error = requireString(value.error, `${label}.error`, MAX_STEP_DETAIL_LENGTH);
   }
   if (value.permission !== undefined) {
@@ -280,7 +280,7 @@ function parseMessage(value: unknown, label: string): AssistantMessage {
     message.interrupted = value.interrupted;
   }
 
-  if (value.error !== undefined) {
+  if (value.error !== undefined && value.error !== null) {
     message.error = requireString(value.error, `${label}.error`, MAX_MESSAGE_LENGTH);
   }
 
