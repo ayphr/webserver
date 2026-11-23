@@ -1,13 +1,21 @@
 import {
+  ASSISTANT_LOCATIONS,
+  ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_STREAM_PATH,
   ASSISTANT_THINKING_STATUSES,
+  ASSISTANT_TOOL_PERMISSIONS,
+  ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_TOOL_STATUSES,
+  type AssistantLocation,
   type AssistantMode,
+  type AssistantPermissionLevel,
   type AssistantStreamClientMessage,
   type AssistantStreamServerMessage,
   type AssistantThinkingStep,
   type AssistantThinkingStatus,
   type AssistantToolCall,
+  type AssistantToolPermission,
+  type AssistantToolPermissionDecision,
   type AssistantToolStatus,
   type AssistantVariant,
 } from '@common';
@@ -17,6 +25,7 @@ export type AssistantStreamHandlers = {
   onToken: (requestId: string, token: string, index?: number) => void;
   onThinking?: (requestId: string, step: AssistantThinkingStep) => void;
   onTool?: (requestId: string, tool: AssistantToolCall) => void;
+  onToolPermissionRequest?: (requestId: string, tool: AssistantToolCall) => void;
   onDone: (requestId: string, durationMs?: number) => void;
   onError?: (requestId: string, error: string) => void;
 };
@@ -24,6 +33,9 @@ export type AssistantStreamHandlers = {
 export type AssistantStreamOptions = {
   mode?: AssistantMode;
   variant?: AssistantVariant;
+  location?: AssistantLocation;
+  permissionLevel?: AssistantPermissionLevel;
+  allowedTools?: string[];
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -34,6 +46,12 @@ const isThinkingStatus = (value: unknown): value is AssistantThinkingStatus =>
 
 const isToolStatus = (value: unknown): value is AssistantToolStatus =>
   typeof value === 'string' && ASSISTANT_TOOL_STATUSES.includes(value as AssistantToolStatus);
+
+const isToolPermission = (value: unknown): value is AssistantToolPermission =>
+  typeof value === 'string' && ASSISTANT_TOOL_PERMISSIONS.includes(value as AssistantToolPermission);
+
+const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
+  typeof value === 'string' && values.includes(value as T);
 
 const isThinkingStep = (value: unknown): value is AssistantThinkingStep => {
   if (!isRecord(value)) return false;
@@ -50,6 +68,7 @@ const isToolCall = (value: unknown): value is AssistantToolCall => {
   if (value.label !== undefined && typeof value.label !== 'string') return false;
   if (value.detail !== undefined && typeof value.detail !== 'string') return false;
   if (value.error !== undefined && typeof value.error !== 'string') return false;
+  if (value.permission !== undefined && !isToolPermission(value.permission)) return false;
   return value.durationMs === undefined || (typeof value.durationMs === 'number' && Number.isFinite(value.durationMs));
 };
 
@@ -60,6 +79,7 @@ const isServerMessage = (value: unknown): value is AssistantStreamServerMessage 
   if (typeof value.requestId !== 'string') return false;
   if (value.type === 'thinking') return isThinkingStep(value.step);
   if (value.type === 'tool') return isToolCall(value.tool);
+  if (value.type === 'tool_permission_request') return isToolCall(value.tool);
   if (value.type === 'token') {
     return (
       typeof value.token === 'string' &&
@@ -131,6 +151,10 @@ export class AssistantStreamClient {
         this.handlers.onTool?.(parsed.requestId, parsed.tool);
         return;
       }
+      if (parsed.type === 'tool_permission_request') {
+        this.handlers.onToolPermissionRequest?.(parsed.requestId, parsed.tool);
+        return;
+      }
       if (parsed.type === 'token') {
         this.handlers.onToken(parsed.requestId, parsed.token, parsed.index);
         return;
@@ -170,7 +194,23 @@ export class AssistantStreamClient {
       requestId,
       mode: options.mode,
       variant: options.variant,
+      location: isOneOf(ASSISTANT_LOCATIONS, options.location) ? options.location : undefined,
+      permissionLevel: isOneOf(ASSISTANT_PERMISSION_LEVELS, options.permissionLevel)
+        ? options.permissionLevel
+        : undefined,
+      allowedTools: Array.isArray(options.allowedTools)
+        ? options.allowedTools.filter((tool): tool is string => typeof tool === 'string')
+        : undefined,
     });
+  }
+
+  respondToToolPermission(
+    requestId: string,
+    toolId: string,
+    decision: AssistantToolPermissionDecision,
+  ) {
+    if (!isOneOf(ASSISTANT_TOOL_PERMISSION_DECISIONS, decision)) return;
+    this.send({ type: 'tool_permission', requestId, toolId, decision });
   }
 
   cancel(requestId: string) {

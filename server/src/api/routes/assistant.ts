@@ -1,18 +1,26 @@
 import {
+  ASSISTANT_LOCATIONS,
   ASSISTANT_MODES,
+  ASSISTANT_PERMISSION_LEVELS,
   ASSISTANT_THINKING_STATUSES,
+  ASSISTANT_TOOL_PERMISSIONS,
   ASSISTANT_TOOL_STATUSES,
   ASSISTANT_VARIANTS,
+  DEFAULT_ASSISTANT_PREFERENCES,
   createDefaultAssistantState,
   type AssistantChat,
   type AssistantFolder,
+  type AssistantLocation,
   type AssistantMessage,
   type AssistantMessageFeedback,
   type AssistantMode,
+  type AssistantPermissionLevel,
+  type AssistantPreferences,
   type AssistantState,
   type AssistantThinkingStep,
   type AssistantThinkingStatus,
   type AssistantToolCall,
+  type AssistantToolPermission,
   type AssistantToolStatus,
   type AssistantVariant,
 } from '@common';
@@ -29,6 +37,7 @@ const MAX_FOLDER_NAME_LENGTH = 100;
 const MAX_MESSAGE_LENGTH = 100_000;
 const MAX_THINKING_STEPS = 12;
 const MAX_TOOL_CALLS = 12;
+const MAX_ALLOWED_TOOLS = 100;
 const MAX_STEP_LABEL_LENGTH = 200;
 const MAX_STEP_DETAIL_LENGTH = 1_000;
 
@@ -73,6 +82,33 @@ const requireMode = (value: unknown, label: string): AssistantMode => {
   }
   return value as AssistantMode;
 };
+
+const requireLocation = (value: unknown, label: string): AssistantLocation => {
+  if (typeof value !== 'string' || !ASSISTANT_LOCATIONS.includes(value as AssistantLocation)) {
+    throw new Error(`invalid ${label}`);
+  }
+  return value as AssistantLocation;
+};
+
+const requirePermissionLevel = (value: unknown, label: string): AssistantPermissionLevel => {
+  if (
+    typeof value !== 'string' ||
+    !ASSISTANT_PERMISSION_LEVELS.includes(value as AssistantPermissionLevel)
+  ) {
+    throw new Error(`invalid ${label}`);
+  }
+  return value as AssistantPermissionLevel;
+};
+
+function parseToolPermission(value: unknown, label: string): AssistantToolPermission {
+  if (
+    typeof value !== 'string' ||
+    !ASSISTANT_TOOL_PERMISSIONS.includes(value as AssistantToolPermission)
+  ) {
+    throw new Error(`invalid ${label}`);
+  }
+  return value as AssistantToolPermission;
+}
 
 function parseThinkingStatus(value: unknown, label: string): AssistantThinkingStatus {
   if (typeof value !== 'string' || !ASSISTANT_THINKING_STATUSES.includes(value as AssistantThinkingStatus)) {
@@ -122,6 +158,9 @@ function parseToolCall(value: unknown, label: string): AssistantToolCall {
   }
   if (value.error !== undefined) {
     tool.error = requireString(value.error, `${label}.error`, MAX_STEP_DETAIL_LENGTH);
+  }
+  if (value.permission !== undefined) {
+    tool.permission = parseToolPermission(value.permission, `${label}.permission`);
   }
   return tool;
 }
@@ -225,6 +264,40 @@ function parseFolder(value: unknown, label: string): AssistantFolder {
   return folder;
 }
 
+function parseAssistantPreferences(value: unknown): AssistantPreferences {
+  if (!isRecord(value)) throw new Error('invalid preferences');
+
+  const allowedToolsValue = value.allowedTools ?? DEFAULT_ASSISTANT_PREFERENCES.allowedTools;
+  if (!Array.isArray(allowedToolsValue) || allowedToolsValue.length > MAX_ALLOWED_TOOLS) {
+    throw new Error('invalid allowedTools');
+  }
+  const allowedTools = allowedToolsValue.map((tool, index) =>
+    requireId(tool, `allowedTools[${index}]`),
+  );
+  if (new Set(allowedTools).size !== allowedTools.length) {
+    throw new Error('duplicate allowed tool');
+  }
+
+  const sendShortcut = value.sendShortcut ?? DEFAULT_ASSISTANT_PREFERENCES.sendShortcut;
+  if (sendShortcut !== 'enter' && sendShortcut !== 'shift-enter') {
+    throw new Error('invalid sendShortcut');
+  }
+
+  return {
+    defaultVariant: requireVariant(value.defaultVariant, 'defaultVariant'),
+    sendShortcut,
+    taskLocation:
+      value.taskLocation === undefined
+        ? DEFAULT_ASSISTANT_PREFERENCES.taskLocation
+        : requireLocation(value.taskLocation, 'taskLocation'),
+    permissionLevel:
+      value.permissionLevel === undefined
+        ? DEFAULT_ASSISTANT_PREFERENCES.permissionLevel
+        : requirePermissionLevel(value.permissionLevel, 'permissionLevel'),
+    allowedTools,
+  };
+}
+
 function parseAssistantState(value: unknown): AssistantState {
   if (!isRecord(value)) throw new Error('invalid state');
   if (!Array.isArray(value.chats) || value.chats.length > MAX_CHATS) {
@@ -259,19 +332,13 @@ function parseAssistantState(value: unknown): AssistantState {
     throw new Error('active folder does not exist');
   }
 
-  const defaultVariant = requireVariant(value.preferences.defaultVariant, 'defaultVariant');
-  const sendShortcut = value.preferences.sendShortcut;
-  if (sendShortcut !== 'enter' && sendShortcut !== 'shift-enter') {
-    throw new Error('invalid sendShortcut');
-  }
-
   return {
     chats,
     folders,
     activeChatId,
     activeFolderId,
     activeMode,
-    preferences: { defaultVariant, sendShortcut },
+    preferences: parseAssistantPreferences(value.preferences),
   };
 }
 

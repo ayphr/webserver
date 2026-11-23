@@ -6,7 +6,9 @@ import {
   prependAssistantChat,
   reorderAssistantFolders,
   type AssistantChat,
+  type AssistantLocation,
   type AssistantMode,
+  type AssistantPermissionLevel,
   type AssistantPreferences,
   type AssistantState,
 } from '@common';
@@ -26,6 +28,9 @@ export type AssistantController = {
   updatePreferences: (patch: Partial<AssistantPreferences>) => void;
   selectFolder: (folderId: string | null) => void;
   selectMode: (mode: AssistantMode) => void;
+  selectTaskLocation: (location: AssistantLocation) => void;
+  selectPermissionLevel: (level: AssistantPermissionLevel) => void;
+  allowTool: (name: string) => void;
   createFolder: (name: string) => void;
   createChat: (folderId: string | null, mode: AssistantMode) => AssistantChat;
   renameFolder: (id: string, name: string) => void;
@@ -174,6 +179,39 @@ export const useAssistantState = (): AssistantController => {
     [update],
   );
 
+  const selectTaskLocation = useCallback(
+    (location: AssistantLocation) => {
+      updatePreferences({ taskLocation: location });
+    },
+    [updatePreferences],
+  );
+
+  const selectPermissionLevel = useCallback(
+    (level: AssistantPermissionLevel) => {
+      updatePreferences({ permissionLevel: level });
+    },
+    [updatePreferences],
+  );
+
+  const allowTool = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      update((current) =>
+        current.preferences.allowedTools.includes(trimmed)
+          ? current
+          : {
+              ...current,
+              preferences: {
+                ...current.preferences,
+                allowedTools: [...current.preferences.allowedTools, trimmed],
+              },
+            },
+      );
+    },
+    [update],
+  );
+
   const createFolder = useCallback(
     (name: string) => {
       const trimmed = name.trim();
@@ -210,6 +248,7 @@ export const useAssistantState = (): AssistantController => {
         ...current,
         chats: prependAssistantChat(current.chats, chat),
         activeChatId: chat.id,
+        activeMode: mode,
       }));
       return chat;
     },
@@ -325,6 +364,9 @@ export const useAssistantState = (): AssistantController => {
       updatePreferences,
       selectFolder,
       selectMode,
+      selectTaskLocation,
+      selectPermissionLevel,
+      allowTool,
       createFolder,
       createChat,
       renameFolder,
@@ -345,6 +387,9 @@ export const useAssistantState = (): AssistantController => {
       updatePreferences,
       selectFolder,
       selectMode,
+      selectTaskLocation,
+      selectPermissionLevel,
+      allowTool,
       createFolder,
       createChat,
       renameFolder,

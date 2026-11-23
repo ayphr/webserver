@@ -10,6 +10,7 @@ export type NotificationType =
   | 'punishment'
   | 'appeal'
   | 'subscription'
+  | 'assistant_task'
   | 'system';
 
 /** All notification types, for building preference controls and validating overrides. */
@@ -21,6 +22,7 @@ export const NOTIFICATION_TYPES = [
   'punishment',
   'appeal',
   'subscription',
+  'assistant_task',
   'system',
 ] as const satisfies readonly NotificationType[];
 

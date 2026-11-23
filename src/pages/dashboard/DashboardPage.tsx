@@ -584,7 +584,14 @@ export const DashboardPage = () => {
     }
 
     if (assistant.state.activeChatId !== routeChatId) {
-      assistant.update((current) => ({ ...current, activeChatId: routeChatId }));
+      assistant.update((current) => {
+        const chat = current.chats.find((item) => item.id === routeChatId);
+        return {
+          ...current,
+          activeChatId: routeChatId,
+          activeMode: chat?.mode ?? current.activeMode,
+        };
+      });
       chatActionTokenRef.current += 1;
       setChatAction({ type: 'open', token: chatActionTokenRef.current, chatId: routeChatId });
     }

@@ -4,6 +4,7 @@ import {
   type AssistantChat,
   type AssistantThinkingStep,
   type AssistantToolCall,
+  type AssistantToolPermissionDecision,
   type AssistantVariant,
 } from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
@@ -384,6 +385,24 @@ export const AssistantInput = ({
     );
   };
 
+  const handleToolPermissionRequest = (requestId: string, tool: AssistantToolCall) => {
+    handleStreamTool(requestId, tool);
+  };
+
+  const handleToolPermission = (toolId: string, decision: AssistantToolPermissionDecision) => {
+    const requestId = streamRequestIdRef.current;
+    if (!requestId) return;
+
+    const activeTool = messagesRef.current
+      .find((message) => message.id === streamMessageIdRef.current)
+      ?.tools?.find((tool) => tool.id === toolId);
+    if (decision === 'allow_always' && activeTool) {
+      assistant.allowTool(activeTool.name);
+    }
+
+    getStreamClient().respondToToolPermission(requestId, toolId, decision);
+  };
+
   const finishStream = (requestId: string, error?: string, serverDurationMs?: number) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
@@ -429,6 +448,7 @@ export const AssistantInput = ({
         onToken: handleStreamToken,
         onThinking: handleStreamThinking,
         onTool: handleStreamTool,
+        onToolPermissionRequest: handleToolPermissionRequest,
         onDone: handleStreamDone,
         onError: handleStreamError,
       });
@@ -487,7 +507,11 @@ export const AssistantInput = ({
     commitMessages(() => chat.messages);
     currentChatIdRef.current = chat.id;
     nextIdRef.current = chat.messages.reduce((max, message) => Math.max(max, message.id), 0) + 1;
-    assistant.update((current) => ({ ...current, activeChatId: chat.id }));
+    assistant.update((current) => ({
+      ...current,
+      activeChatId: chat.id,
+      activeMode: chat.mode,
+    }));
     setOpenMenuId(null);
 
     const lastVariant = [...chat.messages]
@@ -603,7 +627,13 @@ export const AssistantInput = ({
           : m,
       ),
     );
-    getStreamClient().stream(requestId, { mode: state.activeMode, variant });
+    getStreamClient().stream(requestId, {
+      mode: state.activeMode,
+      variant,
+      location: assistant.preferences.taskLocation,
+      permissionLevel: assistant.preferences.permissionLevel,
+      allowedTools: assistant.preferences.allowedTools,
+    });
   };
 
   const appendAndStream = (text: string, onComplete?: () => void) => {
@@ -727,6 +757,7 @@ export const AssistantInput = ({
             onUndo={handleUndo}
             onFeedback={handleFeedback}
             onRegenerate={handleRegenerate}
+            onToolPermission={handleToolPermission}
             onCopy={copyMessage}
             onRemoveQueued={removeQueuedMessage}
             onMoveQueued={moveQueuedMessage}
@@ -738,8 +769,12 @@ export const AssistantInput = ({
             folders={state.folders}
             activeFolderId={toolbarFolderId}
             activeMode={toolbarMode}
+            taskLocation={assistant.preferences.taskLocation}
+            permissionLevel={assistant.preferences.permissionLevel}
             onSelectFolder={assistant.selectFolder}
             onSelectMode={assistant.selectMode}
+            onSelectTaskLocation={assistant.selectTaskLocation}
+            onSelectPermissionLevel={assistant.selectPermissionLevel}
             onCreateFolder={assistant.createFolder}
             showControls={!state.activeChatId}
             onToggleSidebar={onToggleSidebar}

@@ -1,30 +1,63 @@
 import type { ServerWebSocket, WebSocketHandler } from 'bun';
 import {
+  ASSISTANT_LOCATIONS,
   ASSISTANT_MODES,
+  ASSISTANT_PERMISSION_LEVELS,
+  ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_VARIANTS,
+  type AssistantLocation,
   type AssistantMode,
+  type AssistantPermissionLevel,
   type AssistantStreamClientMessage,
   type AssistantStreamServerMessage,
   type AssistantThinkingStatus,
+  type AssistantToolPermission,
+  type AssistantToolPermissionDecision,
   type AssistantToolStatus,
   type AssistantVariant,
 } from '@common';
+import { runBackgroundTask } from '../lib/backgroundTasks';
 import { createAssistantMockStream, splitAssistantResponseIntoTokens } from '../lib/assistantStream';
+import { notifyUser } from '../lib/notifications';
 import { getUserFromToken } from './auth';
 
 export type AssistantSocketData = { userUuid: string | null };
 type AssistantWebSocket = ServerWebSocket<AssistantSocketData>;
-type ActiveStreams = Map<string, ReturnType<typeof setTimeout>>;
+type Timer = ReturnType<typeof setTimeout>;
+
+type ActiveStream = {
+  cancelled: boolean;
+  timers: Set<Timer>;
+  cloudKey?: string;
+  onOrphaned?: () => void;
+};
+type ActiveStreams = Map<string, ActiveStream>;
+type ToolPermissionHandler = (
+  toolId: string,
+  decision: AssistantToolPermissionDecision,
+) => void;
+type CloudTask = { timers: Set<Timer> };
 
 const MAX_CONCURRENT_STREAMS = 8;
 const AUTH_TIMEOUT_MS = 10_000;
 const FIRST_TOKEN_DELAY_MS = 300;
 const TOKEN_DELAY_MIN_MS = 70;
 const TOKEN_DELAY_VARY_MS = 50;
+const CLOUD_FIRST_PROGRESS_MS = 900;
+const CLOUD_PROGRESS_STEP_MS = 1_400;
+const CLOUD_LINK = '/dashboard';
+
+/** Example tools that need approval under "Sometimes ask". */
+const SENSITIVE_TOOLS = new Set(['data.query', 'docs.lookup']);
 
 const activeStreams = new Map<AssistantWebSocket, ActiveStreams>();
-const authTimers = new Map<AssistantWebSocket, ReturnType<typeof setTimeout>>();
+const authTimers = new Map<AssistantWebSocket, Timer>();
 const messageQueues = new Map<AssistantWebSocket, Promise<void>>();
+const toolPermissionHandlers = new Map<string, ToolPermissionHandler>();
+const cloudTasks = new Map<string, CloudTask>();
+
+const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
+  typeof value === 'string' && values.includes(value as T);
 
 const send = (ws: AssistantWebSocket, message: AssistantStreamServerMessage) => {
   if (ws.readyState !== 1) return;
@@ -36,12 +69,78 @@ const rejectUnauthenticated = (ws: AssistantWebSocket, error: string) => {
   ws.close();
 };
 
-const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
+const clearTimers = (timers: Set<Timer>) => {
+  for (const timer of timers) clearTimeout(timer);
+  timers.clear();
+};
+
+const notifyCloudUser = (userUuid: string, title: string, message: string) => {
+  void runBackgroundTask('assistant-cloud-progress', () =>
+    notifyUser({
+      userUuid,
+      type: 'assistant_task',
+      title,
+      message,
+      link: CLOUD_LINK,
+    }),
+  );
+};
+
+const clearCloudTask = (key: string) => {
+  const task = cloudTasks.get(key);
+  if (!task) return;
+  clearTimers(task.timers);
+  cloudTasks.delete(key);
+};
+
+const startCloudTask = (
+  key: string,
+  userUuid: string,
+  requestId: string,
+  steps: string[],
+) => {
+  clearCloudTask(key);
+  const task: CloudTask = { timers: new Set() };
+  cloudTasks.set(key, task);
+
+  notifyCloudUser(
+    userUuid,
+    'Cloud task started',
+    `Task ${requestId.slice(-6)} is running on the server.`,
+  );
+
+  steps.slice(0, 3).forEach((step, index) => {
+    const timer = setTimeout(() => {
+      task.timers.delete(timer);
+      if (!cloudTasks.has(key)) return;
+      notifyCloudUser(userUuid, 'Cloud task is working', `${step}…`);
+    }, CLOUD_FIRST_PROGRESS_MS + index * CLOUD_PROGRESS_STEP_MS);
+    task.timers.add(timer);
+    timer.unref?.();
+  });
+};
+
+const cancelStream = (
+  ws: AssistantWebSocket,
+  requestId: string,
+  options: { stopCloudTask?: boolean } = {},
+) => {
   const streams = activeStreams.get(ws);
-  if (!streams) return;
-  const timer = streams.get(requestId);
-  if (timer) clearTimeout(timer);
+  const stream = streams?.get(requestId);
+  if (!stream || !streams) return;
+
+  stream.cancelled = true;
+  clearTimers(stream.timers);
   streams.delete(requestId);
+  toolPermissionHandlers.delete(requestId);
+
+  if (stream.cloudKey) {
+    const [userUuid] = stream.cloudKey.split(':', 2);
+    clearCloudTask(stream.cloudKey);
+    if (options.stopCloudTask && userUuid) {
+      notifyCloudUser(userUuid, 'Cloud task stopped', 'The task was cancelled.');
+    }
+  }
 };
 
 const isMode = (value: unknown): value is AssistantMode =>
@@ -55,6 +154,10 @@ const startStream = (
   requestId: string,
   mode: AssistantMode,
   variant: AssistantVariant,
+  location: AssistantLocation,
+  permissionLevel: AssistantPermissionLevel,
+  allowedTools: string[],
+  userUuid: string,
 ) => {
   const streams = activeStreams.get(ws);
   if (!streams) return;
@@ -69,8 +172,28 @@ const startStream = (
   const tokens = splitAssistantResponseIntoTokens(mock.content);
   const startedAt = Date.now();
   const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
-  const toolStatuses = new Map<string, AssistantToolStatus>();
+  const toolSignatures = new Map<string, string>();
+  const permissionDecisions = new Map<string, AssistantToolPermissionDecision>();
+  const allowedToolNames = new Set(allowedTools);
+  const stream: ActiveStream = { cancelled: false, timers: new Set() };
   let index = 0;
+  let pendingToolId: string | null = null;
+
+  const schedule = (callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      stream.timers.delete(timer);
+      if (stream.cancelled) return;
+      callback();
+    }, delay);
+    stream.timers.add(timer);
+  };
+
+  const needsPermission = (name: string) => {
+    if (mode !== 'task' || permissionLevel === 'never-ask') return false;
+    if (allowedToolNames.has(name)) return false;
+    if (permissionLevel === 'always-ask') return true;
+    return SENSITIVE_TOOLS.has(name);
+  };
 
   const stageIndexFor = (length: number) => {
     if (length === 0 || tokens.length === 0) return length - 1;
@@ -101,34 +224,126 @@ const startStream = (
     });
   };
 
+  const emitTool = (
+    tool: (typeof mock.tools)[number],
+    status: AssistantToolStatus,
+    permission?: AssistantToolPermission,
+    detail?: string,
+  ) => {
+    const signature = `${status}|${permission ?? ''}|${detail ?? ''}`;
+    if (toolSignatures.get(tool.id) === signature) return;
+    toolSignatures.set(tool.id, signature);
+    send(ws, {
+      type: 'tool',
+      requestId,
+      tool: {
+        ...tool,
+        status,
+        detail,
+        durationMs: status === 'done' ? tool.durationMs : undefined,
+        permission,
+      },
+    });
+  };
+
   const emitTools = (forceDone = false) => {
     const active = stageIndexFor(mock.tools.length);
     mock.tools.forEach((base, stageIndex) => {
-      const status: AssistantToolStatus = forceDone
-        ? 'done'
-        : stageIndex < active
-          ? 'done'
-          : stageIndex === active
-            ? 'running'
-            : 'pending';
-      if (toolStatuses.get(base.id) === status) return;
-      toolStatuses.set(base.id, status);
-      send(ws, {
-        type: 'tool',
-        requestId,
-        tool: {
-          ...base,
-          status,
-          durationMs: status === 'done' ? base.durationMs : undefined,
-        },
-      });
+      if (pendingToolId !== null && base.id !== pendingToolId) return;
+
+      if (forceDone) {
+        const decision = permissionDecisions.get(base.id);
+        if (decision === 'deny') {
+          emitTool(base, 'denied', 'denied', 'Denied by you');
+          return;
+        }
+        if (decision) {
+          const permission = decision === 'allow_always' ? 'allowed_always' : 'allowed_once';
+          emitTool(base, 'done', permission);
+          return;
+        }
+        emitTool(base, 'done');
+        return;
+      }
+
+      if (stageIndex < active) {
+        const decision = permissionDecisions.get(base.id);
+        const permission = decision
+          ? decision === 'allow_always'
+            ? 'allowed_always'
+            : decision === 'allow_once'
+              ? 'allowed_once'
+              : 'denied'
+          : undefined;
+        emitTool(base, decision === 'deny' ? 'denied' : 'done', permission);
+        return;
+      }
+
+      if (stageIndex !== active || pendingToolId !== null) return;
+
+      if (needsPermission(base.name) && !permissionDecisions.has(base.id)) {
+        emitTool(base, 'awaiting_permission', 'pending', 'Waiting for your approval');
+        pendingToolId = base.id;
+        toolPermissionHandlers.set(requestId, (toolId, decision) => {
+          if (toolId !== pendingToolId || stream.cancelled) return;
+          pendingToolId = null;
+          stream.onOrphaned = undefined;
+          toolPermissionHandlers.delete(requestId);
+          permissionDecisions.set(toolId, decision);
+
+          if (decision === 'deny') {
+            emitTool(base, 'denied', 'denied', 'Denied by you');
+            schedule(emitToken, TOKEN_DELAY_MIN_MS);
+            return;
+          }
+
+          const permission = decision === 'allow_always' ? 'allowed_always' : 'allowed_once';
+          const label = decision === 'allow_always' ? 'Allowed always' : 'Allowed once';
+          emitTool(base, 'running', permission, label);
+          schedule(() => {
+            emitTool(base, 'done', permission);
+            schedule(emitToken, TOKEN_DELAY_MIN_MS);
+          }, base.durationMs ?? 250);
+        });
+        stream.onOrphaned = () => {
+          toolPermissionHandlers.get(requestId)?.(base.id, 'deny');
+        };
+        send(ws, {
+          type: 'tool_permission_request',
+          requestId,
+          tool: {
+            ...base,
+            status: 'awaiting_permission',
+            detail: 'Waiting for your approval',
+            permission: 'pending',
+          },
+        });
+        return;
+      }
+
+      emitTool(base, 'running');
     });
   };
 
   const complete = () => {
     emitThinking(true);
     emitTools(true);
+    clearTimers(stream.timers);
     streams.delete(requestId);
+    toolPermissionHandlers.delete(requestId);
+
+    if (stream.cloudKey) {
+      clearCloudTask(stream.cloudKey);
+      const [completedUserUuid] = stream.cloudKey.split(':', 2);
+      if (completedUserUuid) {
+        notifyCloudUser(
+          completedUserUuid,
+          'Cloud task completed',
+          'Your task is finished. Open the assistant to review the result.',
+        );
+      }
+    }
+
     send(ws, {
       type: 'done',
       requestId,
@@ -148,15 +363,29 @@ const startStream = (
     emitThinking();
     emitTools();
 
-    const timer = setTimeout(emitToken, TOKEN_DELAY_MIN_MS + Math.random() * TOKEN_DELAY_VARY_MS);
-    streams.set(requestId, timer);
+    if (pendingToolId === null) {
+      schedule(emitToken, TOKEN_DELAY_MIN_MS + Math.random() * TOKEN_DELAY_VARY_MS);
+    }
   };
+
+  streams.set(requestId, stream);
+
+  if (location === 'cloud') {
+    const cloudKey = `${userUuid}:${requestId}`;
+    stream.cloudKey = cloudKey;
+    const progressSteps = [
+      ...mock.thinking.map((step) => step.label),
+      ...mock.tools.map((tool) => tool.label ?? tool.name),
+    ];
+    startCloudTask(cloudKey, userUuid, requestId, progressSteps);
+  }
 
   emitThinking();
   emitTools();
 
-  const timer = setTimeout(emitToken, FIRST_TOKEN_DELAY_MS);
-  streams.set(requestId, timer);
+  if (pendingToolId === null) {
+    schedule(emitToken, FIRST_TOKEN_DELAY_MS);
+  }
 };
 
 const isClientMessage = (value: unknown): value is AssistantStreamClientMessage => {
@@ -174,9 +403,36 @@ const isClientMessage = (value: unknown): value is AssistantStreamClientMessage 
   if (!hasValidRequestId) return false;
 
   if (message.type === 'cancel') return true;
+  if (message.type === 'tool_permission') {
+    return (
+      typeof message.toolId === 'string' &&
+      Boolean(message.toolId) &&
+      message.toolId.length <= 200 &&
+      isOneOf(ASSISTANT_TOOL_PERMISSION_DECISIONS, message.decision)
+    );
+  }
   if (message.type !== 'stream') return false;
   if (message.mode !== undefined && !isMode(message.mode)) return false;
   if (message.variant !== undefined && !isVariant(message.variant)) return false;
+  if (message.location !== undefined && !isOneOf(ASSISTANT_LOCATIONS, message.location)) {
+    return false;
+  }
+  if (
+    message.permissionLevel !== undefined &&
+    !isOneOf(ASSISTANT_PERMISSION_LEVELS, message.permissionLevel)
+  ) {
+    return false;
+  }
+  if (
+    message.allowedTools !== undefined &&
+    (!Array.isArray(message.allowedTools) ||
+      message.allowedTools.length > 100 ||
+      !message.allowedTools.every(
+        (tool) => typeof tool === 'string' && Boolean(tool) && tool.length <= 200,
+      ))
+  ) {
+    return false;
+  }
   return true;
 };
 
@@ -216,10 +472,25 @@ const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayB
   }
 
   if (parsed.type === 'stream') {
-    startStream(ws, parsed.requestId, parsed.mode ?? 'chat', parsed.variant ?? 'standard');
-  } else {
-    cancelStream(ws, parsed.requestId);
+    startStream(
+      ws,
+      parsed.requestId,
+      parsed.mode ?? 'chat',
+      parsed.variant ?? 'standard',
+      parsed.location ?? 'local',
+      parsed.permissionLevel ?? 'always-ask',
+      parsed.allowedTools ?? [],
+      ws.data.userUuid,
+    );
+    return;
   }
+
+  if (parsed.type === 'tool_permission') {
+    toolPermissionHandlers.get(parsed.requestId)?.(parsed.toolId, parsed.decision);
+    return;
+  }
+
+  cancelStream(ws, parsed.requestId);
 };
 
 export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
@@ -257,7 +528,17 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
 
     const streams = activeStreams.get(ws);
     if (streams) {
-      for (const streamTimer of streams.values()) clearTimeout(streamTimer);
+      for (const [requestId, stream] of [...streams.entries()]) {
+        if (stream.cloudKey) {
+          // Cloud tasks deliberately keep running after a socket closes. Any
+          // outstanding permission request is auto-denied so the task finishes.
+          stream.onOrphaned?.();
+          stream.onOrphaned = undefined;
+          streams.delete(requestId);
+          continue;
+        }
+        cancelStream(ws, requestId);
+      }
       activeStreams.delete(ws);
     }
   },

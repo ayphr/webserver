@@ -12,6 +12,7 @@ import {
   IconArrowBackUp,
   IconArrowDown,
   IconArrowUp,
+  IconCheck,
   IconChevronDown,
   IconCopy,
   IconCopyCheck,
@@ -19,6 +20,7 @@ import {
   IconFileText,
   IconRefresh,
   IconSearch,
+  IconShieldStar,
   IconThumbDown,
   IconThumbDownFilled,
   IconThumbUp,
@@ -31,6 +33,8 @@ import {
   ASSISTANT_DATA,
   type AssistantThinkingStep,
   type AssistantToolCall,
+  type AssistantToolPermission,
+  type AssistantToolPermissionDecision,
   type AssistantVariant,
 } from '@common';
 import type { LiveAssistantMessage } from './types';
@@ -52,6 +56,7 @@ export interface AssistantMessagesProps {
   onUndo: (messageId: number) => void;
   onFeedback: (messageId: number, feedback: 'like' | 'dislike') => void;
   onRegenerate: (messageId: number) => void;
+  onToolPermission: (toolId: string, decision: AssistantToolPermissionDecision) => void;
   onCopy: (messageId: number, content: string) => void;
   onRemoveQueued: (index: number) => void;
   onMoveQueued: (index: number, direction: -1 | 1) => void;
@@ -167,21 +172,80 @@ const renderToolIcon = (name: string) => {
   return <IconTool {...TOOL_ICON_PROPS} />;
 };
 
-const ToolCallLine = ({ tool }: { tool: AssistantToolCall }) => (
-  <div className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}>
-    {renderToolIcon(tool.name)}
-    <span className="assistant-chat__tool-line-label">{tool.label ?? tool.name}</span>
-    {(tool.error || tool.detail) && (
-      <span className="assistant-chat__tool-line-detail">{tool.error ?? tool.detail}</span>
-    )}
-  </div>
-);
+const TOOL_PERMISSION_LABELS: Partial<Record<AssistantToolPermission, string>> = {
+  pending: 'Waiting for approval',
+  allowed_once: 'Allowed once',
+  allowed_always: 'Allowed always',
+  denied: 'Denied',
+};
 
-const ToolGroup = ({ tools, active }: { tools: AssistantToolCall[]; active: boolean }) => {
+const ToolCallLine = ({
+  tool,
+  onToolPermission,
+}: {
+  tool: AssistantToolCall;
+  onToolPermission: (toolId: string, decision: AssistantToolPermissionDecision) => void;
+}) => {
+  const permissionLabel = tool.permission ? TOOL_PERMISSION_LABELS[tool.permission] : undefined;
+  const awaiting = tool.status === 'awaiting_permission';
+
+  return (
+    <div className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}>
+      {renderToolIcon(tool.name)}
+      <span className="assistant-chat__tool-line-label">{tool.label ?? tool.name}</span>
+      {(tool.error || tool.detail) && (
+        <span className="assistant-chat__tool-line-detail">{tool.error ?? tool.detail}</span>
+      )}
+      {permissionLabel && !awaiting && (
+        <span className="assistant-chat__tool-permission-label">{permissionLabel}</span>
+      )}
+      {awaiting && (
+        <div className="assistant-chat__tool-permission-actions">
+          <button
+            type="button"
+            onClick={() => onToolPermission(tool.id, 'allow_once')}
+            aria-label={`Allow ${tool.label ?? tool.name} once`}
+          >
+            <IconCheck size={12} strokeWidth={2} />
+            <span>Allow once</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onToolPermission(tool.id, 'allow_always')}
+            aria-label={`Always allow ${tool.label ?? tool.name}`}
+          >
+            <IconShieldStar size={12} strokeWidth={2} />
+            <span>Always allow</span>
+          </button>
+          <button
+            type="button"
+            className="assistant-chat__tool-permission-deny"
+            onClick={() => onToolPermission(tool.id, 'deny')}
+            aria-label={`Deny ${tool.label ?? tool.name}`}
+          >
+            <IconX size={12} strokeWidth={2} />
+            <span>Deny</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ToolGroup = ({
+  tools,
+  active,
+  onToolPermission,
+}: {
+  tools: AssistantToolCall[];
+  active: boolean;
+  onToolPermission: (toolId: string, decision: AssistantToolPermissionDecision) => void;
+}) => {
   const [open, setOpen] = useState(active);
   const [showHistory, setShowHistory] = useState(false);
   const reachedIndex = latestReachedIndex(tools);
-  const latest = reachedIndex >= 0 ? tools[reachedIndex] : undefined;
+  const awaitingPermission = tools.find((tool) => tool.status === 'awaiting_permission');
+  const latest = awaitingPermission ?? (reachedIndex >= 0 ? tools[reachedIndex] : undefined);
   const reachedCount = reachedIndex + 1;
 
   useEffect(() => {
@@ -233,11 +297,15 @@ const ToolGroup = ({ tools, active }: { tools: AssistantToolCall[]; active: bool
           {active ? (
             <>
               {showHistory &&
-                earlierTools.map((tool) => <ToolCallLine key={tool.id} tool={tool} />)}
-              <ToolCallLine key={latest.id} tool={latest} />
+                earlierTools.map((tool) => (
+                  <ToolCallLine key={tool.id} tool={tool} onToolPermission={onToolPermission} />
+                ))}
+              <ToolCallLine key={latest.id} tool={latest} onToolPermission={onToolPermission} />
             </>
           ) : (
-            tools.map((tool) => <ToolCallLine key={tool.id} tool={tool} />)
+            tools.map((tool) => (
+              <ToolCallLine key={tool.id} tool={tool} onToolPermission={onToolPermission} />
+            ))
           )}
         </div>
       )}
@@ -259,6 +327,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
       onUndo,
       onFeedback,
       onRegenerate,
+      onToolPermission,
       onCopy,
       onRemoveQueued,
       onMoveQueued,
@@ -477,7 +546,11 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                     <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
                   )}
                   {message.tools && message.tools.length > 0 && (
-                    <ToolGroup tools={message.tools} active={isStreaming} />
+                    <ToolGroup
+                      tools={message.tools}
+                      active={isStreaming}
+                      onToolPermission={onToolPermission}
+                    />
                   )}
                   <div className="assistant-chat__bubble">
                     {message.content ? (

@@ -5,6 +5,24 @@ export type AssistantSendShortcut = 'enter' | 'shift-enter';
 export const ASSISTANT_MODES: AssistantMode[] = ['chat', 'task'];
 export type AssistantMode = 'chat' | 'task';
 
+export const ASSISTANT_LOCATIONS = ['local', 'cloud'] as const;
+export type AssistantLocation = (typeof ASSISTANT_LOCATIONS)[number];
+
+export const ASSISTANT_PERMISSION_LEVELS = ['always-ask', 'sometimes-ask', 'never-ask'] as const;
+export type AssistantPermissionLevel = (typeof ASSISTANT_PERMISSION_LEVELS)[number];
+
+export const ASSISTANT_TOOL_PERMISSION_DECISIONS = ['allow_once', 'allow_always', 'deny'] as const;
+export type AssistantToolPermissionDecision = (typeof ASSISTANT_TOOL_PERMISSION_DECISIONS)[number];
+
+export const ASSISTANT_TOOL_PERMISSIONS = [
+  'not_required',
+  'pending',
+  'allowed_once',
+  'allowed_always',
+  'denied',
+] as const;
+export type AssistantToolPermission = (typeof ASSISTANT_TOOL_PERMISSIONS)[number];
+
 export const ASSISTANT_THINKING_STATUSES = ['pending', 'running', 'done'] as const;
 export type AssistantThinkingStatus = (typeof ASSISTANT_THINKING_STATUSES)[number];
 
@@ -16,7 +34,14 @@ export type AssistantThinkingStep = {
   durationMs?: number;
 };
 
-export const ASSISTANT_TOOL_STATUSES = ['pending', 'running', 'done', 'error'] as const;
+export const ASSISTANT_TOOL_STATUSES = [
+  'pending',
+  'awaiting_permission',
+  'running',
+  'done',
+  'denied',
+  'error',
+] as const;
 export type AssistantToolStatus = (typeof ASSISTANT_TOOL_STATUSES)[number];
 
 export type AssistantToolCall = {
@@ -27,19 +52,36 @@ export type AssistantToolCall = {
   detail?: string;
   durationMs?: number;
   error?: string;
+  /** Records how a permission-gated tool was resolved. */
+  permission?: AssistantToolPermission;
 };
 
 export const ASSISTANT_STREAM_PATH = '/ws/assistant';
 
 export type AssistantStreamClientMessage =
   | { type: 'auth'; token: string }
-  | { type: 'stream'; requestId: string; mode?: AssistantMode; variant?: AssistantVariant }
+  | {
+      type: 'stream';
+      requestId: string;
+      mode?: AssistantMode;
+      variant?: AssistantVariant;
+      location?: AssistantLocation;
+      permissionLevel?: AssistantPermissionLevel;
+      allowedTools?: string[];
+    }
+  | {
+      type: 'tool_permission';
+      requestId: string;
+      toolId: string;
+      decision: AssistantToolPermissionDecision;
+    }
   | { type: 'cancel'; requestId: string };
 
 export type AssistantStreamServerMessage =
   | { type: 'auth_error'; error: string }
   | { type: 'thinking'; requestId: string; step: AssistantThinkingStep }
   | { type: 'tool'; requestId: string; tool: AssistantToolCall }
+  | { type: 'tool_permission_request'; requestId: string; tool: AssistantToolCall }
   | { type: 'token'; requestId: string; token: string; index?: number }
   | { type: 'done'; requestId: string; durationMs?: number }
   | { type: 'error'; requestId: string; error: string };
@@ -83,6 +125,10 @@ export type AssistantChat = {
 export type AssistantPreferences = {
   defaultVariant: AssistantVariant;
   sendShortcut: AssistantSendShortcut;
+  taskLocation: AssistantLocation;
+  permissionLevel: AssistantPermissionLevel;
+  /** Tool names the user chose to always allow, persisted across sessions. */
+  allowedTools: string[];
 };
 
 export type AssistantState = {
@@ -97,6 +143,9 @@ export type AssistantState = {
 export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
   defaultVariant: 'standard',
   sendShortcut: 'enter',
+  taskLocation: 'local',
+  permissionLevel: 'always-ask',
+  allowedTools: [],
 };
 
 export const createDefaultAssistantState = (): AssistantState => ({
@@ -105,7 +154,7 @@ export const createDefaultAssistantState = (): AssistantState => ({
   activeChatId: null,
   activeFolderId: null,
   activeMode: 'chat',
-  preferences: { ...DEFAULT_ASSISTANT_PREFERENCES },
+  preferences: { ...DEFAULT_ASSISTANT_PREFERENCES, allowedTools: [] },
 });
 
 export type AssistantThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';

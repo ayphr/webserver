@@ -1,7 +1,10 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   IconArrowDown,
   IconClipboardList,
+  IconClipboardListFilled,
+  IconCloud,
+  IconDeviceDesktop,
   IconFolder,
   IconFolderFilled,
   IconFolders,
@@ -9,11 +12,21 @@ import {
   IconLayoutSidebar,
   IconLayoutSidebarFilled,
   IconMessageCircle,
+  IconMessageCircleFilled,
   IconPlayerPause,
   IconPlayerPlay,
   IconPlus,
+  IconShieldExclamation,
+  IconShieldMinus,
+  IconShieldStar,
 } from '@tabler/icons-react';
-import { sortAssistantFolders, type AssistantFolder, type AssistantMode } from '@common';
+import {
+  sortAssistantFolders,
+  type AssistantFolder,
+  type AssistantLocation,
+  type AssistantMode,
+  type AssistantPermissionLevel,
+} from '@common';
 import { Tooltip } from '../common/Tooltip';
 import { useRadio } from '../../context';
 import { useDismiss } from '../../hooks/useDismiss';
@@ -23,8 +36,12 @@ export interface AssistantToolbarProps {
   folders: AssistantFolder[];
   activeFolderId: string | null;
   activeMode: AssistantMode;
+  taskLocation: AssistantLocation;
+  permissionLevel: AssistantPermissionLevel;
   onSelectFolder: (folderId: string | null) => void;
   onSelectMode: (mode: AssistantMode) => void;
+  onSelectTaskLocation: (location: AssistantLocation) => void;
+  onSelectPermissionLevel: (level: AssistantPermissionLevel) => void;
   onCreateFolder: (name: string) => void;
   showControls?: boolean;
   onToggleSidebar?: () => void;
@@ -33,12 +50,132 @@ export interface AssistantToolbarProps {
   onJumpToLatest?: () => void;
 }
 
+type MenuName = 'folder' | 'mode' | 'location' | 'permissions';
+
+type ToolbarOption<T extends string> = {
+  value: T;
+  label: string;
+  icon: ReactNode;
+  selectedIcon?: ReactNode;
+};
+
+type ToolbarSelectProps<T extends string> = {
+  ariaLabel: string;
+  options: readonly ToolbarOption<T>[];
+  value: T;
+  isOpen: boolean;
+  hidden?: boolean;
+  onToggle: () => void;
+  onSelect: (value: T) => void;
+};
+
+const ToolbarSelect = <T extends string>({
+  ariaLabel,
+  options,
+  value,
+  isOpen,
+  hidden = false,
+  onToggle,
+  onSelect,
+}: ToolbarSelectProps<T>) => {
+  const active = options.find((option) => option.value === value) ?? options[0];
+  if (!active) return null;
+
+  return (
+    <div className="assistant-toolbar__group" hidden={hidden}>
+      <button
+        type="button"
+        className={`assistant-toolbar__item ${isOpen ? 'assistant-toolbar__item--open' : ''}`}
+        onClick={onToggle}
+        aria-label={`${ariaLabel}: ${active.label}`}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+      >
+        {active.icon}
+        <span className="assistant-toolbar__label">{active.label}</span>
+      </button>
+      {isOpen && (
+        <div className="assistant-menu" role="menu" aria-label={ariaLabel}>
+          {options.map((option) => {
+            const selected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={selected}
+                className={`assistant-menu__item ${selected ? 'assistant-menu__item--selected' : ''}`}
+                onClick={() => onSelect(option.value)}
+              >
+                <span className="assistant-menu__icon">
+                  {selected ? option.selectedIcon ?? option.icon : option.icon}
+                </span>
+                <span className="assistant-menu__text">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MODE_OPTIONS: readonly ToolbarOption<AssistantMode>[] = [
+  {
+    value: 'chat',
+    label: 'Chat',
+    icon: <IconMessageCircle size={16} strokeWidth={1.75} />,
+    selectedIcon: <IconMessageCircleFilled size={16} strokeWidth={1.75} />,
+  },
+  {
+    value: 'task',
+    label: 'Task',
+    icon: <IconClipboardList size={16} strokeWidth={1.75} />,
+    selectedIcon: <IconClipboardListFilled size={16} strokeWidth={1.75} />,
+  },
+];
+
+const LOCATION_OPTIONS: readonly ToolbarOption<AssistantLocation>[] = [
+  {
+    value: 'local',
+    label: 'Local',
+    icon: <IconDeviceDesktop size={16} strokeWidth={1.75} />,
+  },
+  {
+    value: 'cloud',
+    label: 'Cloud',
+    icon: <IconCloud size={16} strokeWidth={1.75} />,
+  },
+];
+
+const PERMISSION_OPTIONS: readonly ToolbarOption<AssistantPermissionLevel>[] = [
+  {
+    value: 'always-ask',
+    label: 'Always ask',
+    icon: <IconShieldStar size={16} strokeWidth={1.75} />,
+  },
+  {
+    value: 'sometimes-ask',
+    label: 'Sometimes ask',
+    icon: <IconShieldMinus size={16} strokeWidth={1.75} />,
+  },
+  {
+    value: 'never-ask',
+    label: 'Allow all',
+    icon: <IconShieldExclamation size={16} strokeWidth={1.75} />,
+  },
+];
+
 export const AssistantToolbar = ({
   folders,
   activeFolderId,
   activeMode,
+  taskLocation,
+  permissionLevel,
   onSelectFolder,
   onSelectMode,
+  onSelectTaskLocation,
+  onSelectPermissionLevel,
   onCreateFolder,
   showControls = true,
   onToggleSidebar,
@@ -47,20 +184,31 @@ export const AssistantToolbar = ({
   onJumpToLatest,
 }: AssistantToolbarProps) => {
   const { isPlaying: isRadioPlaying, toggle: toggleRadio } = useRadio();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<MenuName | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = () => {
-    setMenuOpen(false);
+    setOpenMenu(null);
     setCreatingFolder(false);
     setNewFolderName('');
   };
 
-  useDismiss(toolbarRef, closeMenu, { enabled: menuOpen });
+  useDismiss(toolbarRef, closeMenu, { enabled: openMenu !== null });
 
   const activeFolder = folders.find((folder) => folder.id === activeFolderId);
+  const isTask = activeMode === 'task';
+
+  const toggleMenu = (menu: MenuName) => {
+    if (openMenu === menu) {
+      closeMenu();
+      return;
+    }
+    setOpenMenu(menu);
+    setCreatingFolder(false);
+    setNewFolderName('');
+  };
 
   const handleSelectFolder = (folderId: string | null) => {
     onSelectFolder(folderId);
@@ -93,16 +241,17 @@ export const AssistantToolbar = ({
       <div className="assistant-toolbar__group" hidden={!showControls}>
         <button
           type="button"
-          className={`assistant-toolbar__item ${menuOpen ? 'assistant-toolbar__item--open' : ''}`}
-          onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
+          className={`assistant-toolbar__item ${openMenu === 'folder' ? 'assistant-toolbar__item--open' : ''}`}
+          onClick={() => toggleMenu('folder')}
+          aria-label={`Folder: ${activeFolder?.name ?? 'Uncategorised'}`}
           aria-haspopup="menu"
-          aria-expanded={menuOpen}
+          aria-expanded={openMenu === 'folder'}
         >
           <IconFolder size={16} strokeWidth={1.75} />
           <span className="assistant-toolbar__label">{activeFolder?.name ?? 'Uncategorised'}</span>
         </button>
-        {menuOpen && (
-          <div className="assistant-menu" role="menu">
+        {openMenu === 'folder' && (
+          <div className="assistant-menu" role="menu" aria-label="Folder">
             <button
               type="button"
               role="menuitemradio"
@@ -180,36 +329,54 @@ export const AssistantToolbar = ({
           </div>
         )}
       </div>
-      <div className="assistant-toolbar__mode" role="group" aria-label="Assistant mode" hidden={!showControls}>
-        <button
-          type="button"
-          className={`assistant-toolbar__mode-button ${activeMode === 'chat' ? 'assistant-toolbar__mode-button--active' : ''}`}
-          aria-pressed={activeMode === 'chat'}
-          onClick={() => onSelectMode('chat')}
-        >
-          <IconMessageCircle size={14} strokeWidth={1.75} />
-          <span>Chat</span>
-        </button>
-        <button
-          type="button"
-          className={`assistant-toolbar__mode-button ${activeMode === 'task' ? 'assistant-toolbar__mode-button--active' : ''}`}
-          aria-pressed={activeMode === 'task'}
-          onClick={() => onSelectMode('task')}
-        >
-          <IconClipboardList size={14} strokeWidth={1.75} />
-          <span>Task</span>
-        </button>
-      </div>
+      <ToolbarSelect
+        ariaLabel="Assistant mode"
+        options={MODE_OPTIONS}
+        value={activeMode}
+        isOpen={openMenu === 'mode'}
+        hidden={!showControls}
+        onToggle={() => toggleMenu('mode')}
+        onSelect={(mode) => {
+          onSelectMode(mode);
+          closeMenu();
+        }}
+      />
+      <ToolbarSelect
+        ariaLabel="Task location"
+        options={LOCATION_OPTIONS}
+        value={taskLocation}
+        isOpen={openMenu === 'location'}
+        hidden={!showControls || !isTask}
+        onToggle={() => toggleMenu('location')}
+        onSelect={(location) => {
+          onSelectTaskLocation(location);
+          closeMenu();
+        }}
+      />
+      <ToolbarSelect
+        ariaLabel="Tool permissions"
+        options={PERMISSION_OPTIONS}
+        value={permissionLevel}
+        isOpen={openMenu === 'permissions'}
+        hidden={!showControls || !isTask}
+        onToggle={() => toggleMenu('permissions')}
+        onSelect={(level) => {
+          onSelectPermissionLevel(level);
+          closeMenu();
+        }}
+      />
       {!showControls && (
         <div className="assistant-toolbar__context">
           <IconFolder size={13} strokeWidth={1.75} />
           <span>{activeFolder?.name ?? 'Uncategorised'}</span>
-          {activeMode === 'task' ? (
-            <IconClipboardList size={13} strokeWidth={1.75} />
+          {isTask ? (
+            taskLocation === 'cloud'
+              ? <IconCloud size={13} strokeWidth={1.75} />
+              : <IconDeviceDesktop size={13} strokeWidth={1.75} />
           ) : (
             <IconMessageCircle size={13} strokeWidth={1.75} />
           )}
-          <span>{activeMode === 'task' ? 'Task' : 'Chat'}</span>
+          <span>{isTask ? (taskLocation === 'cloud' ? 'Cloud task' : 'Local task') : 'Chat'}</span>
         </div>
       )}
       {showJumpToLatest && onJumpToLatest && (
