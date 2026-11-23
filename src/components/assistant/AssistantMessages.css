@@ -13,12 +13,12 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 0 1rem 4.5rem 0;
+  padding: 0 1rem 0.75rem 0;
   overflow-y: auto;
   overflow-anchor: none;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scroll-padding-bottom: 4.5rem;
+  scroll-padding-bottom: 0.75rem;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s ease;
@@ -464,80 +464,87 @@
 }
 
 .assistant-markdown pre {
+  /* Atom One Dark palette, applied to highlight.js classes emitted by rehype-highlight. */
+  --hljs-bg: #282c34;
+  --hljs-fg: #abb2bf;
+  --hljs-comment: #5c6370;
+  --hljs-purple: #c678dd;
+  --hljs-red: #e06c75;
+  --hljs-cyan: #56b6c2;
+  --hljs-green: #98c379;
+  --hljs-orange: #d19a66;
+  --hljs-blue: #61afef;
+
   margin: 0.65rem 0;
-  padding: 0.1rem 0 0.1rem 0.75rem;
-  border-left: 1px solid var(--border-subtle);
-  background-color: transparent;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #383e4a;
+  border-radius: var(--radius-sm);
+  background-color: var(--hljs-bg);
+  color: var(--hljs-fg);
   overflow-x: auto;
 }
 
 .assistant-markdown pre code {
   padding: 0;
   background: transparent;
+  color: var(--hljs-fg);
   font-size: 0.8rem;
   line-height: 1.55;
 }
 
-/* Syntax tokens emitted by rehype-highlight (highlight.js classes). */
-.assistant-markdown pre .hljs-keyword,
-.assistant-markdown pre .hljs-literal,
-.assistant-markdown pre .hljs-selector-tag {
-  color: var(--accent-purple);
+.assistant-markdown pre .hljs-comment,
+.assistant-markdown pre .hljs-quote {
+  color: var(--hljs-comment);
+  font-style: italic;
 }
 
-.assistant-markdown pre .hljs-built_in,
-.assistant-markdown pre .hljs-type,
-.assistant-markdown pre .hljs-title.class_ {
-  color: var(--accent-cyan);
+.assistant-markdown pre .hljs-doctag,
+.assistant-markdown pre .hljs-keyword,
+.assistant-markdown pre .hljs-formula,
+.assistant-markdown pre .hljs-symbol,
+.assistant-markdown pre .hljs-bullet,
+.assistant-markdown pre .hljs-link,
+.assistant-markdown pre .hljs-selector-id {
+  color: var(--hljs-purple);
+}
+
+.assistant-markdown pre .hljs-section,
+.assistant-markdown pre .hljs-name,
+.assistant-markdown pre .hljs-selector-tag,
+.assistant-markdown pre .hljs-deletion,
+.assistant-markdown pre .hljs-subst {
+  color: var(--hljs-red);
+}
+
+.assistant-markdown pre .hljs-literal {
+  color: var(--hljs-cyan);
 }
 
 .assistant-markdown pre .hljs-string,
 .assistant-markdown pre .hljs-regexp,
 .assistant-markdown pre .hljs-addition,
-.assistant-markdown pre .hljs-attr {
-  color: var(--accent-green);
+.assistant-markdown pre .hljs-attribute,
+.assistant-markdown pre .hljs-meta .hljs-string {
+  color: var(--hljs-green);
 }
 
-.assistant-markdown pre .hljs-number,
-.assistant-markdown pre .hljs-symbol,
-.assistant-markdown pre .hljs-bullet,
-.assistant-markdown pre .hljs-meta {
-  color: var(--accent-amber);
-}
-
-.assistant-markdown pre .hljs-comment,
-.assistant-markdown pre .hljs-quote {
-  color: var(--text-dim);
-  font-style: italic;
-}
-
-.assistant-markdown pre .hljs-title,
-.assistant-markdown pre .hljs-title.function_,
-.assistant-markdown pre .hljs-section {
-  color: var(--accent-blue);
-}
-
+.assistant-markdown pre .hljs-attr,
 .assistant-markdown pre .hljs-variable,
 .assistant-markdown pre .hljs-template-variable,
-.assistant-markdown pre .hljs-params {
-  color: var(--accent-orange);
-}
-
-.assistant-markdown pre .hljs-tag,
-.assistant-markdown pre .hljs-name,
-.assistant-markdown pre .hljs-attribute {
-  color: var(--accent-pink);
-}
-
-.assistant-markdown pre .hljs-selector-id,
+.assistant-markdown pre .hljs-type,
 .assistant-markdown pre .hljs-selector-class,
 .assistant-markdown pre .hljs-selector-attr,
-.assistant-markdown pre .hljs-selector-pseudo {
-  color: var(--accent-teal);
+.assistant-markdown pre .hljs-selector-pseudo,
+.assistant-markdown pre .hljs-number {
+  color: var(--hljs-orange);
 }
 
-.assistant-markdown pre .hljs-deletion {
-  color: var(--accent-red);
+.assistant-markdown pre .hljs-built_in,
+.assistant-markdown pre .hljs-title,
+.assistant-markdown pre .hljs-title.class_,
+.assistant-markdown pre .hljs-title.function_,
+.assistant-markdown pre .hljs-meta {
+  color: var(--hljs-blue);
 }
 
 .assistant-markdown pre .hljs-emphasis {
@@ -545,7 +552,11 @@
 }
 
 .assistant-markdown pre .hljs-strong {
-  font-weight: var(--font-weight-md);
+  font-weight: 600;
+}
+
+.assistant-markdown pre .hljs-link {
+  text-decoration: underline;
 }
 
 .assistant-markdown table {
@@ -801,6 +812,63 @@
 
 .assistant-chat__tool-line:hover .assistant-chat__tool-line-label {
   color: var(--text-primary);
+}
+
+.assistant-chat__tool-line--awaiting_permission {
+  flex-wrap: wrap;
+  color: var(--text-primary);
+}
+
+.assistant-chat__tool-line--awaiting_permission .assistant-chat__tool-line-icon {
+  color: var(--text-primary);
+}
+
+.assistant-chat__tool-line--denied .assistant-chat__tool-line-icon,
+.assistant-chat__tool-line--denied .assistant-chat__tool-line-label {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.assistant-chat__tool-permission-label {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
+.assistant-chat__tool-permission-actions {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-left: 1.2rem;
+}
+
+.assistant-chat__tool-permission-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 1.6rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background-color: var(--bg-elevated);
+  color: var(--text-muted);
+  font-family: var(--font-family-base);
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-md);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.assistant-chat__tool-permission-actions button:hover {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.assistant-chat__tool-permission-actions .assistant-chat__tool-permission-deny:hover {
+  color: var(--status-error, var(--text-primary));
 }
 
 @keyframes assistant-message-in {

@@ -6,6 +6,7 @@ import {
   IconBell,
   IconBellCog,
   IconCheck,
+  IconCloud,
   IconCreditCard,
   IconInfoCircle,
   IconLogin,
@@ -46,6 +47,7 @@ const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   punishment: 'Punishments',
   appeal: 'Appeals',
   subscription: 'Subscriptions & billing',
+  assistant_task: 'Assistant tasks',
   system: 'System messages',
 };
 
@@ -69,6 +71,8 @@ function NotificationIcon({ type }: Readonly<{ type: NotificationType }>) {
       return <IconMessage size={18} strokeWidth={1.75} />;
     case 'subscription':
       return <IconCreditCard size={18} strokeWidth={1.75} />;
+    case 'assistant_task':
+      return <IconCloud size={18} strokeWidth={1.75} />;
     case 'system':
     default:
       return <IconInfoCircle size={18} strokeWidth={1.75} />;

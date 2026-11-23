@@ -29,7 +29,7 @@
 
 .dashboard-main--assistant:has(.assistant-input--chat) {
   padding-top: 1rem;
-  padding-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
   overflow: hidden;
 }
 
