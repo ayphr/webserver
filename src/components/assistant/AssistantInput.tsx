@@ -11,6 +11,7 @@ import irisAnimation from '../../assets/animations/iris.webm';
 import { AssistantStreamClient } from '../../lib/assistantStream';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import { AssistantComposer } from './AssistantComposer';
+import { Link } from 'react-router-dom';
 import { AssistantMessages, type AssistantMessagesHandle } from './AssistantMessages';
 import { AssistantToolbar } from './AssistantToolbar';
 import type { AssistantChatAction, LiveAssistantMessage } from './types';
@@ -881,11 +882,14 @@ export const AssistantInput = ({
             onJumpToLatest={handleJumpToLatest}
           />
           {safetyLocked ? (
-            <div className="assistant-chat__safety-lock" role="note">
-              <strong>Safety notice:</strong> This conversation is locked after a safety intervention.
-              Further messages are disabled. If you need help, please use the resources above or contact
-              emergency services.
-            </div>
+            <p className="assistant-input__disclaimer">
+              Iris is AI. By using it, you agree to our{' '}
+              <Link to="/policies/terms">Terms</Link> &amp;{' '}
+              <Link to="/policies/privacy">Privacy Policy</Link>.{' '}
+              {dataShared
+                ? 'Chats may be reviewed and used to improve our AI models and enforce the Terms.'
+                : 'Chats may be reviewed to enforce the Terms.'}
+            </p>
           ) : (
             <AssistantComposer
               placeholder={placeholder}

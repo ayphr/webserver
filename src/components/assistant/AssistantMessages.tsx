@@ -735,7 +735,8 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   {message.interrupted && (
                     <p className="assistant-chat__interrupted">You interrupted this response.</p>
                   )}
-                  <div className="assistant-chat__toolbar">
+                  {!message.safetyNotice && (
+                    <div className="assistant-chat__toolbar">
                     <button
                       type="button"
                       className={`assistant-chat__tool ${message.feedback === 'like' ? 'assistant-chat__tool--active' : ''}`}
@@ -795,6 +796,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       </span>
                     </span>
                   </div>
+                  )}
                 </div>
               )}
             </div>
