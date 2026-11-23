@@ -26,6 +26,7 @@ export type AssistantStreamHandlers = {
   onThinking?: (requestId: string, step: AssistantThinkingStep) => void;
   onTool?: (requestId: string, tool: AssistantToolCall) => void;
   onToolPermissionRequest?: (requestId: string, tool: AssistantToolCall) => void;
+  onSafety?: (requestId: string, notice: 'refusal' | 'crisis' | 'csam') => void;
   onDone: (requestId: string, durationMs?: number) => void;
   onError?: (requestId: string, error: string) => void;
 };
@@ -91,6 +92,9 @@ const isServerMessage = (value: unknown): value is AssistantStreamServerMessage 
   }
   if (value.type === 'done') {
     return value.durationMs === undefined || (typeof value.durationMs === 'number' && Number.isFinite(value.durationMs));
+  }
+  if (value.type === 'safety') {
+    return value.notice === 'refusal' || value.notice === 'crisis' || value.notice === 'csam';
   }
   return value.type === 'error' && typeof value.error === 'string';
 };
@@ -164,8 +168,9 @@ export class AssistantStreamClient {
       }
 
       this.active.delete(parsed.requestId);
+      if (parsed.type === 'safety') this.handlers.onSafety?.(parsed.requestId, parsed.notice);
       if (parsed.type === 'done') this.handlers.onDone(parsed.requestId, parsed.durationMs);
-      else this.handlers.onError?.(parsed.requestId, parsed.error);
+      else if (parsed.type === 'error') this.handlers.onError?.(parsed.requestId, parsed.error);
     };
 
     socket.onclose = () => {

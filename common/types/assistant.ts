@@ -89,6 +89,7 @@ export type AssistantStreamServerMessage =
   | { type: 'tool_permission_request'; requestId: string; tool: AssistantToolCall }
   | { type: 'token'; requestId: string; token: string; index?: number }
   | { type: 'done'; requestId: string; durationMs?: number }
+  | { type: 'safety'; requestId: string; notice: 'refusal' | 'crisis' | 'csam' }
   | { type: 'error'; requestId: string; error: string };
 
 export type AssistantMessageFeedback = 'like' | 'dislike' | null;
@@ -100,6 +101,8 @@ export type AssistantMessage = {
   createdAt: number;
   interrupted?: boolean;
   error?: string;
+  /** Safety intervention applied to this message, if any. */
+  safetyNotice?: 'refusal' | 'crisis' | 'csam';
   feedback?: AssistantMessageFeedback;
   variant?: AssistantVariant;
   durationMs?: number;

@@ -839,6 +839,7 @@ export const DashboardPage = () => {
                 <AssistantInput
                   availableVariants={availableAssistantVariants}
                   username={user.username}
+                  userCountry={user.country}
                   defaultVariant={effectiveAssistantVariant}
                   dataShared={getPlanFeaturesForUser(user).dataShared}
                   sendShortcut={assistantSendShortcut}

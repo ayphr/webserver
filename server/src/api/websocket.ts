@@ -20,7 +20,7 @@ import {
 } from '@common';
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { createAssistantMockStream, splitAssistantResponseIntoTokens } from '../lib/assistantStream';
-import { detectSafetyCategories, SUICIDE_SUPPORT_MESSAGE, SAFETY_REFUSAL_MESSAGE, CSAM_ZERO_TOLERANCE_MESSAGE, redactPII } from '@common';
+import { detectSafetyCategories, redactPII } from '@common';
 import { saveStreamResult } from '../lib/db/assistant';
 import { createLogger } from '../lib/logger';
 import {
@@ -134,6 +134,7 @@ type StreamResultInput = {
   content?: string;
   thinking?: NonNullable<AssistantMessage['thinking']>;
   tools?: NonNullable<AssistantMessage['tools']>;
+  safetyNotice?: 'refusal' | 'crisis' | 'csam';
   durationMs?: number;
   notificationLevel: AssistantNotificationLevel;
   link: string;
@@ -157,6 +158,7 @@ const persistStreamResult = async (input: StreamResultInput): Promise<void> => {
           createdAt: now,
           variant: input.variant,
           durationMs: input.durationMs,
+          safetyNotice: input.safetyNotice,
           thinking: (input.thinking ?? []).map((step) => ({ ...step, status: 'done' })),
           tools: input.tools ?? [],
         };
@@ -255,27 +257,34 @@ const startStream = (
   }
 
   const combinedCategories = [...new Set([...promptCategories, ...assistantCategories])];
-  const highRiskCategories = combinedCategories.filter((category) => category !== 'suicidal');
+  const isSuicidal = combinedCategories.includes('suicidal');
+  // Suicidal intent should not be misclassified as ordinary violence.
+  const highRiskCategories = combinedCategories.filter(
+    (category) => category !== 'suicidal' && !(isSuicidal && category === 'violence'),
+  );
+
+  let safetyNotice: 'refusal' | 'crisis' | 'csam' | undefined;
   if (highRiskCategories.includes('csam') || highRiskCategories.includes('child_abuse')) {
-    mock.content = CSAM_ZERO_TOLERANCE_MESSAGE;
+    safetyNotice = 'csam';
+    mock.content = '';
     mock.thinking = [];
     mock.tools = [];
   } else if (highRiskCategories.length > 0) {
-    mock.content = SAFETY_REFUSAL_MESSAGE;
+    safetyNotice = 'refusal';
+    mock.content = '';
+    mock.thinking = [];
+    mock.tools = [];
+  } else if (isSuicidal) {
+    safetyNotice = 'crisis';
+    mock.content = '';
     mock.thinking = [];
     mock.tools = [];
   }
-  if (combinedCategories.length > 0) {
-    mock.thinking = [];
-    mock.tools = [];
+
+  if (safetyNotice) {
+    send(ws, { type: 'safety', requestId, notice: safetyNotice });
   }
-  if (
-    (promptCategories.includes('suicidal') || assistantCategories.includes('suicidal')) &&
-    !highRiskCategories.includes('csam') &&
-    !highRiskCategories.includes('child_abuse')
-  ) {
-    mock.content = `${mock.content}\n\n---\n\n${SUICIDE_SUPPORT_MESSAGE}`;
-  }
+
   mock.content = redactPII(mock.content);
 
   const tokens = splitAssistantResponseIntoTokens(mock.content);
@@ -491,6 +500,7 @@ const startStream = (
         mode,
         variant,
         content: mock.content,
+        safetyNotice,
         thinking: mock.thinking.map((step) => ({ ...step, status: 'done' as const })),
         tools: finalTools,
         durationMs,
@@ -535,6 +545,7 @@ const startStream = (
       chatId,
       messageId: messageId ?? 2,
       prompt: redactedPrompt,
+      safetyNotice,
       mode,
       variant,
       notificationLevel: effectiveNotificationLevel,

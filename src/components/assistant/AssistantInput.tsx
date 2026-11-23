@@ -23,6 +23,7 @@ export interface AssistantInputProps {
   className?: string;
   availableVariants?: AssistantVariant[];
   username?: string;
+  userCountry?: string;
   defaultVariant?: AssistantVariant;
   dataShared?: boolean;
   sendShortcut?: 'enter' | 'shift-enter';
@@ -124,6 +125,7 @@ export const AssistantInput = ({
   className = '',
   availableVariants = ASSISTANT_VARIANTS,
   username,
+  userCountry,
   defaultVariant,
   dataShared = true,
   sendShortcut = 'enter',
@@ -153,6 +155,7 @@ export const AssistantInput = ({
     const chat = state.chats.find((item) => item.id === state.activeChatId);
     return chat?.messages ?? [];
   });
+  const safetyLocked = messages.some((message) => Boolean(message.safetyNotice));
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
   const [subtitleSequence, setSubtitleSequence] = useState(() => ({
@@ -382,6 +385,17 @@ export const AssistantInput = ({
     );
   };
 
+  const handleStreamSafety = (requestId: string, notice: 'refusal' | 'crisis' | 'csam') => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    if (messageId === null) return;
+    commitMessages((previous) =>
+      previous.map((m) =>
+        m.id === messageId && m.role === 'assistant' ? { ...m, safetyNotice: notice } : m,
+      ),
+    );
+  };
+
   const handleStreamTool = (requestId: string, tool: AssistantToolCall) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
@@ -516,6 +530,7 @@ export const AssistantInput = ({
         onToken: handleStreamToken,
         onThinking: handleStreamThinking,
         onTool: handleStreamTool,
+        onSafety: handleStreamSafety,
         onToolPermissionRequest: handleToolPermissionRequest,
         onDone: handleStreamDone,
         onError: handleStreamError,
@@ -773,6 +788,7 @@ export const AssistantInput = ({
   };
 
   const handleSend = () => {
+    if (safetyLocked) return;
     if (isGenerating) {
       stopGeneration({ continueQueue: true });
       return;
@@ -834,6 +850,7 @@ export const AssistantInput = ({
             onOpenMenuChange={handleOpenMenuChange}
             copiedId={copiedId}
             fallbackVariant={variant}
+            userCountry={userCountry}
             onUndo={handleUndo}
             onFeedback={handleFeedback}
             onRegenerate={handleRegenerate}
@@ -863,22 +880,30 @@ export const AssistantInput = ({
             showJumpToLatest={showJumpToLatest}
             onJumpToLatest={handleJumpToLatest}
           />
-          <AssistantComposer
-            placeholder={placeholder}
-            value={value}
-            onValueChange={setValue}
-            variant={variant}
-            onVariantChange={setVariant}
-            availableVariants={availableVariants}
-            isChat={isChat}
-            isGenerating={isGenerating}
-            sendShortcut={sendShortcut}
-            isMac={isMac}
-            textareaRef={textareaRef}
-            dataShared={dataShared}
-            onSend={handleSend}
-            onQueue={queueCurrentMessage}
-          />
+          {safetyLocked ? (
+            <div className="assistant-chat__safety-lock" role="note">
+              <strong>Safety notice:</strong> This conversation is locked after a safety intervention.
+              Further messages are disabled. If you need help, please use the resources above or contact
+              emergency services.
+            </div>
+          ) : (
+            <AssistantComposer
+              placeholder={placeholder}
+              value={value}
+              onValueChange={setValue}
+              variant={variant}
+              onVariantChange={setVariant}
+              availableVariants={availableVariants}
+              isChat={isChat}
+              isGenerating={isGenerating}
+              sendShortcut={sendShortcut}
+              isMac={isMac}
+              textareaRef={textareaRef}
+              dataShared={dataShared}
+              onSend={handleSend}
+              onQueue={queueCurrentMessage}
+            />
+          )}
         </div>
       </div>
     </div>

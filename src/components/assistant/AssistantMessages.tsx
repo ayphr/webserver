@@ -54,6 +54,7 @@ export interface AssistantMessagesProps {
   onOpenMenuChange: (id: number | null) => void;
   copiedId: number | null;
   fallbackVariant: AssistantVariant;
+  userCountry?: string;
   onUndo: (messageId: number) => void;
   onFeedback: (messageId: number, feedback: 'like' | 'dislike') => void;
   onRegenerate: (messageId: number) => void;
@@ -315,6 +316,81 @@ const ToolGroup = ({
   );
 };
 
+const CRISIS_RESOURCES: Record<string, { label: string; value: string }[]> = {
+  US: [{ label: 'Suicide & Crisis Lifeline', value: 'Call or text 988' }],
+  CA: [{ label: 'Suicide Crisis Helpline', value: 'Call or text 988' }],
+  GB: [{ label: 'Samaritans', value: 'Call 116 123' }],
+  IE: [{ label: 'Samaritans', value: 'Call 116 123' }],
+  AU: [{ label: 'Lifeline', value: 'Call 13 11 14' }],
+  NZ: [{ label: 'Need to talk?', value: 'Call or text 1737' }],
+  DE: [{ label: 'Telefonseelsorge', value: 'Call 0800 111 0 111' }],
+  FR: [{ label: 'Numéro national de prévention du suicide', value: 'Call 3114' }],
+};
+
+const SafetyCard = ({ notice, country }: { notice: 'refusal' | 'crisis' | 'csam'; country?: string }) => {
+  const code = (country ?? '').toUpperCase();
+  const resources = CRISIS_RESOURCES[code] ?? [];
+  return (
+    <div className={`assistant-safety-card assistant-safety-card--${notice}`}>
+      {notice === 'crisis' && (
+        <>
+          <h4>You deserve support right now</h4>
+          <p>If you're in immediate danger, call your local emergency number.</p>
+          {resources.length > 0 ? (
+            <ul>
+              {resources.map((item) => (
+                <li key={item.label}>
+                  <strong>{item.label}:</strong> {item.value}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>
+              Find a local helpline at{' '}
+              <a href="https://findahelpline.com" target="_blank" rel="noopener noreferrer">
+                findahelpline.com
+              </a>
+              .
+            </p>
+          )}
+          <p>
+            Please also contact someone you trust and tell them you need help.
+          </p>
+        </>
+      )}
+      {notice === 'refusal' && (
+        <>
+          <h4>I can't help with that</h4>
+          <p>
+            I can't assist with violence, threats, abuse, sexual harm, or anything involving children.
+          </p>
+          <p>I can help with safety planning, de-escalation, reporting resources, or support options.</p>
+        </>
+      )}
+      {notice === 'csam' && (
+        <>
+          <h4>Child safety</h4>
+          <p>
+            I can't engage with or provide content involving child sexual abuse material or exploitation of
+            minors.
+          </p>
+          <p>
+            If you've encountered suspected CSAM, report it to{' '}
+            <a href="https://www.cybertipline.org" target="_blank" rel="noopener noreferrer">
+              NCMEC CyberTipline
+            </a>{' '}
+            or your local authorities. You can also find a hotline via{' '}
+            <a href="https://www.inhope.org" target="_blank" rel="noopener noreferrer">
+              INHOPE
+            </a>
+            .
+          </p>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMessagesProps>(
   function AssistantMessages(
     {
@@ -326,6 +402,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
       onOpenMenuChange,
       copiedId,
       fallbackVariant,
+      userCountry,
       onUndo,
       onFeedback,
       onRegenerate,
@@ -556,7 +633,10 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   {message.thinking && message.thinking.length > 0 && (
                     <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
                   )}
-                  {(() => {
+                  {message.safetyNotice ? (
+                    <SafetyCard notice={message.safetyNotice} country={userCountry} />
+                  ) : (
+                    (() => {
                     const groups =
                       message.toolGroups && message.toolGroups.length > 0
                         ? message.toolGroups
@@ -649,7 +729,8 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       );
                     }
                     return nodes;
-                  })()}
+                  })()
+                  )}
                   {message.error && <p className="assistant-chat__error">{message.error}</p>}
                   {message.interrupted && (
                     <p className="assistant-chat__interrupted">You interrupted this response.</p>
