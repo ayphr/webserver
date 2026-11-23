@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  buildGeminiRequestBody,
   createAssistantModelRouter,
   readGeminiEventStream,
   stripAiPrefix,
@@ -22,6 +23,23 @@ describe('Gemini adapter', () => {
     expect(stripAiPrefix('ai: hello')).toBe('hello');
     expect(stripAiPrefix('  AI:   hello')).toBe('hello');
     expect(stripAiPrefix('hello ai: world')).toBe('hello ai: world');
+  });
+
+  it('builds a stateless request without unsupported step fields', () => {
+    const body = buildGeminiRequestBody('gemini-4-hydrogen', [
+      { role: 'system', content: 'Be brief' },
+      { role: 'user', content: 'ai: Hello' },
+      { role: 'assistant', content: 'ai: Hi' },
+    ]);
+
+    expect(body.input).toEqual([
+      { type: 'user_input', content: [{ type: 'text', text: 'Hello' }] },
+      { type: 'model_output', content: [{ type: 'text', text: 'Hi' }] },
+    ]);
+    expect(body.system_instruction).toBe('Be brief');
+    expect(body.store).toBe(false);
+    expect(body.stream).toBe(true);
+    expect('status' in body.input[0]!).toBe(false);
   });
 
   it('parses text deltas and final usage from CRLF SSE frames', async () => {

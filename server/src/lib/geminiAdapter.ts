@@ -25,13 +25,24 @@ type GeminiUsage = {
   total_thought_tokens?: number;
 };
 
-const toGeminiSteps = (messages: AssistantContextMessage[]) =>
+export type GeminiRequestBody = {
+  model: string;
+  input: Array<{
+    type: 'user_input' | 'model_output';
+    content: Array<{ type: 'text'; text: string }>;
+  }>;
+  system_instruction?: string;
+  store: boolean;
+  stream: boolean;
+  generation_config: { max_output_tokens: number };
+};
+
+const toGeminiSteps = (messages: AssistantContextMessage[]): GeminiRequestBody['input'] =>
   messages
     .filter((message) => message.role !== 'system')
     .map((message) => ({
       type: message.role === 'assistant' ? 'model_output' : 'user_input',
-      status: 'done',
-      content: [{ type: 'text', text: stripAiPrefix(message.content) }],
+      content: [{ type: 'text' as const, text: stripAiPrefix(message.content) }],
     }));
 
 const toSystemInstruction = (messages: AssistantContextMessage[]) =>
@@ -124,13 +135,27 @@ export async function readGeminiEventStream(
   return { content, usage };
 };
 
+/** Builds the stateless request body, stripped of the `ai:` opt-in marker. */
+export function buildGeminiRequestBody(
+  modelId: string,
+  messages: AssistantContextMessage[],
+): GeminiRequestBody {
+  const systemInstruction = toSystemInstruction(messages);
+  return {
+    model: modelId,
+    input: toGeminiSteps(messages),
+    ...(systemInstruction ? { system_instruction: systemInstruction } : {}),
+    store: false,
+    stream: true,
+    generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS },
+  };
+}
+
 async function requestGemini(
   modelId: string,
   messages: AssistantContextMessage[],
   apiKey: string,
 ): Promise<AssistantModelDraft> {
-  const steps = toGeminiSteps(messages);
-  const systemInstruction = toSystemInstruction(messages);
   const response = await fetch(`${GEMINI_ENDPOINT}?alt=sse`, {
     method: 'POST',
     headers: {
@@ -138,14 +163,7 @@ async function requestGemini(
       'Content-Type': 'application/json',
       'Api-Revision': API_REVISION,
     },
-    body: JSON.stringify({
-      model: modelId,
-      input: steps,
-      ...(systemInstruction ? { system_instruction: systemInstruction } : {}),
-      store: false,
-      stream: true,
-      generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS },
-    }),
+    body: JSON.stringify(buildGeminiRequestBody(modelId, messages)),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
