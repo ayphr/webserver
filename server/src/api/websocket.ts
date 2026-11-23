@@ -258,8 +258,16 @@ const startStream = (
   const highRiskCategories = combinedCategories.filter((category) => category !== 'suicidal');
   if (highRiskCategories.includes('csam') || highRiskCategories.includes('child_abuse')) {
     mock.content = CSAM_ZERO_TOLERANCE_MESSAGE;
+    mock.thinking = [];
+    mock.tools = [];
   } else if (highRiskCategories.length > 0) {
     mock.content = SAFETY_REFUSAL_MESSAGE;
+    mock.thinking = [];
+    mock.tools = [];
+  }
+  if (combinedCategories.length > 0) {
+    mock.thinking = [];
+    mock.tools = [];
   }
   if (
     (promptCategories.includes('suicidal') || assistantCategories.includes('suicidal')) &&
