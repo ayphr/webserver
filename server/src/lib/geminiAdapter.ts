@@ -26,7 +26,7 @@ const GEMINI_TOOLS = Object.values(ASSISTANT_TOOL_DEFINITIONS).map((definition) 
   parameters: definition.parameters ?? { type: 'object', properties: {} },
 }));
 
-const buildAssistantSystemPrompt = (): string => {
+export const buildAssistantSystemPrompt = (): string => {
   const toolLines = Object.values(ASSISTANT_TOOL_DEFINITIONS)
     .map((definition) => `- ${definition.name}: ${definition.description}`)
     .join('\\n');

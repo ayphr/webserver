@@ -33,6 +33,7 @@ import {
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { splitAssistantResponseIntoTokens } from '../lib/assistantStream';
 import { getAssistantModelAdapter } from '../lib/assistantModel';
+import { buildAssistantSystemPrompt } from '../lib/geminiAdapter';
 import { executeAssistantTool } from '../lib/assistantTools';
 import { detectSafetyCategories, redactPII } from '@common';
 import { getAssistantState, saveStreamResult, updateAssistantChatContext } from '../lib/db/assistant';
@@ -378,6 +379,7 @@ const startStream = async (
   });
 
   const modelId = context.usage.modelId;
+  const useLiveAI = /^\\s*ai:/i.test(prompt ?? '');
   const rejectInsufficientCredits = () => {
     send(ws, { type: 'error', requestId, error: 'insufficient credits' });
     notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
@@ -386,7 +388,9 @@ const startStream = async (
   // Reserve enough credits for the request before any model work happens. The
   // hold is settled to the actual usage when the stream finishes or is stopped.
   const reservedCredits = estimateAssistantUsageCredits(modelId, {
-    inputTokens: context.usage.usedTokens,
+    inputTokens:
+      context.usage.usedTokens +
+      (useLiveAI ? estimateTokens(buildAssistantSystemPrompt()) : 0),
     outputTokens: Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
   });
   const creditBalance = await getCreditBalanceFromUuid(userUuid);
@@ -408,7 +412,7 @@ const startStream = async (
       modelId,
       messages: context.contextMessages,
       usage: context.usage,
-      useLiveAI: /^\s*ai:/i.test(prompt ?? ''),
+      useLiveAI,
     });
   } catch (error) {
     await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
