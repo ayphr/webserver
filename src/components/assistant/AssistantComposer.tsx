@@ -59,13 +59,65 @@ export const AssistantComposer = ({
   }, [value, textareaRef]);
 
   const [listening, setListening] = useState(false);
+  const [levels, setLevels] = useState<number[]>([0.2, 0.2, 0.2, 0.2]);
   const recognitionRef = useRef<any>(null);
   const baseValueRef = useRef(value);
   const transcriptRef = useRef('');
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   const supported =
     typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  const startAudio = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = context;
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(data);
+        const bars = 4;
+        const step = Math.floor(data.length / bars);
+        const next = Array.from({ length: bars }, (_, i) => {
+          let sum = 0;
+          for (let j = 0; j < step; j += 1) sum += data[i * step + j] ?? 0;
+          const avg = sum / step / 255;
+          return Math.max(0.15, Math.min(1, avg * 1.8 + 0.1));
+        });
+        setLevels(next);
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch {
+      // ignore mic errors
+    }
+  };
+
+  const stopAudio = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    analyserRef.current = null;
+    if (audioContextRef.current) {
+      void audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+    setLevels([0.2, 0.2, 0.2, 0.2]);
+  };
 
   const startListening = () => {
     if (!supported) return;
@@ -87,12 +139,19 @@ export const AssistantComposer = ({
       transcriptRef.current = final;
       onValueChange(`${baseValueRef.current} ${final}${interim}`.trim());
     };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
+    rec.onend = () => {
+      setListening(false);
+      stopAudio();
+    };
+    rec.onerror = () => {
+      setListening(false);
+      stopAudio();
+    };
     recognitionRef.current = rec;
     try {
       rec.start();
       setListening(true);
+      void startAudio();
     } catch {
       setListening(false);
     }
@@ -100,12 +159,14 @@ export const AssistantComposer = ({
 
   const stopListening = () => {
     recognitionRef.current?.stop();
+    stopAudio();
     setListening(false);
   };
 
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
+      stopAudio();
     };
   }, []);
 
@@ -160,10 +221,9 @@ export const AssistantComposer = ({
             listening ? (
               <div className="assistant-input__listening">
                 <span className="assistant-input__visualizer" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                  <span />
+                  {levels.map((level, index) => (
+                    <span key={index} style={{ height: `${Math.max(4, level * 16)}px` }} />
+                  ))}
                 </span>
                 <button
                   type="button"
