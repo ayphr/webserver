@@ -331,6 +331,7 @@ export class AssistantStreamClient {
   }
 
   cancel(requestId: string) {
+    this.active.delete(requestId);
     this.send({ type: 'cancel', requestId });
   }
 

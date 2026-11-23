@@ -559,9 +559,10 @@ export const AssistantInput = ({
     answers: Record<string, string>,
     customAnswer?: string,
   ) => {
-    const requestId = questionRequestIdRef.current;
-    if (!requestId || requestId !== streamRequestIdRef.current) return;
-    getStreamClient().respondToTool(requestId, toolId, answers, customAnswer);
+    const requestId = questionRequestIdRef.current ?? streamRequestIdRef.current;
+    if (requestId) {
+      getStreamClient().respondToTool(requestId, toolId, answers, customAnswer);
+    }
     questionRequestIdRef.current = null;
     setActiveQuestion(null);
   };
