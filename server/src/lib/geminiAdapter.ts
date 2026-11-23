@@ -1,6 +1,9 @@
 import {
+  ASSISTANT_TOOL_DEFINITIONS,
   estimateTokens,
+  isAssistantToolName,
   type AssistantContextMessage,
+  type AssistantToolCall,
   type AssistantUsageTokens,
 } from '@common';
 import { GEMINI_API_KEY } from '../env';
@@ -15,6 +18,30 @@ const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/intera
 const API_REVISION = '2026-05-20';
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_TOKENS = 8_192;
+
+const GEMINI_TOOLS = Object.values(ASSISTANT_TOOL_DEFINITIONS).map((definition) => ({
+  type: 'function',
+  name: definition.name,
+  description: definition.description,
+  parameters: definition.parameters ?? { type: 'object', properties: {} },
+}));
+
+const buildAssistantSystemPrompt = (): string => {
+  const toolLines = Object.values(ASSISTANT_TOOL_DEFINITIONS)
+    .map((definition) => `- ${definition.name}: ${definition.description}`)
+    .join('\\n');
+  return [
+    'You are Iris, the AI assistant built into the Ayphr web application.',
+    'You help users understand their devices, locations, team settings, and team members, and you can ask them clarifying questions when needed.',
+    `Current date and time: ${new Date().toISOString()} (server time).`,
+    'Ayphr environment: users belong to teams; teams own devices and locations; data is scoped to the team; credits are billed per model usage at 1 credit = $0.005 USD.',
+    'Available tools (call them only when the answer needs live data; the server executes them and returns results):',
+    toolLines,
+    'How the user controls you: they choose the model variant, permission level, allowed tools, and notification level; sensitive or unallowed tools require explicit approval; they can compact long conversations.',
+    'Safety: never provide instructions for self-harm, violence, abuse, or sexual content involving minors; for suicidal intent, respond with crisis support and localized resources; refuse other harmful requests clearly.',
+    'When you use a tool, summarize the returned data plainly and cite what came from it; do not invent device readings or team data.',
+  ].join('\\n\\n');
+};
 
 /** The opt-in marker is stripped before anything is sent to Gemini. */
 export const stripAiPrefix = (content: string) => content.replace(/^\s*ai:\s*/i, '');
@@ -32,6 +59,7 @@ export type GeminiRequestBody = {
     content: Array<{ type: 'text'; text: string }>;
   }>;
   system_instruction?: string;
+  tools?: Array<Record<string, unknown>>;
   store: boolean;
   stream: boolean;
   generation_config: { max_output_tokens: number };
@@ -45,11 +73,15 @@ const toGeminiSteps = (messages: AssistantContextMessage[]): GeminiRequestBody['
       content: [{ type: 'text' as const, text: stripAiPrefix(message.content) }],
     }));
 
-const toSystemInstruction = (messages: AssistantContextMessage[]) =>
-  messages
+const toSystemInstruction = (messages: AssistantContextMessage[]) => {
+  const parts = [buildAssistantSystemPrompt()];
+  const summary = messages
     .filter((message) => message.role === 'system')
     .map((message) => stripAiPrefix(message.content))
     .join('\n\n');
+  if (summary) parts.push(summary);
+  return parts.join('\n\n');
+};
 
 /**
  * Reads a Gemini SSE stream and collects the text deltas plus final usage.
@@ -57,7 +89,7 @@ const toSystemInstruction = (messages: AssistantContextMessage[]) =>
  */
 export async function readGeminiEventStream(
   response: Response,
-): Promise<{ content: string; usage?: GeminiUsage }> {
+): Promise<{ content: string; usage?: GeminiUsage; toolCalls: Array<{ id?: string; name: string; arguments: string }> }> {
   if (!response.body) throw new Error('Gemini returned an empty response body');
 
   const reader = response.body.getReader();
@@ -65,6 +97,9 @@ export async function readGeminiEventStream(
   let buffer = '';
   let content = '';
   let usage: GeminiUsage | undefined;
+  const toolCalls: Array<{ id?: string; name: string; arguments: string }> = [];
+  const pendingCalls = new Map<number, { id?: string; name?: string; arguments: string }>();
+  const finalized = new Set<number>();
 
   const handleFrame = (frame: string) => {
     const data = frame
@@ -85,10 +120,38 @@ export async function readGeminiEventStream(
     }
 
     const type = event.event_type;
+    const index = typeof event.index === 'number' ? event.index : 0;
+
+    if (type === 'step.start') {
+      const step = typeof event.step === 'object' && event.step !== null ? (event.step as Record<string, unknown>) : null;
+      if (step?.type === 'function_call') {
+        const entry = pendingCalls.get(index) ?? { arguments: '' };
+        if (typeof step.id === 'string') entry.id = step.id;
+        if (typeof step.name === 'string') entry.name = step.name;
+        if (typeof step.arguments === 'string') entry.arguments += step.arguments;
+        pendingCalls.set(index, entry);
+      }
+      return;
+    }
+
+    if (type === 'step.stop') {
+      const entry = pendingCalls.get(index);
+      if (entry?.name && !finalized.has(index)) {
+        toolCalls.push({ id: entry.id, name: entry.name, arguments: entry.arguments });
+        finalized.add(index);
+      }
+      return;
+    }
+
     if (type === 'step.delta') {
       const delta = event.delta;
       if (typeof delta === 'object' && delta !== null) {
         const candidate = delta as Record<string, unknown>;
+        if (candidate.type === 'arguments_delta' && typeof candidate.arguments === 'string') {
+          const entry = pendingCalls.get(index) ?? { arguments: '' };
+          entry.arguments += candidate.arguments;
+          pendingCalls.set(index, entry);
+        }
         if (candidate.type === 'text' && typeof candidate.text === 'string') {
           content += candidate.text;
         }
@@ -132,7 +195,14 @@ export async function readGeminiEventStream(
   buffer += decoder.decode();
   if (buffer.trim()) handleFrame(buffer);
 
-  return { content, usage };
+  for (const [pendingIndex, entry] of pendingCalls) {
+    if (entry.name && !finalized.has(pendingIndex)) {
+      toolCalls.push({ id: entry.id, name: entry.name, arguments: entry.arguments });
+      finalized.add(pendingIndex);
+    }
+  }
+
+  return { content, usage, toolCalls };
 };
 
 /** Builds the stateless request body, stripped of the `ai:` opt-in marker. */
@@ -145,6 +215,7 @@ export function buildGeminiRequestBody(
     model: modelId,
     input: toGeminiSteps(messages),
     ...(systemInstruction ? { system_instruction: systemInstruction } : {}),
+    tools: GEMINI_TOOLS,
     store: false,
     stream: true,
     generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS },
@@ -172,7 +243,7 @@ async function requestGemini(
     throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 200)}`);
   }
 
-  const { content, usage } = await readGeminiEventStream(response);
+  const { content, usage, toolCalls } = await readGeminiEventStream(response);
   const inputText = messages.map((message) => stripAiPrefix(message.content)).join('\n');
   const reportedInput = usage?.total_input_tokens;
   const reportedOutput = usage?.total_output_tokens;
@@ -188,10 +259,33 @@ async function requestGemini(
         : estimateTokens(content),
   };
 
+  const tools: AssistantToolCall[] = toolCalls.map((call, toolIndex) => {
+    let input: Record<string, unknown> = {};
+    if (call.arguments.trim()) {
+      try {
+        const parsed: unknown = JSON.parse(call.arguments);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          input = parsed as Record<string, unknown>;
+        }
+      } catch {
+        input = {};
+      }
+    }
+    const definition = isAssistantToolName(call.name) ? ASSISTANT_TOOL_DEFINITIONS[call.name] : undefined;
+    return {
+      id: call.id || `gemini-tool-${toolIndex}`,
+      name: call.name,
+      label: definition?.label ?? call.name,
+      status: 'pending',
+      input,
+      durationMs: 0,
+    };
+  });
+
   return {
     content: content.trim(),
     thinking: [],
-    tools: [],
+    tools,
     usage: resolvedUsage,
   };
 }

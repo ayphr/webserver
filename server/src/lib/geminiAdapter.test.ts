@@ -36,7 +36,8 @@ describe('Gemini adapter', () => {
       { type: 'user_input', content: [{ type: 'text', text: 'Hello' }] },
       { type: 'model_output', content: [{ type: 'text', text: 'Hi' }] },
     ]);
-    expect(body.system_instruction).toBe('Be brief');
+    expect(body.system_instruction).toContain('You are Iris');
+    expect(body.system_instruction).toContain('Be brief');
     expect(body.store).toBe(false);
     expect(body.stream).toBe(true);
     expect('status' in body.input[0]!).toBe(false);
