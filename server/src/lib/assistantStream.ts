@@ -443,18 +443,49 @@ const THINKING_POOL = [
   { label: 'Review metrics', detail: 'Confirm the baseline and targets' },
 ] as const;
 
+// Mutations are intentionally absent: the mock stream should never change
+// account data on its own. They are still callable by the live provider.
 const TOOL_POOL: AssistantToolName[] = [
   'devices.list',
   'devices.data',
+  'devices.uptime',
+  'devices.logs',
+  'devices.tokens',
+  'devices.forecast',
   'locations.list',
+  'locations.detail',
+  'alerts.list',
+  'integrations.list',
+  'credits.balance',
+  'notifications.list',
+  'sessions.list',
+  'user.profile',
+  'assistant.chats',
+  'help.search',
   'team.settings',
   'team.members',
+  'team.audit',
+  'team.invites',
   'user.question',
 ];
 
 const createToolInput = (name: AssistantToolName): AssistantToolInput => {
   if (name === 'devices.data') return { hours: 24, limit: 20, metric: 'all' };
-  if (name === 'devices.list' || name === 'locations.list' || name === 'team.members') {
+  if (name === 'devices.logs') return { level: 'error', limit: 10 };
+  if (name === 'devices.tokens') return { limit: 10 };
+  if (name === 'devices.forecast') return { hours: 24 };
+  if (name === 'help.search') return { query: 'alerts', limit: 5 };
+  if (name === 'notifications.list') return { filter: 'unread', limit: 10 };
+  if (
+    name === 'devices.list' ||
+    name === 'locations.list' ||
+    name === 'team.members' ||
+    name === 'team.audit' ||
+    name === 'team.invites' ||
+    name === 'alerts.list' ||
+    name === 'sessions.list' ||
+    name === 'assistant.chats'
+  ) {
     return { limit: 20 };
   }
   if (name === 'user.question') {

@@ -9,17 +9,21 @@ import {
 import {
   getDataPointStats,
   getDataPointsForDevice,
-  getDevicesForTeamId,
   getLocationsForTeamId,
   getUserFromUuid,
   ensureDefaultLocation,
   toPublicDevice,
 } from './db';
-import { getTeamForUser, getTeamMembers, getTeamScopeUuid } from './db/teams';
+import { getTeamForUser, getTeamMembers } from './db/teams';
 import { getTeamContext } from './teamContext';
 import { getTeamMemberRole, toTeamMembers } from './teamAccess';
+import {
+  extendedAssistantToolData,
+  resolveAssistantDevice,
+  resolveAssistantScope,
+} from './assistantToolData';
 
-export interface AssistantDataProviders {
+export type AssistantDataProviders = {
   listDevices(userUuid: string, limit: number): Promise<unknown>;
   readDeviceData(
     userUuid: string,
@@ -28,7 +32,7 @@ export interface AssistantDataProviders {
   listLocations(userUuid: string, limit: number): Promise<unknown>;
   getTeamSettings(userUuid: string): Promise<unknown>;
   listTeamMembers(userUuid: string, limit: number): Promise<unknown>;
-}
+} & typeof extendedAssistantToolData;
 
 export type AssistantToolExecutionContext = {
   userUuid: string;
@@ -52,13 +56,13 @@ const requireUser = async (userUuid: string) => {
 };
 
 const defaultProviders: AssistantDataProviders = {
+  ...extendedAssistantToolData,
+
   async listDevices(userUuid, limit) {
-    const user = await requireUser(userUuid);
-    const scopeUuid = await getTeamScopeUuid(user);
-    const devices = (await getDevicesForTeamId(scopeUuid)).slice(0, limit);
+    const { devices } = await resolveAssistantScope(userUuid);
     const stats = await getDataPointStats(devices.map((device) => device.serial));
     return {
-      devices: devices.map((device) => {
+      devices: devices.slice(0, limit).map((device) => {
         const publicDevice = toPublicDevice(device);
         const deviceStats = stats.get(device.serial);
         return {
@@ -71,19 +75,7 @@ const defaultProviders: AssistantDataProviders = {
   },
 
   async readDeviceData(userUuid, input) {
-    const user = await requireUser(userUuid);
-    const scopeUuid = await getTeamScopeUuid(user);
-    const devices = await getDevicesForTeamId(scopeUuid);
-    const device = input.deviceId
-      ? devices.find(
-          (candidate) =>
-            String(candidate.serial) === input.deviceId ||
-            candidate.name?.toLowerCase() === input.deviceId?.toLowerCase(),
-        )
-      : devices[0];
-    if (!device) throw new Error('Device not found');
-    if (device.teamId !== scopeUuid) throw new Error('Device is outside your team scope');
-
+    const { device } = await resolveAssistantDevice(userUuid, input.deviceId);
     const since = new Date(Date.now() - input.hours * 60 * 60 * 1000);
     const { points, totalCount } = await getDataPointsForDevice(device.serial, {
       since,
@@ -162,8 +154,8 @@ const defaultProviders: AssistantDataProviders = {
 let providers: AssistantDataProviders = defaultProviders;
 
 /** Lets tests or deployments override where assistant tools read data from. */
-export function registerAssistantDataProviders(next: AssistantDataProviders): void {
-  providers = next;
+export function registerAssistantDataProviders(next: Partial<AssistantDataProviders>): void {
+  providers = { ...defaultProviders, ...next };
 }
 
 const requireProviders = (): AssistantDataProviders => providers;
@@ -177,10 +169,11 @@ const summarize = (data: unknown, limit = 600): string => {
   }
 };
 
-const readProvider = async (
+const callProvider = async (
   context: AssistantToolExecutionContext,
   name: AssistantToolName,
   read: (source: AssistantDataProviders) => Promise<unknown>,
+  errorSummary: string,
 ): Promise<AssistantToolResult> => {
   try {
     const data = await read(requireProviders());
@@ -190,11 +183,23 @@ const readProvider = async (
       toolId: context.toolId,
       name,
       status: 'error',
-      summary: 'Could not read the requested data.',
+      summary: errorSummary,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 };
+
+const readProvider = (
+  context: AssistantToolExecutionContext,
+  name: AssistantToolName,
+  read: (source: AssistantDataProviders) => Promise<unknown>,
+) => callProvider(context, name, read, 'Could not read the requested data.');
+
+const writeProvider = (
+  context: AssistantToolExecutionContext,
+  name: AssistantToolName,
+  read: (source: AssistantDataProviders) => Promise<unknown>,
+) => callProvider(context, name, read, 'Could not complete that change.');
 
 const executors: Record<AssistantToolName, AssistantToolExecutor> = {
   'devices.list': (context) => {
@@ -209,18 +214,148 @@ const executors: Record<AssistantToolName, AssistantToolExecutor> = {
       source.readDeviceData(context.userUuid, input),
     );
   },
+  'devices.uptime': (context) => {
+    const input = normalizeAssistantToolInput('devices.uptime', context.input);
+    return readProvider(context, 'devices.uptime', (source) =>
+      source.getDeviceUptime(context.userUuid, input.deviceId),
+    );
+  },
+  'devices.logs': (context) => {
+    const input = normalizeAssistantToolInput('devices.logs', context.input);
+    return readProvider(context, 'devices.logs', (source) =>
+      source.listDeviceLogs(context.userUuid, input),
+    );
+  },
+  'devices.tokens': (context) => {
+    const input = normalizeAssistantToolInput('devices.tokens', context.input);
+    return readProvider(context, 'devices.tokens', (source) =>
+      source.listDeviceTokens(context.userUuid, input.deviceId, input.limit),
+    );
+  },
+  'devices.forecast': (context) => {
+    const input = normalizeAssistantToolInput('devices.forecast', context.input);
+    return readProvider(context, 'devices.forecast', (source) =>
+      source.forecastDevice(context.userUuid, input),
+    );
+  },
   'locations.list': (context) => {
     const input = normalizeAssistantToolInput('locations.list', context.input);
     return readProvider(context, 'locations.list', (source) =>
       source.listLocations(context.userUuid, input.limit),
     );
   },
+  'locations.detail': (context) => {
+    const input = normalizeAssistantToolInput('locations.detail', context.input);
+    return readProvider(context, 'locations.detail', (source) =>
+      source.getLocation(context.userUuid, input.locationId),
+    );
+  },
+  'alerts.list': (context) => {
+    const input = normalizeAssistantToolInput('alerts.list', context.input);
+    return readProvider(context, 'alerts.list', (source) =>
+      source.listAlerts(context.userUuid, input),
+    );
+  },
+  'alerts.create': (context) => {
+    const input = normalizeAssistantToolInput('alerts.create', context.input);
+    return writeProvider(context, 'alerts.create', (source) =>
+      source.createAlert(context.userUuid, input),
+    );
+  },
+  'alerts.update': (context) => {
+    const input = normalizeAssistantToolInput('alerts.update', context.input);
+    return writeProvider(context, 'alerts.update', (source) =>
+      source.updateAlert(context.userUuid, input),
+    );
+  },
+  'alerts.delete': (context) => {
+    const input = normalizeAssistantToolInput('alerts.delete', context.input);
+    return writeProvider(context, 'alerts.delete', (source) =>
+      source.deleteAlert(context.userUuid, input.id as string),
+    );
+  },
+  'alerts.test': (context) => {
+    const input = normalizeAssistantToolInput('alerts.test', context.input);
+    return writeProvider(context, 'alerts.test', (source) =>
+      source.testAlert(context.userUuid, input.id as string),
+    );
+  },
+  'integrations.list': (context) =>
+    readProvider(context, 'integrations.list', (source) =>
+      source.listIntegrations(context.userUuid),
+    ),
   'team.settings': (context) =>
     readProvider(context, 'team.settings', (source) => source.getTeamSettings(context.userUuid)),
   'team.members': (context) => {
     const input = normalizeAssistantToolInput('team.members', context.input);
     return readProvider(context, 'team.members', (source) =>
       source.listTeamMembers(context.userUuid, input.limit),
+    );
+  },
+  'team.audit': (context) => {
+    const input = normalizeAssistantToolInput('team.audit', context.input);
+    return readProvider(context, 'team.audit', (source) =>
+      source.listTeamAudit(context.userUuid, input.limit),
+    );
+  },
+  'team.invites': (context) => {
+    const input = normalizeAssistantToolInput('team.invites', context.input);
+    return readProvider(context, 'team.invites', (source) =>
+      source.listTeamInvites(context.userUuid, input.limit),
+    );
+  },
+  'credits.balance': (context) =>
+    readProvider(context, 'credits.balance', (source) =>
+      source.getCreditBalance(context.userUuid),
+    ),
+  'notifications.list': (context) => {
+    const input = normalizeAssistantToolInput('notifications.list', context.input);
+    return readProvider(context, 'notifications.list', (source) =>
+      source.listNotifications(context.userUuid, input),
+    );
+  },
+  'notifications.read': (context) => {
+    const input = normalizeAssistantToolInput('notifications.read', context.input);
+    return writeProvider(context, 'notifications.read', (source) =>
+      source.markNotificationRead(context.userUuid, input),
+    );
+  },
+  'sessions.list': (context) => {
+    const input = normalizeAssistantToolInput('sessions.list', context.input);
+    return readProvider(context, 'sessions.list', (source) =>
+      source.listSessions(context.userUuid, input.limit),
+    );
+  },
+  'user.profile': (context) =>
+    readProvider(context, 'user.profile', (source) => source.getUserProfile(context.userUuid)),
+  'assistant.chats': (context) => {
+    const input = normalizeAssistantToolInput('assistant.chats', context.input);
+    return readProvider(context, 'assistant.chats', (source) =>
+      source.listAssistantChats(context.userUuid, input.limit),
+    );
+  },
+  'help.search': (context) => {
+    const input = normalizeAssistantToolInput('help.search', context.input);
+    return readProvider(context, 'help.search', (source) =>
+      source.searchHelp(input.query as string, input.limit),
+    );
+  },
+  'alerts.mute': (context) => {
+    const input = normalizeAssistantToolInput('alerts.mute', context.input);
+    return writeProvider(context, 'alerts.mute', (source) =>
+      source.muteAlert(context.userUuid, input),
+    );
+  },
+  'location.create': (context) => {
+    const input = normalizeAssistantToolInput('location.create', context.input);
+    return writeProvider(context, 'location.create', (source) =>
+      source.createLocation(context.userUuid, input.displayName as string),
+    );
+  },
+  'device.rename': (context) => {
+    const input = normalizeAssistantToolInput('device.rename', context.input);
+    return writeProvider(context, 'device.rename', (source) =>
+      source.renameDevice(context.userUuid, input.deviceId, input.displayName as string),
     );
   },
   'user.question': async (context) => {

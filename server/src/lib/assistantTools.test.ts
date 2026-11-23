@@ -41,6 +41,54 @@ describe('assistant tool execution', () => {
     expect(result.summary).toContain('serial');
   });
 
+  it('executes the full alert lifecycle against registered providers', async () => {
+    const calls: string[] = [];
+    registerAssistantDataProviders({
+      async createAlert(_userUuid, input) {
+        calls.push(`create:${input.displayName}`);
+        return { alert: { id: 'alert-1', name: input.displayName } } as never;
+      },
+      async updateAlert(_userUuid, input) {
+        calls.push(`update:${input.id}`);
+        return { alert: { id: input.id, name: 'Updated' } } as never;
+      },
+      async deleteAlert(_userUuid, id) {
+        calls.push(`delete:${id}`);
+        return { deleted: true } as never;
+      },
+      async testAlert(_userUuid, id) {
+        calls.push(`test:${id}`);
+        return { results: [] } as never;
+      },
+      async muteAlert(_userUuid, input) {
+        calls.push(`mute:${input.id}`);
+        return { muted: true } as never;
+      },
+    });
+
+    const condition = { metric: 'temperature', operator: 'gt', value: 30 };
+    const created = await executeAssistantTool('alerts.create', {
+      ...baseContext,
+      input: { name: 'Too hot', conditions: [condition] },
+    });
+    expect(created.status).toBe('ok');
+
+    for (const name of ['alerts.update', 'alerts.delete', 'alerts.test', 'alerts.mute'] as const) {
+      const result = await executeAssistantTool(name, {
+        ...baseContext,
+        input: { id: 'alert-1' },
+      });
+      expect(result.status).toBe('ok');
+    }
+    expect(calls).toEqual([
+      'create:Too hot',
+      'update:alert-1',
+      'delete:alert-1',
+      'test:alert-1',
+      'mute:alert-1',
+    ]);
+  });
+
   it('waits for an interactive answer', async () => {
     const result = await executeAssistantTool('user.question', {
       ...baseContext,

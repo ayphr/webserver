@@ -115,15 +115,6 @@ const notificationLevelFor = (
   level: AssistantNotificationLevel,
 ): AssistantNotificationLevel => (mode === 'task' ? level : 'never');
 
-/** Tools that need approval under "Sometimes ask". */
-const SENSITIVE_TOOLS = new Set([
-  'devices.data',
-  'locations.list',
-  'team.settings',
-  'team.members',
-  'user.question',
-]);
-
 const activeStreams = new Map<AssistantWebSocket, ActiveStreams>();
 const authTimers = new Map<AssistantWebSocket, Timer>();
 const messageQueues = new Map<AssistantWebSocket, Promise<void>>();
@@ -622,7 +613,9 @@ const startStream = async (
     if (permissionLevel === 'never-ask') return false;
     if (allowedToolNames.has(name)) return false;
     if (permissionLevel === 'always-ask') return true;
-    return SENSITIVE_TOOLS.has(name) || Boolean(ASSISTANT_TOOL_DEFINITIONS[name as keyof typeof ASSISTANT_TOOL_DEFINITIONS]?.interactive);
+    const definition =
+      ASSISTANT_TOOL_DEFINITIONS[name as keyof typeof ASSISTANT_TOOL_DEFINITIONS];
+    return Boolean(definition?.sensitive || definition?.interactive);
   };
 
   const stageIndexFor = (length: number) => {

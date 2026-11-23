@@ -41,6 +41,27 @@ describe('assistant tool input normalization', () => {
     ).toThrow();
   });
 
+  it('validates alert rule arguments', () => {
+    const input = normalizeAssistantToolInput('alerts.create', {
+      name: 'Too warm',
+      logic: 'or',
+      conditions: [{ metric: 'temperature', operator: 'gt', value: 28 }],
+      integrationIds: ['one', 'two'],
+      repeatIntervalMinutes: 99999,
+    });
+    expect(input.logic).toBe('or');
+    expect(input.conditions?.[0]).toEqual({ metric: 'temperature', operator: 'gt', value: 28 });
+    expect(input.integrationIds).toEqual(['one', 'two']);
+    expect(input.repeatIntervalMinutes).toBe(10080);
+    expect(() => normalizeAssistantToolInput('alerts.create', { name: 'Bad' })).toThrow();
+    expect(() =>
+      normalizeAssistantToolInput('alerts.create', {
+        name: 'Bad',
+        conditions: [{ metric: ' Radiation ', operator: 'gt', value: 1 }],
+      }),
+    ).toThrow();
+  });
+
   it('rejects unknown tools', () => {
     expect(() => normalizeAssistantToolInput('system.delete', {})).toThrow();
   });

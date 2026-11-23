@@ -1,5 +1,13 @@
 import {
+  ALERT_LOGIC,
+  ALERT_MAX_CONDITIONS,
+  ALERT_MAX_REPEAT_MINUTES,
+  ALERT_METRICS,
+  ALERT_MIN_REPEAT_MINUTES,
+  ALERT_OPERATORS,
   isAssistantToolName,
+  type AlertCondition,
+  type AlertLogic,
   type AssistantQuestionStep,
   type AssistantToolInput,
   type AssistantToolName,
@@ -10,7 +18,21 @@ export type NormalizedAssistantToolInput = {
   limit: number;
   hours: number;
   deviceId?: string;
+  locationId?: string;
   metric: string;
+  displayName?: string;
+  query?: string;
+  level: string;
+  event: string;
+  filter: 'all' | 'unread';
+  all: boolean;
+  id?: string;
+  minutes: number;
+  logic?: AlertLogic;
+  conditions?: AlertCondition[];
+  integrationIds?: string[];
+  repeatIntervalMinutes?: number;
+  enabled?: boolean;
   question?: {
     prompt: string;
     steps: AssistantQuestionStep[];
@@ -26,6 +48,46 @@ const text = (value: unknown, maxLength: number): string | undefined =>
 const boundedNumber = (value: unknown, fallback: number, min: number, max: number): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, Math.floor(value)));
+};
+
+const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
+  typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
+
+const parseAlertConditions = (value: unknown): AlertCondition[] => {
+  if (!Array.isArray(value) || value.length === 0 || value.length > ALERT_MAX_CONDITIONS) {
+    throw new Error('an alert needs between 1 and 6 conditions');
+  }
+  return value.map((entry) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error('invalid alert condition');
+    }
+    const condition = entry as Record<string, unknown>;
+    if (
+      typeof condition.metric !== 'string' ||
+      !(ALERT_METRICS as readonly string[]).includes(condition.metric) ||
+      typeof condition.operator !== 'string' ||
+      !(ALERT_OPERATORS as readonly string[]).includes(condition.operator) ||
+      typeof condition.value !== 'number' ||
+      !Number.isFinite(condition.value)
+    ) {
+      throw new Error('invalid alert condition');
+    }
+    return {
+      metric: condition.metric as AlertCondition['metric'],
+      operator: condition.operator as AlertCondition['operator'],
+      value: condition.value,
+    };
+  });
+};
+
+const parseIntegrationIds = (value: unknown): string[] => {
+  if (!Array.isArray(value) || value.length > 20) {
+    throw new Error('invalid integration list');
+  }
+  if (!value.every((id) => typeof id === 'string' && id.trim().length > 0)) {
+    throw new Error('invalid integration list');
+  }
+  return [...new Set(value.map((id) => (id as string).trim()))];
 };
 
 const parseSteps = (value: unknown): AssistantQuestionStep[] => {
@@ -69,10 +131,83 @@ export function normalizeAssistantToolInput(
     limit: boundedNumber(raw.limit, 20, 1, 100),
     hours: boundedNumber(raw.hours, 24, 1, 720),
     metric: text(raw.metric, 40) ?? 'all',
+    level: oneOf(raw.level, ['all', 'info', 'warning', 'error'] as const, 'all'),
+    event: oneOf(
+      raw.event,
+      [
+        'all',
+        'upload_success',
+        'upload_error',
+        'auth_error',
+        'malformed_data',
+        'rate_limited',
+        'token_revoked',
+      ] as const,
+      'all',
+    ),
+    filter: oneOf(raw.filter, ['all', 'unread'] as const, 'all'),
+    all: raw.all === true,
+    minutes: boundedNumber(raw.minutes, 60, 0, 10_080),
   };
 
   const deviceId = text(raw.deviceId, 120);
   if (deviceId) normalized.deviceId = deviceId;
+
+  const locationId = text(raw.locationId, 120);
+  if (locationId) normalized.locationId = locationId;
+
+  const displayName = text(raw.name, 120);
+  if (displayName) normalized.displayName = displayName;
+
+  const query = text(raw.query, 300);
+  if (query) normalized.query = query;
+
+  const id = text(raw.id, 160);
+  if (id) normalized.id = id;
+
+  if (name === 'help.search' && !normalized.query) {
+    throw new Error('help.search needs a query');
+  }
+  if ((name === 'location.create' || name === 'device.rename') && !normalized.displayName) {
+    throw new Error(`${name} needs a name`);
+  }
+  if (
+    (name === 'alerts.mute' || name === 'alerts.delete' || name === 'alerts.test' || name === 'alerts.update') &&
+    !normalized.id
+  ) {
+    throw new Error(`${name} needs an alert`);
+  }
+  if (name === 'notifications.read' && !normalized.all && !normalized.id) {
+    throw new Error('notifications.read needs a notification or all');
+  }
+
+  if (name === 'alerts.create' || name === 'alerts.update') {
+    if (name === 'alerts.create' && !normalized.displayName) {
+      throw new Error('alerts.create needs a name');
+    }
+    if (raw.logic !== undefined) {
+      normalized.logic = oneOf(raw.logic, ALERT_LOGIC, 'and');
+    }
+    if (raw.conditions !== undefined || name === 'alerts.create') {
+      normalized.conditions = parseAlertConditions(raw.conditions);
+    }
+    if (raw.integrationIds !== undefined) {
+      normalized.integrationIds = parseIntegrationIds(raw.integrationIds);
+    } else if (name === 'alerts.create') {
+      normalized.integrationIds = [];
+    }
+    if (raw.repeatIntervalMinutes !== undefined) {
+      normalized.repeatIntervalMinutes = boundedNumber(
+        raw.repeatIntervalMinutes,
+        60,
+        ALERT_MIN_REPEAT_MINUTES,
+        ALERT_MAX_REPEAT_MINUTES,
+      );
+    } else if (name === 'alerts.create') {
+      normalized.repeatIntervalMinutes = 60;
+    }
+    if (typeof raw.enabled === 'boolean') normalized.enabled = raw.enabled;
+  }
 
   if (name === 'user.question') {
     const prompt = text(raw.prompt, 500);

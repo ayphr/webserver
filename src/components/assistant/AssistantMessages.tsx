@@ -13,7 +13,10 @@ import {
   IconArrowBackUp,
   IconArrowDown,
   IconArrowUp,
+  IconAlertTriangle,
+  IconBell,
   IconCheck,
+  IconCreditCard,
   IconChevronDown,
   IconCopy,
   IconCopyCheck,
@@ -181,8 +184,11 @@ const TOOL_ICON_PROPS = {
 
 const renderToolIcon = (name: string) => {
   if (name === 'user.question') return <IconHelpCircle {...TOOL_ICON_PROPS} />;
-  if (name === 'locations.list') return <IconMapPin {...TOOL_ICON_PROPS} />;
+  if (name.startsWith('locations.')) return <IconMapPin {...TOOL_ICON_PROPS} />;
   if (name.startsWith('team.')) return <IconUsers {...TOOL_ICON_PROPS} />;
+  if (name.startsWith('alerts.')) return <IconAlertTriangle {...TOOL_ICON_PROPS} />;
+  if (name.startsWith('notifications.')) return <IconBell {...TOOL_ICON_PROPS} />;
+  if (name.startsWith('credits.')) return <IconCreditCard {...TOOL_ICON_PROPS} />;
   if (name.startsWith('devices.')) return <IconDatabase {...TOOL_ICON_PROPS} />;
   if (name.includes('search')) return <IconSearch {...TOOL_ICON_PROPS} />;
   if (name.includes('query') || name.includes('data')) return <IconDatabase {...TOOL_ICON_PROPS} />;
