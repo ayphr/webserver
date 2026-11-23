@@ -212,10 +212,8 @@ const ToolCallLine = ({
     <div className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}>
       {renderToolIcon(tool.name)}
       <span className="assistant-chat__tool-line-label">{tool.label ?? tool.name}</span>
-      {(tool.error || tool.detail || tool.result?.summary) && (
-        <span className="assistant-chat__tool-line-detail">
-          {tool.error ?? tool.detail ?? tool.result?.summary}
-        </span>
+      {tool.error && (
+        <span className="assistant-chat__tool-line-detail">{tool.error}</span>
       )}
       {permissionLabel && !awaiting && (
         <span className="assistant-chat__tool-permission-label">{permissionLabel}</span>

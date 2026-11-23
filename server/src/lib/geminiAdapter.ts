@@ -68,16 +68,23 @@ export type GeminiRequestBody = {
 const toGeminiSteps = (messages: AssistantContextMessage[]): GeminiRequestBody['input'] =>
   messages
     .filter((message) => message.role !== 'system')
-    .map((message) => ({
-      type: message.role === 'assistant' ? 'model_output' : 'user_input',
-      content: [{ type: 'text' as const, text: stripAiPrefix(message.content) }],
-    }));
+    .flatMap((message) => {
+      const text = stripAiPrefix(message.content).trim();
+      if (!text) return [];
+      return [
+        {
+          type: message.role === 'assistant' ? 'model_output' : 'user_input',
+          content: [{ type: 'text' as const, text }],
+        },
+      ];
+    });
 
 const toSystemInstruction = (messages: AssistantContextMessage[]) => {
   const parts = [buildAssistantSystemPrompt()];
   const summary = messages
     .filter((message) => message.role === 'system')
-    .map((message) => stripAiPrefix(message.content))
+    .map((message) => stripAiPrefix(message.content).trim())
+    .filter(Boolean)
     .join('\n\n');
   if (summary) parts.push(summary);
   return parts.join('\n\n');
