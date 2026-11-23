@@ -20,6 +20,7 @@ import {
 } from '@common';
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { createAssistantMockStream, splitAssistantResponseIntoTokens } from '../lib/assistantStream';
+import { detectSafetyCategories, SUICIDE_SUPPORT_MESSAGE } from '@common';
 import { saveStreamResult } from '../lib/db/assistant';
 import { createLogger } from '../lib/logger';
 import {
@@ -31,6 +32,7 @@ import {
   assistantThinkingStepsTotal,
   assistantToolCallsTotal,
   assistantWebsocketEventsTotal,
+  assistantSafetyEventsTotal,
 } from '../lib/metrics';
 import { notifyUser } from '../lib/notifications';
 import { getUserFromToken } from './auth';
@@ -238,6 +240,22 @@ const startStream = (
   }
 
   const mock = createAssistantMockStream(mode, variant);
+
+  const promptCategories = prompt ? detectSafetyCategories(prompt) : [];
+  if (prompt) {
+    for (const category of promptCategories) {
+      assistantSafetyEventsTotal.labels(category, 'user').inc();
+    }
+  }
+
+  const assistantCategories = detectSafetyCategories(mock.content);
+  for (const category of assistantCategories) {
+    assistantSafetyEventsTotal.labels(category, 'assistant').inc();
+  }
+  if (promptCategories.includes('suicidal') || assistantCategories.includes('suicidal')) {
+    mock.content = `${mock.content}\n\n---\n\n${SUICIDE_SUPPORT_MESSAGE}`;
+  }
+
   const tokens = splitAssistantResponseIntoTokens(mock.content);
   const startedAt = Date.now();
   const thinkingStatuses = new Map<string, AssistantThinkingStatus>();

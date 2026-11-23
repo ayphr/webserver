@@ -425,3 +425,10 @@ export const assistantResumeTotal = new Counter({
   labelNames: ['result'],
   registers: [registry],
 });
+
+export const assistantSafetyEventsTotal = new Counter({
+  name: 'ayphr_assistant_safety_events_total',
+  help: 'Assistant safety/moderation events by category and source.',
+  labelNames: ['category', 'source'],
+  registers: [registry],
+});

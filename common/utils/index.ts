@@ -44,6 +44,7 @@ export {
   getEmailValidationError,
 } from './email';
 export { POLICIES_VERSIONS_URL } from './policies';
+export { SAFETY_CATEGORIES, detectSafetyCategories, SUICIDE_SUPPORT_MESSAGE, type SafetyCategory } from './safety';
 export {
   clamp,
   toKelvin,
