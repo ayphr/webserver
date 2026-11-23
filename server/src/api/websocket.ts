@@ -455,6 +455,27 @@ const startStream = async (
   const redactedPrompt = prompt ? redactPII(prompt) : undefined;
   let safetyNotice: 'refusal' | 'crisis' | 'csam' | undefined;
 
+  // Device serials are numeric and can look exactly like phone numbers. Keep
+  // the ones returned by tools so redaction does not corrupt their values.
+  const knownSerials = new Set<string>();
+  const collectSerials = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(collectSerials);
+      return;
+    }
+    if (typeof value !== 'object' || value === null) return;
+    for (const [key, item] of Object.entries(value)) {
+      if (
+        (key === 'serial' || key === 'deviceSerial' || key === 'deviceId') &&
+        (typeof item === 'number' || typeof item === 'string') &&
+        /^\d{6,16}$/.test(String(item))
+      ) {
+        knownSerials.add(String(item));
+      }
+      collectSerials(item);
+    }
+  };
+
   /**
    * Classifies a draft and strips unsafe content. Returns true when the stream
    * must stop after this draft instead of feeding tools back to the model.
@@ -488,7 +509,7 @@ const startStream = async (
       draft.tools = [];
       draft.continuation = undefined;
     }
-    draft.content = redactPII(draft.content);
+    draft.content = redactPII(draft.content, [...knownSerials]);
     return Boolean(notice);
   };
 
@@ -686,6 +707,8 @@ const startStream = async (
     permission?: AssistantToolPermission,
   ) => {
     if (stream.cancelled) return;
+    collectSerials(base.input);
+    collectSerials(result.data);
     toolResults.set(base.id, result);
     send(ws, { type: 'tool_result', requestId, toolId: base.id, result });
     emitTool(

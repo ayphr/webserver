@@ -45,6 +45,8 @@ describe('Gemini adapter', () => {
     expect(prompt).not.toContain('\\n');
     expect(prompt).toContain('devices.list');
     expect(prompt).toContain('user.question');
+    expect(prompt).toContain('human-readable');
+    expect(prompt).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
   });
 
   it('builds a stateless request without unsupported step fields', () => {
