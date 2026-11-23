@@ -45,6 +45,34 @@ export {
 } from './email';
 export { POLICIES_VERSIONS_URL } from './policies';
 export { redactPII } from './pii';
+export {
+  ASSISTANT_CONTEXT_RECENT_MESSAGES,
+  ASSISTANT_CONTEXT_SUMMARY_TOKEN_BUDGET,
+  ASSISTANT_CONTEXT_THRESHOLD_RATIO,
+  estimateContextMessageTokens,
+  estimateMessageTokens,
+  estimateTokens,
+  formatTokenCount,
+  planAssistantContext,
+  toContextMessages,
+  type AssistantContextPlan,
+  type AssistantContextPlanInput,
+} from './context';
+export {
+  ASSISTANT_MODEL_PRICING,
+  USD_PER_CREDIT,
+  estimateAssistantUsageCredits,
+  estimateAssistantUsageUsd,
+  estimateStreamingCredits,
+  formatCreditCost,
+  usdToCredits,
+  type AssistantModelPricing,
+  type AssistantUsageTokens,
+} from './assistantPricing';
+export {
+  normalizeAssistantToolInput,
+  type NormalizedAssistantToolInput,
+} from './assistantTools';
 export { SAFETY_CATEGORIES, detectSafetyCategories, isSafeForContext, SUICIDE_SUPPORT_MESSAGE, SAFETY_REFUSAL_MESSAGE, CSAM_ZERO_TOLERANCE_MESSAGE, type SafetyCategory } from './safety';
 export {
   clamp,

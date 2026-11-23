@@ -107,6 +107,12 @@ export const mergeStreamResults = (
       createdAt: existingChat?.createdAt ?? record.createdAt,
       updatedAt: Math.max(existingChat?.updatedAt ?? 0, record.updatedAt),
       ...(existingChat?.order === undefined ? {} : { order: existingChat.order }),
+      ...(existingChat?.contextSummary === undefined
+        ? {}
+        : { contextSummary: existingChat.contextSummary }),
+      ...(existingChat?.compactedThroughMessageId === undefined
+        ? {}
+        : { compactedThroughMessageId: existingChat.compactedThroughMessageId }),
     };
 
     if (existingChatIndex >= 0) chats[existingChatIndex] = chat;
@@ -216,4 +222,28 @@ export async function deleteAssistantChat(userUuid: string, chatId: string): Pro
     { upsert: true },
   );
   return mergeStreamResults(next, remainingStreamResults);
+}
+
+/**
+ * Persist the server-authored compaction summary for one chat without
+ * rewriting message content or stream results.
+ */
+export async function updateAssistantChatContext(
+  userUuid: string,
+  chatId: string,
+  context: { contextSummary: string; compactedThroughMessageId: number },
+): Promise<void> {
+  const assistantStates = await getCollection('assistantStates');
+  trackMongoOperation('updateOne', ASSISTANT_STATES_COLLECTION);
+  await assistantStates.updateOne(
+    { userUuid, 'chats.id': chatId },
+    {
+      $set: {
+        'chats.$[chat].contextSummary': context.contextSummary,
+        'chats.$[chat].compactedThroughMessageId': context.compactedThroughMessageId,
+        updatedAt: new Date(),
+      },
+    },
+    { arrayFilters: [{ 'chat.id': chatId }] },
+  );
 }

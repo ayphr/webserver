@@ -1,11 +1,23 @@
 import type { ServerWebSocket, WebSocketHandler } from 'bun';
 import {
+  ASSISTANT_DATA,
+  ASSISTANT_CONTEXT_SUMMARY_TOKEN_BUDGET,
   ASSISTANT_MODES,
   ASSISTANT_NOTIFICATION_LEVELS,
   ASSISTANT_PERMISSION_LEVELS,
+  ASSISTANT_TOOL_DEFINITIONS,
   ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_VARIANTS,
+  estimateAssistantUsageCredits,
+  estimateTokens,
+  getAssistantModel,
+  planAssistantContext,
+  toContextMessages,
+  type AssistantContextMessage,
+  type AssistantContextUsage,
   type AssistantMessage,
+  type AssistantToolResult,
+  type AssistantUserQuestion,
   type AssistantMode,
   type AssistantNotificationLevel,
   type AssistantPermissionLevel,
@@ -19,9 +31,11 @@ import {
   type AssistantVariant,
 } from '@common';
 import { runBackgroundTask } from '../lib/backgroundTasks';
-import { createAssistantMockStream, splitAssistantResponseIntoTokens } from '../lib/assistantStream';
+import { splitAssistantResponseIntoTokens } from '../lib/assistantStream';
+import { getAssistantModelAdapter } from '../lib/assistantModel';
+import { executeAssistantTool } from '../lib/assistantTools';
 import { detectSafetyCategories, redactPII } from '@common';
-import { saveStreamResult } from '../lib/db/assistant';
+import { getAssistantState, saveStreamResult, updateAssistantChatContext } from '../lib/db/assistant';
 import { createLogger } from '../lib/logger';
 import {
   assistantActiveStreams,
@@ -33,9 +47,17 @@ import {
   assistantToolCallsTotal,
   assistantWebsocketEventsTotal,
   assistantSafetyEventsTotal,
+  assistantContextTokens,
+  assistantContextCompactionsTotal,
 } from '../lib/metrics';
 import { notifyUser } from '../lib/notifications';
 import { getUserFromToken } from './auth';
+import {
+  consumeCredits,
+  getCreditBalanceFromUuid,
+  holdCredits,
+  releaseCredits,
+} from '../lib/credits';
 
 const log = createLogger('assistant-websocket');
 
@@ -50,11 +72,18 @@ type ActiveStream = {
   persistStart?: Promise<void>;
   orphaned?: boolean;
   onOrphaned?: () => void;
+  /** Releases any credit hold and charges the credits actually used. */
+  onSettle?: () => Promise<number>;
 };
 type ActiveStreams = Map<string, ActiveStream>;
 type ToolPermissionHandler = (
   toolId: string,
   decision: AssistantToolPermissionDecision,
+) => void;
+type ToolResponseHandler = (
+  toolId: string,
+  answers: Record<string, string>,
+  customAnswer?: string,
 ) => void;
 
 const MAX_CONCURRENT_STREAMS = 8;
@@ -75,16 +104,26 @@ const notificationLevelFor = (
   level: AssistantNotificationLevel,
 ): AssistantNotificationLevel => (mode === 'task' ? level : 'never');
 
-/** Example tools that need approval under "Sometimes ask". */
-const SENSITIVE_TOOLS = new Set(['data.query', 'docs.lookup']);
+/** Tools that need approval under "Sometimes ask". */
+const SENSITIVE_TOOLS = new Set([
+  'devices.data',
+  'locations.list',
+  'team.settings',
+  'team.members',
+  'user.question',
+]);
 
 const activeStreams = new Map<AssistantWebSocket, ActiveStreams>();
 const authTimers = new Map<AssistantWebSocket, Timer>();
 const messageQueues = new Map<AssistantWebSocket, Promise<void>>();
 const toolPermissionHandlers = new Map<string, ToolPermissionHandler>();
+const toolResponseHandlers = new Map<string, ToolResponseHandler>();
 
 const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
   typeof value === 'string' && values.includes(value as T);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const send = (ws: AssistantWebSocket, message: AssistantStreamServerMessage) => {
   if (ws.readyState !== 1) return;
@@ -123,6 +162,25 @@ const notifyTaskUser = (
   );
 };
 
+/** Interactive tools need a response even from chat mode, unlike task completion notices. */
+const notifyUserQuestion = (
+  userUuid: string,
+  link: string,
+  notificationLevel: AssistantNotificationLevel,
+) => {
+  if (notificationLevel === 'never') return;
+
+  void runBackgroundTask('assistant-user-question-notification', () =>
+    notifyUser({
+      userUuid,
+      type: 'assistant_task',
+      title: 'Iris',
+      message: 'Iris needs your answer.',
+      link,
+    }),
+  );
+};
+
 type StreamResultInput = {
   userUuid: string;
   chatId: string;
@@ -136,6 +194,7 @@ type StreamResultInput = {
   tools?: NonNullable<AssistantMessage['tools']>;
   safetyNotice?: 'refusal' | 'crisis' | 'csam';
   durationMs?: number;
+  creditCost?: number;
   notificationLevel: AssistantNotificationLevel;
   link: string;
 };
@@ -158,6 +217,7 @@ const persistStreamResult = async (input: StreamResultInput): Promise<void> => {
           createdAt: now,
           variant: input.variant,
           durationMs: input.durationMs,
+          creditCost: input.creditCost,
           safetyNotice: input.safetyNotice,
           thinking: (input.thinking ?? []).map((step) => ({ ...step, status: 'done' })),
           tools: input.tools ?? [],
@@ -205,9 +265,15 @@ const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
   stream.cancelled = true;
   assistantActiveStreams.dec();
   assistantWebsocketEventsTotal.labels('cancel', 'ok').inc();
+  if (stream.onSettle) {
+    void stream.onSettle().catch((error: unknown) => {
+      log.warn({ error, requestId }, 'failed to settle assistant credits after cancel');
+    });
+  }
   clearTimers(stream.timers);
   streams.delete(requestId);
   toolPermissionHandlers.delete(requestId);
+  toolResponseHandlers.delete(requestId);
 };
 
 const isMode = (value: unknown): value is AssistantMode =>
@@ -216,7 +282,69 @@ const isMode = (value: unknown): value is AssistantMode =>
 const isVariant = (value: unknown): value is AssistantVariant =>
   typeof value === 'string' && ASSISTANT_VARIANTS.includes(value as AssistantVariant);
 
-const startStream = (
+type PreparedContext = {
+  usage: AssistantContextUsage;
+  contextMessages: ReturnType<typeof planAssistantContext>['contextMessages'];
+  summary?: string;
+};
+
+/**
+ * Loads the authoritative chat, estimates its context usage and compacts old
+ * messages when needed. A real model adapter can later replace the summary
+ * generator without changing this flow.
+ */
+const prepareContext = async (
+  userUuid: string,
+  chatId: string | undefined,
+  variant: AssistantVariant,
+  prompt: string | undefined,
+  trigger: 'stream' | 'manual',
+): Promise<PreparedContext> => {
+  const state = chatId ? await getAssistantState(userUuid) : null;
+  const chat = state?.chats.find((item) => item.id === chatId);
+  let plan = planAssistantContext({ chat, variant, prompt });
+  let summary = chat?.contextSummary;
+
+  if (chatId && chat && (plan.needsCompaction || trigger === 'manual') && plan.olderMessages.length > 0) {
+    try {
+      const summaryMessages: AssistantContextMessage[] = summary
+        ? [{ role: 'system', content: summary }]
+        : [];
+      const generated = await getAssistantModelAdapter().summarize({
+        modelId: ASSISTANT_DATA[variant].model,
+        messages: [...summaryMessages, ...toContextMessages(plan.olderMessages)],
+        maxTokens: ASSISTANT_CONTEXT_SUMMARY_TOKEN_BUDGET,
+      });
+      if (generated.trim()) {
+        summary = generated;
+        const compactedThroughMessageId = plan.olderMessages[plan.olderMessages.length - 1]?.id;
+        if (compactedThroughMessageId !== undefined) {
+          await updateAssistantChatContext(userUuid, chatId, {
+            contextSummary: summary,
+            compactedThroughMessageId,
+          });
+          plan = planAssistantContext({
+            chat: { ...chat, contextSummary: summary, compactedThroughMessageId },
+            variant,
+            prompt,
+          });
+          assistantContextCompactionsTotal.labels(variant, trigger).inc();
+        }
+      }
+    } catch (error) {
+      log.warn({ error, userUuid, chatId }, 'failed to compact assistant context');
+    }
+  }
+
+  assistantContextTokens.labels(variant).set(plan.usage.usedTokens);
+  return {
+    usage: { ...plan.usage, compacted: Boolean(summary) },
+    contextMessages: plan.contextMessages,
+    summary,
+  };
+};
+
+const startStream = async (
   ws: AssistantWebSocket,
   requestId: string,
   mode: AssistantMode,
@@ -241,7 +369,62 @@ const startStream = (
     return;
   }
 
-  const mock = createAssistantMockStream(mode, variant);
+  const context = await prepareContext(userUuid, chatId, variant, prompt, 'stream');
+  send(ws, {
+    type: 'context',
+    requestId,
+    usage: context.usage,
+    ...(context.summary ? { summary: context.summary } : {}),
+  });
+
+  const modelId = context.usage.modelId;
+  const rejectInsufficientCredits = () => {
+    send(ws, { type: 'error', requestId, error: 'insufficient credits' });
+    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
+  };
+
+  // Reserve enough credits for the request before any model work happens. The
+  // hold is settled to the actual usage when the stream finishes or is stopped.
+  const reservedCredits = estimateAssistantUsageCredits(modelId, {
+    inputTokens: context.usage.usedTokens,
+    outputTokens: Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
+  });
+  const creditBalance = await getCreditBalanceFromUuid(userUuid);
+  if (!creditBalance || creditBalance.available < reservedCredits) {
+    rejectInsufficientCredits();
+    return;
+  }
+  const hold = await holdCredits(userUuid, reservedCredits);
+  if (!hold?.changed) {
+    rejectInsufficientCredits();
+    return;
+  }
+
+  let mock;
+  try {
+    mock = await getAssistantModelAdapter().generate({
+      mode,
+      variant,
+      modelId,
+      messages: context.contextMessages,
+      usage: context.usage,
+      useLiveAI: /^\s*ai:/i.test(prompt ?? ''),
+    });
+  } catch (error) {
+    await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
+      log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
+    });
+    log.warn({ error, userUuid, chatId, variant }, 'assistant model request failed');
+    send(ws, {
+      type: 'error',
+      requestId,
+      error: error instanceof Error && error.message.includes('GEMINI_API_KEY')
+        ? error.message
+        : 'Model request failed',
+    });
+    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
+    return;
+  }
 
   const promptCategories = prompt ? detectSafetyCategories(prompt) : [];
   if (prompt) {
@@ -291,13 +474,40 @@ const startStream = (
   const startedAt = Date.now();
   const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
   const toolSignatures = new Map<string, string>();
+  const toolResults = new Map<string, AssistantToolResult>();
   const permissionDecisions = new Map<string, AssistantToolPermissionDecision>();
   const allowedToolNames = new Set(allowedTools);
   const stream: ActiveStream = {
     cancelled: false,
     timers: new Set(),
   };
+
+  let settledCredits = false;
+  let emittedText = '';
+  const settleCredits = async (): Promise<number> => {
+    if (settledCredits) return 0;
+    settledCredits = true;
+    await releaseCredits(userUuid, reservedCredits).catch((error: unknown) => {
+      log.warn({ error, userUuid }, 'failed to release assistant credit hold');
+    });
+    // The hold was sized to cover the request. Capping the final charge keeps
+    // settlement from failing after the response has already been delivered if
+    // a provider reports slightly more usage than the estimate.
+    const cost = Math.min(
+      reservedCredits,
+      estimateAssistantUsageCredits(modelId, {
+        inputTokens: mock.usage?.inputTokens ?? context.usage.usedTokens,
+        outputTokens: mock.usage?.outputTokens ?? estimateTokens(emittedText || mock.content),
+      }),
+    );
+    const result = await consumeCredits(userUuid, cost);
+    if (cost > 0 && !result?.changed) return -1;
+    return cost;
+  };
+  stream.onSettle = settleCredits;
+
   let index = 0;
+  let toolCursor = 0;
   let completed = false;
   let pendingToolId: string | null = null;
 
@@ -314,11 +524,12 @@ const startStream = (
     if (permissionLevel === 'never-ask') return false;
     if (allowedToolNames.has(name)) return false;
     if (permissionLevel === 'always-ask') return true;
-    return SENSITIVE_TOOLS.has(name);
+    return SENSITIVE_TOOLS.has(name) || Boolean(ASSISTANT_TOOL_DEFINITIONS[name as keyof typeof ASSISTANT_TOOL_DEFINITIONS]?.interactive);
   };
 
   const stageIndexFor = (length: number) => {
-    if (length === 0 || tokens.length === 0) return length - 1;
+    if (length === 0) return -1;
+    if (tokens.length === 0) return 0;
     return Math.min(length - 1, Math.floor((index / tokens.length) * length));
   };
 
@@ -351,8 +562,9 @@ const startStream = (
     status: AssistantToolStatus,
     permission?: AssistantToolPermission,
     detail?: string,
+    error?: string,
   ) => {
-    const signature = `${status}|${permission ?? ''}|${detail ?? ''}`;
+    const signature = `${status}|${permission ?? ''}|${detail ?? ''}|${error ?? ''}`;
     if (toolSignatures.get(tool.id) === signature) return;
     toolSignatures.set(tool.id, signature);
     send(ws, {
@@ -362,21 +574,127 @@ const startStream = (
         ...tool,
         status,
         detail,
+        error,
         durationMs: status === 'done' ? tool.durationMs : undefined,
         permission,
       },
     });
   };
 
+  const waitForToolResponse = (toolId: string, question: AssistantUserQuestion) =>
+    new Promise<Record<string, string>>((resolve, reject) => {
+      if (stream.cancelled) {
+        reject(new Error('Stream cancelled'));
+        return;
+      }
+
+      send(ws, { type: 'user_question', requestId, toolId, question });
+      notifyUserQuestion(userUuid, notificationLink, notificationLevel);
+
+      toolResponseHandlers.set(requestId, (answeredToolId, answers, customAnswer) => {
+        if (answeredToolId !== toolId) return;
+        toolResponseHandlers.delete(requestId);
+        stream.onOrphaned = undefined;
+        resolve({ ...answers, ...(customAnswer ? { custom: customAnswer } : {}) });
+      });
+      stream.onOrphaned = () => {
+        toolResponseHandlers.delete(requestId);
+        reject(new Error('No answer received'));
+      };
+    });
+
+  const recordToolResult = (
+    base: (typeof mock.tools)[number],
+    result: AssistantToolResult,
+    permission?: AssistantToolPermission,
+  ) => {
+    if (stream.cancelled) return;
+    toolResults.set(base.id, result);
+    send(ws, { type: 'tool_result', requestId, toolId: base.id, result });
+    emitTool(
+      base,
+      result.status === 'ok' ? 'done' : 'error',
+      permission,
+      result.summary,
+      result.error,
+    );
+  };
+
+  const runTool = (
+    base: (typeof mock.tools)[number],
+    permission?: AssistantToolPermission,
+  ) => {
+    void executeAssistantTool(base.name, {
+      userUuid,
+      chatId,
+      requestId,
+      toolId: base.id,
+      input: base.input ?? {},
+      askUser: (question) => waitForToolResponse(base.id, question),
+    })
+      .then((result) => recordToolResult(base, result, permission))
+      .catch((error: unknown) => {
+        recordToolResult(base, {
+          toolId: base.id,
+          name: base.name,
+          status: 'error',
+          summary: 'The tool failed.',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }, permission);
+      })
+      .finally(() => {
+        if (stream.cancelled) return;
+        pendingToolId = null;
+        toolCursor += 1;
+        if (tokens.length === 0 && toolCursor < mock.tools.length) {
+          emitTools();
+        } else {
+          schedule(emitToken, TOKEN_DELAY_MIN_MS);
+        }
+      });
+  };
+
+  const denyTool = (
+    base: (typeof mock.tools)[number],
+    permission: AssistantToolPermission,
+  ) => {
+    emitTool(base, 'denied', permission, 'Denied by you');
+    recordToolResult(base, {
+      toolId: base.id,
+      name: base.name,
+      status: 'error',
+      summary: 'You denied this tool.',
+      error: 'Denied by you',
+    }, permission);
+  };
+
   const emitTools = (forceDone = false) => {
-    const active = stageIndexFor(mock.tools.length);
+    const active =
+      tokens.length === 0
+        ? Math.min(toolCursor, mock.tools.length - 1)
+        : stageIndexFor(mock.tools.length);
     mock.tools.forEach((base, stageIndex) => {
       if (pendingToolId !== null && base.id !== pendingToolId) return;
 
       if (forceDone) {
         const decision = permissionDecisions.get(base.id);
+        const result = toolResults.get(base.id);
         if (decision === 'deny') {
           emitTool(base, 'denied', 'denied', 'Denied by you');
+          return;
+        }
+        if (result) {
+          emitTool(
+            base,
+            result.status === 'ok' ? 'done' : 'error',
+            decision === 'allow_always'
+              ? 'allowed_always'
+              : decision === 'allow_once'
+                ? 'allowed_once'
+                : undefined,
+            result.summary,
+            result.error,
+          );
           return;
         }
         if (decision) {
@@ -390,6 +708,7 @@ const startStream = (
 
       if (stageIndex < active) {
         const decision = permissionDecisions.get(base.id);
+        const result = toolResults.get(base.id);
         const permission = decision
           ? decision === 'allow_always'
             ? 'allowed_always'
@@ -397,7 +716,13 @@ const startStream = (
               ? 'allowed_once'
               : 'denied'
           : undefined;
-        emitTool(base, decision === 'deny' ? 'denied' : 'done', permission);
+        emitTool(
+          base,
+          result ? (result.status === 'ok' ? 'done' : 'error') : decision === 'deny' ? 'denied' : 'done',
+          permission,
+          result?.summary,
+          result?.error,
+        );
         return;
       }
 
@@ -414,18 +739,21 @@ const startStream = (
           permissionDecisions.set(toolId, decision);
 
           if (decision === 'deny') {
-            emitTool(base, 'denied', 'denied', 'Denied by you');
-            schedule(emitToken, TOKEN_DELAY_MIN_MS);
+            denyTool(base, 'denied');
+            toolCursor += 1;
+            if (tokens.length === 0 && toolCursor < mock.tools.length) {
+              emitTools();
+            } else {
+              schedule(emitToken, TOKEN_DELAY_MIN_MS);
+            }
             return;
           }
 
           const permission = decision === 'allow_always' ? 'allowed_always' : 'allowed_once';
           const label = decision === 'allow_always' ? 'Allowed always' : 'Allowed once';
           emitTool(base, 'running', permission, label);
-          schedule(() => {
-            emitTool(base, 'done', permission);
-            schedule(emitToken, TOKEN_DELAY_MIN_MS);
-          }, base.durationMs ?? 250);
+          pendingToolId = base.id;
+          runTool(base, permission);
         });
         stream.onOrphaned = () => {
           toolPermissionHandlers.get(requestId)?.(base.id, 'deny');
@@ -443,7 +771,16 @@ const startStream = (
         return;
       }
 
-      emitTool(base, 'running');
+      const decision = permissionDecisions.get(base.id);
+      const permission =
+        decision === 'allow_always'
+          ? 'allowed_always'
+          : decision === 'allow_once'
+            ? 'allowed_once'
+            : undefined;
+      emitTool(base, 'running', permission, 'Reading data');
+      pendingToolId = base.id;
+      runTool(base, permission);
     });
   };
 
@@ -456,11 +793,39 @@ const startStream = (
     clearTimers(stream.timers);
     streams.delete(requestId);
     toolPermissionHandlers.delete(requestId);
+    toolResponseHandlers.delete(requestId);
 
     const durationMs = Math.max(1, Date.now() - startedAt);
     assistantActiveStreams.dec();
+
+    const creditCost = await settleCredits();
+    if (creditCost < 0) {
+      rejectInsufficientCredits();
+      return;
+    }
+
     const finalTools: AssistantToolCall[] = mock.tools.map((base) => {
       const decision = permissionDecisions.get(base.id);
+      const result = toolResults.get(base.id);
+      const permission =
+        decision === 'allow_always'
+          ? ('allowed_always' as const)
+          : decision === 'allow_once'
+            ? ('allowed_once' as const)
+            : decision === 'deny'
+              ? ('denied' as const)
+              : undefined;
+
+      if (result) {
+        return {
+          ...base,
+          status: result.status === 'ok' ? ('done' as const) : ('error' as const),
+          ...(permission ? { permission } : {}),
+          detail: result.summary,
+          error: result.error,
+          result,
+        };
+      }
       if (decision === 'deny') {
         return {
           ...base,
@@ -473,8 +838,7 @@ const startStream = (
         return {
           ...base,
           status: 'done' as const,
-          permission:
-            decision === 'allow_always' ? ('allowed_always' as const) : ('allowed_once' as const),
+          permission,
         };
       }
       return { ...base, status: 'done' as const };
@@ -504,6 +868,7 @@ const startStream = (
         thinking: mock.thinking.map((step) => ({ ...step, status: 'done' as const })),
         tools: finalTools,
         durationMs,
+        creditCost,
         notificationLevel: effectiveNotificationLevel,
         link: notificationLink,
       });
@@ -515,6 +880,7 @@ const startStream = (
       type: 'done',
       requestId,
       durationMs,
+      creditCost,
     });
   };
 
@@ -526,6 +892,23 @@ const startStream = (
     }
 
     index += 1;
+    emittedText += token;
+    const runningCost = estimateAssistantUsageCredits(modelId, {
+      inputTokens: context.usage.usedTokens,
+      outputTokens: estimateTokens(emittedText),
+    });
+    if (runningCost > reservedCredits) {
+      stream.cancelled = true;
+      clearTimers(stream.timers);
+      streams.delete(requestId);
+      toolPermissionHandlers.delete(requestId);
+      toolResponseHandlers.delete(requestId);
+      assistantActiveStreams.dec();
+      assistantStreamsTotal.labels(mode, variant, 'error').inc();
+      void settleCredits().finally(() => rejectInsufficientCredits());
+      return;
+    }
+
     send(ws, { type: 'token', requestId, token, index: index - 1 });
     emitThinking();
     emitTools();
@@ -594,12 +977,32 @@ const isClientMessage = (value: unknown): value is AssistantStreamClientMessage 
   }
 
   if (message.type === 'cancel') return true;
+  if (message.type === 'compact') {
+    return typeof message.chatId === 'string' && isVariant(message.variant);
+  }
   if (message.type === 'tool_permission') {
     return (
       typeof message.toolId === 'string' &&
       Boolean(message.toolId) &&
       message.toolId.length <= 200 &&
       isOneOf(ASSISTANT_TOOL_PERMISSION_DECISIONS, message.decision)
+    );
+  }
+  if (message.type === 'tool_response') {
+    if (
+      typeof message.toolId !== 'string' ||
+      !message.toolId ||
+      message.toolId.length > 200 ||
+      !isRecord(message.answers)
+    ) {
+      return false;
+    }
+    const answers = Object.values(message.answers);
+    if (answers.length > 20 || !answers.every((answer) => typeof answer === 'string' && answer.length <= 500)) {
+      return false;
+    }
+    return message.customAnswer === undefined || (
+      typeof message.customAnswer === 'string' && message.customAnswer.length <= 500
     );
   }
   if (message.type !== 'stream') return false;
@@ -665,8 +1068,25 @@ const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayB
     return;
   }
 
+  if (parsed.type === 'compact') {
+    const context = await prepareContext(
+      ws.data.userUuid,
+      parsed.chatId,
+      parsed.variant,
+      undefined,
+      'manual',
+    );
+    send(ws, {
+      type: 'context',
+      requestId: parsed.requestId,
+      usage: context.usage,
+      ...(context.summary ? { summary: context.summary } : {}),
+    });
+    return;
+  }
+
   if (parsed.type === 'stream') {
-    startStream(
+    await startStream(
       ws,
       parsed.requestId,
       parsed.mode ?? 'chat',
@@ -684,6 +1104,15 @@ const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayB
 
   if (parsed.type === 'tool_permission') {
     toolPermissionHandlers.get(parsed.requestId)?.(parsed.toolId, parsed.decision);
+    return;
+  }
+
+  if (parsed.type === 'tool_response') {
+    toolResponseHandlers.get(parsed.requestId)?.(
+      parsed.toolId,
+      parsed.answers,
+      parsed.customAnswer,
+    );
     return;
   }
 

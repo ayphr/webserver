@@ -1,0 +1,121 @@
+.user-question-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  padding: 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  max-width: 32rem;
+}
+
+.user-question-card__prompt {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-md);
+}
+
+.user-question-card__progress {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.user-question-card__step {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.user-question-card__answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.user-question-card__answer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.user-question-card__answer:hover:not(:disabled) {
+  background: var(--surface-hover-subtle);
+}
+
+.user-question-card__answer--selected {
+  border-color: var(--text-primary);
+  background: var(--bg-input-off);
+}
+
+.user-question-card__answer:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.user-question-card__recommended {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.user-question-card__custom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.user-question-card__custom input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  font-size: 0.85rem;
+}
+
+.user-question-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.user-question-card__back,
+.user-question-card__next {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.user-question-card__next {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.user-question-card__back:hover:not(:disabled),
+.user-question-card__next:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.user-question-card__back:disabled,
+.user-question-card__next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -6,7 +6,12 @@ import {
   ASSISTANT_TOOL_PERMISSIONS,
   ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_TOOL_STATUSES,
+  ASSISTANT_VARIANTS,
+  isAssistantModelId,
+  type AssistantContextUsage,
   type AssistantMode,
+  type AssistantToolResult,
+  type AssistantUserQuestion,
   type AssistantNotificationLevel,
   type AssistantPermissionLevel,
   type AssistantStreamClientMessage,
@@ -27,7 +32,10 @@ export type AssistantStreamHandlers = {
   onTool?: (requestId: string, tool: AssistantToolCall) => void;
   onToolPermissionRequest?: (requestId: string, tool: AssistantToolCall) => void;
   onSafety?: (requestId: string, notice: 'refusal' | 'crisis' | 'csam') => void;
-  onDone: (requestId: string, durationMs?: number) => void;
+  onContext?: (requestId: string, usage: AssistantContextUsage, summary?: string) => void;
+  onToolResult?: (requestId: string, toolId: string, result: AssistantToolResult) => void;
+  onUserQuestion?: (requestId: string, toolId: string, question: AssistantUserQuestion) => void;
+  onDone: (requestId: string, durationMs?: number, creditCost?: number) => void;
   onError?: (requestId: string, error: string) => void;
 };
 
@@ -76,6 +84,57 @@ const isToolCall = (value: unknown): value is AssistantToolCall => {
   return value.durationMs === undefined || (typeof value.durationMs === 'number' && Number.isFinite(value.durationMs));
 };
 
+const isContextUsage = (value: unknown): value is AssistantContextUsage => {
+  if (!isRecord(value)) return false;
+  const numbers = [
+    'usedTokens',
+    'budgetTokens',
+    'contextWindowTokens',
+    'maxOutputTokens',
+    'ratio',
+    'thresholdRatio',
+    'messageCount',
+    'includedMessageCount',
+    'compactedMessageCount',
+    'summaryTokens',
+  ];
+  if (!numbers.every((key) => typeof value[key] === 'number' && Number.isFinite(value[key]))) {
+    return false;
+  }
+  if (typeof value.variant !== 'string' || !ASSISTANT_VARIANTS.includes(value.variant as never)) {
+    return false;
+  }
+  if (typeof value.modelId !== 'string' || !isAssistantModelId(value.modelId)) return false;
+  if (typeof value.modelLabel !== 'string' || typeof value.compacted !== 'boolean') return false;
+  return value.chatId === undefined || typeof value.chatId === 'string';
+};
+
+const isStringRecord = (value: unknown): value is Record<string, string> =>
+  isRecord(value) && Object.values(value).every((item) => typeof item === 'string');
+
+const isUserQuestion = (value: unknown): value is AssistantUserQuestion => {
+  if (!isRecord(value) || typeof value.prompt !== 'string') return false;
+  if (typeof value.customAnswerAllowed !== 'boolean' || !Array.isArray(value.steps)) return false;
+  return value.steps.every((step) => {
+    if (!isRecord(step) || typeof step.id !== 'string' || typeof step.prompt !== 'string') {
+      return false;
+    }
+    if (!Array.isArray(step.suggestedAnswers)) return false;
+    if (!step.suggestedAnswers.every((answer) => typeof answer === 'string')) return false;
+    return step.recommendedAnswer === undefined || typeof step.recommendedAnswer === 'string';
+  });
+};
+
+const isToolResult = (value: unknown): value is AssistantToolResult => {
+  if (!isRecord(value)) return false;
+  if (typeof value.toolId !== 'string' || typeof value.name !== 'string') return false;
+  if (value.status !== 'ok' && value.status !== 'error') return false;
+  if (typeof value.summary !== 'string') return false;
+  if (value.error !== undefined && typeof value.error !== 'string') return false;
+  if (value.answers !== undefined && !isStringRecord(value.answers)) return false;
+  return value.question === undefined || isUserQuestion(value.question);
+};
+
 const isServerMessage = (value: unknown): value is AssistantStreamServerMessage => {
   if (!isRecord(value)) return false;
   if (value.type === 'auth_error') return typeof value.error === 'string';
@@ -91,10 +150,27 @@ const isServerMessage = (value: unknown): value is AssistantStreamServerMessage 
     );
   }
   if (value.type === 'done') {
-    return value.durationMs === undefined || (typeof value.durationMs === 'number' && Number.isFinite(value.durationMs));
+    return (
+      (value.durationMs === undefined ||
+        (typeof value.durationMs === 'number' && Number.isFinite(value.durationMs))) &&
+      (value.creditCost === undefined ||
+        (typeof value.creditCost === 'number' && Number.isFinite(value.creditCost)))
+    );
   }
   if (value.type === 'safety') {
     return value.notice === 'refusal' || value.notice === 'crisis' || value.notice === 'csam';
+  }
+  if (value.type === 'context') {
+    return (
+      isContextUsage(value.usage) &&
+      (value.summary === undefined || typeof value.summary === 'string')
+    );
+  }
+  if (value.type === 'tool_result') {
+    return typeof value.toolId === 'string' && isToolResult(value.result);
+  }
+  if (value.type === 'user_question') {
+    return typeof value.toolId === 'string' && isUserQuestion(value.question);
   }
   return value.type === 'error' && typeof value.error === 'string';
 };
@@ -150,6 +226,18 @@ export class AssistantStreamClient {
         return;
       }
 
+      if (parsed.type === 'context') {
+        this.handlers.onContext?.(parsed.requestId, parsed.usage, parsed.summary);
+        return;
+      }
+      if (parsed.type === 'tool_result') {
+        this.handlers.onToolResult?.(parsed.requestId, parsed.toolId, parsed.result);
+        return;
+      }
+      if (parsed.type === 'user_question') {
+        this.handlers.onUserQuestion?.(parsed.requestId, parsed.toolId, parsed.question);
+        return;
+      }
       if (parsed.type === 'thinking') {
         this.handlers.onThinking?.(parsed.requestId, parsed.step);
         return;
@@ -169,7 +257,7 @@ export class AssistantStreamClient {
 
       this.active.delete(parsed.requestId);
       if (parsed.type === 'safety') this.handlers.onSafety?.(parsed.requestId, parsed.notice);
-      if (parsed.type === 'done') this.handlers.onDone(parsed.requestId, parsed.durationMs);
+      if (parsed.type === 'done') this.handlers.onDone(parsed.requestId, parsed.durationMs, parsed.creditCost);
       else if (parsed.type === 'error') this.handlers.onError?.(parsed.requestId, parsed.error);
     };
 
@@ -227,6 +315,19 @@ export class AssistantStreamClient {
   ) {
     if (!isOneOf(ASSISTANT_TOOL_PERMISSION_DECISIONS, decision)) return;
     this.send({ type: 'tool_permission', requestId, toolId, decision });
+  }
+
+  compact(requestId: string, chatId: string, variant: AssistantVariant) {
+    this.send({ type: 'compact', requestId, chatId, variant });
+  }
+
+  respondToTool(
+    requestId: string,
+    toolId: string,
+    answers: Record<string, string>,
+    customAnswer?: string,
+  ) {
+    this.send({ type: 'tool_response', requestId, toolId, answers, customAnswer });
   }
 
   cancel(requestId: string) {

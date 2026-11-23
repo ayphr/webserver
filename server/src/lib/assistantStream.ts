@@ -1,14 +1,20 @@
-import type {
-  AssistantMode,
-  AssistantThinkingStep,
-  AssistantToolCall,
-  AssistantVariant,
+import {
+  ASSISTANT_TOOL_DEFINITIONS,
+  type AssistantMode,
+  type AssistantUsageTokens,
+  type AssistantThinkingStep,
+  type AssistantToolCall,
+  type AssistantToolInput,
+  type AssistantToolName,
+  type AssistantVariant,
 } from '@common';
 
 export type AssistantMockStream = {
   content: string;
   thinking: AssistantThinkingStep[];
   tools: AssistantToolCall[];
+  /** Actual token usage reported by a provider, when available. */
+  usage?: AssistantUsageTokens;
 };
 
 const step = (
@@ -437,16 +443,42 @@ const THINKING_POOL = [
   { label: 'Review metrics', detail: 'Confirm the baseline and targets' },
 ] as const;
 
-const TOOL_POOL = [
-  { name: 'context.search', label: 'Searched recent signals' },
-  { name: 'data.query', label: 'Queried the metric store' },
-  { name: 'docs.lookup', label: 'Checked the docs' },
-  { name: 'response.format', label: 'Formatted the response' },
-  { name: 'code.inspect', label: 'Inspected the relevant code' },
-  { name: 'logs.tail', label: 'Tailed recent logs' },
-  { name: 'config.read', label: 'Read the current config' },
-  { name: 'tests.run', label: 'Ran the affected tests' },
-] as const;
+const TOOL_POOL: AssistantToolName[] = [
+  'devices.list',
+  'devices.data',
+  'locations.list',
+  'team.settings',
+  'team.members',
+  'user.question',
+];
+
+const createToolInput = (name: AssistantToolName): AssistantToolInput => {
+  if (name === 'devices.data') return { hours: 24, limit: 20, metric: 'all' };
+  if (name === 'devices.list' || name === 'locations.list' || name === 'team.members') {
+    return { limit: 20 };
+  }
+  if (name === 'user.question') {
+    return {
+      prompt: 'A couple of quick choices will help me tailor the answer.',
+      customAnswerAllowed: true,
+      steps: [
+        {
+          id: 'metric',
+          prompt: 'Which signal matters most right now?',
+          suggestedAnswers: ['Temperature', 'Humidity', 'Battery level'],
+          recommendedAnswer: 'Temperature',
+        },
+        {
+          id: 'window',
+          prompt: 'How far back should I look?',
+          suggestedAnswers: ['Last 24 hours', 'Last 7 days', 'Last 30 days'],
+          recommendedAnswer: 'Last 24 hours',
+        },
+      ],
+    };
+  }
+  return {};
+};
 
 const TARGET_LENGTHS: Record<AssistantMode, [number, number]> = {
   chat: [1900, 2300],
@@ -472,9 +504,15 @@ const createThinking = (count: number): AssistantThinkingStep[] =>
   );
 
 const createTools = (count: number): AssistantToolCall[] =>
-  pickSome(TOOL_POOL, count).map((item, index) =>
-    tool(`tool-${index}`, item.name, item.label, randomInt(120, 380)),
-  );
+  pickSome(TOOL_POOL, count).map((name, index) => ({
+    ...tool(
+      `tool-${index}`,
+      name,
+      ASSISTANT_TOOL_DEFINITIONS[name].label,
+      randomInt(120, 380),
+    ),
+    input: createToolInput(name),
+  }));
 
 export const createAssistantMockStream = (
   mode: AssistantMode = 'chat',

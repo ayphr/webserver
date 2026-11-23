@@ -9,6 +9,8 @@ export * from './badges';
 export * from './subscription';
 
 export * from './assistant';
+export * from './assistantModels';
+export * from './assistantTools';
 export * from './location';
 export * from './plans';
 export * from './credits';

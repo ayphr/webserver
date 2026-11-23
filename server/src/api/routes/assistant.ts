@@ -20,8 +20,11 @@ import {
   type AssistantThinkingStep,
   type AssistantThinkingStatus,
   type AssistantToolCall,
+  type AssistantToolInput,
   type AssistantToolPermission,
+  type AssistantToolResult,
   type AssistantToolStatus,
+  type AssistantUserQuestion,
   type AssistantVariant,
 } from '@common';
 import { deleteAssistantChat, getAssistantState, saveAssistantState } from '../../lib/db';
@@ -40,6 +43,8 @@ const MAX_TOOL_CALLS = 12;
 const MAX_ALLOWED_TOOLS = 100;
 const MAX_STEP_LABEL_LENGTH = 200;
 const MAX_STEP_DETAIL_LENGTH = 1_000;
+const MAX_TOOL_PAYLOAD_LENGTH = 20_000;
+const MAX_QUESTION_STEPS = 5;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -143,6 +148,84 @@ function parseThinkingStep(value: unknown, label: string): AssistantThinkingStep
   return step;
 }
 
+function requireJsonSize(value: unknown, label: string, maxLength: number): void {
+  try {
+    if (JSON.stringify(value).length > maxLength) throw new Error(`invalid ${label}`);
+  } catch {
+    throw new Error(`invalid ${label}`);
+  }
+}
+
+function parseStringRecord(value: unknown, label: string): Record<string, string> {
+  if (!isRecord(value)) throw new Error(`invalid ${label}`);
+  const record: Record<string, string> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (key.length > 100 || typeof item !== 'string' || item.length > 500) {
+      throw new Error(`invalid ${label}`);
+    }
+    record[key] = item;
+  }
+  return record;
+}
+
+function parseUserQuestion(value: unknown, label: string): AssistantUserQuestion {
+  if (!isRecord(value)) throw new Error(`invalid ${label}`);
+  if (!Array.isArray(value.steps) || value.steps.length > MAX_QUESTION_STEPS) {
+    throw new Error(`invalid ${label}.steps`);
+  }
+  return {
+    prompt: requireString(value.prompt, `${label}.prompt`, 500),
+    customAnswerAllowed: value.customAnswerAllowed !== false,
+    steps: value.steps.map((raw, index) => {
+      if (!isRecord(raw)) throw new Error(`invalid ${label}.steps[${index}]`);
+      if (!Array.isArray(raw.suggestedAnswers) || raw.suggestedAnswers.length < 2 || raw.suggestedAnswers.length > 6) {
+        throw new Error(`invalid ${label}.steps[${index}].suggestedAnswers`);
+      }
+      return {
+        id: requireId(raw.id, `${label}.steps[${index}].id`),
+        prompt: requireString(raw.prompt, `${label}.steps[${index}].prompt`, 300),
+        suggestedAnswers: raw.suggestedAnswers.map((answer, answerIndex) =>
+          requireString(answer, `${label}.steps[${index}].suggestedAnswers[${answerIndex}]`, 120),
+        ),
+        ...(raw.recommendedAnswer === undefined
+          ? {}
+          : {
+              recommendedAnswer: requireString(
+                raw.recommendedAnswer,
+                `${label}.steps[${index}].recommendedAnswer`,
+                120,
+              ),
+            }),
+      };
+    }),
+  };
+}
+
+function parseToolResult(value: unknown, label: string): AssistantToolResult {
+  if (!isRecord(value)) throw new Error(`invalid ${label}`);
+  if (value.status !== 'ok' && value.status !== 'error') throw new Error(`invalid ${label}.status`);
+  const result: AssistantToolResult = {
+    toolId: requireId(value.toolId, `${label}.toolId`),
+    name: requireString(value.name, `${label}.name`, MAX_STEP_LABEL_LENGTH),
+    status: value.status,
+    summary: requireString(value.summary, `${label}.summary`, MAX_STEP_DETAIL_LENGTH),
+  };
+  if (value.error !== undefined) {
+    result.error = requireString(value.error, `${label}.error`, MAX_STEP_DETAIL_LENGTH);
+  }
+  if (value.data !== undefined) {
+    requireJsonSize(value.data, `${label}.data`, MAX_TOOL_PAYLOAD_LENGTH);
+    result.data = value.data;
+  }
+  if (value.question !== undefined) {
+    result.question = parseUserQuestion(value.question, `${label}.question`);
+  }
+  if (value.answers !== undefined) {
+    result.answers = parseStringRecord(value.answers, `${label}.answers`);
+  }
+  return result;
+}
+
 function parseToolCall(value: unknown, label: string): AssistantToolCall {
   if (!isRecord(value)) throw new Error(`invalid ${label}`);
   const tool: AssistantToolCall = {
@@ -164,6 +247,14 @@ function parseToolCall(value: unknown, label: string): AssistantToolCall {
   }
   if (value.permission !== undefined) {
     tool.permission = parseToolPermission(value.permission, `${label}.permission`);
+  }
+  if (value.input !== undefined) {
+    if (!isRecord(value.input)) throw new Error(`invalid ${label}.input`);
+    requireJsonSize(value.input, `${label}.input`, MAX_TOOL_PAYLOAD_LENGTH);
+    tool.input = value.input as AssistantToolInput;
+  }
+  if (value.result !== undefined) {
+    tool.result = parseToolResult(value.result, `${label}.result`);
   }
   return tool;
 }
@@ -214,6 +305,12 @@ function parseMessage(value: unknown, label: string): AssistantMessage {
     message.durationMs = Math.max(0, durationMs);
   }
 
+  if (value.creditCost !== undefined) {
+    const creditCost = requireNumber(value.creditCost, `${label}.creditCost`);
+    if (creditCost < 0) throw new Error(`invalid ${label}.creditCost`);
+    message.creditCost = Math.min(creditCost, 1_000_000);
+  }
+
   if (value.thinking !== undefined) {
     if (!Array.isArray(value.thinking) || value.thinking.length > MAX_THINKING_STEPS) {
       throw new Error(`invalid ${label}.thinking`);
@@ -253,6 +350,15 @@ function parseChat(value: unknown, label: string): AssistantChat {
     updatedAt: requireNumber(value.updatedAt, `${label}.updatedAt`),
   };
   if (value.order !== undefined) chat.order = requireNumber(value.order, `${label}.order`);
+  if (value.contextSummary !== undefined) {
+    chat.contextSummary = requireString(value.contextSummary, `${label}.contextSummary`, 20_000);
+  }
+  if (value.compactedThroughMessageId !== undefined) {
+    chat.compactedThroughMessageId = requireNumber(
+      value.compactedThroughMessageId,
+      `${label}.compactedThroughMessageId`,
+    );
+  }
   return chat;
 }
 

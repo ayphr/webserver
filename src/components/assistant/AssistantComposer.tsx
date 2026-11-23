@@ -8,9 +8,43 @@ import {
   IconKey,
   IconPlayerStop,
 } from '@tabler/icons-react';
-import type { AssistantSendShortcut, AssistantVariant } from '@common';
+import type {
+  AssistantContextUsage,
+  AssistantSendShortcut,
+  AssistantVariant,
+} from '@common';
 import { AssistantDropdown } from '../common';
+import { ContextGauge } from './ContextGauge';
 import './AssistantComposer.css';
+
+type SpeechRecognitionResultLike = {
+  0: { transcript: string };
+  isFinal: boolean;
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: Record<number, SpeechRecognitionResultLike> & { length: number };
+};
+
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult?: (event: SpeechRecognitionEventLike) => void;
+  onend?: () => void;
+  onerror?: () => void;
+  start(): void;
+  stop(): void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+type SpeechWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  webkitAudioContext?: typeof AudioContext;
+};
 
 export interface AssistantComposerProps {
   placeholder?: string;
@@ -27,6 +61,10 @@ export interface AssistantComposerProps {
   dataShared: boolean;
   onSend: () => void;
   onQueue: () => void;
+  contextUsage?: AssistantContextUsage;
+  onCompact?: () => void;
+  showContextGauge?: boolean;
+  isCompacting?: boolean;
 }
 
 export const AssistantComposer = ({
@@ -44,6 +82,10 @@ export const AssistantComposer = ({
   dataShared,
   onSend,
   onQueue,
+  contextUsage,
+  onCompact,
+  showContextGauge = false,
+  isCompacting = false,
 }: AssistantComposerProps) => {
   useEffect(() => {
     const el = textareaRef.current;
@@ -60,7 +102,7 @@ export const AssistantComposer = ({
 
   const [listening, setListening] = useState(false);
   const [levels, setLevels] = useState<number[]>([0.2, 0.2, 0.2, 0.2]);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const baseValueRef = useRef(value);
   const transcriptRef = useRef('');
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -68,15 +110,18 @@ export const AssistantComposer = ({
   const micStreamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
 
-  const supported =
-    typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  const speechWindow = typeof window === 'undefined' ? null : (window as SpeechWindow);
+  const supported = Boolean(
+    speechWindow?.SpeechRecognition || speechWindow?.webkitSpeechRecognition,
+  );
 
   const startAudio = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
-      const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextConstructor = window.AudioContext || speechWindow?.webkitAudioContext;
+      if (!AudioContextConstructor) return;
+      const context = new AudioContextConstructor();
       audioContextRef.current = context;
       const source = context.createMediaStreamSource(stream);
       const analyser = context.createAnalyser();
@@ -121,14 +166,15 @@ export const AssistantComposer = ({
 
   const startListening = () => {
     if (!supported) return;
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = speechWindow?.SpeechRecognition ?? speechWindow?.webkitSpeechRecognition;
+    if (!SR) return;
     const rec = new SR();
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = navigator.language || 'en-US';
     baseValueRef.current = value;
     transcriptRef.current = '';
-    rec.onresult = (event: any) => {
+    rec.onresult = (event) => {
       let final = transcriptRef.current;
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
@@ -216,6 +262,13 @@ export const AssistantComposer = ({
               )}
               <IconCornerDownLeft size={13} strokeWidth={1.75} />
             </span>
+          )}
+          {showContextGauge && onCompact && (
+            <ContextGauge
+              usage={contextUsage}
+              onCompact={onCompact}
+              disabled={isCompacting || isGenerating}
+            />
           )}
           {supported && (
             listening ? (

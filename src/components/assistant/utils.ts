@@ -16,9 +16,10 @@ export const mergeById = <T extends { id: string }>(items: T[] | undefined, next
 };
 
 export const toPersistableMessage = (message: LiveAssistantMessage): AssistantMessage => {
-  const { liveDurationMs, liveTokensPerSecond, ...persistable } = message;
+  const { liveDurationMs, liveTokensPerSecond, liveCreditCost, ...persistable } = message;
   void liveDurationMs;
   void liveTokensPerSecond;
+  void liveCreditCost;
   return persistable;
 };
 

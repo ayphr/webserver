@@ -82,6 +82,30 @@ describe('mergeStreamResults', () => {
     expect(merged.chats[0]?.messages[1]?.error).toBeUndefined();
   });
 
+  test('preserves compaction metadata when merging stream results', () => {
+    const base = createDefaultAssistantState();
+    const state: AssistantState = {
+      ...base,
+      chats: [
+        {
+          id: 'chat-1',
+          title: 'Client title',
+          folderId: null,
+          mode: 'task',
+          createdAt: 1,
+          updatedAt: 2,
+          messages: [userMessage(1, 'Do the task')!],
+          contextSummary: 'Earlier summary',
+          compactedThroughMessageId: 1,
+        },
+      ],
+    };
+    const merged = mergeStreamResults(state, { 'chat-1:2': record('chat-1', 2) });
+
+    expect(merged.chats[0]?.contextSummary).toBe('Earlier summary');
+    expect(merged.chats[0]?.compactedThroughMessageId).toBe(1);
+  });
+
   test('does not resurrect messages explicitly removed by the client', () => {
     const base = createDefaultAssistantState();
     const state: AssistantState = {

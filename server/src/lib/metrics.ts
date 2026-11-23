@@ -432,3 +432,17 @@ export const assistantSafetyEventsTotal = new Counter({
   labelNames: ['category', 'source'],
   registers: [registry],
 });
+
+export const assistantContextTokens = new Gauge({
+  name: 'ayphr_assistant_context_tokens',
+  help: 'Estimated context tokens used on the most recent assistant request.',
+  labelNames: ['variant'],
+  registers: [registry],
+});
+
+export const assistantContextCompactionsTotal = new Counter({
+  name: 'ayphr_assistant_context_compactions_total',
+  help: 'Assistant context compactions by variant and trigger.',
+  labelNames: ['variant', 'trigger'],
+  registers: [registry],
+});

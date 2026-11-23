@@ -84,6 +84,9 @@ export const STRIPE_WEBHOOK_SECRET = Bun.env.STRIPE_WEBHOOK_SECRET || '';
 export const RESEND_API_KEY = Bun.env.RESEND_API_KEY || '';
 export const RESEND_FROM_EMAIL = Bun.env.RESEND_FROM_EMAIL || 'Ayphr <noreply@ayphr.com>';
 
+/** Enables real Gemini responses for prompts that start with `ai:`. */
+export const GEMINI_API_KEY = Bun.env.GEMINI_API_KEY || '';
+
 /** Web Push VAPID keys. All three are required before subscriptions are accepted. */
 export const VAPID_PUBLIC_KEY = Bun.env.VAPID_PUBLIC_KEY || '';
 export const VAPID_PRIVATE_KEY = Bun.env.VAPID_PRIVATE_KEY || '';
@@ -246,6 +249,7 @@ export function validateEnvironment(source: EnvSource = Bun.env): EnvironmentVal
     STRIPE_SECRET_KEY: source.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: source.STRIPE_WEBHOOK_SECRET,
     RESEND_API_KEY: source.RESEND_API_KEY,
+    GEMINI_API_KEY: source.GEMINI_API_KEY,
     REDIS_URL: source.REDIS_URL,
     STRIPE_PRICE_TIERS: source.STRIPE_PRICE_TIERS,
   })) {

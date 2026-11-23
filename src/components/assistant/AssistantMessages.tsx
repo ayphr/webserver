@@ -19,6 +19,8 @@ import {
   IconCopyCheck,
   IconDatabase,
   IconFileText,
+  IconHelpCircle,
+  IconMapPin,
   IconRefresh,
   IconSearch,
   IconShieldStar,
@@ -27,18 +29,22 @@ import {
   IconThumbUp,
   IconThumbUpFilled,
   IconTool,
+  IconUsers,
   IconWand,
   IconX,
 } from '@tabler/icons-react';
 import {
   ASSISTANT_DATA,
+  formatCreditCost,
   type AssistantThinkingStep,
   type AssistantToolCall,
   type AssistantToolPermission,
   type AssistantToolPermissionDecision,
+  type AssistantUserQuestion,
   type AssistantVariant,
 } from '@common';
 import type { LiveAssistantMessage } from './types';
+import { UserQuestionCard } from './UserQuestionCard';
 import { formatDuration, formatMessageTime } from './utils';
 import { useDismiss } from '../../hooks/useDismiss';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
@@ -59,6 +65,12 @@ export interface AssistantMessagesProps {
   onFeedback: (messageId: number, feedback: 'like' | 'dislike') => void;
   onRegenerate: (messageId: number) => void;
   onToolPermission: (toolId: string, decision: AssistantToolPermissionDecision) => void;
+  activeQuestion?: {
+    messageId: number;
+    toolId: string;
+    question: AssistantUserQuestion;
+  } | null;
+  onToolAnswer?: (toolId: string, answers: Record<string, string>, customAnswer?: string) => void;
   onCopy: (messageId: number, content: string) => void;
   onRemoveQueued: (index: number) => void;
   onMoveQueued: (index: number, direction: -1 | 1) => void;
@@ -168,6 +180,10 @@ const TOOL_ICON_PROPS = {
 } as const;
 
 const renderToolIcon = (name: string) => {
+  if (name === 'user.question') return <IconHelpCircle {...TOOL_ICON_PROPS} />;
+  if (name === 'locations.list') return <IconMapPin {...TOOL_ICON_PROPS} />;
+  if (name.startsWith('team.')) return <IconUsers {...TOOL_ICON_PROPS} />;
+  if (name.startsWith('devices.')) return <IconDatabase {...TOOL_ICON_PROPS} />;
   if (name.includes('search')) return <IconSearch {...TOOL_ICON_PROPS} />;
   if (name.includes('query') || name.includes('data')) return <IconDatabase {...TOOL_ICON_PROPS} />;
   if (name.includes('docs') || name.includes('lookup')) return <IconFileText {...TOOL_ICON_PROPS} />;
@@ -196,8 +212,10 @@ const ToolCallLine = ({
     <div className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}>
       {renderToolIcon(tool.name)}
       <span className="assistant-chat__tool-line-label">{tool.label ?? tool.name}</span>
-      {(tool.error || tool.detail) && (
-        <span className="assistant-chat__tool-line-detail">{tool.error ?? tool.detail}</span>
+      {(tool.error || tool.detail || tool.result?.summary) && (
+        <span className="assistant-chat__tool-line-detail">
+          {tool.error ?? tool.detail ?? tool.result?.summary}
+        </span>
       )}
       {permissionLabel && !awaiting && (
         <span className="assistant-chat__tool-permission-label">{permissionLabel}</span>
@@ -407,6 +425,8 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
       onFeedback,
       onRegenerate,
       onToolPermission,
+      activeQuestion,
+      onToolAnswer,
       onCopy,
       onRemoveQueued,
       onMoveQueued,
@@ -607,6 +627,9 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
             : message.durationMs
               ? message.content.split(/\s+/).filter(Boolean).length / (message.durationMs / 1000)
               : undefined;
+          const displayedCreditCost = isStreaming
+            ? message.liveCreditCost
+            : message.creditCost;
 
           return (
             <div
@@ -731,6 +754,15 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                     return nodes;
                   })()
                   )}
+                  {activeQuestion?.messageId === message.id && onToolAnswer && (
+                    <UserQuestionCard
+                      question={activeQuestion.question}
+                      disabled={!isStreaming}
+                      onSubmit={(answers, customAnswer) =>
+                        onToolAnswer(activeQuestion.toolId, answers, customAnswer)
+                      }
+                    />
+                  )}
                   {message.error && <p className="assistant-chat__error">{message.error}</p>}
                   {message.interrupted && (
                     <p className="assistant-chat__interrupted">You interrupted this response.</p>
@@ -794,6 +826,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                           ? '— tok/s'
                           : `${tokensPerSecond.toFixed(1)} tok/s`}
                       </span>
+                      <span>{formatCreditCost(displayedCreditCost ?? 0)}</span>
                     </span>
                   </div>
                   )}

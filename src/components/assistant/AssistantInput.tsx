@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ASSISTANT_VARIANTS,
+  estimateStreamingCredits,
   type AssistantChat,
+  type AssistantContextUsage,
   type AssistantThinkingStep,
   type AssistantToolCall,
   type AssistantToolPermissionDecision,
+  type AssistantToolResult,
+  type AssistantUserQuestion,
   type AssistantVariant,
 } from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
@@ -170,6 +174,13 @@ export const AssistantInput = ({
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
   const [followSignal, setFollowSignal] = useState(0);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [contextUsage, setContextUsage] = useState<AssistantContextUsage | undefined>();
+  const [isCompacting, setIsCompacting] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState<{
+    messageId: number;
+    toolId: string;
+    question: AssistantUserQuestion;
+  } | null>(null);
 
   const isMac =
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -188,6 +199,9 @@ export const AssistantInput = ({
   const streamMessageIdRef = useRef<number | null>(null);
   const streamStartRef = useRef<number | null>(null);
   const streamLastEventWasToolRef = useRef(false);
+  const compactRequestIdRef = useRef<string | null>(null);
+  const contextUsageRef = useRef<AssistantContextUsage | undefined>(undefined);
+  const questionRequestIdRef = useRef<string | null>(null);
   const processQueueRef = useRef<() => void>(() => {});
   const nextIdRef = useRef(messages.reduce((max, message) => Math.max(max, message.id), 0) + 1);
 
@@ -278,6 +292,10 @@ export const AssistantInput = ({
     setShowJumpToLatest(false);
     const chat = state.chats.find((item) => item.id === state.activeChatId);
     currentChatIdRef.current = state.activeChatId;
+    setContextUsage(undefined);
+    contextUsageRef.current = undefined;
+    setActiveQuestion(null);
+    questionRequestIdRef.current = null;
     nextIdRef.current = Math.max(
       nextIdRef.current,
       (chat?.messages ?? []).reduce((max, message) => Math.max(max, message.id), 0) + 1,
@@ -340,12 +358,30 @@ export const AssistantInput = ({
   const cancelStream = () => {
     clearServerRefresh();
     streamLastEventWasToolRef.current = false;
+    setActiveQuestion(null);
+    questionRequestIdRef.current = null;
     const requestId = streamRequestIdRef.current;
+    const messageId = streamMessageIdRef.current;
     if (requestId) streamClientRef.current?.cancel(requestId);
     streamRequestIdRef.current = null;
     streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
     streamStartRef.current = null;
+    if (messageId !== null) {
+      commitMessages((previous) =>
+        previous.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                liveDurationMs: undefined,
+                liveTokensPerSecond: undefined,
+                liveCreditCost: undefined,
+                creditCost: m.liveCreditCost,
+              }
+            : m,
+        ),
+      );
+    }
     setStreamingMessageId(null);
     setIsGenerating(false);
   };
@@ -362,11 +398,15 @@ export const AssistantInput = ({
         if (m.id !== messageId) return m;
         const content = m.content + token;
         const tokenCount = content.split(/\s+/).filter(Boolean).length;
+        const usage = contextUsageRef.current;
         return {
           ...m,
           content,
           liveDurationMs: elapsedMs,
           liveTokensPerSecond: tokenCount / (elapsedMs / 1000),
+          liveCreditCost: usage
+            ? estimateStreamingCredits(usage.modelId, usage.usedTokens, content)
+            : undefined,
         };
       }),
     );
@@ -395,6 +435,26 @@ export const AssistantInput = ({
         m.id === messageId && m.role === 'assistant' ? { ...m, safetyNotice: notice } : m,
       ),
     );
+  };
+
+  const handleStreamContext = (requestId: string, usage: AssistantContextUsage) => {
+    if (usage.chatId && usage.chatId !== currentChatIdRef.current) return;
+    setContextUsage(usage);
+    contextUsageRef.current = usage;
+    if (requestId === compactRequestIdRef.current) {
+      compactRequestIdRef.current = null;
+      setIsCompacting(false);
+      void assistant.refresh();
+    }
+  };
+
+  const handleCompactContext = () => {
+    const chatId = currentChatIdRef.current;
+    if (!chatId || compactRequestIdRef.current) return;
+    const requestId = createId();
+    compactRequestIdRef.current = requestId;
+    setIsCompacting(true);
+    getStreamClient().compact(requestId, chatId, variant);
   };
 
   const handleStreamTool = (requestId: string, tool: AssistantToolCall) => {
@@ -449,6 +509,63 @@ export const AssistantInput = ({
     getStreamClient().respondToToolPermission(requestId, toolId, decision);
   };
 
+  const handleStreamToolResult = (
+    requestId: string,
+    toolId: string,
+    result: AssistantToolResult,
+  ) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    if (messageId === null) return;
+
+    setActiveQuestion((current) => (current?.toolId === toolId ? null : current));
+    questionRequestIdRef.current = null;
+    commitMessages((previous) =>
+      previous.map((message) => {
+        if (message.id !== messageId || message.role !== 'assistant') return message;
+        const updateTool = (tool: AssistantToolCall): AssistantToolCall =>
+          tool.id === toolId
+            ? {
+                ...tool,
+                status: result.status === 'ok' ? 'done' : 'error',
+                detail: result.summary,
+                error: result.error,
+                result,
+              }
+            : tool;
+        return {
+          ...message,
+          tools: (message.tools ?? []).map(updateTool),
+          toolGroups: message.toolGroups?.map((group) => group.map(updateTool)),
+        };
+      }),
+    );
+  };
+
+  const handleStreamUserQuestion = (
+    requestId: string,
+    toolId: string,
+    question: AssistantUserQuestion,
+  ) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    const messageId = streamMessageIdRef.current;
+    if (messageId === null) return;
+    questionRequestIdRef.current = requestId;
+    setActiveQuestion({ messageId, toolId, question });
+  };
+
+  const handleToolAnswer = (
+    toolId: string,
+    answers: Record<string, string>,
+    customAnswer?: string,
+  ) => {
+    const requestId = questionRequestIdRef.current;
+    if (!requestId || requestId !== streamRequestIdRef.current) return;
+    getStreamClient().respondToTool(requestId, toolId, answers, customAnswer);
+    questionRequestIdRef.current = null;
+    setActiveQuestion(null);
+  };
+
   const clearServerRefresh = () => {
     if (serverRefreshTimerRef.current) clearTimeout(serverRefreshTimerRef.current);
     serverRefreshTimerRef.current = null;
@@ -478,7 +595,12 @@ export const AssistantInput = ({
     }, delay);
   };
 
-  const finishStream = (requestId: string, error?: string, serverDurationMs?: number) => {
+  const finishStream = (
+    requestId: string,
+    error?: string,
+    serverDurationMs?: number,
+    serverCreditCost?: number,
+  ) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     const elapsedMs = takeStreamDuration();
@@ -489,6 +611,8 @@ export const AssistantInput = ({
     streamCompleteRef.current = null;
     streamMessageIdRef.current = null;
     setStreamingMessageId(null);
+    setActiveQuestion(null);
+    questionRequestIdRef.current = null;
 
     if (messageId !== null) {
       const next = messagesRef.current.map((m) =>
@@ -498,6 +622,8 @@ export const AssistantInput = ({
               durationMs: m.durationMs ?? durationMs,
               liveDurationMs: undefined,
               liveTokensPerSecond: undefined,
+              liveCreditCost: undefined,
+              creditCost: serverCreditCost ?? m.liveCreditCost,
               ...(error && !isDisconnect ? { error } : {}),
             }
           : m,
@@ -517,8 +643,8 @@ export const AssistantInput = ({
     else setIsGenerating(false);
   };
 
-  const handleStreamDone = (requestId: string, durationMs?: number) => {
-    finishStream(requestId, undefined, durationMs);
+  const handleStreamDone = (requestId: string, durationMs?: number, creditCost?: number) => {
+    finishStream(requestId, undefined, durationMs, creditCost);
   };
 
   const handleStreamError = (requestId: string, error: string) => {
@@ -533,6 +659,9 @@ export const AssistantInput = ({
         onTool: handleStreamTool,
         onSafety: handleStreamSafety,
         onToolPermissionRequest: handleToolPermissionRequest,
+        onContext: handleStreamContext,
+        onToolResult: handleStreamToolResult,
+        onUserQuestion: handleStreamUserQuestion,
         onDone: handleStreamDone,
         onError: handleStreamError,
       });
@@ -555,6 +684,8 @@ export const AssistantInput = ({
               durationMs: m.durationMs ?? durationMs,
               liveDurationMs: undefined,
               liveTokensPerSecond: undefined,
+              liveCreditCost: undefined,
+              creditCost: m.liveCreditCost,
             }
           : m,
       );
@@ -708,6 +839,8 @@ export const AssistantInput = ({
               toolGroups: [],
               liveDurationMs: 0,
               liveTokensPerSecond: 0,
+              liveCreditCost: 0,
+              creditCost: undefined,
             }
           : m,
       ),
@@ -856,6 +989,8 @@ export const AssistantInput = ({
             onFeedback={handleFeedback}
             onRegenerate={handleRegenerate}
             onToolPermission={handleToolPermission}
+            activeQuestion={activeQuestion}
+            onToolAnswer={handleToolAnswer}
             onCopy={copyMessage}
             onRemoveQueued={removeQueuedMessage}
             onMoveQueued={moveQueuedMessage}
@@ -906,6 +1041,10 @@ export const AssistantInput = ({
               dataShared={dataShared}
               onSend={handleSend}
               onQueue={queueCurrentMessage}
+              contextUsage={contextUsage}
+              onCompact={handleCompactContext}
+              showContextGauge={toolbarMode === 'chat'}
+              isCompacting={isCompacting}
             />
           )}
         </div>

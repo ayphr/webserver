@@ -1,3 +1,10 @@
+import type { AssistantModelId } from './assistantModels';
+import type {
+  AssistantToolInput,
+  AssistantToolResult,
+  AssistantUserQuestion,
+} from './assistantTools';
+
 export const ASSISTANT_VARIANTS: AssistantVariant[] = ['nano', 'lite', 'standard', 'plus', 'turbo'];
 export type AssistantVariant = 'nano' | 'lite' | 'standard' | 'plus' | 'turbo';
 export type AssistantSendShortcut = 'enter' | 'shift-enter';
@@ -56,12 +63,46 @@ export type AssistantToolCall = {
   contentOffset?: number;
   /** Records how a permission-gated tool was resolved. */
   permission?: AssistantToolPermission;
+  /** Validated arguments the server executed with. */
+  input?: AssistantToolInput;
+  /** Result returned by the tool, persisted with the message. */
+  result?: AssistantToolResult;
 };
 
 export const ASSISTANT_STREAM_PATH = '/ws/assistant';
 
+export type AssistantContextMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
+/** Server-authoritative view of how much of a model's context is in use. */
+export type AssistantContextUsage = {
+  chatId?: string;
+  variant: AssistantVariant;
+  modelId: AssistantModelId;
+  modelLabel: string;
+  usedTokens: number;
+  budgetTokens: number;
+  contextWindowTokens: number;
+  maxOutputTokens: number;
+  ratio: number;
+  thresholdRatio: number;
+  messageCount: number;
+  includedMessageCount: number;
+  compactedMessageCount: number;
+  summaryTokens: number;
+  compacted: boolean;
+};
+
 export type AssistantStreamClientMessage =
   | { type: 'auth'; token: string }
+  | {
+      type: 'compact';
+      requestId: string;
+      chatId: string;
+      variant: AssistantVariant;
+    }
   | {
       type: 'stream';
       requestId: string;
@@ -80,6 +121,13 @@ export type AssistantStreamClientMessage =
       toolId: string;
       decision: AssistantToolPermissionDecision;
     }
+  | {
+      type: 'tool_response';
+      requestId: string;
+      toolId: string;
+      answers: Record<string, string>;
+      customAnswer?: string;
+    }
   | { type: 'cancel'; requestId: string };
 
 export type AssistantStreamServerMessage =
@@ -88,8 +136,11 @@ export type AssistantStreamServerMessage =
   | { type: 'tool'; requestId: string; tool: AssistantToolCall }
   | { type: 'tool_permission_request'; requestId: string; tool: AssistantToolCall }
   | { type: 'token'; requestId: string; token: string; index?: number }
-  | { type: 'done'; requestId: string; durationMs?: number }
+  | { type: 'done'; requestId: string; durationMs?: number; creditCost?: number }
   | { type: 'safety'; requestId: string; notice: 'refusal' | 'crisis' | 'csam' }
+  | { type: 'context'; requestId: string; usage: AssistantContextUsage; summary?: string }
+  | { type: 'tool_result'; requestId: string; toolId: string; result: AssistantToolResult }
+  | { type: 'user_question'; requestId: string; toolId: string; question: AssistantUserQuestion }
   | { type: 'error'; requestId: string; error: string };
 
 export type AssistantMessageFeedback = 'like' | 'dislike' | null;
@@ -106,6 +157,8 @@ export type AssistantMessage = {
   feedback?: AssistantMessageFeedback;
   variant?: AssistantVariant;
   durationMs?: number;
+  /** Credits charged by the server for this response. */
+  creditCost?: number;
   thinking?: AssistantThinkingStep[];
   tools?: AssistantToolCall[];
   /** Persisted grouping of tool calls by consecutive runs in the stream. */
@@ -130,6 +183,10 @@ export type AssistantChat = {
   updatedAt: number;
   /** Display position within folderId. Legacy chats without it fall back to createdAt. */
   order?: number;
+  /** Server-generated summary of messages compacted out of the model context. */
+  contextSummary?: string;
+  /** Last message id already folded into contextSummary. */
+  compactedThroughMessageId?: number;
 };
 
 export type AssistantPreferences = {
@@ -177,7 +234,7 @@ export const createDefaultAssistantState = (): AssistantState => ({
 export type AssistantThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export type AssistantData = {
-  model: string;
+  model: AssistantModelId;
   modelLabel: string;
   variantLabel: string;
   thinkingLevel?: AssistantThinkingLevel;
