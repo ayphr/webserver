@@ -32,7 +32,11 @@ import {
 } from '@common';
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { splitAssistantResponseIntoTokens } from '../lib/assistantStream';
-import { getAssistantModelAdapter } from '../lib/assistantModel';
+import {
+  getAssistantModelAdapter,
+  type AssistantModelDraft,
+  type AssistantModelToolResult,
+} from '../lib/assistantModel';
 import { buildAssistantSystemPrompt, isLiveAiPrompt } from '../lib/geminiAdapter';
 import { executeAssistantTool } from '../lib/assistantTools';
 import { detectSafetyCategories, redactPII } from '@common';
@@ -93,6 +97,12 @@ const FIRST_TOKEN_DELAY_MS = 300;
 const TOKEN_DELAY_MIN_MS = 70;
 const TOKEN_DELAY_VARY_MS = 50;
 const DEFAULT_TASK_LINK = '/dashboard';
+/** Task mode may chain many tool rounds; chat is capped much lower. */
+const MAX_CHAT_TOOL_ROUNDS = 8;
+const MAX_TASK_TOOL_ROUNDS = 64;
+
+const maxToolRounds = (mode: AssistantMode) =>
+  mode === 'task' ? MAX_TASK_TOOL_ROUNDS : MAX_CHAT_TOOL_ROUNDS;
 
 const assistantChatLink = (chatId?: string) =>
   chatId
@@ -385,9 +395,9 @@ const startStream = async (
     notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
   };
 
-  // Reserve enough credits for the request before any model work happens. The
-  // hold is settled to the actual usage when the stream finishes or is stopped.
-  const reservedCredits = estimateAssistantUsageCredits(modelId, {
+  // Reserve enough credits for the first request before any model work happens.
+  // Each continuation round reserves its own estimate before the provider call.
+  let reservedCredits = estimateAssistantUsageCredits(modelId, {
     inputTokens:
       context.usage.usedTokens +
       (useLiveAI ? estimateTokens(buildAssistantSystemPrompt()) : 0),
@@ -404,16 +414,87 @@ const startStream = async (
     return;
   }
 
-  let mock;
-  try {
-    mock = await getAssistantModelAdapter().generate({
+  /**
+   * Reserves credits for a continuation round. The additional hold is included
+   * in the final settlement and in the running-cost interruption check.
+   */
+  const holdMoreCredits = async (amount: number): Promise<boolean> => {
+    if (!Number.isFinite(amount) || amount <= 0) return true;
+    const balance = await getCreditBalanceFromUuid(userUuid);
+    if (!balance || balance.available < amount) return false;
+    const additional = await holdCredits(userUuid, amount);
+    if (!additional?.changed) return false;
+    reservedCredits += amount;
+    return true;
+  };
+
+  const estimateRoundCredits = (inputTokens: number, outputTokens: number) =>
+    estimateAssistantUsageCredits(modelId, { inputTokens, outputTokens });
+
+  const generateDraft = (options: {
+    continuation?: AssistantModelDraft['continuation'];
+    toolResults?: AssistantModelToolResult[];
+    disableTools?: boolean;
+  }): Promise<AssistantModelDraft> =>
+    getAssistantModelAdapter().generate({
       mode,
       variant,
       modelId,
       messages: context.contextMessages,
       usage: context.usage,
       useLiveAI,
+      ...options,
     });
+
+  const promptCategories = prompt ? detectSafetyCategories(prompt) : [];
+  if (prompt) {
+    for (const category of promptCategories) {
+      assistantSafetyEventsTotal.labels(category, 'user').inc();
+    }
+  }
+  const redactedPrompt = prompt ? redactPII(prompt) : undefined;
+  let safetyNotice: 'refusal' | 'crisis' | 'csam' | undefined;
+
+  /**
+   * Classifies a draft and strips unsafe content. Returns true when the stream
+   * must stop after this draft instead of feeding tools back to the model.
+   */
+  const applyDraftSafety = (draft: AssistantModelDraft): boolean => {
+    const assistantCategories = detectSafetyCategories(draft.content);
+    for (const category of assistantCategories) {
+      assistantSafetyEventsTotal.labels(category, 'assistant').inc();
+    }
+
+    const combinedCategories = [...new Set([...promptCategories, ...assistantCategories])];
+    const isSuicidal = combinedCategories.includes('suicidal');
+    // Suicidal intent should not be misclassified as ordinary violence.
+    const highRiskCategories = combinedCategories.filter(
+      (category) => category !== 'suicidal' && !(isSuicidal && category === 'violence'),
+    );
+
+    let notice: typeof safetyNotice;
+    if (highRiskCategories.includes('csam') || highRiskCategories.includes('child_abuse')) {
+      notice = 'csam';
+    } else if (highRiskCategories.length > 0) {
+      notice = 'refusal';
+    } else if (isSuicidal) {
+      notice = 'crisis';
+    }
+
+    if (notice) {
+      safetyNotice = notice;
+      draft.content = '';
+      draft.thinking = [];
+      draft.tools = [];
+      draft.continuation = undefined;
+    }
+    draft.content = redactPII(draft.content);
+    return Boolean(notice);
+  };
+
+  let mock: AssistantModelDraft;
+  try {
+    mock = await generateDraft({});
   } catch (error) {
     await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
       log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
@@ -430,51 +511,10 @@ const startStream = async (
     return;
   }
 
-  const promptCategories = prompt ? detectSafetyCategories(prompt) : [];
-  if (prompt) {
-    for (const category of promptCategories) {
-      assistantSafetyEventsTotal.labels(category, 'user').inc();
-    }
-  }
-  const redactedPrompt = prompt ? redactPII(prompt) : undefined;
+  let stopAfterRound = applyDraftSafety(mock);
+  if (safetyNotice) send(ws, { type: 'safety', requestId, notice: safetyNotice });
 
-  const assistantCategories = detectSafetyCategories(mock.content);
-  for (const category of assistantCategories) {
-    assistantSafetyEventsTotal.labels(category, 'assistant').inc();
-  }
-
-  const combinedCategories = [...new Set([...promptCategories, ...assistantCategories])];
-  const isSuicidal = combinedCategories.includes('suicidal');
-  // Suicidal intent should not be misclassified as ordinary violence.
-  const highRiskCategories = combinedCategories.filter(
-    (category) => category !== 'suicidal' && !(isSuicidal && category === 'violence'),
-  );
-
-  let safetyNotice: 'refusal' | 'crisis' | 'csam' | undefined;
-  if (highRiskCategories.includes('csam') || highRiskCategories.includes('child_abuse')) {
-    safetyNotice = 'csam';
-    mock.content = '';
-    mock.thinking = [];
-    mock.tools = [];
-  } else if (highRiskCategories.length > 0) {
-    safetyNotice = 'refusal';
-    mock.content = '';
-    mock.thinking = [];
-    mock.tools = [];
-  } else if (isSuicidal) {
-    safetyNotice = 'crisis';
-    mock.content = '';
-    mock.thinking = [];
-    mock.tools = [];
-  }
-
-  if (safetyNotice) {
-    send(ws, { type: 'safety', requestId, notice: safetyNotice });
-  }
-
-  mock.content = redactPII(mock.content);
-
-  const tokens = splitAssistantResponseIntoTokens(mock.content);
+  let tokens = splitAssistantResponseIntoTokens(mock.content);
   const startedAt = Date.now();
   const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
   const toolSignatures = new Map<string, string>();
@@ -488,20 +528,53 @@ const startStream = async (
 
   let settledCredits = false;
   let emittedText = '';
+  let emittedTokenCount = 0;
+  let round = 0;
+  let projectedCost = 0;
+  const allThinking: NonNullable<AssistantMessage['thinking']> = [];
+  const allTools: AssistantToolCall[] = [];
+  const allUsage = { inputTokens: 0, outputTokens: 0 };
+
+  /** Accumulates a round's output and its projected cost for credit tracking. */
+  const addDraftToTotals = (draft: AssistantModelDraft) => {
+    allThinking.push(...draft.thinking);
+    allTools.push(...draft.tools);
+    const usage = draft.usage ?? {
+      inputTokens: context.usage.usedTokens + estimateTokens(emittedText),
+      outputTokens: estimateTokens(
+        `${draft.content}\n${draft.tools.map((tool) => JSON.stringify(tool.input ?? {})).join('\n')}`,
+      ),
+    };
+    allUsage.inputTokens += usage.inputTokens;
+    allUsage.outputTokens += usage.outputTokens;
+    projectedCost += estimateAssistantUsageCredits(modelId, usage);
+  };
+  addDraftToTotals(mock);
+
+  // A provider can report more usage than the preflight estimate. Reserve the
+  // difference before streaming so the running-cost guard stays meaningful.
+  if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
+    await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
+      log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
+    });
+    rejectInsufficientCredits();
+    return;
+  }
+
   const settleCredits = async (): Promise<number> => {
     if (settledCredits) return 0;
     settledCredits = true;
     await releaseCredits(userUuid, reservedCredits).catch((error: unknown) => {
       log.warn({ error, userUuid }, 'failed to release assistant credit hold');
     });
-    // The hold was sized to cover the request. Capping the final charge keeps
-    // settlement from failing after the response has already been delivered if
-    // a provider reports slightly more usage than the estimate.
+    // The hold was sized to cover every round. Capping the final charge keeps
+    // settlement from failing after a response has already been delivered if a
+    // provider reports slightly more usage than the estimate.
     const cost = Math.min(
       reservedCredits,
       estimateAssistantUsageCredits(modelId, {
-        inputTokens: mock.usage?.inputTokens ?? context.usage.usedTokens,
-        outputTokens: mock.usage?.outputTokens ?? estimateTokens(emittedText || mock.content),
+        inputTokens: allUsage.inputTokens || context.usage.usedTokens,
+        outputTokens: allUsage.outputTokens || estimateTokens(emittedText),
       }),
     );
     const result = await consumeCredits(userUuid, cost);
@@ -788,6 +861,24 @@ const startStream = async (
     });
   };
 
+  const failStream = (error: string) => {
+    if (completed || stream.cancelled) return;
+    stream.cancelled = true;
+    clearTimers(stream.timers);
+    streams.delete(requestId);
+    toolPermissionHandlers.delete(requestId);
+    toolResponseHandlers.delete(requestId);
+    // Reject any in-flight interactive tool so its executor can unwind.
+    stream.onOrphaned?.();
+    stream.onOrphaned = undefined;
+    assistantActiveStreams.dec();
+    assistantStreamsTotal.labels(mode, variant, 'error').inc();
+    void settleCredits().finally(() => {
+      send(ws, { type: 'error', requestId, error });
+      notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
+    });
+  };
+
   const complete = async () => {
     if (completed) return;
     completed = true;
@@ -808,7 +899,7 @@ const startStream = async (
       return;
     }
 
-    const finalTools: AssistantToolCall[] = mock.tools.map((base) => {
+    const finalTools: AssistantToolCall[] = allTools.map((base) => {
       const decision = permissionDecisions.get(base.id);
       const result = toolResults.get(base.id);
       const permission =
@@ -850,8 +941,8 @@ const startStream = async (
 
     assistantStreamsTotal.labels(mode, variant, 'success').inc();
     assistantStreamDuration.labels(mode, variant).observe(durationMs / 1000);
-    assistantStreamTokensTotal.labels(variant).inc(tokens.length);
-    for (const _ of mock.thinking) {
+    assistantStreamTokensTotal.labels(variant).inc(emittedTokenCount);
+    for (let stepIndex = 0; stepIndex < allThinking.length; stepIndex += 1) {
       assistantThinkingStepsTotal.labels('done').inc();
     }
     for (const tool of finalTools) {
@@ -867,9 +958,9 @@ const startStream = async (
         prompt: redactedPrompt,
         mode,
         variant,
-        content: mock.content,
+        content: emittedText,
         safetyNotice,
-        thinking: mock.thinking.map((step) => ({ ...step, status: 'done' as const })),
+        thinking: allThinking.map((step) => ({ ...step, status: 'done' as const })),
         tools: finalTools,
         durationMs,
         creditCost,
@@ -888,7 +979,118 @@ const startStream = async (
     });
   };
 
+  /** Starts a fresh model round with its own token and tool cursors. */
+  function startRound(draft: AssistantModelDraft, nextRound: number) {
+    mock = draft;
+    round = nextRound;
+    index = 0;
+    toolCursor = 0;
+    pendingToolId = null;
+
+    // Keep the boundary between rounds in both the live feed and the persisted
+    // content, since the client simply appends tokens in arrival order.
+    const separator = emittedText && draft.content && !emittedText.endsWith('\n') ? '\n\n' : '';
+    tokens = [
+      ...(separator ? [separator] : []),
+      ...splitAssistantResponseIntoTokens(draft.content),
+    ];
+
+    emitThinking();
+    emitTools();
+    if (pendingToolId === null) schedule(emitToken, TOKEN_DELAY_MIN_MS);
+  }
+
+  /** Feeds this round's tool results back to the model, or finishes the stream. */
+  async function finishRound() {
+    if (completed || stream.cancelled) return;
+
+    // Close out this round's thinking before moving on; the next round starts
+    // with a fresh set of steps and cursors.
+    emitThinking(true);
+
+    const roundToolResults: AssistantModelToolResult[] = mock.tools.flatMap((base) => {
+      const result = toolResults.get(base.id);
+      if (!result) return [];
+      let content: string;
+      try {
+        content = JSON.stringify(
+          result.status === 'error'
+            ? { error: result.error ?? result.summary }
+            : result.data ?? { summary: result.summary },
+        );
+      } catch {
+        content = result.summary;
+      }
+      return [
+        {
+          toolId: base.id,
+          name: base.name,
+          content,
+          isError: result.status === 'error',
+        },
+      ];
+    });
+
+    const limit = maxToolRounds(mode);
+    const canContinue =
+      !stopAfterRound &&
+      mock.tools.length > 0 &&
+      roundToolResults.length > 0 &&
+      round + 1 < limit;
+
+    if (!canContinue) {
+      void complete();
+      return;
+    }
+
+    const nextRound = round + 1;
+    const nextInputTokens =
+      context.usage.usedTokens +
+      estimateTokens(emittedText) +
+      estimateTokens(roundToolResults.map((result) => result.content).join('\n')) +
+      (useLiveAI ? estimateTokens(buildAssistantSystemPrompt()) : 0);
+    const nextCost = estimateRoundCredits(
+      nextInputTokens,
+      Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
+    );
+    if (!(await holdMoreCredits(nextCost))) {
+      failStream('insufficient credits');
+      return;
+    }
+
+    let nextDraft: AssistantModelDraft;
+    try {
+      nextDraft = await generateDraft({
+        continuation: mock.continuation,
+        toolResults: roundToolResults,
+        // On the last allowed round, force the model to answer with what it has.
+        disableTools: nextRound + 1 >= limit,
+      });
+    } catch (error) {
+      log.warn({ error, userUuid, chatId, variant, round: nextRound }, 'assistant continuation failed');
+      // Earlier rounds already streamed content; keep that answer instead of
+      // leaving the client waiting for a response that will never arrive.
+      void complete();
+      return;
+    }
+
+    if (applyDraftSafety(nextDraft)) stopAfterRound = true;
+    if (safetyNotice) send(ws, { type: 'safety', requestId, notice: safetyNotice });
+
+    addDraftToTotals(nextDraft);
+    if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
+      failStream('insufficient credits');
+      return;
+    }
+    startRound(nextDraft, nextRound);
+  }
+
   const emitToken = () => {
+    if (projectedCost > reservedCredits) {
+      failStream('insufficient credits');
+      return;
+    }
+
     const token = tokens[index];
     if (token === undefined) {
       // Tool-only responses (or a trailing tool run) must not complete while
@@ -898,27 +1100,13 @@ const startStream = async (
         emitTools();
         return;
       }
-      void complete();
+      void finishRound();
       return;
     }
 
     index += 1;
     emittedText += token;
-    const runningCost = estimateAssistantUsageCredits(modelId, {
-      inputTokens: context.usage.usedTokens,
-      outputTokens: estimateTokens(emittedText),
-    });
-    if (runningCost > reservedCredits) {
-      stream.cancelled = true;
-      clearTimers(stream.timers);
-      streams.delete(requestId);
-      toolPermissionHandlers.delete(requestId);
-      toolResponseHandlers.delete(requestId);
-      assistantActiveStreams.dec();
-      assistantStreamsTotal.labels(mode, variant, 'error').inc();
-      void settleCredits().finally(() => rejectInsufficientCredits());
-      return;
-    }
+    emittedTokenCount += 1;
 
     send(ws, { type: 'token', requestId, token, index: index - 1 });
     emitThinking();

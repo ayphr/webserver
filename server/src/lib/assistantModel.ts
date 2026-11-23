@@ -6,10 +6,30 @@ import {
   type AssistantModelId,
   type AssistantVariant,
 } from '@common';
-import { createAssistantMockStream, type AssistantMockStream } from './assistantStream';
+import {
+  createAssistantMockFollowUp,
+  createAssistantMockStream,
+  type AssistantMockStream,
+} from './assistantStream';
 import { geminiAdapter, createAssistantModelRouter } from './geminiAdapter';
 
-export type AssistantModelDraft = AssistantMockStream;
+export type AssistantModelDraft = AssistantMockStream & {
+  /** Provider-native state needed to continue after tool execution. */
+  continuation?: AssistantModelContinuation;
+};
+
+export type AssistantModelContinuation = {
+  /** Provider-native steps accumulated across every round so far. */
+  steps: Array<Record<string, unknown>>;
+};
+
+export type AssistantModelToolResult = {
+  toolId: string;
+  name: string;
+  /** Provider-facing text content, usually JSON. */
+  content: string;
+  isError?: boolean;
+};
 
 export type AssistantModelRequest = {
   mode: AssistantMode;
@@ -20,6 +40,15 @@ export type AssistantModelRequest = {
   usage: AssistantContextUsage;
   /** True when the user opted into the real provider with the `ai:` prefix. */
   useLiveAI?: boolean;
+  /** Opaque provider state from a previous draft that requested tools. */
+  continuation?: AssistantModelContinuation;
+  /** Executed results for the tool calls in `continuation`. */
+  toolResults?: AssistantModelToolResult[];
+  /**
+   * Omits tool declarations so the model has to answer with the results it
+   * already has. Used for the final round of a long tool loop.
+   */
+  disableTools?: boolean;
 };
 
 export type AssistantSummaryRequest = {
@@ -42,7 +71,10 @@ export interface AssistantModelAdapter {
 const mockAdapter: AssistantModelAdapter = {
   id: 'mock',
 
-  async generate({ mode, variant }) {
+  async generate({ mode, variant, toolResults }) {
+    if (toolResults && toolResults.length > 0) {
+      return createAssistantMockFollowUp(mode, variant, toolResults);
+    }
     return createAssistantMockStream(mode, variant);
   },
 

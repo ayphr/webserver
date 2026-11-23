@@ -9,8 +9,10 @@ import {
 import { GEMINI_API_KEY } from '../env';
 import type {
   AssistantModelAdapter,
+  AssistantModelContinuation,
   AssistantModelDraft,
   AssistantModelRequest,
+  AssistantModelToolResult,
   AssistantSummaryRequest,
 } from './assistantModel';
 
@@ -59,12 +61,37 @@ type GeminiUsage = {
   total_thought_tokens?: number;
 };
 
+type GeminiStep = Record<string, unknown>;
+
+type PendingStep = {
+  kind: 'function_call' | 'model_output' | 'thought' | 'other';
+  step: GeminiStep;
+  arguments: string;
+  text: string;
+  summary: string;
+  finalized: boolean;
+};
+
+const parseArguments = (text: string): Record<string, unknown> => {
+  if (!text.trim()) return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Malformed arguments are surfaced as an empty object; the tool validator
+    // reports the invalid input to the model.
+  }
+  return {};
+};
+
+const stepKind = (type: unknown): PendingStep['kind'] =>
+  type === 'function_call' || type === 'model_output' || type === 'thought' ? type : 'other';
+
 export type GeminiRequestBody = {
   model: string;
-  input: Array<{
-    type: 'user_input' | 'model_output';
-    content: Array<{ type: 'text'; text: string }>;
-  }>;
+  input: Array<Record<string, unknown>>;
   system_instruction?: string;
   tools?: Array<Record<string, unknown>>;
   store: boolean;
@@ -72,7 +99,7 @@ export type GeminiRequestBody = {
   generation_config: { max_output_tokens: number };
 };
 
-const toGeminiSteps = (messages: AssistantContextMessage[]): GeminiRequestBody['input'] =>
+const toGeminiSteps = (messages: AssistantContextMessage[]): Array<Record<string, unknown>> =>
   messages
     .filter((message) => message.role !== 'system')
     .flatMap((message) => {
@@ -86,6 +113,17 @@ const toGeminiSteps = (messages: AssistantContextMessage[]): GeminiRequestBody['
       ];
     });
 
+/** Function results are fed back as their own steps in the stateless history. */
+const toFunctionResultSteps = (
+  results: AssistantModelToolResult[] = [],
+): Array<Record<string, unknown>> =>
+  results.map((entry) => ({
+    type: 'function_result',
+    name: entry.name,
+    call_id: entry.toolId,
+    result: [{ type: 'text', text: entry.content }],
+  }));
+
 const toSystemInstruction = (messages: AssistantContextMessage[]) => {
   const parts = [buildAssistantSystemPrompt()];
   const summary = messages
@@ -97,13 +135,21 @@ const toSystemInstruction = (messages: AssistantContextMessage[]) => {
   return parts.join('\n\n');
 };
 
+export type GeminiEventStreamResult = {
+  content: string;
+  usage?: GeminiUsage;
+  toolCalls: Array<{ id?: string; name: string; arguments: string }>;
+  /** Assembled model steps, ordered as they appeared in the stream. */
+  steps: GeminiStep[];
+};
+
 /**
- * Reads a Gemini SSE stream and collects the text deltas plus final usage.
+ * Reads a Gemini SSE stream and collects text, usage, function calls, and the
+ * assembled model steps. The steps are replayed verbatim in stateless
+ * follow-up requests, so a tool round can continue with the provider.
  * Kept separate from the adapter so the wire format can be tested in isolation.
  */
-export async function readGeminiEventStream(
-  response: Response,
-): Promise<{ content: string; usage?: GeminiUsage; toolCalls: Array<{ id?: string; name: string; arguments: string }> }> {
+export async function readGeminiEventStream(response: Response): Promise<GeminiEventStreamResult> {
   if (!response.body) throw new Error('Gemini returned an empty response body');
 
   const reader = response.body.getReader();
@@ -111,9 +157,47 @@ export async function readGeminiEventStream(
   let buffer = '';
   let content = '';
   let usage: GeminiUsage | undefined;
+  let fallbackCallId = 0;
   const toolCalls: Array<{ id?: string; name: string; arguments: string }> = [];
-  const pendingCalls = new Map<number, { id?: string; name?: string; arguments: string }>();
-  const finalized = new Set<number>();
+  const pendingSteps = new Map<number, PendingStep>();
+  const stepOrder = new Set<number>();
+
+  const finalizeStep = (index: number) => {
+    const pending = pendingSteps.get(index);
+    if (!pending || pending.finalized) return;
+    pending.finalized = true;
+
+    if (pending.kind === 'function_call') {
+      const name = typeof pending.step.name === 'string' ? pending.step.name : '';
+      if (!name) return;
+      const declaredId = typeof pending.step.id === 'string' ? pending.step.id : '';
+      const id = declaredId || `gemini-tool-${fallbackCallId++}`;
+      pending.step.id = id;
+      // Streaming providers send an empty object at step.start and the real
+      // arguments as `arguments_delta`. Keep a non-empty object if one arrived
+      // without deltas instead of replacing it with `{}`.
+      const declaredArguments = pending.step.arguments;
+      const argumentsText = pending.arguments.trim()
+        ? pending.arguments
+        : typeof declaredArguments === 'string'
+          ? declaredArguments
+          : declaredArguments && typeof declaredArguments === 'object'
+            ? JSON.stringify(declaredArguments)
+            : '';
+      pending.step.arguments = argumentsText ? parseArguments(argumentsText) : {};
+      toolCalls.push({ id, name, arguments: argumentsText });
+      return;
+    }
+
+    if (pending.kind === 'model_output' && pending.text) {
+      pending.step.content = [{ type: 'text', text: pending.text }];
+      return;
+    }
+
+    if (pending.kind === 'thought') {
+      if (pending.summary) pending.step.summary = { type: 'text', text: pending.summary };
+    }
+  };
 
   const handleFrame = (frame: string) => {
     const data = frame
@@ -137,37 +221,64 @@ export async function readGeminiEventStream(
     const index = typeof event.index === 'number' ? event.index : 0;
 
     if (type === 'step.start') {
-      const step = typeof event.step === 'object' && event.step !== null ? (event.step as Record<string, unknown>) : null;
-      if (step?.type === 'function_call') {
-        const entry = pendingCalls.get(index) ?? { arguments: '' };
-        if (typeof step.id === 'string') entry.id = step.id;
-        if (typeof step.name === 'string') entry.name = step.name;
-        if (typeof step.arguments === 'string') entry.arguments += step.arguments;
-        pendingCalls.set(index, entry);
-      }
+      const step =
+        typeof event.step === 'object' && event.step !== null
+          ? (event.step as Record<string, unknown>)
+          : null;
+      if (!step) return;
+      stepOrder.add(index);
+      pendingSteps.set(index, {
+        kind: stepKind(step.type),
+        step: { ...step },
+        arguments: typeof step.arguments === 'string' ? step.arguments : '',
+        text: '',
+        summary: '',
+        finalized: false,
+      });
       return;
     }
 
     if (type === 'step.stop') {
-      const entry = pendingCalls.get(index);
-      if (entry?.name && !finalized.has(index)) {
-        toolCalls.push({ id: entry.id, name: entry.name, arguments: entry.arguments });
-        finalized.add(index);
-      }
+      stepOrder.add(index);
+      finalizeStep(index);
       return;
     }
 
     if (type === 'step.delta') {
       const delta = event.delta;
-      if (typeof delta === 'object' && delta !== null) {
-        const candidate = delta as Record<string, unknown>;
-        if (candidate.type === 'arguments_delta' && typeof candidate.arguments === 'string') {
-          const entry = pendingCalls.get(index) ?? { arguments: '' };
-          entry.arguments += candidate.arguments;
-          pendingCalls.set(index, entry);
+      if (typeof delta !== 'object' || delta === null) return;
+      const candidate = delta as Record<string, unknown>;
+      const pending = pendingSteps.get(index);
+
+      if (candidate.type === 'arguments_delta' && typeof candidate.arguments === 'string') {
+        stepOrder.add(index);
+        if (pending) {
+          pending.arguments += candidate.arguments;
         }
-        if (candidate.type === 'text' && typeof candidate.text === 'string') {
-          content += candidate.text;
+        return;
+      }
+
+      if (candidate.type === 'text' && typeof candidate.text === 'string') {
+        content += candidate.text;
+        if (pending) pending.text += candidate.text;
+        return;
+      }
+
+      if (candidate.type === 'thought_signature' && typeof candidate.signature === 'string') {
+        if (pending) pending.step.signature = candidate.signature;
+        return;
+      }
+
+      if (candidate.type === 'thought_summary') {
+        const summary = candidate.content;
+        if (
+          pending &&
+          typeof summary === 'object' &&
+          summary !== null &&
+          (summary as Record<string, unknown>).type === 'text' &&
+          typeof (summary as Record<string, unknown>).text === 'string'
+        ) {
+          pending.summary += String((summary as Record<string, unknown>).text);
         }
       }
       return;
@@ -209,38 +320,58 @@ export async function readGeminiEventStream(
   buffer += decoder.decode().replace(/\r\n/g, '\n');
   if (buffer.trim()) handleFrame(buffer);
 
-  for (const [pendingIndex, entry] of pendingCalls) {
-    if (entry.name && !finalized.has(pendingIndex)) {
-      toolCalls.push({ id: entry.id, name: entry.name, arguments: entry.arguments });
-      finalized.add(pendingIndex);
-    }
-  }
+  for (const index of stepOrder) finalizeStep(index);
 
-  return { content, usage, toolCalls };
+  const steps: GeminiStep[] = [...stepOrder]
+    .sort((left, right) => left - right)
+    .flatMap((index) => {
+      const pending = pendingSteps.get(index);
+      if (!pending) return [];
+      if (pending.kind === 'function_call') {
+        return typeof pending.step.name === 'string' && pending.step.name ? [pending.step] : [];
+      }
+      if (pending.kind === 'model_output') {
+        return pending.text ? [pending.step] : [];
+      }
+      if (pending.kind === 'thought') {
+        return pending.step.signature !== undefined || pending.summary ? [pending.step] : [];
+      }
+      return [];
+    });
+
+  return { content, usage, toolCalls, steps };
 };
 
-/** Builds the stateless request body, stripped of the `ai:` opt-in marker. */
+/**
+ * Builds the stateless request body, stripped of the `ai:` opt-in marker.
+ * Continuation steps and function results are replayed after the base context
+ * because `store: false` keeps no server-side conversation state.
+ */
 export function buildGeminiRequestBody(
   modelId: string,
   messages: AssistantContextMessage[],
+  continuation?: AssistantModelContinuation,
+  toolResults?: AssistantModelToolResult[],
+  disableTools = false,
 ): GeminiRequestBody {
   const systemInstruction = toSystemInstruction(messages);
   return {
     model: modelId,
-    input: toGeminiSteps(messages),
+    input: [
+      ...toGeminiSteps(messages),
+      ...(continuation?.steps ?? []),
+      ...toFunctionResultSteps(toolResults),
+    ],
     ...(systemInstruction ? { system_instruction: systemInstruction } : {}),
-    tools: GEMINI_TOOLS,
+    ...(disableTools ? {} : { tools: GEMINI_TOOLS }),
     store: false,
     stream: true,
     generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS },
   };
 }
 
-async function requestGemini(
-  modelId: string,
-  messages: AssistantContextMessage[],
-  apiKey: string,
-): Promise<AssistantModelDraft> {
+async function requestGemini(request: AssistantModelRequest, apiKey: string): Promise<AssistantModelDraft> {
+  const { modelId, messages, continuation, toolResults, disableTools } = request;
   const response = await fetch(`${GEMINI_ENDPOINT}?alt=sse`, {
     method: 'POST',
     headers: {
@@ -248,7 +379,9 @@ async function requestGemini(
       'Content-Type': 'application/json',
       'Api-Revision': API_REVISION,
     },
-    body: JSON.stringify(buildGeminiRequestBody(modelId, messages)),
+    body: JSON.stringify(
+      buildGeminiRequestBody(modelId, messages, continuation, toolResults, disableTools),
+    ),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
@@ -257,8 +390,12 @@ async function requestGemini(
     throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 200)}`);
   }
 
-  const { content, usage, toolCalls } = await readGeminiEventStream(response);
-  const inputText = messages.map((message) => stripAiPrefix(message.content)).join('\n');
+  const { content, usage, toolCalls, steps } = await readGeminiEventStream(response);
+  const inputText = [
+    ...messages.map((message) => stripAiPrefix(message.content)),
+    ...(continuation?.steps ?? []).map((step) => JSON.stringify(step)),
+    ...(toolResults ?? []).map((result) => result.content),
+  ].join('\n');
   const reportedInput = usage?.total_input_tokens;
   const reportedOutput = usage?.total_output_tokens;
   const thoughtTokens = usage?.total_thought_tokens ?? 0;
@@ -270,37 +407,35 @@ async function requestGemini(
     outputTokens:
       typeof reportedOutput === 'number' && Number.isFinite(reportedOutput)
         ? reportedOutput + Math.max(0, thoughtTokens)
-        : estimateTokens(content),
+        : estimateTokens(`${content}\n${toolCalls.map((call) => call.arguments).join('\n')}`),
   };
 
-  const tools: AssistantToolCall[] = toolCalls.map((call, toolIndex) => {
-    let input: Record<string, unknown> = {};
-    if (call.arguments.trim()) {
-      try {
-        const parsed: unknown = JSON.parse(call.arguments);
-        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-          input = parsed as Record<string, unknown>;
-        }
-      } catch {
-        input = {};
-      }
-    }
+  const tools: AssistantToolCall[] = toolCalls.map((call) => {
     const definition = isAssistantToolName(call.name) ? ASSISTANT_TOOL_DEFINITIONS[call.name] : undefined;
     return {
-      id: call.id || `gemini-tool-${toolIndex}`,
+      id: call.id as string,
       name: call.name,
       label: definition?.label ?? call.name,
       status: 'pending',
-      input,
+      input: parseArguments(call.arguments),
       durationMs: 0,
     };
   });
+
+  // Keep the entire stateless history after the base messages: prior model
+  // steps, the results we just sent, and the steps from this response.
+  const history = [
+    ...(continuation?.steps ?? []),
+    ...toFunctionResultSteps(toolResults),
+    ...steps,
+  ];
 
   return {
     content: content.trim(),
     thinking: [],
     tools,
     usage: resolvedUsage,
+    ...(history.length > 0 ? { continuation: { steps: history } } : {}),
   };
 }
 
@@ -309,7 +444,7 @@ export const geminiAdapter: AssistantModelAdapter = {
 
   async generate(request: AssistantModelRequest) {
     if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
-    return requestGemini(request.modelId, request.messages, GEMINI_API_KEY);
+    return requestGemini(request, GEMINI_API_KEY);
   },
 
   async summarize(_request: AssistantSummaryRequest) {

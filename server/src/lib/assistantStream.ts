@@ -528,6 +528,43 @@ export const createAssistantMockStream = (
   };
 };
 
+type MockToolResult = {
+  name: string;
+  content: string;
+  isError?: boolean;
+};
+
+/**
+ * Mock follow-up after a tool round. A real provider answers from the tool
+ * results; the mock echoes a short summary so the same multi-round loop can be
+ * exercised without live AI.
+ */
+export const createAssistantMockFollowUp = (
+  mode: AssistantMode,
+  _variant: AssistantVariant,
+  results: MockToolResult[],
+): AssistantMockStream => {
+  const succeeded = results.filter((result) => !result.isError);
+  if (succeeded.length === 0) {
+    return {
+      content:
+        "I couldn't read the data I needed, so I don't have a reliable answer for that yet. You can retry the request or adjust the tool permissions.",
+      thinking: [],
+      tools: [],
+    };
+  }
+
+  const inputs = succeeded
+    .map((result) => result.content.replace(/\s+/g, ' ').slice(0, 160))
+    .join(' ');
+  const content =
+    mode === 'task'
+      ? `## Findings\n\nI used the data returned by the tools and reviewed ${succeeded.length} result${succeeded.length === 1 ? '' : 's'}.\n\n${inputs}\n\n## Next steps\n\nIf you want, I can dig into a specific device, location, or team member next.`
+      : `Here's what I found: ${inputs}`;
+
+  return { content, thinking: [], tools: [] };
+};
+
 export const generateAssistantResponse = (mode: AssistantMode = 'chat'): string =>
   createAssistantMockStream(mode).content;
 
