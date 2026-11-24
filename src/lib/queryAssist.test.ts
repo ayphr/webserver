@@ -22,6 +22,17 @@ describe('prepareAssistedQuery', () => {
     expect(() => prepareAssistedQuery({ ...validResponse, query: result.query })).not.toThrow();
   });
 
+  test('accepts Date objects revived by the API client', () => {
+    const result = prepareAssistedQuery({
+      ...validResponse,
+      from: new Date(validResponse.from),
+      to: new Date(validResponse.to),
+    });
+
+    expect(result.from).toBe(validResponse.from);
+    expect(result.to).toBe(validResponse.to);
+  });
+
   test('normalizes explanation whitespace and supplies a fallback', () => {
     expect(prepareAssistedQuery({
       ...validResponse,
@@ -60,5 +71,38 @@ describe('prepareAssistedQuery', () => {
       ...validResponse,
       type: 'turbo',
     })).toThrow('Iris returned an invalid query mode');
+  });
+
+  test('falls back to the current range and mode when the response omits them', () => {
+    const result = prepareAssistedQuery({
+      query: validResponse.query,
+      explanation: validResponse.explanation,
+      creditCost: validResponse.creditCost,
+    }, {
+      from: '2025-02-01T00:00:00Z',
+      to: '2025-02-02T00:00:00Z',
+      type: 'boost',
+    });
+
+    expect(result.from).toBe('2025-02-01T00:00:00.000Z');
+    expect(result.to).toBe('2025-02-02T00:00:00.000Z');
+    expect(result.type).toBe('boost');
+  });
+
+  test('ignores invalid response run settings when a fallback is available', () => {
+    const result = prepareAssistedQuery({
+      ...validResponse,
+      from: 'yesterday',
+      to: null,
+      type: 'turbo',
+    }, {
+      from: validResponse.from,
+      to: validResponse.to,
+      type: 'standard',
+    });
+
+    expect(result.from).toBe(validResponse.from);
+    expect(result.to).toBe(validResponse.to);
+    expect(result.type).toBe('standard');
   });
 });

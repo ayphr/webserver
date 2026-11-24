@@ -15,6 +15,12 @@ export type PreparedAssistedQuery = {
   creditCost: number;
 };
 
+export type AssistedQueryFallback = {
+  from?: string;
+  to?: string;
+  type?: QueryType;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -28,6 +34,9 @@ const compiles = (query: string): boolean => {
 };
 
 const normalizedTimestamp = (value: unknown): string | null => {
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value.toISOString() : null;
+  }
   if (typeof value !== 'string' || value.length > 40) return null;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
@@ -39,7 +48,10 @@ const normalizedTimestamp = (value: unknown): string | null => {
  * responding, but editor-bound content and run settings are checked again here
  * so malformed or stale responses can never replace the user's query.
  */
-export function prepareAssistedQuery(response: unknown): PreparedAssistedQuery {
+export function prepareAssistedQuery(
+  response: unknown,
+  fallback: AssistedQueryFallback = {},
+): PreparedAssistedQuery {
   if (!isRecord(response) || typeof response.query !== 'string') {
     throw new Error('Iris did not return a query. Try again.');
   }
@@ -64,15 +76,18 @@ export function prepareAssistedQuery(response: unknown): PreparedAssistedQuery {
     throw new Error('Iris returned an invalid query. Try describing it differently.');
   }
 
-  const from = normalizedTimestamp(response.from);
-  const to = normalizedTimestamp(response.to);
+  // Older API deployments omit these fields. Prefer Iris's choice when valid,
+  // otherwise keep the range and mode already shown in the editor.
+  const from = normalizedTimestamp(response.from) ?? normalizedTimestamp(fallback.from);
+  const to = normalizedTimestamp(response.to) ?? normalizedTimestamp(fallback.to);
   if (!from || !to || Date.parse(from) > Date.parse(to)) {
     throw new Error('Iris returned an invalid time range. Try again.');
   }
 
-  const type = typeof response.type === 'string' && QUERY_TYPES.includes(response.type as QueryType)
+  const responseType = typeof response.type === 'string' && QUERY_TYPES.includes(response.type as QueryType)
     ? response.type as QueryType
     : null;
+  const type = responseType ?? (fallback.type && QUERY_TYPES.includes(fallback.type) ? fallback.type : null);
   if (!type) throw new Error('Iris returned an invalid query mode. Try again.');
 
   const creditCost = typeof response.creditCost === 'number' && Number.isFinite(response.creditCost)

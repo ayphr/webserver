@@ -505,7 +505,11 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
         type: draft.type,
         existingQuery: trimmedQuery || undefined,
       });
-      const prepared = prepareAssistedQuery(response);
+      const prepared = prepareAssistedQuery(response, {
+        from: draft.range.from,
+        to: draft.range.to,
+        type: draft.type,
+      });
       patchDraft({
         query: prepared.query,
         range: { from: prepared.from, to: prepared.to },
