@@ -1,6 +1,7 @@
 import {
   ASSISTANT_TOOL_DEFINITIONS,
   estimateTokens,
+  getAssistantModel,
   isAssistantToolName,
   type AssistantContextMessage,
   type AssistantToolCall,
@@ -12,13 +13,13 @@ import type {
   AssistantModelContinuation,
   AssistantModelDraft,
   AssistantModelRequest,
+  AssistantModelStreamHandlers,
   AssistantModelToolResult,
 } from './assistantModel';
 
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const API_REVISION = '2026-05-20';
 const REQUEST_TIMEOUT_MS = 60_000;
-const MAX_OUTPUT_TOKENS = 8_192;
 
 const GEMINI_TOOLS = Object.values(ASSISTANT_TOOL_DEFINITIONS).map((definition) => ({
   type: 'function',
@@ -127,6 +128,10 @@ const toSystemInstruction = (messages: AssistantContextMessage[]) => {
   return parts.join('\n\n');
 };
 
+export type GeminiStreamHandlers = {
+  onTextDelta?: (text: string) => void;
+};
+
 export type GeminiEventStreamResult = {
   content: string;
   usage?: GeminiUsage;
@@ -141,7 +146,10 @@ export type GeminiEventStreamResult = {
  * follow-up requests, so a tool round can continue with the provider.
  * Kept separate from the adapter so the wire format can be tested in isolation.
  */
-export async function readGeminiEventStream(response: Response): Promise<GeminiEventStreamResult> {
+export async function readGeminiEventStream(
+  response: Response,
+  handlers: GeminiStreamHandlers = {},
+): Promise<GeminiEventStreamResult> {
   if (!response.body) throw new Error('Gemini returned an empty response body');
 
   const reader = response.body.getReader();
@@ -253,6 +261,9 @@ export async function readGeminiEventStream(response: Response): Promise<GeminiE
       if (candidate.type === 'text' && typeof candidate.text === 'string') {
         content += candidate.text;
         if (pending) pending.text += candidate.text;
+        // Fire before the rest of the stream is read so the websocket can
+        // start emitting tokens immediately instead of after a full response.
+        handlers.onTextDelta?.(candidate.text);
         return;
       }
 
@@ -358,84 +369,103 @@ export function buildGeminiRequestBody(
     ...(disableTools ? {} : { tools: GEMINI_TOOLS }),
     store: false,
     stream: true,
-    generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS },
+    generation_config: { max_output_tokens: getAssistantModel(modelId).maxOutputTokens },
   };
 }
 
-async function requestGemini(request: AssistantModelRequest, apiKey: string): Promise<AssistantModelDraft> {
-  const { modelId, messages, continuation, toolResults, disableTools } = request;
-  const response = await fetch(`${GEMINI_ENDPOINT}?alt=sse`, {
-    method: 'POST',
-    headers: {
-      'x-goog-api-key': apiKey,
-      'Content-Type': 'application/json',
-      'Api-Revision': API_REVISION,
-    },
-    body: JSON.stringify(
-      buildGeminiRequestBody(modelId, messages, continuation, toolResults, disableTools),
-    ),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+async function requestGemini(
+  request: AssistantModelRequest,
+  apiKey: string,
+  handlers?: AssistantModelStreamHandlers,
+): Promise<AssistantModelDraft> {
+  const { modelId, messages, continuation, toolResults, disableTools, signal } = request;
+  const timeoutController = new AbortController();
+  const timeout = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
+  const onExternalAbort = () => timeoutController.abort();
+  signal?.addEventListener('abort', onExternalAbort, { once: true });
+  if (signal?.aborted) onExternalAbort();
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 200)}`);
-  }
+  try {
+    const response = await fetch(`${GEMINI_ENDPOINT}?alt=sse`, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Api-Revision': API_REVISION,
+      },
+      body: JSON.stringify(
+        buildGeminiRequestBody(modelId, messages, continuation, toolResults, disableTools),
+      ),
+      signal: timeoutController.signal,
+    });
 
-  const { content, usage, toolCalls, steps } = await readGeminiEventStream(response);
-  const inputText = [
-    ...messages.map((message) => message.content),
-    ...(continuation?.steps ?? []).map((step) => JSON.stringify(step)),
-    ...(toolResults ?? []).map((result) => result.content),
-  ].join('\n');
-  const reportedInput = usage?.total_input_tokens;
-  const reportedOutput = usage?.total_output_tokens;
-  const thoughtTokens = usage?.total_thought_tokens ?? 0;
-  const resolvedUsage: AssistantUsageTokens = {
-    inputTokens:
-      typeof reportedInput === 'number' && Number.isFinite(reportedInput)
-        ? reportedInput
-        : estimateTokens(inputText),
-    outputTokens:
-      typeof reportedOutput === 'number' && Number.isFinite(reportedOutput)
-        ? reportedOutput + Math.max(0, thoughtTokens)
-        : estimateTokens(`${content}\n${toolCalls.map((call) => call.arguments).join('\n')}`),
-  };
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 200)}`);
+    }
 
-  const tools: AssistantToolCall[] = toolCalls.map((call) => {
-    const definition = isAssistantToolName(call.name) ? ASSISTANT_TOOL_DEFINITIONS[call.name] : undefined;
-    return {
-      id: call.id as string,
-      name: call.name,
-      label: definition?.label ?? call.name,
-      status: 'pending',
-      input: parseArguments(call.arguments),
-      durationMs: 0,
+    const { content, usage, toolCalls, steps } = await readGeminiEventStream(response, {
+      onTextDelta: handlers?.onTextDelta,
+    });
+    const inputText = [
+      ...messages.map((message) => message.content),
+      ...(continuation?.steps ?? []).map((step) => JSON.stringify(step)),
+      ...(toolResults ?? []).map((result) => result.content),
+    ].join('\n');
+    const reportedInput = usage?.total_input_tokens;
+    const reportedOutput = usage?.total_output_tokens;
+    const thoughtTokens = usage?.total_thought_tokens ?? 0;
+    const resolvedUsage: AssistantUsageTokens = {
+      inputTokens:
+        typeof reportedInput === 'number' && Number.isFinite(reportedInput)
+          ? reportedInput
+          : estimateTokens(inputText),
+      outputTokens:
+        typeof reportedOutput === 'number' && Number.isFinite(reportedOutput)
+          ? reportedOutput + Math.max(0, thoughtTokens)
+          : estimateTokens(`${content}\n${toolCalls.map((call) => call.arguments).join('\n')}`),
     };
-  });
 
-  // Keep the entire stateless history after the base messages: prior model
-  // steps, the results we just sent, and the steps from this response.
-  const history = [
-    ...(continuation?.steps ?? []),
-    ...toFunctionResultSteps(toolResults),
-    ...steps,
-  ];
+    const tools: AssistantToolCall[] = toolCalls.map((call) => {
+      const definition = isAssistantToolName(call.name)
+        ? ASSISTANT_TOOL_DEFINITIONS[call.name]
+        : undefined;
+      return {
+        id: call.id as string,
+        name: call.name,
+        label: definition?.label ?? call.name,
+        status: 'pending',
+        input: parseArguments(call.arguments),
+        durationMs: 0,
+      };
+    });
 
-  return {
-    content: content.trim(),
-    thinking: [],
-    tools,
-    usage: resolvedUsage,
-    ...(history.length > 0 ? { continuation: { steps: history } } : {}),
-  };
+    // Keep the entire stateless history after the base messages: prior model
+    // steps, the results we just sent, and the steps from this response.
+    const history = [
+      ...(continuation?.steps ?? []),
+      ...toFunctionResultSteps(toolResults),
+      ...steps,
+    ];
+
+    return {
+      content: content.trim(),
+      thinking: [],
+      tools,
+      usage: resolvedUsage,
+      ...(history.length > 0 ? { continuation: { steps: history } } : {}),
+    };
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', onExternalAbort);
+  }
 }
 
 export const geminiAdapter: AssistantModelAdapter = {
   id: 'gemini',
 
-  async generate(request: AssistantModelRequest) {
+  async generate(request: AssistantModelRequest, handlers?: AssistantModelStreamHandlers) {
     if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
-    return requestGemini(request, GEMINI_API_KEY);
+    return requestGemini(request, GEMINI_API_KEY, handlers);
   },
 };

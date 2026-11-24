@@ -162,4 +162,43 @@ describe('Gemini adapter', () => {
     await expect(readGeminiEventStream(response)).rejects.toThrow('quota exceeded');
   });
 
+  it('emits text deltas before the stream finishes', async () => {
+    let releaseSecond: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    const firstFrame = frame('step.delta', { delta: { type: 'text', text: 'first ' } });
+    const secondFrame = frame('step.delta', { delta: { type: 'text', text: 'second' } });
+    const encoder = new TextEncoder();
+
+    const stream = new Response(
+      new ReadableStream({
+        async start(controller) {
+          controller.enqueue(encoder.encode(firstFrame));
+          await gate;
+          controller.enqueue(encoder.encode(secondFrame));
+          controller.close();
+        },
+      }),
+    );
+
+    const seen: string[] = [];
+    let firedBeforeSecondFrame = false;
+    const pending = readGeminiEventStream(stream, {
+      onTextDelta: (delta) => {
+        seen.push(delta);
+        if (seen.length === 1) {
+          // The gate is still closed here, so this proves the callback fired
+          // before the provider finished streaming.
+          firedBeforeSecondFrame = true;
+          releaseSecond?.();
+        }
+      },
+    });
+    const result = await pending;
+    expect(firedBeforeSecondFrame).toBe(true);
+    expect(seen).toEqual(['first ', 'second']);
+    expect(result.content).toBe('first second');
+  });
+
 });

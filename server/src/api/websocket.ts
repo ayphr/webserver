@@ -77,6 +77,8 @@ type ActiveStream = {
   persistStart?: Promise<void>;
   orphaned?: boolean;
   onOrphaned?: () => void;
+  /** Aborts the in-flight provider request so streaming stops immediately. */
+  onAbort?: () => void;
   /** Releases any credit hold and charges the credits actually used. */
   onSettle?: () => Promise<number>;
 };
@@ -93,9 +95,6 @@ type ToolResponseHandler = (
 
 const MAX_CONCURRENT_STREAMS = 8;
 const AUTH_TIMEOUT_MS = 10_000;
-const FIRST_TOKEN_DELAY_MS = 300;
-const TOKEN_DELAY_MIN_MS = 70;
-const TOKEN_DELAY_VARY_MS = 50;
 const DEFAULT_TASK_LINK = '/dashboard';
 /** Task mode may chain many tool rounds; chat is capped much lower. */
 const MAX_CHAT_TOOL_ROUNDS = 8;
@@ -265,6 +264,7 @@ const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
   if (!stream || !streams) return;
 
   stream.cancelled = true;
+  stream.onAbort?.();
   assistantActiveStreams.dec();
   assistantWebsocketEventsTotal.labels('cancel', 'ok').inc();
   if (stream.onSettle) {
@@ -419,20 +419,6 @@ const startStream = async (
   const estimateRoundCredits = (inputTokens: number, outputTokens: number) =>
     estimateAssistantUsageCredits(modelId, { inputTokens, outputTokens });
 
-  const generateDraft = (options: {
-    continuation?: AssistantModelDraft['continuation'];
-    toolResults?: AssistantModelToolResult[];
-    disableTools?: boolean;
-  }): Promise<AssistantModelDraft> =>
-    getAssistantModelAdapter().generate({
-      mode,
-      variant,
-      modelId,
-      messages: context.contextMessages,
-      usage: context.usage,
-      ...options,
-    });
-
   const promptCategories = prompt ? detectSafetyCategories(prompt) : [];
   if (prompt) {
     for (const category of promptCategories) {
@@ -441,6 +427,26 @@ const startStream = async (
   }
   const redactedPrompt = prompt ? redactPII(prompt) : undefined;
   let safetyNotice: 'refusal' | 'crisis' | 'csam' | undefined;
+  let safetyNoticeSent = false;
+
+  const reportSafety = (notice: NonNullable<typeof safetyNotice>) => {
+    safetyNotice = notice;
+    if (safetyNoticeSent) return;
+    safetyNoticeSent = true;
+    send(ws, { type: 'safety', requestId, notice });
+  };
+
+  const noticeForCategories = (categories: readonly string[]): NonNullable<typeof safetyNotice> | undefined => {
+    const isSuicidal = categories.includes('suicidal');
+    // Suicidal intent should not be misclassified as ordinary violence.
+    const highRisk = categories.filter(
+      (category) => category !== 'suicidal' && !(isSuicidal && category === 'violence'),
+    );
+    if (highRisk.includes('csam') || highRisk.includes('child_abuse')) return 'csam';
+    if (highRisk.length > 0) return 'refusal';
+    if (isSuicidal) return 'crisis';
+    return undefined;
+  };
 
   // Device serials are numeric and can look exactly like phone numbers. Keep
   // the ones returned by tools so redaction does not corrupt their values.
@@ -463,9 +469,100 @@ const startStream = async (
     }
   };
 
+  const startedAt = Date.now();
+  const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
+  const toolSignatures = new Map<string, string>();
+  const toolResults = new Map<string, AssistantToolResult>();
+  const permissionDecisions = new Map<string, AssistantToolPermissionDecision>();
+  const allowedToolNames = new Set(allowedTools);
+
+  let settledCredits = false;
+  let emittedText = '';
+  let emittedTokenCount = 0;
+  let round = 0;
+  let projectedCost = 0;
+  let roundTextStart = 0;
+  let stopAfterRound = false;
+  let textStopped = false;
+  let rawBuffer = '';
+  const allThinking: NonNullable<AssistantMessage['thinking']> = [];
+  const allTools: AssistantToolCall[] = [];
+  const allUsage = { inputTokens: 0, outputTokens: 0 };
+
+  const abortController = new AbortController();
+  const stream: ActiveStream = {
+    cancelled: false,
+    timers: new Set(),
+    onAbort: () => abortController.abort(),
+  };
+  streams.set(requestId, stream);
+  assistantActiveStreams.inc();
+  assistantWebsocketEventsTotal.labels('stream', 'started').inc();
+
+  const promptNotice = noticeForCategories(promptCategories);
+  if (promptNotice) {
+    stopAfterRound = true;
+    textStopped = true;
+    reportSafety(promptNotice);
+  }
+
+  /** Emits one already-validated token to the client in arrival order. */
+  const emitLiveToken = (token: string) => {
+    if (stream.cancelled || textStopped) return;
+    const tokenIndex = emittedTokenCount;
+    emittedText += token;
+    emittedTokenCount += 1;
+    send(ws, { type: 'token', requestId, token, index: tokenIndex });
+  };
+
+  /** Holds back the tail of the stream so PII patterns cannot span redaction boundaries. */
+  const flushRawText = (final = false) => {
+    const keep = final ? 0 : 48;
+    if (rawBuffer.length <= keep) return;
+    const cut = rawBuffer.length - keep;
+    const chunk = rawBuffer.slice(0, cut);
+    rawBuffer = rawBuffer.slice(cut);
+    const safe = redactPII(chunk, [...knownSerials]);
+    if (!safe) return;
+    const combined = [...new Set([...promptCategories, ...detectSafetyCategories(safe)])];
+    const notice = noticeForCategories(combined);
+    if (notice) {
+      textStopped = true;
+      emittedText = emittedText.slice(0, roundTextStart);
+      for (const category of combined) assistantSafetyEventsTotal.labels(category, 'assistant').inc();
+      reportSafety(notice);
+      return;
+    }
+    for (const token of splitAssistantResponseIntoTokens(safe)) emitLiveToken(token);
+  };
+
+  const generateDraft = (options: {
+    continuation?: AssistantModelDraft['continuation'];
+    toolResults?: AssistantModelToolResult[];
+    disableTools?: boolean;
+  }): Promise<AssistantModelDraft> =>
+    getAssistantModelAdapter().generate(
+      {
+        mode,
+        variant,
+        modelId,
+        messages: context.contextMessages,
+        usage: context.usage,
+        signal: abortController.signal,
+        ...options,
+      },
+      {
+        onTextDelta: (delta) => {
+          if (stream.cancelled || textStopped) return;
+          rawBuffer += delta;
+          flushRawText();
+        },
+      },
+    );
+
   /**
-   * Classifies a draft and strips unsafe content. Returns true when the stream
-   * must stop after this draft instead of feeding tools back to the model.
+   * Final safety pass on the assembled draft. Live text was already validated
+   * and redacted while streaming, so this mainly protects tool-only rounds.
    */
   const applyDraftSafety = (draft: AssistantModelDraft): boolean => {
     const assistantCategories = detectSafetyCategories(draft.content);
@@ -474,23 +571,10 @@ const startStream = async (
     }
 
     const combinedCategories = [...new Set([...promptCategories, ...assistantCategories])];
-    const isSuicidal = combinedCategories.includes('suicidal');
-    // Suicidal intent should not be misclassified as ordinary violence.
-    const highRiskCategories = combinedCategories.filter(
-      (category) => category !== 'suicidal' && !(isSuicidal && category === 'violence'),
-    );
-
-    let notice: typeof safetyNotice;
-    if (highRiskCategories.includes('csam') || highRiskCategories.includes('child_abuse')) {
-      notice = 'csam';
-    } else if (highRiskCategories.length > 0) {
-      notice = 'refusal';
-    } else if (isSuicidal) {
-      notice = 'crisis';
-    }
+    const notice = noticeForCategories(combinedCategories);
 
     if (notice) {
-      safetyNotice = notice;
+      reportSafety(notice);
       draft.content = '';
       draft.thinking = [];
       draft.tools = [];
@@ -504,9 +588,13 @@ const startStream = async (
   try {
     currentDraft = await generateDraft({});
   } catch (error) {
+    if (streams.get(requestId) === stream) streams.delete(requestId);
+    assistantActiveStreams.dec();
     await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
       log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
     });
+    // Cancelling aborts the provider request; that rejection is expected.
+    if (stream.cancelled) return;
     log.warn({ error, userUuid, chatId, variant }, 'assistant model request failed');
     send(ws, {
       type: 'error',
@@ -519,29 +607,12 @@ const startStream = async (
     return;
   }
 
-  let stopAfterRound = applyDraftSafety(currentDraft);
-  if (safetyNotice) send(ws, { type: 'safety', requestId, notice: safetyNotice });
+  flushRawText(true);
+  stopAfterRound = applyDraftSafety(currentDraft);
 
-  let tokens = splitAssistantResponseIntoTokens(currentDraft.content);
-  const startedAt = Date.now();
-  const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
-  const toolSignatures = new Map<string, string>();
-  const toolResults = new Map<string, AssistantToolResult>();
-  const permissionDecisions = new Map<string, AssistantToolPermissionDecision>();
-  const allowedToolNames = new Set(allowedTools);
-  const stream: ActiveStream = {
-    cancelled: false,
-    timers: new Set(),
-  };
-
-  let settledCredits = false;
-  let emittedText = '';
-  let emittedTokenCount = 0;
-  let round = 0;
-  let projectedCost = 0;
-  const allThinking: NonNullable<AssistantMessage['thinking']> = [];
-  const allTools: AssistantToolCall[] = [];
-  const allUsage = { inputTokens: 0, outputTokens: 0 };
+  // Text was emitted live from provider deltas. Keep the scheduler's token list
+  // empty so it advances straight to tool execution and completion.
+  let tokens: string[] = [];
 
   /** Accumulates a round's output and its projected cost for credit tracking. */
   const addDraftToTotals = (draft: AssistantModelDraft) => {
@@ -562,6 +633,8 @@ const startStream = async (
   // A provider can report more usage than the preflight estimate. Reserve the
   // difference before streaming so the running-cost guard stays meaningful.
   if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
+    if (streams.get(requestId) === stream) streams.delete(requestId);
+    assistantActiveStreams.dec();
     await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
       log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
     });
@@ -595,15 +668,6 @@ const startStream = async (
   let toolCursor = 0;
   let completed = false;
   let pendingToolId: string | null = null;
-
-  const schedule = (callback: () => void, delay: number) => {
-    const timer = setTimeout(() => {
-      stream.timers.delete(timer);
-      if (stream.cancelled) return;
-      callback();
-    }, delay);
-    stream.timers.add(timer);
-  };
 
   const needsPermission = (name: string) => {
     if (permissionLevel === 'never-ask') return false;
@@ -738,7 +802,7 @@ const startStream = async (
         if (tokens.length === 0 && toolCursor < currentDraft.tools.length) {
           emitTools();
         } else {
-          schedule(emitToken, TOKEN_DELAY_MIN_MS);
+          emitToken();
         }
       });
   };
@@ -833,7 +897,7 @@ const startStream = async (
             if (tokens.length === 0 && toolCursor < currentDraft.tools.length) {
               emitTools();
             } else {
-              schedule(emitToken, TOKEN_DELAY_MIN_MS);
+              emitToken();
             }
             return;
           }
@@ -877,7 +941,7 @@ const startStream = async (
     if (completed || stream.cancelled) return;
     stream.cancelled = true;
     clearTimers(stream.timers);
-    streams.delete(requestId);
+    if (streams.get(requestId) === stream) streams.delete(requestId);
     toolPermissionHandlers.delete(requestId);
     toolResponseHandlers.delete(requestId);
     // Reject any in-flight interactive tool so its executor can unwind.
@@ -892,13 +956,13 @@ const startStream = async (
   };
 
   const complete = async () => {
-    if (completed) return;
+    if (completed || stream.cancelled) return;
     completed = true;
 
     emitThinking(true);
     emitTools(true);
     clearTimers(stream.timers);
-    streams.delete(requestId);
+    if (streams.get(requestId) === stream) streams.delete(requestId);
     toolPermissionHandlers.delete(requestId);
     toolResponseHandlers.delete(requestId);
 
@@ -991,25 +1055,19 @@ const startStream = async (
     });
   };
 
-  /** Starts a fresh model round with its own token and tool cursors. */
+  /** Starts a fresh model round with its own tool cursors. */
   function startRound(nextDraft: AssistantModelDraft, nextRound: number) {
     currentDraft = nextDraft;
     round = nextRound;
     index = 0;
     toolCursor = 0;
     pendingToolId = null;
-
-    // Keep the boundary between rounds in both the live feed and the persisted
-    // content, since the client simply appends tokens in arrival order.
-    const separator = emittedText && nextDraft.content && !emittedText.endsWith('\n') ? '\n\n' : '';
-    tokens = [
-      ...(separator ? [separator] : []),
-      ...splitAssistantResponseIntoTokens(nextDraft.content),
-    ];
+    // The next round's text was streamed live while the draft was generated.
+    tokens = [];
 
     emitThinking();
     emitTools();
-    if (pendingToolId === null) schedule(emitToken, TOKEN_DELAY_MIN_MS);
+    if (pendingToolId === null) emitToken();
   }
 
   /** Feeds this round's tool results back to the model, or finishes the stream. */
@@ -1070,6 +1128,17 @@ const startStream = async (
       return;
     }
 
+    // Text for the next round streams live during generateDraft, so prepare the
+    // round boundary and safety state before the provider request starts.
+    if (emittedText && !emittedText.endsWith('\n') && !textStopped) {
+      emittedText += '\n\n';
+      emittedTokenCount += 1;
+      send(ws, { type: 'token', requestId, token: '\n\n', index: emittedTokenCount - 1 });
+    }
+    roundTextStart = emittedText.length;
+    textStopped = Boolean(stopAfterRound);
+    rawBuffer = '';
+
     let nextDraft: AssistantModelDraft;
     try {
       nextDraft = await generateDraft({
@@ -1087,7 +1156,6 @@ const startStream = async (
     }
 
     if (applyDraftSafety(nextDraft)) stopAfterRound = true;
-    if (safetyNotice) send(ws, { type: 'safety', requestId, notice: safetyNotice });
 
     addDraftToTotals(nextDraft);
     if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
@@ -1097,41 +1165,19 @@ const startStream = async (
     startRound(nextDraft, nextRound);
   }
 
+  /** Text is streamed live; this only advances to tools or round completion. */
   const emitToken = () => {
     if (projectedCost > reservedCredits) {
       failStream('insufficient credits');
       return;
     }
 
-    const token = tokens[index];
-    if (token === undefined) {
-      // Tool-only responses (or a trailing tool run) must not complete while
-      // tools are still pending or running. Emit the next tool (if any) so
-      // multi-tool responses continue instead of stalling after the first call.
-      if (currentDraft.tools.length > 0 && toolCursor < currentDraft.tools.length) {
-        emitTools();
-        return;
-      }
-      void finishRound();
+    if (currentDraft.tools.length > 0 && toolCursor < currentDraft.tools.length) {
+      emitTools();
       return;
     }
-
-    index += 1;
-    emittedText += token;
-    emittedTokenCount += 1;
-
-    send(ws, { type: 'token', requestId, token, index: index - 1 });
-    emitThinking();
-    emitTools();
-
-    if (pendingToolId === null) {
-      schedule(emitToken, TOKEN_DELAY_MIN_MS + Math.random() * TOKEN_DELAY_VARY_MS);
-    }
+    void finishRound();
   };
-
-  streams.set(requestId, stream);
-  assistantActiveStreams.inc();
-  assistantWebsocketEventsTotal.labels('stream', 'started').inc();
 
   if (chatId) {
     stream.persistStart = persistStreamResult({
@@ -1151,7 +1197,7 @@ const startStream = async (
   emitTools();
 
   if (pendingToolId === null) {
-    schedule(emitToken, FIRST_TOKEN_DELAY_MS);
+    emitToken();
   }
 };
 

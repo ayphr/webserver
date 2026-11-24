@@ -49,12 +49,23 @@ export type AssistantModelRequest = {
    * already has. Used for the final round of a long tool loop.
    */
   disableTools?: boolean;
+  /** Cancels the in-flight provider request when the client stream is cancelled. */
+  signal?: AbortSignal;
+};
+
+/** Live callbacks fired while the provider response is still arriving. */
+export type AssistantModelStreamHandlers = {
+  /** Called once for each text chunk, before the draft is complete. */
+  onTextDelta?: (delta: string) => void;
 };
 
 /** Boundary between websocket orchestration and the sole provider, Gemini. */
 export interface AssistantModelAdapter {
   readonly id: string;
-  generate(request: AssistantModelRequest): Promise<AssistantModelDraft>;
+  generate(
+    request: AssistantModelRequest,
+    handlers?: AssistantModelStreamHandlers,
+  ): Promise<AssistantModelDraft>;
 }
 
 const adapter: AssistantModelAdapter = geminiAdapter;
