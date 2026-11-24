@@ -54,6 +54,10 @@ describe('router', () => {
     expect(match?.template).toBe('/api/devices/query');
   });
 
+  test('matches the Iris query authoring route', () => {
+    expect(matchRoute('POST', `${V1}/queries/assist`)?.template).toBe('/api/queries/assist');
+  });
+
   test('matches device logs route', () => {
     const match = matchRoute('GET', `${V1}/devices/42/logs`);
     expect(match?.template).toBe('/api/devices/:serial/logs');

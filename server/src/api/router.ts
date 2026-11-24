@@ -65,6 +65,7 @@ import {
   handleDeviceTokensList,
   handleDeviceTokenRevoke,
 } from './routes/devices';
+import { handleQueryAssist } from './routes/queries';
 import { handleLocationsListMine, handleLocationCreate, handleLocationGet, handleLocationUpdate, handleLocationDelete } from './routes/locations';
 import {
   handleAlertsList,
@@ -250,6 +251,7 @@ const ROUTES: readonly RouteDefinition[] = [
   { method: 'GET', path: '/api/devices', handle: handleListMine },
   { method: 'GET', path: '/api/devices/mine', handle: handleListMine },
   { method: 'POST', path: '/api/devices/query', handle: handleQueryDevices },
+  { method: 'POST', path: '/api/queries/assist', handle: handleQueryAssist },
   { method: 'GET', path: '/api/devices/:serial/data', handle: handleDeviceGetData },
   { method: 'GET', path: '/api/devices/:serial/data/export', handle: handleExportDeviceData },
   { method: 'POST', path: '/api/devices/:serial/data/fill', handle: handleDeviceDataFill },

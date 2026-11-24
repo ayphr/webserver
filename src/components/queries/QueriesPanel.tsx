@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, tooltips } from '@codemirror/view';
@@ -26,6 +26,8 @@ import {
   MAX_BOOST_QUERY_POINTS,
   MAX_QUERY_POINTS_BY_TYPE,
   MAX_STANDARD_QUERY_POINTS,
+  QUERY_ASSIST_CREDIT_COST,
+  QUERY_ASSIST_PROMPT_MAX_LENGTH,
   estimateQueryComputeUnits,
   formatBoostRequiredMessage,
   formatTql,
@@ -43,6 +45,7 @@ import { api } from '../../lib/api';
 import { formatCredits } from '../../lib/credits';
 import { downloadRows, slugifyFilename, type ExportRow } from '../../lib/export';
 import { EXTERNAL_URLS } from '../../lib/externalUrls';
+import { prepareAssistedQuery } from '../../lib/queryAssist';
 import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/tqlEditor';
 import { Button, Input, Pagination, Select, ToggleDropdown, Tooltip } from '../common';
 import { createQueryDraft } from './utils';
@@ -274,7 +277,15 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const [sort, setSort] = useState<SortState>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [assistPrompt, setAssistPrompt] = useState('');
+  const [isAssisting, setIsAssisting] = useState(false);
+  const [assistExplanation, setAssistExplanation] = useState<string | null>(null);
+  const [assistError, setAssistError] = useState<string | null>(null);
   const searchInputId = useId();
+  const assistInputId = useId();
+  const assistHeadingId = useId();
+  const assistStatusId = useId();
+  const assistErrorId = useId();
 
   const deviceOptions = useMemo(() => buildDeviceOptions(devices), [devices]);
   const selectedSerials = useMemo(
@@ -452,6 +463,17 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     && (!credits || credits.available >= creditCost)
     && !isRunning;
 
+  const assistUnavailableReason = isDevicesLoading
+    ? 'Loading devices…'
+    : selectedSerials.length === 0
+      ? 'Select at least one device for Iris to use.'
+      : rangeError
+        ? rangeError
+        : credits && credits.available < QUERY_ASSIST_CREDIT_COST
+          ? 'You do not have enough credits to write a query.'
+          : null;
+  const canAssist = !assistUnavailableReason && Boolean(assistPrompt.trim()) && !isAssisting;
+
   const patchDraft = (patch: Partial<QueryDraft>) => {
     setDraft((current) => ({ ...current, ...patch }));
     setError(null);
@@ -464,6 +486,41 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
       if (formatted !== draft.query) patchDraft({ query: formatted });
     } catch {
       // Leave the editor text untouched if formatting fails.
+    }
+  };
+
+  const handleAssist = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canAssist) return;
+
+    setIsAssisting(true);
+    setAssistError(null);
+    setAssistExplanation(null);
+    try {
+      const response = await api.queries.assist({
+        prompt: assistPrompt.trim(),
+        serials: selectedSerials,
+        from: draft.range.from,
+        to: draft.range.to,
+        type: draft.type,
+        existingQuery: trimmedQuery || undefined,
+      });
+      const prepared = prepareAssistedQuery(response);
+      patchDraft({ query: prepared.query });
+      setAssistExplanation(prepared.explanation);
+      setAssistPrompt('');
+
+      if (onCreditsChange) {
+        try {
+          onCreditsChange(await api.credits.me());
+        } catch {
+          // The query was generated successfully; ignore credit refresh failures.
+        }
+      }
+    } catch (err) {
+      setAssistError(err instanceof Error ? err.message : 'Iris could not write a query.');
+    } finally {
+      setIsAssisting(false);
     }
   };
 
@@ -695,6 +752,60 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
           </div>
         </section>
 
+        <section className="queries-panel__assist" aria-labelledby={assistHeadingId}>
+          <div className="queries-panel__assist-heading">
+            <div>
+              <h2 id={assistHeadingId}>Write with Iris</h2>
+              <p>Describe the telemetry you want and Iris will draft a TQL query.</p>
+            </div>
+            <span className="queries-panel__badge" title="Credits charged per query draft.">
+              <IconCoin size={13} strokeWidth={2} />
+              {formatCredits(QUERY_ASSIST_CREDIT_COST)} credits
+            </span>
+          </div>
+          <form className="queries-panel__assist-form" onSubmit={(event) => void handleAssist(event)}>
+            <Input
+              id={assistInputId}
+              label="What should this query find?"
+              placeholder="e.g. Show the hottest readings from the last hour"
+              value={assistPrompt}
+              maxLength={QUERY_ASSIST_PROMPT_MAX_LENGTH}
+              disabled={isAssisting}
+              aria-describedby={[
+                assistError ? assistErrorId : null,
+                assistExplanation ? assistStatusId : null,
+              ].filter(Boolean).join(' ') || undefined}
+              onChange={(event) => {
+                setAssistError(null);
+                setAssistPrompt(event.target.value);
+              }}
+              fullWidth
+            />
+            <Button
+              type="submit"
+              variant="secondary"
+              isLoading={isAssisting}
+              disabled={!canAssist}
+              title={assistUnavailableReason ?? 'Draft a TQL query with Iris'}
+            >
+              <IconWand size={15} strokeWidth={1.75} />
+              Write with Iris
+            </Button>
+          </form>
+          {assistExplanation && (
+            <p id={assistStatusId} className="queries-panel__assist-status" role="status">
+              <IconSparkle2 size={14} strokeWidth={1.75} />
+              {assistExplanation}
+            </p>
+          )}
+          {assistError && (
+            <p id={assistErrorId} className="queries-panel__assist-error" role="alert">
+              <IconAlertCircle size={14} strokeWidth={1.75} />
+              {assistError}
+            </p>
+          )}
+        </section>
+
         {(boostRequiredMessage || tooManyPointsMessage) && (
           <div className="queries-panel__warning" role="alert">
             <IconAlertCircle size={17} strokeWidth={1.75} />
@@ -739,7 +850,10 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
               EditorView.lineWrapping,
             ]}
             basicSetup={{ autocompletion: false }}
-            onChange={(value) => patchDraft({ query: value })}
+            onChange={(value) => {
+              setAssistExplanation(null);
+              patchDraft({ query: value });
+            }}
           />
         </div>
 

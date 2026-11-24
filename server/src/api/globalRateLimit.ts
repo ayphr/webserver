@@ -30,6 +30,7 @@ const EXEMPT_TEMPLATES = new Set([
   '/api/devices/query',
   '/api/devices/:serial/query',
   '/api/devices/:serial/alerts/:id/test',
+  '/api/queries/assist',
 
   // Stripe retries come from a small set of shared addresses.
   '/api/subscriptions/stripe/webhook',

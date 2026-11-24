@@ -31,6 +31,8 @@ describe('Gemini adapter', () => {
     expect(prompt).not.toContain('\\n');
     expect(prompt).toContain('look it up in the user’s workspace');
     expect(prompt).toContain('human-readable');
+    expect(prompt).toContain('TQL');
+    expect(prompt).toContain('Iris writer');
     expect(prompt).not.toMatch(/\bdevices\.list\b|\buser\.question\b|\balerts\.create\b/);
     expect(prompt).not.toMatch(/\bgemini-\d|\b\/v1beta\/|\bassistantStates\b/);
     expect(prompt).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);

@@ -454,6 +454,11 @@ export const API_ROUTES = [
     operationId: 'postDevicesQuery',
   },
   {
+    method: 'POST',
+    path: '/api/v1/queries/assist',
+    operationId: 'postQueriesAssist',
+  },
+  {
     method: 'GET',
     path: '/api/v1/devices/:serial/data',
     operationId: 'getDevicesSerialData',
@@ -847,6 +852,7 @@ export const API_PATHS = {
   getDevices: '/api/v1/devices',
   getDevicesMine: '/api/v1/devices/mine',
   postDevicesQuery: '/api/v1/devices/query',
+  postQueriesAssist: '/api/v1/queries/assist',
   getDevicesSerialData: '/api/v1/devices/:serial/data',
   getDevicesSerialDataExport: '/api/v1/devices/:serial/data/export',
   postDevicesSerialDataFill: '/api/v1/devices/:serial/data/fill',

@@ -15,6 +15,7 @@ import { createTeamsApi } from './teams';
 import { createNotificationsApi } from './notifications';
 import { createIntegrationsApi } from './integrations';
 import { createAssistantApi } from './assistant';
+import { createQueriesApi } from './queries';
 import { getSafeRedirect } from '../redirects';
 import { API_PATHS, apiPath } from './generated/routes';
 
@@ -37,6 +38,7 @@ export type AyphrApiClient = RequestClient & {
   notifications: ReturnType<typeof createNotificationsApi>;
   integrations: ReturnType<typeof createIntegrationsApi>;
   assistant: ReturnType<typeof createAssistantApi>;
+  queries: ReturnType<typeof createQueriesApi>;
 };
 
 export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
@@ -72,6 +74,7 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
     notifications: createNotificationsApi(client),
     integrations: createIntegrationsApi(client),
     assistant: createAssistantApi(client),
+    queries: createQueriesApi(client),
   };
 }
 

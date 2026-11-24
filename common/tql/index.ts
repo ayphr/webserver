@@ -27,6 +27,7 @@ export {
   getQueryBoostRequiredSteps,
 } from './utils';
 export { formatTql } from './formatter';
+export { TQL_REFERENCE } from './reference';
 export {
   BOOST_ONLY_PIPELINE_STEPS,
   getBoostRequiredSteps,

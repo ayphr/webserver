@@ -37,3 +37,32 @@ export function createDefaultQueryRange(now = new Date()): QueryRange {
     to: now.toISOString(),
   };
 }
+
+/** Maximum length of a plain-language query request sent to Iris. */
+export const QUERY_ASSIST_PROMPT_MAX_LENGTH = 1000;
+
+/** Flat credit cost for one Iris query-generation request. */
+export const QUERY_ASSIST_CREDIT_COST = 0.1;
+
+export type QueryAssistRequest = {
+  /** The user's request in plain language. */
+  prompt: string;
+  /** Device serials already selected in the Queries tab. */
+  serials: number[];
+  /** ISO timestamps for the selected range. */
+  from: string;
+  to: string;
+  /** Query mode selected in the UI; advanced steps may still require Boost. */
+  type: QueryType;
+  /** Current editor contents, used as context for follow-up requests. */
+  existingQuery?: string;
+};
+
+export type QueryAssistResponse = {
+  /** Validated, formatted TQL ready for the editor. */
+  query: string;
+  /** One short sentence explaining what the query does. */
+  explanation: string;
+  /** Credits charged for this generation. */
+  creditCost: number;
+};

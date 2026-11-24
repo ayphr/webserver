@@ -1,0 +1,180 @@
+import { randomUUID } from 'node:crypto';
+import {
+  QUERY_ASSIST_CREDIT_COST,
+  QUERY_ASSIST_PROMPT_MAX_LENGTH,
+  QUERY_TYPES,
+  type QueryAssistRequest,
+  type QueryType,
+  type User,
+} from '@common';
+import {
+  getCreditBalance,
+  holdCredits,
+  releaseCredits,
+  settleCreditHold,
+} from '../../lib/credits';
+import { getDeviceBySerial } from '../../lib/db';
+import { getTeamScopeUuid } from '../../lib/db/teams';
+import { parseSerial } from '../../lib/deviceValidation';
+import {
+  MAX_QUERY_AUTHOR_CONTEXT_LENGTH,
+  generateTqlQuery,
+  QueryAuthorError,
+} from '../../lib/queryAuthor';
+import { json, readJsonBody } from '../../lib/http';
+import { createLogger } from '../../lib/logger';
+import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
+import { requireAuth } from '../auth';
+
+const log = createLogger('query-assist');
+const queryAssistLimiter = createRateLimiter(60 * 60 * 1000, 30, 'query-assist');
+const MAX_SERIALS = 100;
+const MAX_TIMESTAMP_LENGTH = 40;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const parseTimestamp = (value: unknown): string | null => {
+  if (typeof value !== 'string' || value.length > MAX_TIMESTAMP_LENGTH) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString() === value ? value : null;
+};
+
+export function parseQueryAssistBody(body: unknown): { request: QueryAssistRequest } | { error: string } {
+  if (!isRecord(body)) return { error: 'request body must be valid JSON' };
+
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+  if (!prompt) return { error: 'Describe the query you want.' };
+  if (prompt.length > QUERY_ASSIST_PROMPT_MAX_LENGTH) {
+    return { error: `Keep the description under ${QUERY_ASSIST_PROMPT_MAX_LENGTH} characters.` };
+  }
+
+  if (!Array.isArray(body.serials) || body.serials.length === 0 || body.serials.length > MAX_SERIALS) {
+    return { error: 'Select at least one device.' };
+  }
+  const serials = body.serials
+    .map((serial) => parseSerial(serial))
+    .filter((serial): serial is number => serial !== null && serial > 0);
+  if (serials.length !== body.serials.length) return { error: 'Invalid device selection.' };
+
+  const from = parseTimestamp(body.from);
+  const to = parseTimestamp(body.to);
+  if (!from || !to) return { error: 'Choose a valid start and end time.' };
+  if (Date.parse(from) > Date.parse(to)) return { error: 'Start must be before end.' };
+
+  if (body.type !== undefined && !QUERY_TYPES.includes(body.type as QueryType)) {
+    return { error: 'Invalid query type.' };
+  }
+  const type: QueryType = body.type === undefined ? 'standard' : body.type as QueryType;
+
+  let existingQuery: string | undefined;
+  if (typeof body.existingQuery === 'string' && body.existingQuery.trim()) {
+    if (body.existingQuery.length > MAX_QUERY_AUTHOR_CONTEXT_LENGTH) {
+      return { error: 'Current query is too long.' };
+    }
+    existingQuery = body.existingQuery;
+  }
+
+  return {
+    request: {
+      prompt,
+      serials: [...new Set(serials)],
+      from,
+      to,
+      type,
+      existingQuery,
+    },
+  };
+}
+
+export const handleQueryAssist = requireAuth(async (request, user: User) => {
+  const limit = await queryAssistLimiter.check(`user:${user.uuid}`);
+  if (!limit.allowed) return tooManyRequests(limit.retryAfterMs);
+
+  const body = await readJsonBody<unknown>(request);
+  const parsed = parseQueryAssistBody(body);
+  if ('error' in parsed) return json({ error: parsed.error }, 400);
+
+  const referenceId = randomUUID();
+  const now = new Date();
+  let holdPlaced = false;
+
+  const releaseHold = async () => {
+    if (!holdPlaced) return;
+    try {
+      const released = await releaseCredits(user.uuid, QUERY_ASSIST_CREDIT_COST, now, {
+        reason: 'query_assist_release',
+        referenceId,
+      });
+      if (!released?.changed) {
+        log.warn({ userUuid: user.uuid, referenceId }, 'failed to release query assist credit hold');
+      }
+    } catch (error) {
+      log.error({ error, userUuid: user.uuid, referenceId }, 'failed to release query assist credit hold');
+    }
+  };
+
+  try {
+    const scopeUuid = await getTeamScopeUuid(user);
+    const selected: Array<{ serial: number; name?: string | null }> = [];
+    for (const serial of parsed.request.serials) {
+      const device = await getDeviceBySerial(serial);
+      if (!device) return json({ error: 'not found' }, 404);
+      if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
+      selected.push(device);
+    }
+
+    const balance = await getCreditBalance(user, now);
+    if (balance.available < QUERY_ASSIST_CREDIT_COST) {
+      return json({ error: 'You do not have enough credits to write a query.' }, 402);
+    }
+
+    const hold = await holdCredits(user.uuid, QUERY_ASSIST_CREDIT_COST, now, {
+      reason: 'query_assist_reserve',
+      referenceId,
+    });
+    if (!hold?.changed) {
+      return json({ error: 'You do not have enough credits to write a query.' }, 402);
+    }
+    holdPlaced = true;
+
+    const result = await generateTqlQuery({
+      ...parsed.request,
+      deviceLabels: selected.map((device) => ({
+        serial: device.serial,
+        name: device.name?.trim() || `Device ${device.serial}`,
+      })),
+    }, { signal: request.signal });
+
+    const settled = await settleCreditHold(
+      user.uuid,
+      QUERY_ASSIST_CREDIT_COST,
+      QUERY_ASSIST_CREDIT_COST,
+      { reason: 'query_assist_charge', referenceId },
+      now,
+    );
+    if (settled < 0) {
+      log.error({ userUuid: user.uuid, referenceId }, 'query assist credit settlement failed');
+      return json({ error: 'Iris could not complete the request. Try again.' }, 500);
+    }
+    holdPlaced = false;
+
+    return json({
+      query: result.query,
+      explanation: result.explanation,
+      creditCost: QUERY_ASSIST_CREDIT_COST,
+    });
+  } catch (error) {
+    await releaseHold();
+    if (error instanceof QueryAuthorError) {
+      log.warn({ error, userUuid: user.uuid, referenceId }, 'query author rejected the draft');
+      return json({ error: error.message }, 422);
+    }
+    if (error instanceof Error && /GEMINI_API_KEY/i.test(error.message)) {
+      log.error({ error, userUuid: user.uuid, referenceId }, 'GEMINI_API_KEY is not configured');
+      return json({ error: 'Iris is unavailable right now.' }, 503);
+    }
+    log.error({ error, userUuid: user.uuid, referenceId }, 'failed to generate a TQL query');
+    return json({ error: 'Iris could not write a query. Try again.' }, 500);
+  }
+});

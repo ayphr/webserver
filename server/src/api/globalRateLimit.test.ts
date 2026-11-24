@@ -16,6 +16,7 @@ describe('global rate limit exemptions', () => {
   test('exempts routes with dedicated limiters and static avatars', () => {
     expect(isGlobalRateLimitExempt('POST', `${V1}/auth/login`, '/api/auth/login')).toBe(true);
     expect(isGlobalRateLimitExempt('POST', `${V1}/devices/data`, '/api/devices/data')).toBe(true);
+    expect(isGlobalRateLimitExempt('POST', `${V1}/queries/assist`, '/api/queries/assist')).toBe(true);
     expect(isGlobalRateLimitExempt('GET', `${V1}/avatars/abc`, '/api/avatars/:uuid')).toBe(true);
   });
 
