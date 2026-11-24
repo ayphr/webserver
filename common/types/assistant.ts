@@ -65,6 +65,8 @@ export type AssistantToolCall = {
   permission?: AssistantToolPermission;
   /** Validated arguments the server executed with. */
   input?: AssistantToolInput;
+  /** Human-readable preview of a pending mutation, shown before approval. */
+  preview?: string;
   /** Result returned by the tool, persisted with the message. */
   result?: AssistantToolResult;
 };

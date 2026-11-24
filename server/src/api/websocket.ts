@@ -7,6 +7,8 @@ import {
   ASSISTANT_TOOL_DEFINITIONS,
   ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_VARIANTS,
+  describeAssistantToolChange,
+  isAssistantMutationTool,
   estimateAssistantUsageCredits,
   estimateTokens,
   getAssistantModel,
@@ -40,6 +42,9 @@ import {
 import { buildAssistantSystemPrompt } from '../lib/geminiAdapter';
 import { executeAssistantTool } from '../lib/assistantTools';
 import { detectSafetyCategories, redactPII } from '@common';
+import { getUserFromUuid } from '../lib/db';
+import { getTeamForUser } from '../lib/db/teams';
+import { logTeamAudit } from '../lib/teamAuditService';
 import { getAssistantState, saveStreamResult, updateAssistantChatContext } from '../lib/db/assistant';
 import { createLogger } from '../lib/logger';
 import {
@@ -65,6 +70,23 @@ import {
 } from '../lib/credits';
 
 const log = createLogger('assistant-websocket');
+
+/** Adds a human-readable change preview to every tool before it reaches the UI. */
+const withToolPreviews = (
+  draft: AssistantModelDraft,
+  knownSerials: string[] = [],
+): AssistantModelDraft => ({
+  ...draft,
+  tools: draft.tools.map((tool) => ({
+    ...tool,
+    preview: tool.preview
+      ? redactPII(tool.preview, knownSerials)
+      : redactPII(
+          describeAssistantToolChange(tool.name, tool.input ?? {}) ?? '',
+          knownSerials,
+        ) || undefined,
+  })),
+});
 
 export type AssistantSocketData = { userUuid: string | null };
 type AssistantWebSocket = ServerWebSocket<AssistantSocketData>;
@@ -396,7 +418,7 @@ const startStream = async (
     rejectInsufficientCredits();
     return;
   }
-  const hold = await holdCredits(userUuid, reservedCredits);
+  const hold = await holdCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_reserve' });
   if (!hold?.changed) {
     rejectInsufficientCredits();
     return;
@@ -410,7 +432,7 @@ const startStream = async (
     if (!Number.isFinite(amount) || amount <= 0) return true;
     const balance = await getCreditBalanceFromUuid(userUuid);
     if (!balance || balance.available < amount) return false;
-    const additional = await holdCredits(userUuid, amount);
+    const additional = await holdCredits(userUuid, amount, undefined, { referenceId: requestId, reason: 'assistant_stream_continuation' });
     if (!additional?.changed) return false;
     reservedCredits += amount;
     return true;
@@ -586,11 +608,11 @@ const startStream = async (
 
   let currentDraft: AssistantModelDraft;
   try {
-    currentDraft = await generateDraft({});
+    currentDraft = withToolPreviews(await generateDraft({}), [...knownSerials]);
   } catch (error) {
     if (streams.get(requestId) === stream) streams.delete(requestId);
     assistantActiveStreams.dec();
-    await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
+    await releaseCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_release' }).catch((releaseError: unknown) => {
       log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
     });
     // Cancelling aborts the provider request; that rejection is expected.
@@ -635,7 +657,7 @@ const startStream = async (
   if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
     if (streams.get(requestId) === stream) streams.delete(requestId);
     assistantActiveStreams.dec();
-    await releaseCredits(userUuid, reservedCredits).catch((releaseError: unknown) => {
+    await releaseCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_release' }).catch((releaseError: unknown) => {
       log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
     });
     rejectInsufficientCredits();
@@ -645,7 +667,7 @@ const startStream = async (
   const settleCredits = async (): Promise<number> => {
     if (settledCredits) return 0;
     settledCredits = true;
-    await releaseCredits(userUuid, reservedCredits).catch((error: unknown) => {
+    await releaseCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_release' }).catch((error: unknown) => {
       log.warn({ error, userUuid }, 'failed to release assistant credit hold');
     });
     // The hold was sized to cover every round. Capping the final charge keeps
@@ -658,7 +680,7 @@ const startStream = async (
         outputTokens: allUsage.outputTokens || estimateTokens(emittedText),
       }),
     );
-    const result = await consumeCredits(userUuid, cost);
+    const result = await consumeCredits(userUuid, cost, undefined, { referenceId: requestId, reason: 'assistant_stream_charge' });
     if (cost > 0 && !result?.changed) return -1;
     return cost;
   };
@@ -754,6 +776,34 @@ const startStream = async (
       };
     });
 
+  /** Writes a team audit entry for each successful assistant mutation. */
+  const auditToolMutation = async (
+    base: (typeof currentDraft.tools)[number],
+    result: AssistantToolResult,
+  ) => {
+    if (!isAssistantMutationTool(base.name) || result.status !== 'ok') return;
+    try {
+      const user = await getUserFromUuid(userUuid);
+      if (!user) return;
+      const team = await getTeamForUser(user);
+      if (!team) return;
+      await logTeamAudit({
+        teamId: team.id,
+        actorUuid: user.uuid,
+        actorUsername: user.username,
+        action: `assistant.${base.name}`,
+        details: {
+          requestId,
+          toolId: base.id,
+          summary: result.summary,
+          preview: base.preview ?? describeAssistantToolChange(base.name, base.input ?? {}),
+        },
+      });
+    } catch (error) {
+      log.warn({ error, userUuid, name: base.name }, 'failed to record assistant tool audit');
+    }
+  };
+
   const recordToolResult = (
     base: (typeof currentDraft.tools)[number],
     result: AssistantToolResult,
@@ -762,6 +812,7 @@ const startStream = async (
     if (stream.cancelled) return;
     collectSerials(base.input);
     collectSerials(result.data);
+    void auditToolMutation(base, result);
     toolResults.set(base.id, result);
     send(ws, { type: 'tool_result', requestId, toolId: base.id, result });
     emitTool(
@@ -1057,7 +1108,7 @@ const startStream = async (
 
   /** Starts a fresh model round with its own tool cursors. */
   function startRound(nextDraft: AssistantModelDraft, nextRound: number) {
-    currentDraft = nextDraft;
+    currentDraft = withToolPreviews(nextDraft, [...knownSerials]);
     round = nextRound;
     index = 0;
     toolCursor = 0;
@@ -1155,6 +1206,7 @@ const startStream = async (
       return;
     }
 
+    flushRawText(true);
     if (applyDraftSafety(nextDraft)) stopAfterRound = true;
 
     addDraftToTotals(nextDraft);
@@ -1388,8 +1440,22 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
   },
 
   message(ws, raw) {
+    // Cancellation must bypass the queue: a stream request awaits the provider
+    // response, so a queued cancel could never interrupt it.
+    if (ws.data.userUuid) {
+      try {
+        const parsed: unknown = JSON.parse(typeof raw === 'string' ? raw : raw.toString());
+        if (isRecord(parsed) && parsed.type === 'cancel') {
+          void handleMessage(ws, raw).catch(() => {});
+          return;
+        }
+      } catch {
+        // Malformed frames fall through to normal validation.
+      }
+    }
+
     // Auth resolution is async, so serialize each socket's messages to keep
-    // stream/cancel requests from running before auth has completed.
+    // stream requests from running before auth has completed.
     const previous = messageQueues.get(ws) ?? Promise.resolve();
     const next = previous.then(() => handleMessage(ws, raw));
     messageQueues.set(ws, next);

@@ -44,3 +44,22 @@ export type CreditBalance = {
 export type CreditsMePayload = {
   credits: CreditBalance;
 };
+
+/** Immutable audit record for every atomic credit balance mutation. */
+export type CreditTransaction = {
+  id: string;
+  teamId: string;
+  /** User that triggered the mutation, when known. */
+  actorUuid?: string;
+  kind: 'grant' | 'hold' | 'release' | 'charge';
+  /** Positive credit amount moved by this transaction. */
+  amount: number;
+  /** Stored counters immediately after the mutation. */
+  monthlyUsed: number;
+  additional: number;
+  onHold: number;
+  /** Client stream/request or billing reference, when available. */
+  referenceId?: string;
+  reason?: string;
+  createdAt: Date;
+};

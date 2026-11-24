@@ -71,6 +71,8 @@ export {
 } from './assistantPricing';
 export {
   normalizeAssistantToolInput,
+  describeAssistantToolChange,
+  isAssistantMutationTool,
   type NormalizedAssistantToolInput,
 } from './assistantTools';
 export { SAFETY_CATEGORIES, detectSafetyCategories, isSafeForContext, SUICIDE_SUPPORT_MESSAGE, SAFETY_REFUSAL_MESSAGE, CSAM_ZERO_TOLERANCE_MESSAGE, type SafetyCategory } from './safety';

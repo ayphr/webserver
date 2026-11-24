@@ -64,6 +64,7 @@ export const TEAM_INVITES_COLLECTION = 'team_invites';
 export const TEAM_AUDIT_LOGS_COLLECTION = 'team_audit_logs';
 /** Team audit history is kept for three months; enforced by a MongoDB TTL index. */
 export const TEAM_AUDIT_LOG_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
+export const CREDIT_TRANSACTIONS_COLLECTION = 'credit_transactions';
 export const APPEALS_COLLECTION = 'appeals';
 export const RATE_LIMITS_COLLECTION = 'rate_limits';
 

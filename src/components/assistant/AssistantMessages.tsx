@@ -224,6 +224,9 @@ const ToolCallLine = ({
       {permissionLabel && !awaiting && (
         <span className="assistant-chat__tool-permission-label">{permissionLabel}</span>
       )}
+      {awaiting && tool.preview && (
+        <div className="assistant-chat__tool-preview">{tool.preview}</div>
+      )}
       {awaiting && (
         <div className="assistant-chat__tool-permission-actions">
           <button

@@ -221,3 +221,66 @@ export function normalizeAssistantToolInput(
 
   return normalized;
 }
+
+const MUTATION_TOOL_NAMES = new Set<AssistantToolName>([
+  'alerts.create',
+  'alerts.update',
+  'alerts.delete',
+  'alerts.test',
+  'alerts.mute',
+  'location.create',
+  'device.rename',
+  'notifications.read',
+]);
+
+/** True for tools that change workspace state and should be audited. */
+export const isAssistantMutationTool = (name: string): name is AssistantToolName =>
+  MUTATION_TOOL_NAMES.has(name as AssistantToolName);
+
+const previewText = (value: unknown, fallback: string) => {
+  const cleaned = text(value, 120)?.trim();
+  return cleaned || fallback;
+};
+
+const previewDevice = (input: Record<string, unknown>) =>
+  previewText(input.displayName ?? input.deviceId, 'the selected device');
+
+/**
+ * Builds a short human-readable description of the exact change a tool would
+ * make. Shown on the approval card so users know what they are allowing.
+ */
+export function describeAssistantToolChange(
+  name: string,
+  input: Record<string, unknown> = {},
+): string | undefined {
+  switch (name) {
+    case 'alerts.create': {
+      const conditionCount = Array.isArray(input.conditions) ? input.conditions.length : 0;
+      return `Create alert “${previewText(input.name, 'Untitled alert')}” for ${previewDevice(input)} with ${conditionCount} condition${conditionCount === 1 ? '' : 's'}.`;
+    }
+    case 'alerts.update': {
+      const changes = ['name', 'conditions', 'integrationIds', 'repeatIntervalMinutes', 'enabled']
+        .filter((field) => input[field] !== undefined);
+      const suffix = changes.length > 0 ? `: ${changes.join(', ')}` : '';
+      return `Change alert ${previewText(input.id, 'the selected alert')}${suffix}.`;
+    }
+    case 'alerts.delete':
+      return `Permanently delete alert ${previewText(input.id, 'the selected alert')}.`;
+    case 'alerts.test':
+      return `Send a test notification for alert ${previewText(input.id, 'the selected alert')}.`;
+    case 'alerts.mute':
+      return Number(input.minutes) === 0
+        ? `Resume notifications for alert ${previewText(input.id, 'the selected alert')}.`
+        : `Pause alert ${previewText(input.id, 'the selected alert')} for ${Number(input.minutes) || 60} minutes.`;
+    case 'location.create':
+      return `Add location “${previewText(input.name, 'Untitled location')}”.`;
+    case 'device.rename':
+      return `Rename ${previewDevice(input)} to “${previewText(input.name, 'a new name')}”.`;
+    case 'notifications.read':
+      return input.all === true
+        ? 'Mark all notifications as read.'
+        : `Mark notification ${previewText(input.id, 'the selected notification')} as read.`;
+    default:
+      return undefined;
+  }
+}

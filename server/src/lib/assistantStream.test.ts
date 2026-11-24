@@ -8,6 +8,13 @@ test('token splitting preserves the original response exactly', () => {
   expect(tokens.join('')).toBe(content);
 });
 
+test('token splitting keeps whitespace that starts a streamed chunk', () => {
+  const content = ' hello\n  world';
+  const tokens = splitAssistantResponseIntoTokens(content);
+  expect(tokens.join('')).toBe(content);
+  expect(tokens[0]).toBe(' ');
+});
+
 test('token splitting handles empty and whitespace-only responses', () => {
   expect(splitAssistantResponseIntoTokens('')).toEqual([]);
   expect(splitAssistantResponseIntoTokens('   \n  ')).toEqual([]);

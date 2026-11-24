@@ -2,7 +2,7 @@ import { Binary, Collection, Db, type Document } from 'mongodb';
 import { createLogger } from '../logger';
 export * from '../../env';
 import { recordMongoOperation } from '../metrics';
-import { type DataPoint, type Device, type DeviceLog, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantMessage, type AssistantMode, type AssistantState, type NotificationPreferences, type PushSubscriptionInput } from '@common';
+import { type DataPoint, type Device, type DeviceLog, type Location, type Punishment, type Session, type User, type Team, type TeamAuditLog, type TeamInvite, type Appeal, type UserNotification, type Integration, type DeviceAlert, type DeviceUploadToken, type AssistantMessage, type AssistantMode, type AssistantState, type NotificationPreferences, type PushSubscriptionInput, type CreditTransaction } from '@common';
 
 import {
   DATA_POINTS_COLLECTION,
@@ -29,6 +29,7 @@ import {
   TEAM_INVITES_COLLECTION,
   TEAM_AUDIT_LOGS_COLLECTION,
   TEAM_AUDIT_LOG_MAX_AGE_SECONDS,
+  CREDIT_TRANSACTIONS_COLLECTION,
   APPEALS_COLLECTION,
   RATE_LIMITS_COLLECTION
 } from '../../env';
@@ -115,6 +116,7 @@ export interface Collections {
   emailCodes: Collection<EmailCode>;
   teams: Collection<Team>;
   teamAuditLogs: Collection<TeamAuditLog>;
+  creditTransactions: Collection<CreditTransaction>;
   teamInvites: Collection<TeamInvite>;
   appeals: Collection<Appeal>;
   notifications: Collection<UserNotification>;
@@ -277,6 +279,7 @@ export async function setupCollections(db: Db): Promise<Collections> {
     emailCodes: db.collection<EmailCode>(EMAIL_CODES_COLLECTION),
     teams: db.collection<Team>(TEAMS_COLLECTION),
     teamAuditLogs: db.collection<TeamAuditLog>(TEAM_AUDIT_LOGS_COLLECTION),
+    creditTransactions: db.collection<CreditTransaction>(CREDIT_TRANSACTIONS_COLLECTION),
     teamInvites: db.collection<TeamInvite>(TEAM_INVITES_COLLECTION),
     appeals: db.collection<Appeal>(APPEALS_COLLECTION),
     notifications: db.collection<UserNotification>(NOTIFICATIONS_COLLECTION),
@@ -366,6 +369,8 @@ export async function setupCollections(db: Db): Promise<Collections> {
       cols.teamAuditLogs,
       TEAM_AUDIT_LOG_MAX_AGE_SECONDS,
     )],
+    [CREDIT_TRANSACTIONS_COLLECTION, () => cols.creditTransactions.createIndex({ id: 1 }, { unique: true })],
+    [CREDIT_TRANSACTIONS_COLLECTION, () => cols.creditTransactions.createIndex({ teamId: 1, createdAt: -1 })],
     [RATE_LIMITS_COLLECTION, () => cols.rateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
   ];
 
