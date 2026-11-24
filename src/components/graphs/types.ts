@@ -20,6 +20,7 @@ export type LineGraphAxisData = {
   pointHoverRadius?: number;
   borderWidth?: number;
   borderDash?: number[];
+  pointStyle?: 'circle' | 'cross' | 'crossRot' | 'dash' | 'line' | 'rect' | 'rectRounded' | 'rectRot' | 'star' | 'triangle';
 };
 
 export type LineGraphScale = {

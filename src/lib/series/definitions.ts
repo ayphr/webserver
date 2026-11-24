@@ -17,6 +17,19 @@ export type SeriesId =
   | 'apparentTemp'
   | 'dewPointDeficit';
 
+/** Distinct markers keep series distinguishable without relying on colour. */
+export type SeriesPointStyle =
+  | 'circle'
+  | 'cross'
+  | 'crossRot'
+  | 'dash'
+  | 'line'
+  | 'rect'
+  | 'rectRounded'
+  | 'rectRot'
+  | 'star'
+  | 'triangle';
+
 export type SeriesDefinition = {
   id: SeriesId;
   /** Display label used in dropdowns, legends and summaries. */
@@ -24,8 +37,10 @@ export type SeriesDefinition = {
   /** Short label for summary columns. */
   shortLabel: string;
   unit: string;
+  /** Monochrome token; dash + marker shape carry the distinction. */
   color: string;
   dash: number[];
+  pointStyle: SeriesPointStyle;
   defaultEnabled: boolean;
   isCalculated: boolean;
   getValue: (point: DataPoint) => number;
@@ -37,8 +52,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Temperature (°C)',
     shortLabel: 'Temperature',
     unit: '°C',
-    color: 'var(--accent-green-solid)',
+    color: 'var(--text-primary)',
     dash: [],
+    pointStyle: 'circle',
     defaultEnabled: true,
     isCalculated: false,
     getValue: (p) => p.temperature,
@@ -48,8 +64,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Relative Humidity (%)',
     shortLabel: 'Humidity',
     unit: '%',
-    color: 'var(--accent-yellow-solid)',
+    color: 'var(--text-muted)',
     dash: [5, 4],
+    pointStyle: 'rect',
     defaultEnabled: true,
     isCalculated: false,
     getValue: (p) => p.humidity,
@@ -59,8 +76,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Pressure (hPa)',
     shortLabel: 'Pressure',
     unit: 'hPa',
-    color: 'var(--accent-red-solid)',
+    color: 'var(--text-dim)',
     dash: [2, 3],
+    pointStyle: 'triangle',
     defaultEnabled: true,
     isCalculated: false,
     getValue: (p) => p.airPressure,
@@ -70,8 +88,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Vapour Pressure Deficit (hPa)',
     shortLabel: 'VPD',
     unit: 'hPa',
-    color: 'var(--accent-purple-solid)',
+    color: 'var(--border-focus)',
     dash: [6, 2],
+    pointStyle: 'rectRot',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.vapourPressureDeficit(p.temperature, p.humidity),
@@ -81,8 +100,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Absolute Humidity (g/m³)',
     shortLabel: 'Abs. Humidity',
     unit: 'g/m³',
-    color: 'var(--accent-orange-solid)',
+    color: 'var(--text-primary)',
     dash: [1, 3],
+    pointStyle: 'cross',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.absoluteHumidity(p.temperature, p.humidity),
@@ -92,8 +112,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Actual Vapour Pressure (hPa)',
     shortLabel: 'Actual VP',
     unit: 'hPa',
-    color: 'var(--accent-pink-solid)',
+    color: 'var(--text-muted)',
     dash: [4, 4],
+    pointStyle: 'star',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.actualVapourPressure(p.temperature, p.humidity),
@@ -103,8 +124,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Saturated Vapour Pressure (hPa)',
     shortLabel: 'Sat. VP',
     unit: 'hPa',
-    color: 'var(--accent-aqua-solid)',
+    color: 'var(--text-dim)',
     dash: [8, 2],
+    pointStyle: 'line',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.saturationVapourPressure(p.temperature),
@@ -114,8 +136,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Dew Point Temp (°C)',
     shortLabel: 'Dew Point',
     unit: '°C',
-    color: 'var(--accent-blue-solid)',
+    color: 'var(--border-focus)',
     dash: [3, 3],
+    pointStyle: 'dash',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.dewPointTemperature(p.temperature, p.humidity),
@@ -125,8 +148,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Wet Bulb Temp (°C)',
     shortLabel: 'Wet Bulb',
     unit: '°C',
-    color: 'var(--accent-teal-solid)',
+    color: 'var(--text-primary)',
     dash: [2, 2, 6, 2],
+    pointStyle: 'rectRounded',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.wetBulbTemperature(p.temperature, p.humidity),
@@ -136,8 +160,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Humidity Ratio (g/kg)',
     shortLabel: 'Hum. Ratio',
     unit: 'g/kg',
-    color: 'var(--accent-indigo-solid)',
+    color: 'var(--text-muted)',
     dash: [7, 3, 1, 3],
+    pointStyle: 'crossRot',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.humidityRatio(p.temperature, p.humidity, p.airPressure),
@@ -147,8 +172,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Moist Air Density (kg/m³)',
     shortLabel: 'Moist Air Density',
     unit: 'kg/m³',
-    color: 'var(--accent-lime-solid)',
+    color: 'var(--text-dim)',
     dash: [5, 2, 1, 2],
+    pointStyle: 'triangle',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.moistAirDensity(p.temperature, p.humidity, p.airPressure),
@@ -158,8 +184,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Enthalpy (kJ/kg)',
     shortLabel: 'Enthalpy',
     unit: 'kJ/kg',
-    color: 'var(--accent-amber-solid)',
+    color: 'var(--border-focus)',
     dash: [4, 2, 1, 2, 1, 2],
+    pointStyle: 'circle',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.enthalpy(p.temperature, p.humidity, p.airPressure),
@@ -169,8 +196,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Apparent Temp (°C)',
     shortLabel: 'Apparent Temp',
     unit: '°C',
-    color: 'var(--accent-rose-solid)',
+    color: 'var(--text-primary)',
     dash: [2, 4],
+    pointStyle: 'star',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.apparentTemperature(p.temperature, p.humidity),
@@ -180,8 +208,9 @@ export const SERIES_DEFINITIONS: SeriesDefinition[] = [
     label: 'Dew Point Deficit (°C)',
     shortLabel: 'Dew Point Deficit',
     unit: '°C',
-    color: 'var(--accent-violet-solid)',
+    color: 'var(--text-muted)',
     dash: [1, 2, 3, 2],
+    pointStyle: 'rect',
     defaultEnabled: false,
     isCalculated: true,
     getValue: (p) => P.dewPointDeficit(p.temperature, p.humidity),

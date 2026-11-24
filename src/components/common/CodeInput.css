@@ -14,7 +14,7 @@
   font-family: var(--font-family-mono);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-overlay-subtle);
   color: var(--text-primary);
 }
 

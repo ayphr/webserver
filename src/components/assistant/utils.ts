@@ -53,6 +53,87 @@ export const formatDuration = (ms?: number) => {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 };
 
+export const TOOL_SLOT_PREFIX = 'assistant-tool-slot:';
+export const TOOL_SLOT_PATTERN = /^\[\[assistant-tool-slot:([^\]]+)\]\]$/;
+const FENCE_PATTERN = /^\s*(```+|~~~+)/;
+const BLANK_LINE_PATTERN = /\n[ \t]*\n/g;
+
+export interface ToolSlot {
+  id: string;
+  offset: number;
+}
+
+/**
+ * Moves a tool offset forward to the end of the current markdown block. Slots
+ * are injected as whole paragraphs, so fences and lists are never cut in half.
+ */
+const safeSlotOffset = (content: string, requested: number): number => {
+  const length = content.length;
+  let position = Math.max(0, Math.min(length, requested));
+  const lines = content.split('\n');
+  const lineStarts = lines.map((_, index) =>
+    lines.slice(0, index).reduce((sum, line) => sum + line.length + 1, 0),
+  );
+
+  let fence: string | null = null;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lineStarts[index]! > position) break;
+    const match = FENCE_PATTERN.exec(lines[index] ?? '');
+    if (fence === null) {
+      if (match) fence = match[1] ?? '';
+    } else if (match && fence && match[1]?.startsWith(fence)) {
+      fence = null;
+    }
+  }
+
+  if (fence !== null) {
+    for (let index = 0; index < lines.length; index += 1) {
+      if (lineStarts[index]! < position) continue;
+      const match = FENCE_PATTERN.exec(lines[index] ?? '');
+      if (match && match[1]?.startsWith(fence)) {
+        position = lineStarts[index]! + (lines[index] ?? '').length + 1;
+        break;
+      }
+    }
+  }
+
+  BLANK_LINE_PATTERN.lastIndex = 0;
+  let boundary: RegExpExecArray | null;
+  while ((boundary = BLANK_LINE_PATTERN.exec(content)) !== null) {
+    if (boundary.index + boundary[0].length >= position) {
+      return boundary.index + boundary[0].length;
+    }
+  }
+  return length;
+};
+
+/** Inserts tool placeholders once, in offset order, into the full markdown. */
+export const buildToolSlotMarkdown = (content: string, slots: ToolSlot[]): string => {
+  if (slots.length === 0) return content;
+  const seen = new Set<string>();
+  const ordered = slots
+    .filter((slot) => {
+      if (seen.has(slot.id) || !Number.isFinite(slot.offset)) return false;
+      seen.add(slot.id);
+      return true;
+    })
+    .sort((a, b) => a.offset - b.offset);
+
+  let result = '';
+  let cursor = 0;
+  let previousAt = -1;
+  for (const slot of ordered) {
+    const at = Math.max(cursor, previousAt, safeSlotOffset(content, slot.offset));
+    previousAt = at;
+    result += `${content.slice(cursor, at)}\n\n[[${TOOL_SLOT_PREFIX}${slot.id}]]\n\n`;
+    cursor = at;
+  }
+  if (cursor === content.length && result.endsWith('\n\n')) {
+    result = result.slice(0, -2);
+  }
+  return `${result}${content.slice(cursor)}`;
+};
+
 export const createChatTitle = (text: string, fallback: string) => {
   const firstLine = text
     .trim()

@@ -128,7 +128,7 @@
 }
 
 .users-panel__roleTag--staff {
-  background-color: rgba(255, 193, 7, 0.15);
+  background-color: var(--status-warning-soft);
   color: var(--accent-yellow);
 }
 

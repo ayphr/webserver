@@ -6,19 +6,30 @@ Frontend and backend for Ayphr.
 
 ## Prerequisites
 
-- Node.js 20+
-- npm 10+
+- Node.js 20+ and npm 10+ (frontend toolchain, `package-lock.json`)
+- Bun **1.4.4** (server toolchain and the test runner, `server/bun.lock`)
+- MongoDB and, optionally, Redis (see `.env.example`)
+
+CI installs the same pinned Bun version declared in `.github/workflows/ci.yml`.
 
 ## Getting Started
 
 ```bash
-npm install
+npm ci                                  # frontend dependencies
+cd server && bun install --frozen-lockfile && cd ..
+cp .env.example .env                    # then fill in your values
 ```
 
 ### Run in Development
 
 ```bash
 npm run dev
+```
+
+The server runs separately:
+
+```bash
+cd server && bun run start
 ```
 
 ### Build for Production
@@ -33,11 +44,26 @@ npm run build
 npm run preview
 ```
 
-### Lint
+### Lint and Typecheck
 
 ```bash
-npm run lint
+npm run lint                            # frontend + shared code
+cd server && bun run lint && bun run typecheck
 ```
+
+## Testing
+
+```bash
+npm test                                # full Bun suite: common/, src/ and server/
+npm run test:typecheck                  # typecheck root-side test files
+cd server && bun test                   # server tests only (what the server CI job runs)
+```
+
+The root suite is the gate for PRs: the server job alone only covers the tests under `server/`, so CI also runs `bun run test` from the repository root. `bunfig.toml` and `server/bunfig.toml` load `test-setup.ts` before every run to unset `REDIS_URL` (forcing in-memory rate limits), set `NODE_ENV=test`, and silence expected `LOG_LEVEL` warnings. Tests use Bun's built-in runner; no test framework dependencies are installed.
+
+Frontend coverage currently targets pure helpers (routing, redirects, stream/state helpers) rather than rendered components: adding a DOM environment would require a new dependency (happy-dom/jsdom), so component tests are intentionally out of scope for now.
+
+The legacy `common/tql/tql.test.ts` still runs but is excluded from `tsconfig.test.json` because its assertions rely on loose `QueryResult` narrowing.
 
 ## Server configuration
 
@@ -47,13 +73,28 @@ Copy `.env.example` to `.env` and fill in the values for your environment. The s
 
 The API is served only under `/api/v1`; unversioned `/api` paths return a JSON 404. The generated OpenAPI document is available at `GET /api/v1/openapi.json` and lists the live route surface, path parameters, and authentication expectations.
 
-The browser client uses a generated route manifest so new routes cannot silently drift away from the frontend:
+The browser client uses a generated route manifest so new routes cannot silently drift away from the frontend. The generator parses the `ROUTES` array from `server/src/api/router.ts` with the TypeScript AST (no regex scraping):
 
 ```bash
-cd server && bun run api:generate
+# from the repository root (or `cd server && bun run api:generate`)
+bun run api:generate
+bun run api:check
 ```
 
-CI runs `bun run api:check`, which fails if the manifest is stale. The manifest currently generates typed path builders; resource modules still own their bespoke request behavior and payload types.
+CI runs `bun run api:check` in both the server and root test jobs; it fails if the manifest is stale or if two routes collide on method/path or generated operation id. The manifest generates typed path builders; resource modules still own their bespoke request behavior and payload types.
+
+## Observability
+
+Grafana dashboards live in `monitoring/grafana/dashboards/`. Counters that are declared but not yet incremented by the assistant (`ayphr_assistant_feedback_total`, `ayphr_assistant_stream_errors_total`, `ayphr_assistant_rate_limited_total`, `ayphr_assistant_resume_total`) have hidden panels and an explanatory note in the assistant dashboard until their call sites are instrumented.
+
+## Lockfile strategy
+
+Both lockfiles are intentional and must stay in sync with their manifests:
+
+- `package-lock.json` — npm, frontend/root toolchain (`npm ci`)
+- `server/bun.lock` — Bun, server toolchain (`bun install --frozen-lockfile` in `server/`)
+
+Do not replace one with the other: CI uses npm for the frontend build and Bun for server tests. When changing dependencies, update the relevant manifest **and** its lockfile in the same commit.
 
 ## Web Push setup
 

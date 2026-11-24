@@ -206,6 +206,8 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
         tension: 0.25,
         fill: false,
         borderWidth: 2,
+        borderDash: m.def.dash,
+        pointStyle: m.def.pointStyle,
         pointRadius,
         pointHoverRadius: 4,
         segment: {
@@ -233,9 +235,9 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
       x: {
         type: 'linear',
         ...(axisWindow ? { min: axisWindow.initialMin, max: axisWindow.initialMax } : {}),
-        grid: { color: CHART_COLORS.grid },
+        grid: { color: resolveCssColor(CHART_COLORS.grid) },
         ticks: {
-          color: CHART_COLORS.mutedText,
+          color: resolveCssColor(CHART_COLORS.mutedText),
           maxTicksLimit: 8,
           callback: (value: string | number) => {
             const d = new Date(Number(value));
@@ -247,25 +249,25 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
         type: 'linear',
         display: true,
         position: 'left',
-        title: { display: true, text: '°C', color: CHART_COLORS.mutedText },
-        grid: { color: CHART_COLORS.grid },
-        ticks: { color: CHART_COLORS.mutedText },
+        title: { display: true, text: '°C', color: resolveCssColor(CHART_COLORS.mutedText) },
+        grid: { color: resolveCssColor(CHART_COLORS.grid) },
+        ticks: { color: resolveCssColor(CHART_COLORS.mutedText) },
       },
       y1: {
         type: 'linear',
         display: true,
         position: 'right',
-        title: { display: true, text: '%', color: CHART_COLORS.mutedText },
+        title: { display: true, text: '%', color: resolveCssColor(CHART_COLORS.mutedText) },
         grid: { drawOnChartArea: false },
-        ticks: { color: CHART_COLORS.mutedText },
+        ticks: { color: resolveCssColor(CHART_COLORS.mutedText) },
       },
       y2: {
         type: 'linear',
         display: true,
         position: 'right',
-        title: { display: true, text: 'hPa', color: CHART_COLORS.mutedText },
+        title: { display: true, text: 'hPa', color: resolveCssColor(CHART_COLORS.mutedText) },
         grid: { drawOnChartArea: false },
-        ticks: { color: CHART_COLORS.mutedText },
+        ticks: { color: resolveCssColor(CHART_COLORS.mutedText) },
       },
     };
 

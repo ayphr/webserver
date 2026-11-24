@@ -1,5 +1,9 @@
 {
   "files": [],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@common": ["./common/index.ts"], "@common/*": ["./common/*"] }
+  },
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }

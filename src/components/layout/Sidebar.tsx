@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import './Sidebar.css';
 import logo from '../../assets/logo.svg';
 import { IconGauge, IconSettings, IconUser, IconDatabase, IconMapPin, IconPlaceholder, IconBan, IconUsers, IconUsersGroup, IconClipboardList, IconLogout, IconDeviceGamepad2, IconCoin, IconMessage, IconSparkle2, IconBell, IconPlugConnected, IconRadio, IconTerminal2 } from '@tabler/icons-react';
@@ -118,6 +118,8 @@ export const Sidebar: React.FC<Props> = ({
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [accountToLogout, setAccountToLogout] = useState<StoredAccount | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuId = useId();
   const { showTooltip, hideTooltip } = useTooltip();
 
   const accountTooltip = `Account menu for ${username}`;
@@ -265,13 +267,23 @@ export const Sidebar: React.FC<Props> = ({
           </button>
         </nav>
 
-        <div className="n-sidebar__accountDisplay n-sidebar__accountDisplay--clickable" ref={containerRef}>
+        <div
+          className="n-sidebar__accountDisplay n-sidebar__accountDisplay--clickable"
+          ref={containerRef}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape' || !isAccountMenuOpen) return;
+            event.stopPropagation();
+            setIsAccountMenuOpen(false);
+            accountButtonRef.current?.focus();
+          }}
+        >
           <button
+            ref={accountButtonRef}
             type="button"
             className="n-sidebar__accountButton"
             onClick={() => setIsAccountMenuOpen((open) => !open)}
-            aria-haspopup="menu"
             aria-expanded={isAccountMenuOpen}
+            aria-controls={accountMenuId}
             aria-label={accountTooltip}
             {...tooltipHandlers(accountTooltip)}
           >
@@ -279,7 +291,12 @@ export const Sidebar: React.FC<Props> = ({
           </button>
 
           {isAccountMenuOpen && (
-            <div className="n-sidebar__accountMenu" role="menu">
+            <div
+              className="n-sidebar__accountMenu"
+              id={accountMenuId}
+              role="group"
+              aria-label="Signed-in accounts"
+            >
               {accounts.filter((account) => !isStoredAccountExpired(account) && account.token !== activeToken).length === 0 && (
                 <div className="n-sidebar__accountMenuItem n-sidebar__accountMenuItem--empty">
                   No other signed-in accounts
@@ -292,6 +309,7 @@ export const Sidebar: React.FC<Props> = ({
                   <button
                     type="button"
                     className="n-sidebar__accountSwitch"
+                    aria-label={`Switch to ${account.user.username}`}
                     onClick={() => {
                       onSwitchAccount?.(account.token);
                       setIsAccountMenuOpen(false);

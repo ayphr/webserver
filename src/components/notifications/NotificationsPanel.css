@@ -84,7 +84,7 @@
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--status-error);
   border-radius: var(--radius-md);
-  background: rgba(255, 100, 100, 0.08);
+  background: var(--status-error-bg);
   color: var(--status-error);
   font-size: 0.85rem;
 }

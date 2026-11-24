@@ -8,7 +8,7 @@
   position: fixed;
   left: 0;
   top: 0;
-  z-index: 9999;
+  z-index: var(--z-tooltip);
   padding: 0.4rem 0.6rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border);

@@ -13,7 +13,7 @@
 .dns-challenge__note {
   margin-top: 0.5rem;
   font-size: 0.85rem;
-  color: #999;
+  color: var(--text-dim);
 }
 
 .dns-challenge {

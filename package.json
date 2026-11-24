@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
+    "test": "bun test",
+    "test:typecheck": "tsc -p tsconfig.test.json --noEmit",
     "api:generate": "bun run server/scripts/generate-api-client.ts",
     "api:check": "bun run server/scripts/generate-api-client.ts --check"
   },

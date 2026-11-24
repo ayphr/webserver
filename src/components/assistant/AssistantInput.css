@@ -121,11 +121,46 @@
   margin-top: 0.15rem;
 }
 
-.assistant-chat__safety-lock {
-  padding: 0.75rem 1rem;
+.assistant-input__safety-lock {
+  padding: 0.85rem 1rem;
   border-radius: 0.75rem;
-  background: var(--status-error-bg);
-  border: 1px solid var(--status-error);
-  color: inherit;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
   font-size: 0.9rem;
+}
+
+.assistant-input__safety-lock h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: var(--font-weight-md);
+}
+
+.assistant-input__safety-lock p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.assistant-input__safety-lock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.assistant-input__safety-lock-actions button {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.assistant-input__safety-lock-actions button:hover,
+.assistant-input__safety-lock-actions button:focus-visible {
+  border-color: var(--border-focus);
 }

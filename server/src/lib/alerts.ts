@@ -9,11 +9,12 @@ import type {
 } from '@common';
 import { evaluateAlertConditions } from '@common';
 import { getAlertsForSerial, getIntegrationsForTeamId, updateAlert } from './db';
+import { getCollection, trackMongoOperation, ALERTS_COLLECTION } from './db/internal';
 import type { DeviceDocument } from './db';
 import { getTeamById } from './db/teams';
 import { teamSupportsAlertsAndWebhooks } from './planAccess';
 import { createLogger } from './logger';
-import { validateWebhookUrl } from './webhookUrl';
+import { postToPinnedWebhook } from './webhookUrl';
 
 const log = createLogger('alerts');
 
@@ -30,6 +31,50 @@ const METRIC_UNITS: Record<AlertMetric, string> = {
 };
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
+
+/** Minimal collection seam for the atomic notification claim. */
+export type AlertNotificationCollection = {
+  findOneAndUpdate(
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+  ): Promise<unknown>;
+};
+
+/**
+ * Only one concurrent telemetry upload may win the right to notify for an
+ * alert window. A newly firing alert bypasses the repeat interval, otherwise
+ * the previous notification must be at least one repeat interval old.
+ */
+export function buildNotificationClaimFilter(
+  alert: DeviceAlert,
+  now: number,
+  repeatMs: number,
+): Record<string, unknown> {
+  return {
+    id: alert.id,
+    enabled: true,
+    $or: [
+      { firing: { $ne: true } },
+      { lastNotifiedAt: { $exists: false } },
+      { lastNotifiedAt: null },
+      { lastNotifiedAt: { $lte: new Date(now - repeatMs) } },
+    ],
+  };
+}
+
+export async function claimAlertNotification(
+  alerts: AlertNotificationCollection,
+  alert: DeviceAlert,
+  now: number,
+  repeatMs: number,
+): Promise<boolean> {
+  trackMongoOperation('findOneAndUpdate', ALERTS_COLLECTION);
+  const claimed = await alerts.findOneAndUpdate(
+    buildNotificationClaimFilter(alert, now, repeatMs),
+    { $set: { lastNotifiedAt: new Date(now), updatedAt: new Date(now) } },
+  );
+  return claimed !== null && claimed !== undefined;
+}
 
 /** A muted alert keeps its firing state but does not deliver notifications. */
 export function isAlertMuted(alert: DeviceAlert, now = Date.now()): boolean {
@@ -105,46 +150,22 @@ async function sendToIntegration(
   device: DeviceDocument,
   reading: DataPoint,
 ): Promise<DeliveryResult> {
-  // Stored integrations may predate URL validation or have a hostname that now
-  // resolves to a restricted address; never fetch an unsafe destination.
-  const urlCheck = await validateWebhookUrl(integration.webhookUrl);
-  if (!urlCheck.ok) {
+  // Revalidate at send time and connect to the validated IP. Stored
+  // integrations may be stale or their DNS may have been rebound since they
+  // were created.
+  const result = await postToPinnedWebhook(integration.webhookUrl, JSON.stringify(buildPayload(integration, alert, device, reading)), {
+    timeoutMs: WEBHOOK_TIMEOUT_MS,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!result.ok) {
     log.warn(
-      { integrationId: integration.id, alertId: alert.id, reason: urlCheck.reason },
-      'skipping unsafe alert webhook url',
+      { integrationId: integration.id, alertId: alert.id, reason: result.reason, status: result.status },
+      'alert webhook delivery rejected or failed',
     );
-    return { ok: false, error: urlCheck.reason };
+    return { ok: false, error: result.reason, ...(result.status !== undefined ? { status: result.status } : {}) };
   }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(urlCheck.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload(integration, alert, device, reading)),
-      signal: controller.signal,
-      redirect: 'error',
-    });
-
-    if (!response.ok) {
-      log.warn(
-        { integrationId: integration.id, alertId: alert.id, status: response.status },
-        'alert webhook returned an error status',
-      );
-      return { ok: false, status: response.status };
-    }
-    return { ok: true, status: response.status };
-  } catch (error) {
-    log.warn(
-      { error, integrationId: integration.id, alertId: alert.id },
-      'failed to deliver alert webhook',
-    );
-    return { ok: false, error: error instanceof Error ? error.message : 'request failed' };
-  } finally {
-    clearTimeout(timeout);
-  }
+  return { ok: true, status: result.status };
 }
 
 /**
@@ -224,16 +245,24 @@ export async function evaluateAlertsForDevice(
         && targets.length > 0
         && (!wasFiring || !lastNotifiedAt || now - lastNotifiedAt >= repeatMs);
 
+      // Claim the notification window before changing firing state or sending:
+      // concurrent uploads race on a guarded findOneAndUpdate and only one
+      // wins the right to deliver for this window.
+      let claimed = false;
+      if (due) {
+        const alertsCollection = await getCollection('alerts') as unknown as AlertNotificationCollection;
+        claimed = await claimAlertNotification(alertsCollection, alert, now, repeatMs);
+      }
+
       const updates: Partial<DeviceAlert> = {};
       if (firing !== wasFiring) updates.firing = firing;
       if (firing && !wasFiring) updates.lastTriggeredAt = new Date(now);
-      if (due) updates.lastNotifiedAt = new Date(now);
-
+      // lastNotifiedAt is owned by the claim above, never written by updateAlert.
       if (Object.keys(updates).length > 0) {
         await updateAlert(alert.id, updates);
       }
 
-      if (!due) return;
+      if (!claimed) return;
 
       await Promise.all(
         targets.map((integration) => sendToIntegration(integration, alert, device, latest)),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -18,7 +18,7 @@ import { isDeviceOnline as isOnline } from '../../lib/deviceActivity';
 import { devicePeriodLabel, DEVICE_PERIODS, type DevicePeriod } from '../../lib/devicePeriod';
 import { CHART_COLORS, createLineGraphConfig, resolveCssColor } from '../../lib/chartTheme';
 import type { DashboardTarget, LocationDetailTab, LocationRouteState } from '../../lib/dashboardRoutes';
-import { Button, Card, ConfirmDialog, Input, Modal, Pagination, Select, Tooltip, type SelectOption } from '../common';
+import { Button, Card, ConfirmDialog, createTabKeyDownHandler, Input, Modal, Pagination, Select, Tooltip, type SelectOption } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphData } from '../graphs/types';
 import '../common/Tabs.css';
@@ -57,12 +57,12 @@ const HISTORY_METRICS = [
 ] as const;
 type HistoryMetric = (typeof HISTORY_METRICS)[number]['value'];
 
-/** Monochrome dataset styling: tone plus dash pattern keeps devices distinct. */
-const HISTORY_LINE_STYLES: Array<{ color: string; dash?: number[] }> = [
-  { color: 'var(--text-primary)' },
-  { color: 'var(--text-muted)', dash: [6, 4] },
-  { color: 'var(--text-dim)', dash: [2, 4] },
-  { color: 'var(--border-focus)', dash: [10, 4] },
+/** Monochrome dataset styling: tone, dash and marker shape keep devices distinct. */
+const HISTORY_LINE_STYLES: Array<{ color: string; dash?: number[]; pointStyle: NonNullable<LineGraphData['datasets'][number]['pointStyle']> }> = [
+  { color: 'var(--text-primary)', pointStyle: 'circle' },
+  { color: 'var(--text-muted)', dash: [6, 4], pointStyle: 'rect' },
+  { color: 'var(--text-dim)', dash: [2, 4], pointStyle: 'triangle' },
+  { color: 'var(--border-focus)', dash: [10, 4], pointStyle: 'cross' },
 ];
 
 type LocationStats = {
@@ -186,6 +186,7 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
         borderColor: resolveCssColor(style.color),
         backgroundColor: 'transparent',
         borderDash: style.dash,
+        pointStyle: style.pointStyle,
         tension: 0.25,
         borderWidth: 2,
         pointRadius: 0,
@@ -211,10 +212,10 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
         type: 'linear' as const,
         display: true,
         border: { display: true },
-        grid: { display: true, color: CHART_COLORS.grid },
+        grid: { display: true, color: resolveCssColor(CHART_COLORS.grid) },
         ticks: {
           display: true,
-          color: CHART_COLORS.mutedText,
+          color: resolveCssColor(CHART_COLORS.mutedText),
           maxTicksLimit: 8,
           callback: (value: string | number) => formatChartLabel(new Date(Number(value))),
         },
@@ -224,9 +225,9 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
         display: true,
         position: 'left' as const,
         border: { display: true },
-        title: { display: true, text: activeMetric.unit, color: CHART_COLORS.mutedText },
-        grid: { display: true, color: CHART_COLORS.grid },
-        ticks: { display: true, color: CHART_COLORS.mutedText },
+        title: { display: true, text: activeMetric.unit, color: resolveCssColor(CHART_COLORS.mutedText) },
+        grid: { display: true, color: resolveCssColor(CHART_COLORS.grid) },
+        ticks: { display: true, color: resolveCssColor(CHART_COLORS.mutedText) },
       },
     },
   }), [activeMetric.unit]);
@@ -350,6 +351,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
 
   const selectedId = locationRoute?.id ?? null;
   const detailTab: LocationDetailTab = locationRoute?.detailTab ?? 'overview';
+  const tabIdPrefix = useId();
 
   const load = useCallback(async () => {
     setError(null);
@@ -492,6 +494,13 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   const selectTab = (tab: LocationDetailTab) => {
     if (!selectedId) return;
     onNavigate({ tab: 'locations', location: { id: selectedId, detailTab: tab } });
+  };
+  const handleTabsKeyDown = createTabKeyDownHandler<LocationDetailTab>(selectTab);
+
+  const handleLocationCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, id: string) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openLocation(id);
   };
 
   const handleCreate = async () => {
@@ -646,7 +655,11 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
                   key={location.id}
                   elevated
                   className="locations__location-card"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${location.name}`}
                   onClick={() => openLocation(location.id)}
+                  onKeyDown={(event) => handleLocationCardKeyDown(event, location.id)}
                 >
                   <div className="locations__location-card__content">
                     <IconMapPin size={18} strokeWidth={1.75} />
@@ -676,6 +689,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
             value={createName}
             onChange={(event) => setCreateName(event.target.value)}
             placeholder="Location name"
+            aria-label="Location name"
             disabled={isCreating}
             fullWidth
           />
@@ -706,13 +720,17 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
 
       <h3 className="locations__title">{selectedLocation.name}</h3>
 
-      <div className="ui-tabs" role="tablist" aria-label="Location sections">
+      <div className="ui-tabs" role="tablist" aria-label="Location sections" onKeyDown={handleTabsKeyDown}>
         {LOCATION_TABS.map((tab) => (
           <button
             key={tab}
             type="button"
             role="tab"
+            data-tab-id={tab}
             aria-selected={detailTab === tab}
+            aria-controls={`${tabIdPrefix}-panel`}
+            id={`${tabIdPrefix}-tab-${tab}`}
+            tabIndex={detailTab === tab ? 0 : -1}
             className={`ui-tab ${detailTab === tab ? 'ui-tab--active' : ''}`}
             onClick={() => selectTab(tab)}
           >
@@ -721,7 +739,13 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
         ))}
       </div>
 
-      <div className="ui-tab-panel">
+      <div
+        className="ui-tab-panel"
+        role="tabpanel"
+        id={`${tabIdPrefix}-panel`}
+        aria-labelledby={`${tabIdPrefix}-tab-${detailTab}`}
+        tabIndex={0}
+      >
         {detailTab === 'overview' && (
           <div className="locations__overview">
             <div className="locations__stat-grid">
@@ -806,7 +830,11 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
           <div className="locations__settings">
             <label className="locations__field">
               <span>Name</span>
-              <Input value={settingsName} onChange={(event) => setSettingsName(event.target.value)} />
+              <Input
+                value={settingsName}
+                onChange={(event) => setSettingsName(event.target.value)}
+                aria-label="Location name"
+              />
             </label>
             <div className="locations__settings-actions">
               <Button variant="primary" onClick={() => void handleSaveSettings()} isLoading={isSavingSettings} disabled={!settingsName.trim()}>

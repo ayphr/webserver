@@ -121,17 +121,17 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => {
   return (
     <TooltipContext.Provider value={tooltipContextValue}>
       {children}
-      {tooltip && (
-        <div
-          ref={tooltipRef}
-          className={`ayphr-tooltip${placement ? ' ayphr-tooltip--visible' : ''}`}
-          data-placement={placement?.placement}
-          style={placement ? { left: placement.left, top: placement.top } : undefined}
-          role="tooltip"
-        >
-          {tooltip.content}
-        </div>
-      )}
+      <div
+        ref={tooltipRef}
+        id="ayphr-tooltip"
+        className={`ayphr-tooltip${placement ? ' ayphr-tooltip--visible' : ''}`}
+        data-placement={placement?.placement}
+        style={placement ? { left: placement.left, top: placement.top } : undefined}
+        role="tooltip"
+        hidden={!tooltip}
+      >
+        {tooltip?.content}
+      </div>
     </TooltipContext.Provider>
   );
 };

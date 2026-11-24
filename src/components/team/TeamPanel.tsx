@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Input, Modal, Select, ProgressBar, Tooltip } from '../common';
+import { Button, createTabKeyDownHandler, Input, Modal, Select, ProgressBar, Tooltip } from '../common';
 import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase, IconPlus, IconExternalLink, IconCopy } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance, SubscriptionTier, SubscriptionPlan, BillingInterval, TeamSubscriptionPayload } from '@common';
 import { PLAN_NAMES } from '@common';
@@ -54,11 +54,21 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [editRole, setEditRole] = useState<TeamRole>('member');
   const [identifier, setIdentifier] = useState('');
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [memberActionError, setMemberActionError] = useState<string | null>(null);
   const [role, setRole] = useState<TeamRole>('member');
   const [requestedTab, setRequestedTab] = useState<TeamTab>('members');
   const canShowInitialTab = initialTab !== undefined
     && (isManager || (initialTab !== 'audit' && initialTab !== 'settings'));
   const activeTab: TeamTab = canShowInitialTab ? initialTab : requestedTab;
+  const tabIdPrefix = useId();
+  const selectTab = (tab: TeamTab) => {
+    setRequestedTab(tab);
+    onTabChange?.(tab);
+  };
+  const handleTabsKeyDown = createTabKeyDownHandler<TeamTab>(selectTab);
+
   const [teamName, setTeamName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
   const [usageCredits, setUsageCredits] = useState<CreditBalance | null>(null);
@@ -177,10 +187,11 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
     };
   }, [activeTab]);
 
-  const handleInvite = async () => {
+  const handleInvite = async (): Promise<boolean> => {
     const value = identifier.trim();
-    if (!value) return;
+    if (!value) return false;
     setError(null);
+    setInviteError(null);
     const isEmail = value.includes('@');
     try {
       await api.teams.addMember({
@@ -192,30 +203,33 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
       setRole('member');
       setIsInviteOpen(false);
       await load();
+      return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to invite member');
+      setInviteError(err instanceof Error ? err.message : 'Failed to invite member');
+      return false;
     }
   };
 
   const handleEditSave = async () => {
     if (!editingMember) return;
+    setMemberActionError(null);
     try {
       await api.teams.updateRole(editingMember.uuid, { role: editRole });
       setEditingMember(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update role');
+      setMemberActionError(err instanceof Error ? err.message : 'Failed to update role');
     }
   };
 
-  const handleEditRemove = async () => {
-    if (!editingMember) return;
+  const removeMember = async (member: TeamMember) => {
+    setMemberActionError(null);
     try {
-      await api.teams.removeMember(editingMember.uuid);
+      await api.teams.removeMember(member.uuid);
       setEditingMember(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove member');
+      setMemberActionError(err instanceof Error ? err.message : 'Failed to remove member');
     }
   };
 
@@ -300,9 +314,10 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
     }
   };
 
-  const handleCreateTeam = async () => {
+  const handleCreateTeam = async (): Promise<boolean> => {
     setIsCreating(true);
     setError(null);
+    setCreateError(null);
     try {
       const created = await api.teams.createTeam(newTeamName.trim() || undefined);
       setTeams((current) => [...current, created]);
@@ -310,8 +325,10 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
       setIsCreateOpen(false);
       setNewTeamName('');
       window.location.reload();
+      return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create team');
+      setCreateError(err instanceof Error ? err.message : 'Failed to create team');
+      return false;
     } finally {
       setIsCreating(false);
     }
@@ -374,7 +391,7 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
   };
 
   if (isLoading) return <p className="team-panel__loading">Loading team…</p>;
-  if (error) return <p className="team-panel__error">{error}</p>;
+  if (error) return <p className="team-panel__error" role="alert">{error}</p>;
   if (!team) return <p className="team-panel__empty">No team found. A team plan is required.</p>;
 
   const isTeamManager = !!userUuid && team?.managerUuid === userUuid;
@@ -422,7 +439,7 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
               </Button>
             </Tooltip>
           ) : (
-            <Button variant="secondary" onClick={() => setIsCreateOpen(true)}>
+            <Button variant="secondary" onClick={() => { setCreateError(null); setIsCreateOpen(true); }}>
               <IconPlus size={16} />
               New team
             </Button>
@@ -432,31 +449,42 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
       <header className="team-panel__header">
         <h3 className="team-panel__title">{team.name ?? 'Team'}</h3>
         {activeTab === 'members' && (
-          <Button variant="secondary" onClick={() => setIsInviteOpen(true)}>
+          <Button variant="secondary" onClick={() => { setInviteError(null); setIsInviteOpen(true); }}>
             <IconUserPlus size={16} />
             Invite member
           </Button>
         )}
       </header>
 
-      <div className="ui-tabs" role="tablist" aria-label="Team sections">
+      {memberActionError && (
+        <p className="team-panel__error" role="alert">{memberActionError}</p>
+      )}
+
+      <div className="ui-tabs" role="tablist" aria-label="Team sections" onKeyDown={handleTabsKeyDown}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             role="tab"
+            data-tab-id={tab.id}
             aria-selected={activeTab === tab.id}
+            aria-controls={`${tabIdPrefix}-panel-${tab.id}`}
+            id={`${tabIdPrefix}-tab-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             className={`ui-tab ${activeTab === tab.id ? 'ui-tab--active' : ''}`}
-            onClick={() => {
-              setRequestedTab(tab.id);
-              onTabChange?.(tab.id);
-            }}
+            onClick={() => selectTab(tab.id)}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
+      <div
+        role="tabpanel"
+        id={`${tabIdPrefix}-panel-${activeTab}`}
+        aria-labelledby={`${tabIdPrefix}-tab-${activeTab}`}
+        tabIndex={0}
+      >
       {activeTab === 'members' && (
         <>
           <section className="team-panel__section team-panel__section--plain">
@@ -474,6 +502,7 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
                   <Button
                     variant="secondary"
                     onClick={() => {
+                      setMemberActionError(null);
                       setEditingMember(m);
                       setEditRole(m.role);
                     }}
@@ -509,7 +538,10 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
                           </span>
                         )}
                         {copyInviteError?.id === invite.id && (
-                          <span className="team-panel__invite-copy-error">{copyInviteError.message}</span>
+                          <span className="team-panel__invite-copy-error" role="alert">{copyInviteError.message}</span>
+                        )}
+                        {copiedInviteId === invite.id && (
+                          <span className="sr-only" role="status">Invite link copied.</span>
                         )}
                       </div>
                       <div className="team-panel__member-actions">
@@ -518,7 +550,14 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
                           {copiedInviteId === invite.id ? 'Copied!' : 'Copy invite link'}
                         </Button>
                         {isManager && (
-                          <Button variant="secondary" onClick={() => handleRevokeInvite(invite.id)}>
+                          <Button
+                            variant="secondary"
+                            onClick={() => setConfirmation({
+                              title: 'Revoke invite?',
+                              message: `Revoke the invite for ${invite.email ?? invite.role}? They will no longer be able to join with this link.`,
+                              action: () => void handleRevokeInvite(invite.id),
+                            })}
+                          >
                             Revoke
                           </Button>
                         )}
@@ -605,8 +644,8 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
                 onChange={(e) => setTeamName(e.target.value)}
                 fullWidth
               />
-              {nameError && <p className="team-panel__error">{nameError}</p>}
-              {nameSuccess && <p className="team-panel__loading">{nameSuccess}</p>}
+              {nameError && <p className="team-panel__error" role="alert">{nameError}</p>}
+              {nameSuccess && <p className="team-panel__loading" role="status">{nameSuccess}</p>}
               <div className="team-panel__edit-actions">
                 <Button onClick={() => void handleSaveName()} isLoading={isSavingName} disabled={isSavingName}>
                   Save
@@ -641,9 +680,9 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
               />
             </div>
 
-            {subscriptionError && <p className="team-panel__error">{subscriptionError}</p>}
+            {subscriptionError && <p className="team-panel__error" role="alert">{subscriptionError}</p>}
             {!subscription && !subscriptionError && (
-              <p className="team-panel__loading">Loading plans…</p>
+              <p className="team-panel__loading" role="status">Loading plans…</p>
             )}
 
             <div className="team-panel__plans">
@@ -711,6 +750,7 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
           <Button variant="danger" onClick={() => setConfirmation({ title: 'Leave team?', message: `Leave ${team.name ?? 'this team'}?`, action: () => void handleLeaveTeam() })}>Leave team</Button>
         </section>
       )}
+      </div>
 
       <Modal
         isOpen={isInviteOpen}
@@ -737,13 +777,14 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
             options={ROLE_OPTIONS}
             fullWidth
           />
+          {inviteError && <p className="team-panel__error" role="alert">{inviteError}</p>}
         </div>
       </Modal>
 
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        onConfirm={() => void handleCreateTeam()}
+        onConfirm={handleCreateTeam}
         title="Create a team"
         confirmText="Create team"
         cancelText="Cancel"
@@ -758,6 +799,7 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
             onChange={(e) => setNewTeamName(e.target.value)}
             fullWidth
           />
+          {createError && <p className="team-panel__error" role="alert">{createError}</p>}
         </div>
       </Modal>
 
@@ -775,11 +817,24 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
             fullWidth
           />
           <div className="team-panel__edit-actions">
-            <Button variant="danger" onClick={handleEditRemove}>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const member = editingMember;
+                if (!member) return;
+                setEditingMember(null);
+                setConfirmation({
+                  title: 'Remove member?',
+                  message: `Remove ${member.username} from ${team.name ?? 'this team'}? They will lose team access immediately.`,
+                  action: () => void removeMember(member),
+                });
+              }}
+            >
               Remove from team
             </Button>
-            <Button onClick={handleEditSave}>Save</Button>
+            <Button onClick={() => void handleEditSave()}>Save</Button>
           </div>
+          {memberActionError && <p className="team-panel__error" role="alert">{memberActionError}</p>}
         </div>
       </Modal>
       <Modal

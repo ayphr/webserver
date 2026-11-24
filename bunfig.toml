@@ -1,0 +1,4 @@
+[test]
+preload = ["./test-setup.ts"]
+# Keep the full suite deterministic; tests should avoid a DOM dependency.
+environment = "node"

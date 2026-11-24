@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Keep local development, CI and the documented prerequisites in lockstep.
+  BUN_VERSION: 1.4.4
+
 jobs:
   frontend:
     name: Frontend
@@ -33,9 +37,29 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run api:check
       - run: bun test
+
+  tests:
+    name: Full test suite (root)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      # Frontend/common tests resolve root deps; server tests resolve server deps.
+      - run: bun install --frozen-lockfile
+        working-directory: server
+      - run: bun run api:check
+      - run: bun run test:typecheck
+      - run: bun run test

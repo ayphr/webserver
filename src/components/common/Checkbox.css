@@ -37,30 +37,30 @@
   width: 1.15rem;
   height: 1.15rem;
   margin-top: 0.1rem;
-  border: 1px solid hsl(0, 0%, 28%);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background-color: hsl(0, 0%, 10%);
+  background-color: var(--bg-surface);
   color: transparent;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .checkbox:hover .checkbox__box {
-  border-color: hsl(0, 0%, 38%);
+  border-color: var(--border-focus);
 }
 
 .checkbox__input:checked + .checkbox__box {
-  background-color: hsl(0, 0%, 26%);
-  border-color: hsl(0, 0%, 38%);
+  background-color: var(--bg-input-off);
+  border-color: var(--border-focus);
   color: var(--text-primary);
 }
 
 .checkbox__input:focus-visible + .checkbox__box {
-  outline: 2px solid hsl(0, 0%, 45%);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 .checkbox--error .checkbox__box {
-  border-color: hsl(0, 0%, 45%);
+  border-color: var(--status-error);
 }
 
 .checkbox__label {

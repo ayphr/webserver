@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   IconAlertCircle,
@@ -33,7 +33,7 @@ import {
   isPushSubscribed,
   isPushSupported,
 } from '../../lib/push';
-import { Button, Checkbox, Modal, Pagination, Tooltip } from '../common';
+import { Button, Checkbox, createTabKeyDownHandler, Modal, Pagination, Tooltip } from '../common';
 import '../common/Tabs.css';
 import './NotificationsPanel.css';
 
@@ -106,6 +106,7 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [isTestingPush, setIsTestingPush] = useState(false);
   const [testPushSent, setTestPushSent] = useState(false);
+  const tabIdPrefix = useId();
 
   const applyUnreadCount = (count: number) => {
     setData((current) => ({ ...current, unreadCount: count }));
@@ -151,6 +152,8 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
     setActiveTab(tab);
     setPage(1);
   };
+
+  const handleTabsKeyDown = createTabKeyDownHandler<NotificationFilter>(handleTabChange);
 
   const handleSelect = async (notification: UserNotification) => {
     if (!notification.read) {
@@ -304,12 +307,12 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
 
   const renderPreferences = () => (
     <div className="notification-preferences">
-      {isPreferencesLoading && <p className="notifications-panel__status">Loading preferences...</p>}
+      {isPreferencesLoading && <p className="notifications-panel__status" role="status">Loading preferences...</p>}
 
       {!isPreferencesLoading && (
         <>
           {preferencesError && (
-            <div className="notifications-panel__error">
+            <div className="notifications-panel__error" role="alert">
               <IconAlertCircle size={18} strokeWidth={1.75} />
               <span>{preferencesError}</span>
             </div>
@@ -375,7 +378,7 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
                 <IconSend size={16} />
                 Send test push
               </Button>
-              {testPushSent && <span className="notification-preferences__hint">Test notification sent.</span>}
+              {testPushSent && <span className="notification-preferences__hint" role="status">Test notification sent.</span>}
             </div>
           )}
         </>
@@ -384,20 +387,21 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
   );
 
   if (isLoading) {
-    return <p className="notifications-panel__status">Loading notifications...</p>;
+    return <p className="notifications-panel__status" role="status">Loading notifications...</p>;
   }
 
   return (
     <div className="notifications-panel">
-      <div className="ui-tabs" role="tablist" aria-label="Notification views">
+      <div className="ui-tabs" role="tablist" aria-label="Notification views" onKeyDown={handleTabsKeyDown}>
         {(['unread', 'all'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             role="tab"
+            data-tab-id={tab}
             aria-selected={activeTab === tab}
-            aria-controls="notifications-panel-list"
-            id={`notifications-tab-${tab}`}
+            aria-controls={`${tabIdPrefix}-panel-list`}
+            id={`${tabIdPrefix}-tab-${tab}`}
             tabIndex={activeTab === tab ? 0 : -1}
             className={`ui-tab ${activeTab === tab ? 'ui-tab--active' : ''}`}
             onClick={() => handleTabChange(tab)}
@@ -408,7 +412,7 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
       </div>
 
       <div className="notifications-panel__toolbar">
-        <span className="notifications-panel__summary">
+        <span className="notifications-panel__summary" aria-live="polite">
           {data.unreadCount > 0
             ? `${data.unreadCount} unread notification${data.unreadCount === 1 ? '' : 's'}`
             : 'You are all caught up'}
@@ -436,16 +440,17 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
       </div>
 
       {error && (
-        <div className="notifications-panel__error">
+        <div className="notifications-panel__error" role="alert">
           <IconAlertCircle size={18} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
       )}
 
       <div
-        id="notifications-panel-list"
+        id={`${tabIdPrefix}-panel-list`}
         role="tabpanel"
-        aria-labelledby={`notifications-tab-${activeTab}`}
+        aria-labelledby={`${tabIdPrefix}-tab-${activeTab}`}
+        tabIndex={0}
       >
         {data.notifications.length === 0 ? (
           <div className="notifications-panel__empty">

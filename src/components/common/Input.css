@@ -28,8 +28,8 @@
 .input {
   flex: 1;
   min-width: 0;
-  background-color: hsl(0, 0%, 10%);
-  border: 1px solid hsl(0, 0%, 16%);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 0.55rem 1rem;
   color: var(--text-primary);
@@ -52,10 +52,10 @@
   }
 
   &:disabled {
-    background-color: hsl(0, 0%, 9%);
-    color: hsl(180, 67%, 99%, 0.3);
+    background-color: var(--bg-surface);
+    color: var(--text-dim);
     cursor: not-allowed;
-    border-color: hsl(0, 0%, 14%);
+    border-color: var(--border-subtle);
   }
 
   &.input--error,
@@ -98,7 +98,7 @@
 
 .input-helper {
   display: block;
-  color: hsl(180, 67%, 99%, 0.45);
+  color: var(--text-dim);
   font-size: 0.8rem;
   margin-top: 0.35rem;
 }

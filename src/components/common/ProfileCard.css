@@ -109,7 +109,7 @@
   border-radius: 999px;
   border: none;
   background-color: transparent;
-  color: hsl(0, 0%, 72%);
+  color: var(--text-muted);
   text-decoration: none;
   cursor: pointer;
   transition: color 0.15s ease, background-color 0.15s ease;

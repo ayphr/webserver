@@ -3,7 +3,6 @@ export { Card, CardHeader, CardBody, CardFooter, type CardProps, type CardHeader
 export { Input, type InputProps } from './Input';
 export { Select, type SelectProps, type SelectOption } from './Select';
 export { AssistantDropdown, type AssistantDropdownProps } from './AssistantDropdown';
-export { AssistantInput, type AssistantInputProps } from '../assistant';
 export type { AssistantSendShortcut } from '@common';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Modal, type ModalProps } from './Modal';
@@ -24,6 +23,7 @@ export { ToggleDropdown, type ToggleDropdownProps } from './ToggleDropdown';
 export { Pagination, type PaginationProps } from './Pagination';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { CodeInput, type CodeInputProps } from './CodeInput';
+export { createTabKeyDownHandler } from './tabKeyboard';
 export { Slider, type SliderProps } from './Slider';
 export {
   SidebarShell,

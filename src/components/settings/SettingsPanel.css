@@ -6,11 +6,11 @@
 }
 
 .settings__error {
-  background-color: hsla(4, 100%, 71%, 0.12);
-  border: 1px solid hsla(4, 100%, 71%, 0.35);
+  background-color: var(--status-error-soft);
+  border: 1px solid var(--status-error-border);
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
-  color: hsl(4, 100%, 71%);
+  color: var(--status-error);
   font-size: 0.9rem;
   display: flex;
   align-items: center;
@@ -79,9 +79,9 @@
 }
 
 .settings__option--danger .settings__option-icon {
-  background: hsla(4, 100%, 71%, 0.12);
+  background: var(--status-error-soft);
   color: var(--accent-red-solid);
-  border-color: hsla(4, 100%, 71%, 0.25);
+  border-color: var(--status-error-border);
 }
 
 .settings__option-text {

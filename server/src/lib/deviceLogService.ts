@@ -183,8 +183,3 @@ export async function listDeviceLogsForExport(
     truncated: rows.length > DEVICE_LOG_EXPORT_LIMIT,
   };
 }
-
-/** Backwards-compatible capped read helper. */
-export async function getDeviceLogs(serial: number, limit = 100): Promise<DeviceLog[]> {
-  return listDeviceLogs(serial, { limit });
-}

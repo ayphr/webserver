@@ -1,10 +1,52 @@
 import type { LookupAddress } from 'dns';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 
 export type WebhookUrlResult =
   | { ok: true; url: string }
   | { ok: false; reason: string };
+
+export type WebhookTarget = {
+  /** Original, validated URL (never rewritten by hostname resolution). */
+  url: string;
+  /** Normalized hostname used for TLS SNI and the Host header. */
+  hostname: string;
+  hostHeader: string;
+  protocol: 'http:' | 'https:';
+  port: number;
+  path: string;
+  /** IP address validated at send time; the connection is pinned to it. */
+  address: string;
+  addressFamily: 4 | 6;
+  isIpLiteral: boolean;
+};
+
+type ResolvedWebhookTarget =
+  | { ok: true; target: WebhookTarget }
+  | { ok: false; reason: string };
+
+export type PinnedRequestOptions = {
+  protocol: 'http:' | 'https:';
+  hostname: string;
+  port: number;
+  path: string;
+  method: 'POST';
+  headers: Record<string, string>;
+  /** Original hostname: TLS uses it for SNI/cert checks even while connecting to the pinned IP. */
+  servername?: string;
+};
+
+export type PinnedRequestFn = (
+  options: PinnedRequestOptions,
+  body: string,
+  timeoutMs: number,
+) => Promise<{ status: number }>;
+
+export type PinnedWebhookResult =
+  | { ok: true; status: number }
+  | { ok: false; reason: string; status?: number };
 
 const MAX_URL_LENGTH = 2048;
 const DNS_LOOKUP_TIMEOUT_MS = 5000;
@@ -122,6 +164,12 @@ function isBlockedIpv6(address: string): boolean {
   return false;
 }
 
+function isBlockedAddress(address: string, family: number): boolean {
+  if (family === 4) return isBlockedIpv4(address);
+  if (family === 6) return isBlockedIpv6(address);
+  return true;
+}
+
 async function resolveWithTimeout(hostname: string): Promise<LookupAddress[]> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -129,7 +177,6 @@ async function resolveWithTimeout(hostname: string): Promise<LookupAddress[]> {
       lookup(hostname, { all: true, verbatim: true }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error('dns lookup timed out')), DNS_LOOKUP_TIMEOUT_MS);
-        timer.unref?.();
       }),
     ]);
   } finally {
@@ -137,8 +184,15 @@ async function resolveWithTimeout(hostname: string): Promise<LookupAddress[]> {
   }
 }
 
-/** Validates a webhook destination against SSRF-prone addresses and hostnames. */
-export async function validateWebhookUrl(value: unknown): Promise<WebhookUrlResult> {
+/**
+ * Validates and resolves a webhook destination in one step. All DNS answers
+ * are checked (so a single private record cannot slip through) and the chosen
+ * IP is returned so the caller can pin the connection to it.
+ */
+export async function resolveWebhookTarget(
+  value: unknown,
+  lookupFn: (hostname: string) => Promise<LookupAddress[]> = resolveWithTimeout,
+): Promise<ResolvedWebhookTarget> {
   if (typeof value !== 'string') return { ok: false, reason: 'webhook url must be a string' };
 
   const url = value.trim();
@@ -168,28 +222,117 @@ export async function validateWebhookUrl(value: unknown): Promise<WebhookUrlResu
   }
 
   const ipVersion = isIP(hostname);
-  if (ipVersion !== 0) {
-    const blocked = ipVersion === 4 ? isBlockedIpv4(hostname) : isBlockedIpv6(hostname);
-    return blocked
-      ? { ok: false, reason: 'webhook url points to a restricted IP address' }
-      : { ok: true, url };
-  }
-
   let addresses: LookupAddress[];
+  if (ipVersion !== 0) {
+    if (isBlockedAddress(hostname, ipVersion)) {
+      return { ok: false, reason: 'webhook url points to a restricted IP address' };
+    }
+    addresses = [{ address: hostname, family: ipVersion as 4 | 6 }];
+  } else {
+    try {
+      addresses = await lookupFn(hostname);
+    } catch {
+      return { ok: false, reason: 'webhook url host could not be resolved' };
+    }
+    if (addresses.length === 0) {
+      return { ok: false, reason: 'webhook url host could not be resolved' };
+    }
+    if (addresses.some(({ address, family }) => isBlockedAddress(address, family))) {
+      return { ok: false, reason: 'webhook url resolves to a restricted IP address' };
+    }
+  }
+
+  const pinned = addresses[0]!;
+  const defaultPort = parsed.protocol === 'https:' ? 443 : 80;
+  const port = parsed.port ? Number(parsed.port) : defaultPort;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return { ok: false, reason: 'invalid webhook url port' };
+  }
+
+  return {
+    ok: true,
+    target: {
+      url,
+      hostname,
+      hostHeader: parsed.host,
+      protocol: parsed.protocol as 'http:' | 'https:',
+      port,
+      path: `${parsed.pathname}${parsed.search}`,
+      address: pinned.address,
+      addressFamily: pinned.family === 6 ? 6 : 4,
+      isIpLiteral: ipVersion !== 0,
+    },
+  };
+}
+
+/** Validates a webhook destination against SSRF-prone addresses and hostnames. */
+export async function validateWebhookUrl(value: unknown): Promise<WebhookUrlResult> {
+  const resolved = await resolveWebhookTarget(value);
+  return resolved.ok ? { ok: true, url: resolved.target.url } : resolved;
+}
+
+/** Builds the connection options for a revalidated, IP-pinned webhook request. */
+export function buildPinnedRequestOptions(
+  target: WebhookTarget,
+  headers: Record<string, string> = {},
+): PinnedRequestOptions {
+  return {
+    protocol: target.protocol,
+    hostname: target.address,
+    port: target.port,
+    path: target.path,
+    method: 'POST',
+    servername: target.isIpLiteral ? undefined : target.hostname,
+    headers: {
+      ...headers,
+      Host: target.hostHeader,
+    },
+  };
+}
+
+async function defaultPinnedRequest(
+  options: PinnedRequestOptions,
+  body: string,
+  timeoutMs: number,
+): Promise<{ status: number }> {
+  return new Promise((resolve, reject) => {
+    const transport = options.protocol === 'https:' ? httpsRequest : httpRequest;
+    const req = transport(options, (response) => {
+      // Drain the response; redirects are intentionally not followed.
+      response.resume();
+      resolve({ status: response.statusCode ?? 0 });
+    });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('webhook request timed out')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+/**
+ * Revalidates the URL immediately before delivery and connects to the
+ * validated IP, closing the DNS-rebinding TOCTOU window. Redirects are never
+ * followed (Node's http/https clients do not follow them automatically).
+ */
+export async function postToPinnedWebhook(
+  value: unknown,
+  body: string,
+  options: {
+    timeoutMs: number;
+    headers?: Record<string, string>;
+    lookup?: (hostname: string) => Promise<LookupAddress[]>;
+    request?: PinnedRequestFn;
+  },
+): Promise<PinnedWebhookResult> {
+  const resolved = await resolveWebhookTarget(value, options.lookup);
+  if (!resolved.ok) return { ok: false, reason: resolved.reason };
+
+  const requestOptions = buildPinnedRequestOptions(resolved.target, options.headers);
   try {
-    addresses = await resolveWithTimeout(hostname);
-  } catch {
-    return { ok: false, reason: 'webhook url host could not be resolved' };
+    const request = options.request ?? defaultPinnedRequest;
+    const { status } = await request(requestOptions, body, options.timeoutMs);
+    if (status >= 200 && status < 300) return { ok: true, status };
+    return { ok: false, status, reason: `webhook returned status ${status}` };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : 'webhook request failed' };
   }
-  if (addresses.length === 0) {
-    return { ok: false, reason: 'webhook url host could not be resolved' };
-  }
-
-  const hasBlockedAddress = addresses.some(({ address, family }) =>
-    family === 4 ? isBlockedIpv4(address) : isBlockedIpv6(address));
-  if (hasBlockedAddress) {
-    return { ok: false, reason: 'webhook url resolves to a restricted IP address' };
-  }
-
-  return { ok: true, url };
 }

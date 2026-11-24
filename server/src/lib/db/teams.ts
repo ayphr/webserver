@@ -11,6 +11,7 @@ import { getSharedSeatCount, getTeamSeatLimit as getPolicySeatLimit } from '../t
 import {
   syncTeamMemberSubscriptions,
 } from '../teamBillingSync';
+import { canManageTeamRole } from '../teamAccess';
 
 export { countTeamAuditLogs, getTeamAuditLogs, listTeamAuditLogs, logTeamAudit } from '../teamAuditService';
 export {
@@ -280,13 +281,18 @@ export async function getTeamMembers(teamId: string): Promise<User[]> {
   return users.find({ $or: [{ teamId: teamId }, { teamIds: teamId }] }).toArray();
 }
 
-export function isTeamManager(user: Pick<User, 'uuid' | 'teamId' | 'teamRole'>, team: Team | null): boolean {
+export function isTeamManager(
+  user: Pick<User, 'uuid' | 'teamRoles'>,
+  team: Team | null,
+): boolean {
   if (!team) return false;
-  if (team.managerUuid === user.uuid) return true;
-  return user.teamRole === 'manager';
+  return canManageTeamRole(user, team);
 }
 
-export function canManageTeam(user: Pick<User, 'uuid' | 'teamId' | 'teamRole'>, team: Team | null): boolean {
+export function canManageTeam(
+  user: Pick<User, 'uuid' | 'teamRoles'>,
+  team: Team | null,
+): boolean {
   return isTeamManager(user, team);
 }
 
@@ -316,8 +322,15 @@ export async function updateTeamName(team: Team, actor: User, name: string): Pro
   });
   const updated = await getTeamById(team.id);
   return updated ?? { ...team, name, updatedAt: now };
-}export function getTeamRole(user: Pick<User, 'teamRole'>): TeamRole {
-  return (user.teamRole as TeamRole) ?? 'member';
+}
+
+/**
+ * Legacy display hint for the currently active team. Callers making an
+ * authorization decision must use `getTeamMemberRole(user, team)` instead.
+ */
+export function getTeamRole(user: Pick<User, 'teamId' | 'teamRole' | 'teamRoles'>): TeamRole {
+  const scoped = user.teamId ? user.teamRoles?.[user.teamId] : undefined;
+  return scoped ?? (user.teamRole as TeamRole | undefined) ?? 'member';
 }
 
 export async function addTeamMember(params: {

@@ -1,10 +1,10 @@
 /** Shared Chart.js palette so every graph uses the same theme. */
 export const CHART_COLORS = {
-  tooltipBackground: 'rgba(18, 18, 18, 0.96)',
-  tooltipTitle: 'hsla(180, 67%, 99%, 1)',
-  mutedText: 'hsl(180, 1%, 53%)',
-  border: 'rgba(255, 255, 255, 0.15)',
-  grid: 'rgba(255, 255, 255, 0.08)',
+  tooltipBackground: 'var(--chart-tooltip-bg)',
+  tooltipTitle: 'var(--text-primary)',
+  mutedText: 'var(--text-muted)',
+  border: 'var(--chart-border)',
+  grid: 'var(--chart-grid)',
 } as const;
 
 /** Resolves a CSS custom property (e.g. `var(--text-primary)`) to its computed value. */
@@ -90,14 +90,14 @@ export function createLineGraphConfig({
       legend: {
         display: showLegend,
         ...(styledLegend
-          ? { position: 'top' as const, labels: { color: CHART_COLORS.tooltipTitle, boxWidth: 16, padding: 14 } }
+          ? { position: 'top' as const, labels: { color: resolveCssColor(CHART_COLORS.tooltipTitle), boxWidth: 16, padding: 14 } }
           : {}),
       },
       tooltip: {
-        backgroundColor: CHART_COLORS.tooltipBackground,
-        titleColor: CHART_COLORS.tooltipTitle,
-        bodyColor: CHART_COLORS.mutedText,
-        borderColor: CHART_COLORS.border,
+        backgroundColor: resolveCssColor(CHART_COLORS.tooltipBackground),
+        titleColor: resolveCssColor(CHART_COLORS.tooltipTitle),
+        bodyColor: resolveCssColor(CHART_COLORS.mutedText),
+        borderColor: resolveCssColor(CHART_COLORS.border),
         borderWidth: 1,
         padding: 10,
         callbacks: tooltipCallbacks ?? {},

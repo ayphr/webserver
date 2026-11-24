@@ -21,7 +21,7 @@
 
 .bio-editor__wrap:focus-within {
   border-color: var(--text-primary);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 2px var(--surface-overlay-border);
 }
 
 .bio-editor__surface {
@@ -59,7 +59,7 @@
 }
 
 .bio-editor__surface::selection {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--surface-overlay-strong);
 }
 
 .bio-editor__footer {

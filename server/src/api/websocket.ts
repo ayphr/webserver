@@ -7,16 +7,19 @@ import {
   ASSISTANT_TOOL_DEFINITIONS,
   ASSISTANT_TOOL_PERMISSION_DECISIONS,
   ASSISTANT_VARIANTS,
+  DEFAULT_ASSISTANT_PREFERENCES,
   describeAssistantToolChange,
   isAssistantMutationTool,
-  estimateAssistantUsageCredits,
+  isAssistantToolName,
   estimateTokens,
   getAssistantModel,
+  normalizeAssistantToolInput,
   planAssistantContext,
   toContextMessages,
   type AssistantContextMessage,
   type AssistantContextUsage,
   type AssistantMessage,
+  type AssistantState,
   type AssistantToolResult,
   type AssistantUserQuestion,
   type AssistantMode,
@@ -31,6 +34,14 @@ import {
   type AssistantToolStatus,
   type AssistantVariant,
 } from '@common';
+import {
+  detectSafetyCategories,
+  noticeForSafetyCategories,
+  safeContentForNotice,
+  shouldShortCircuitPrompt,
+  type SafetyNotice,
+} from '../../../common/utils/safety';
+import { estimateAssistantUsageCredits } from '../../../common/utils/assistantPricing';
 import { runBackgroundTask } from '../lib/backgroundTasks';
 import { splitAssistantResponseIntoTokens } from '../lib/assistantStream';
 import { summarizeAssistantContext } from '../lib/assistantContextSummary';
@@ -41,7 +52,7 @@ import {
 } from '../lib/assistantModel';
 import { buildAssistantSystemPrompt } from '../lib/geminiAdapter';
 import { executeAssistantTool } from '../lib/assistantTools';
-import { detectSafetyCategories, redactPII } from '@common';
+import { redactPII } from '@common';
 import { getUserFromUuid } from '../lib/db';
 import { getTeamForUser } from '../lib/db/teams';
 import { logTeamAudit } from '../lib/teamAuditService';
@@ -63,10 +74,9 @@ import {
 import { notifyUser } from '../lib/notifications';
 import { getUserFromToken } from './auth';
 import {
-  consumeCredits,
   getCreditBalanceFromUuid,
   holdCredits,
-  releaseCredits,
+  settleCreditHold,
 } from '../lib/credits';
 
 const log = createLogger('assistant-websocket');
@@ -94,15 +104,19 @@ type Timer = ReturnType<typeof setTimeout>;
 
 type ActiveStream = {
   cancelled: boolean;
+  /** Live timers (overall deadline and interactive waits) for this stream. */
   timers: Set<Timer>;
-  /** Serializes the initial prompt write ahead of the final response write. */
-  persistStart?: Promise<void>;
-  orphaned?: boolean;
+  /** Guards the active-stream gauge across cancel, completion and socket close. */
+  gaugeReleased: boolean;
+  detached: boolean;
+  /** Rejects a pending permission/answer wait so credits cannot be held forever. */
   onOrphaned?: () => void;
   /** Aborts the in-flight provider request so streaming stops immediately. */
   onAbort?: () => void;
-  /** Releases any credit hold and charges the credits actually used. */
+  /** Releases the hold and charges the credits actually used. */
   onSettle?: () => Promise<number>;
+  /** Resolves the stream's lifetime once cancellation has been handled. */
+  onFinish?: () => void;
 };
 type ActiveStreams = Map<string, ActiveStream>;
 type ToolPermissionHandler = (
@@ -114,9 +128,12 @@ type ToolResponseHandler = (
   answers: Record<string, string>,
   customAnswer?: string,
 ) => void;
+type HandlerMap<T> = Map<AssistantWebSocket, Map<string, T>>;
 
 const MAX_CONCURRENT_STREAMS = 8;
 const AUTH_TIMEOUT_MS = 10_000;
+const DEFAULT_STREAM_TIMEOUT_MS = 5 * 60_000;
+const USER_QUESTION_TIMEOUT_MS = 60_000;
 const DEFAULT_TASK_LINK = '/dashboard';
 /** Task mode may chain many tool rounds; chat is capped much lower. */
 const MAX_CHAT_TOOL_ROUNDS = 8;
@@ -136,11 +153,20 @@ const notificationLevelFor = (
   level: AssistantNotificationLevel,
 ): AssistantNotificationLevel => (mode === 'task' ? level : 'never');
 
+const streamTimeoutMs = (): number => {
+  const configured = Number(process.env.ASSISTANT_STREAM_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? Math.min(configured, 60 * 60_000)
+    : DEFAULT_STREAM_TIMEOUT_MS;
+};
+
 const activeStreams = new Map<AssistantWebSocket, ActiveStreams>();
 const authTimers = new Map<AssistantWebSocket, Timer>();
 const messageQueues = new Map<AssistantWebSocket, Promise<void>>();
-const toolPermissionHandlers = new Map<string, ToolPermissionHandler>();
-const toolResponseHandlers = new Map<string, ToolResponseHandler>();
+// Handler maps are scoped by socket: a decision on one connection must never
+// approve or answer a tool call made on another connection.
+const toolPermissionHandlers: HandlerMap<ToolPermissionHandler> = new Map();
+const toolResponseHandlers: HandlerMap<ToolResponseHandler> = new Map();
 
 const isOneOf = <T extends string>(values: readonly T[], value: unknown): value is T =>
   typeof value === 'string' && values.includes(value as T);
@@ -161,6 +187,48 @@ const rejectUnauthenticated = (ws: AssistantWebSocket, error: string) => {
 const clearTimers = (timers: Set<Timer>) => {
   for (const timer of timers) clearTimeout(timer);
   timers.clear();
+};
+
+const handlersFor = <T>(
+  map: HandlerMap<T>,
+  ws: AssistantWebSocket,
+  create = false,
+): Map<string, T> | undefined => {
+  const existing = map.get(ws);
+  if (existing) return existing;
+  if (!create) return undefined;
+  const created = new Map<string, T>();
+  map.set(ws, created);
+  return created;
+};
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const TOOL_NAME_PATTERN = new RegExp(
+  `\\b(?:${Object.keys(ASSISTANT_TOOL_DEFINITIONS).map(escapeRegExp).join('|')})\\b`,
+  'g',
+);
+const INTERNAL_DETAIL_PATTERNS = [
+  /\b(?:gemini|google)[- ]?\d+(?:\.\d+)*[-a-z]*\b/gi,
+  /\b(?:gemini-tool|call|req)-[A-Za-z0-9_-]{4,}\b/gi,
+  /\b(?:\/v1beta\/|v1beta\/)[A-Za-z0-9_/-]*\b/gi,
+  /\b\/ws\/assistant\b/g,
+  /\b(?:assistantStates|creditTransactions|teamAuditLogs|streamResults)\b/gi,
+  /\b(?:team|user|chat|alert|notification|session|device|location)_[A-Za-z0-9_-]{6,}\b/gi,
+  /\b(?:system_instruction|generation_config|call_id|toolId|referenceId|onHold|monthlyUsed|isError|x-goog-api-key)\b/gi,
+  /\$?0\.005\b/g,
+];
+
+/** Keeps model output free of internal identifiers, paths and cost arithmetic. */
+export const scrubInternalDetails = (text: string, requestId?: string): string => {
+  let result = text.replace(TOOL_NAME_PATTERN, 'the workspace lookup');
+  for (const pattern of INTERNAL_DETAIL_PATTERNS) {
+    result = result.replace(pattern, '[internal detail]');
+  }
+  if (requestId && requestId.length > 3) {
+    result = result.split(requestId).join('[internal detail]');
+  }
+  return result;
 };
 
 /** Assistant notifications are deliberately generic across chats and tasks. */
@@ -215,7 +283,7 @@ type StreamResultInput = {
   content?: string;
   thinking?: NonNullable<AssistantMessage['thinking']>;
   tools?: NonNullable<AssistantMessage['tools']>;
-  safetyNotice?: 'refusal' | 'crisis' | 'csam';
+  safetyNotice?: SafetyNotice;
   durationMs?: number;
   creditCost?: number;
   notificationLevel: AssistantNotificationLevel;
@@ -280,6 +348,33 @@ const persistStreamResult = async (input: StreamResultInput): Promise<void> => {
   }
 };
 
+/**
+ * Detaches a stream from all socket-keyed maps exactly once. `onOrphaned` runs
+ * before the handler maps are deleted so a pending tool question or approval
+ * is rejected instead of being left waiting with a credit hold in place.
+ */
+const detachStream = (
+  ws: AssistantWebSocket,
+  requestId: string,
+  stream: ActiveStream,
+  options: { clearTimers?: boolean } = {},
+) => {
+  if (!stream.detached) {
+    stream.detached = true;
+    stream.onOrphaned?.();
+    stream.onOrphaned = undefined;
+    if (options.clearTimers !== false) clearTimers(stream.timers);
+    const streams = activeStreams.get(ws);
+    if (streams?.get(requestId) === stream) streams.delete(requestId);
+    handlersFor(toolPermissionHandlers, ws)?.delete(requestId);
+    handlersFor(toolResponseHandlers, ws)?.delete(requestId);
+  }
+  if (!stream.gaugeReleased) {
+    stream.gaugeReleased = true;
+    assistantActiveStreams.dec();
+  }
+};
+
 const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
   const streams = activeStreams.get(ws);
   const stream = streams?.get(requestId);
@@ -287,17 +382,14 @@ const cancelStream = (ws: AssistantWebSocket, requestId: string) => {
 
   stream.cancelled = true;
   stream.onAbort?.();
-  assistantActiveStreams.dec();
+  detachStream(ws, requestId, stream);
+  stream.onFinish?.();
   assistantWebsocketEventsTotal.labels('cancel', 'ok').inc();
   if (stream.onSettle) {
     void stream.onSettle().catch((error: unknown) => {
       log.warn({ error, requestId }, 'failed to settle assistant credits after cancel');
     });
   }
-  clearTimers(stream.timers);
-  streams.delete(requestId);
-  toolPermissionHandlers.delete(requestId);
-  toolResponseHandlers.delete(requestId);
 };
 
 const isMode = (value: unknown): value is AssistantMode =>
@@ -323,9 +415,10 @@ const prepareContext = async (
   variant: AssistantVariant,
   prompt: string | undefined,
   trigger: 'stream' | 'manual',
+  state?: AssistantState | null,
 ): Promise<PreparedContext> => {
-  const state = chatId ? await getAssistantState(userUuid) : null;
-  const chat = state?.chats.find((item) => item.id === chatId);
+  const assistantState = state ?? (chatId ? await getAssistantState(userUuid) : null);
+  const chat = assistantState?.chats.find((item) => item.id === chatId);
   let plan = planAssistantContext({ chat, variant, prompt });
   let summary = chat?.contextSummary;
 
@@ -372,9 +465,6 @@ const startStream = async (
   requestId: string,
   mode: AssistantMode,
   variant: AssistantVariant,
-  permissionLevel: AssistantPermissionLevel,
-  allowedTools: string[],
-  notificationLevel: AssistantNotificationLevel,
   chatId: string | undefined,
   messageId: number | undefined,
   prompt: string | undefined,
@@ -384,872 +474,1087 @@ const startStream = async (
   if (!streams) return;
 
   const notificationLink = assistantChatLink(chatId);
-  const effectiveNotificationLevel = notificationLevelFor(mode, notificationLevel);
   cancelStream(ws, requestId);
   if (streams.size >= MAX_CONCURRENT_STREAMS) {
     send(ws, { type: 'error', requestId, error: 'Too many active streams' });
-    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
+    notifyTaskUser(userUuid, notificationLink, 'never', false);
     return;
   }
 
-  const context = await prepareContext(userUuid, chatId, variant, prompt, 'stream');
-  send(ws, {
-    type: 'context',
-    requestId,
-    usage: context.usage,
-    ...(context.summary ? { summary: context.summary } : {}),
+  // Register the stream before any await so an early cancel is not lost while
+  // preferences or context are being loaded.
+  const abortController = new AbortController();
+  const stream: ActiveStream = {
+    cancelled: false,
+    timers: new Set(),
+    gaugeReleased: false,
+    detached: false,
+    onAbort: () => abortController.abort(),
+  };
+  // Tool rounds and permission waits continue after this function reaches the
+  // scheduler. Keep it alive until one of those paths finishes explicitly.
+  let resolveAsyncCompletion!: () => void;
+  const asyncCompletion = new Promise<void>((resolve) => {
+    resolveAsyncCompletion = resolve;
   });
+  stream.onFinish = resolveAsyncCompletion;
+  streams.set(requestId, stream);
+  assistantActiveStreams.inc();
+  assistantWebsocketEventsTotal.labels('stream', 'started').inc();
 
-  const modelId = context.usage.modelId;
-  const systemPromptTokens = estimateTokens(buildAssistantSystemPrompt());
+  let holdSucceeded = false;
+  let reservedCredits = 0;
+  let settledCredits = false;
+  let settlementPromise: Promise<number> | undefined;
+  let emittedText = '';
+  let emittedTokenCount = 0;
+  let round = 0;
+  let roundTextStart = 0;
+  let roundTokenStart = 0;
+  let projectedCost = 0;
+  let stopAfterRound = false;
+  let textStopped = false;
+  let rawBuffer = '';
+  let completed = false;
+  let failureNotified = false;
+  let safetyNotice: SafetyNotice | undefined;
+  let safetyNoticeSent = false;
+  let pendingToolId: string | null = null;
+  let index = 0;
+  let toolCursor = 0;
+  const startedAt = Date.now();
+  const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
+  const toolSignatures = new Map<string, string>();
+  const toolResults = new Map<string, AssistantToolResult>();
+  const permissionDecisions = new Map<string, AssistantToolPermissionDecision>();
+  const pendingAudits: Promise<void>[] = [];
+  const seenSafetyCategories = new Set<string>();
+  const promptCategories = prompt ? detectSafetyCategories(prompt) : [];
+  const promptCategorySet = new Set<string>(promptCategories);
+  const allThinking: NonNullable<AssistantMessage['thinking']> = [];
+  const allTools: AssistantToolCall[] = [];
+  const allUsage = { inputTokens: 0, outputTokens: 0 };
+  const knownSerials = new Set<string>();
+  const redactedPrompt = prompt ? redactPII(prompt) : undefined;
+  let effectiveNotificationLevel: AssistantNotificationLevel =
+    DEFAULT_ASSISTANT_PREFERENCES.notificationLevel;
+  let effectivePermissionLevel: AssistantPermissionLevel = DEFAULT_ASSISTANT_PREFERENCES.permissionLevel;
+  let allowedToolNames = new Set<string>();
+  let context!: PreparedContext;
+  let currentDraft!: AssistantModelDraft;
+  let tokens: string[] = [];
+
+  /** Completion notifications stay task-only; question prompts use the raw preference. */
+  const taskNotificationLevel = () => notificationLevelFor(mode, effectiveNotificationLevel);
+
+  const notifyFailure = () => {
+    if (failureNotified) return;
+    failureNotified = true;
+    notifyTaskUser(userUuid, notificationLink, taskNotificationLevel(), false);
+  };
+
   const rejectInsufficientCredits = () => {
     send(ws, { type: 'error', requestId, error: 'insufficient credits' });
-    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
+    notifyFailure();
   };
 
-  // Reserve enough credits for the first request before any model work happens.
-  // Each continuation round reserves its own estimate before the provider call.
-  let reservedCredits = estimateAssistantUsageCredits(modelId, {
-    inputTokens: context.usage.usedTokens + systemPromptTokens,
-    outputTokens: Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
-  });
-  const creditBalance = await getCreditBalanceFromUuid(userUuid);
-  if (!creditBalance || creditBalance.available < reservedCredits) {
-    rejectInsufficientCredits();
-    return;
-  }
-  const hold = await holdCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_reserve' });
-  if (!hold?.changed) {
-    rejectInsufficientCredits();
-    return;
-  }
-
-  /**
-   * Reserves credits for a continuation round. The additional hold is included
-   * in the final settlement and in the running-cost interruption check.
-   */
-  const holdMoreCredits = async (amount: number): Promise<boolean> => {
-    if (!Number.isFinite(amount) || amount <= 0) return true;
-    const balance = await getCreditBalanceFromUuid(userUuid);
-    if (!balance || balance.available < amount) return false;
-    const additional = await holdCredits(userUuid, amount, undefined, { referenceId: requestId, reason: 'assistant_stream_continuation' });
-    if (!additional?.changed) return false;
-    reservedCredits += amount;
-    return true;
-  };
-
-  const estimateRoundCredits = (inputTokens: number, outputTokens: number) =>
-    estimateAssistantUsageCredits(modelId, { inputTokens, outputTokens });
-
-  const promptCategories = prompt ? detectSafetyCategories(prompt) : [];
-  if (prompt) {
-    for (const category of promptCategories) {
-      assistantSafetyEventsTotal.labels(category, 'user').inc();
-    }
-  }
-  const redactedPrompt = prompt ? redactPII(prompt) : undefined;
-  let safetyNotice: 'refusal' | 'crisis' | 'csam' | undefined;
-  let safetyNoticeSent = false;
-
-  const reportSafety = (notice: NonNullable<typeof safetyNotice>) => {
+  const reportSafety = (notice: NonNullable<SafetyNotice>) => {
     safetyNotice = notice;
     if (safetyNoticeSent) return;
     safetyNoticeSent = true;
     send(ws, { type: 'safety', requestId, notice });
   };
 
-  const noticeForCategories = (categories: readonly string[]): NonNullable<typeof safetyNotice> | undefined => {
-    const isSuicidal = categories.includes('suicidal');
-    // Suicidal intent should not be misclassified as ordinary violence.
-    const highRisk = categories.filter(
-      (category) => category !== 'suicidal' && !(isSuicidal && category === 'violence'),
-    );
-    if (highRisk.includes('csam') || highRisk.includes('child_abuse')) return 'csam';
-    if (highRisk.length > 0) return 'refusal';
-    if (isSuicidal) return 'crisis';
-    return undefined;
-  };
-
-  // Device serials are numeric and can look exactly like phone numbers. Keep
-  // the ones returned by tools so redaction does not corrupt their values.
-  const knownSerials = new Set<string>();
-  const collectSerials = (value: unknown) => {
-    if (Array.isArray(value)) {
-      value.forEach(collectSerials);
-      return;
-    }
-    if (typeof value !== 'object' || value === null) return;
-    for (const [key, item] of Object.entries(value)) {
-      if (
-        (key === 'serial' || key === 'deviceSerial' || key === 'deviceId') &&
-        (typeof item === 'number' || typeof item === 'string') &&
-        /^\d{6,16}$/.test(String(item))
-      ) {
-        knownSerials.add(String(item));
-      }
-      collectSerials(item);
-    }
-  };
-
-  const startedAt = Date.now();
-  const thinkingStatuses = new Map<string, AssistantThinkingStatus>();
-  const toolSignatures = new Map<string, string>();
-  const toolResults = new Map<string, AssistantToolResult>();
-  const permissionDecisions = new Map<string, AssistantToolPermissionDecision>();
-  const allowedToolNames = new Set(allowedTools);
-
-  let settledCredits = false;
-  let emittedText = '';
-  let emittedTokenCount = 0;
-  let round = 0;
-  let projectedCost = 0;
-  let roundTextStart = 0;
-  let stopAfterRound = false;
-  let textStopped = false;
-  let rawBuffer = '';
-  const allThinking: NonNullable<AssistantMessage['thinking']> = [];
-  const allTools: AssistantToolCall[] = [];
-  const allUsage = { inputTokens: 0, outputTokens: 0 };
-
-  const abortController = new AbortController();
-  const stream: ActiveStream = {
-    cancelled: false,
-    timers: new Set(),
-    onAbort: () => abortController.abort(),
-  };
-  streams.set(requestId, stream);
-  assistantActiveStreams.inc();
-  assistantWebsocketEventsTotal.labels('stream', 'started').inc();
-
-  const promptNotice = noticeForCategories(promptCategories);
-  if (promptNotice) {
-    stopAfterRound = true;
-    textStopped = true;
-    reportSafety(promptNotice);
-  }
-
-  /** Emits one already-validated token to the client in arrival order. */
-  const emitLiveToken = (token: string) => {
-    if (stream.cancelled || textStopped) return;
-    const tokenIndex = emittedTokenCount;
-    emittedText += token;
-    emittedTokenCount += 1;
-    send(ws, { type: 'token', requestId, token, index: tokenIndex });
-  };
-
-  /** Holds back the tail of the stream so PII patterns cannot span redaction boundaries. */
-  const flushRawText = (final = false) => {
-    const keep = final ? 0 : 48;
-    if (rawBuffer.length <= keep) return;
-    const cut = rawBuffer.length - keep;
-    const chunk = rawBuffer.slice(0, cut);
-    rawBuffer = rawBuffer.slice(cut);
-    const safe = redactPII(chunk, [...knownSerials]);
-    if (!safe) return;
-    const combined = [...new Set([...promptCategories, ...detectSafetyCategories(safe)])];
-    const notice = noticeForCategories(combined);
-    if (notice) {
-      textStopped = true;
-      emittedText = emittedText.slice(0, roundTextStart);
-      for (const category of combined) assistantSafetyEventsTotal.labels(category, 'assistant').inc();
-      reportSafety(notice);
-      return;
-    }
-    for (const token of splitAssistantResponseIntoTokens(safe)) emitLiveToken(token);
-  };
-
-  const generateDraft = (options: {
-    continuation?: AssistantModelDraft['continuation'];
-    toolResults?: AssistantModelToolResult[];
-    disableTools?: boolean;
-  }): Promise<AssistantModelDraft> =>
-    getAssistantModelAdapter().generate(
-      {
-        mode,
-        variant,
-        modelId,
-        messages: context.contextMessages,
-        usage: context.usage,
-        signal: abortController.signal,
-        ...options,
-      },
-      {
-        onTextDelta: (delta) => {
-          if (stream.cancelled || textStopped) return;
-          rawBuffer += delta;
-          flushRawText();
-        },
-      },
-    );
-
-  /**
-   * Final safety pass on the assembled draft. Live text was already validated
-   * and redacted while streaming, so this mainly protects tool-only rounds.
-   */
-  const applyDraftSafety = (draft: AssistantModelDraft): boolean => {
-    const assistantCategories = detectSafetyCategories(draft.content);
-    for (const category of assistantCategories) {
+  const countAssistantSafety = (categories: readonly string[]) => {
+    for (const category of new Set(categories)) {
+      // Prompt categories were already counted as user events; counting them
+      // again as assistant events inflated the safety metrics.
+      if (promptCategorySet.has(category) || seenSafetyCategories.has(category)) continue;
+      seenSafetyCategories.add(category);
       assistantSafetyEventsTotal.labels(category, 'assistant').inc();
     }
-
-    const combinedCategories = [...new Set([...promptCategories, ...assistantCategories])];
-    const notice = noticeForCategories(combinedCategories);
-
-    if (notice) {
-      reportSafety(notice);
-      draft.content = '';
-      draft.thinking = [];
-      draft.tools = [];
-      draft.continuation = undefined;
-    }
-    draft.content = redactPII(draft.content, [...knownSerials]);
-    return Boolean(notice);
   };
 
-  let currentDraft: AssistantModelDraft;
-  try {
-    currentDraft = withToolPreviews(await generateDraft({}), [...knownSerials]);
-  } catch (error) {
-    if (streams.get(requestId) === stream) streams.delete(requestId);
-    assistantActiveStreams.dec();
-    await releaseCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_release' }).catch((releaseError: unknown) => {
-      log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
-    });
-    // Cancelling aborts the provider request; that rejection is expected.
-    if (stream.cancelled) return;
-    log.warn({ error, userUuid, chatId, variant }, 'assistant model request failed');
-    send(ws, {
-      type: 'error',
-      requestId,
-      error: error instanceof Error && error.message.includes('GEMINI_API_KEY')
-        ? error.message
-        : 'Model request failed',
-    });
-    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
-    return;
-  }
-
-  flushRawText(true);
-  stopAfterRound = applyDraftSafety(currentDraft);
-
-  // Text was emitted live from provider deltas. Keep the scheduler's token list
-  // empty so it advances straight to tool execution and completion.
-  let tokens: string[] = [];
-
-  /** Accumulates a round's output and its projected cost for credit tracking. */
-  const addDraftToTotals = (draft: AssistantModelDraft) => {
-    allThinking.push(...draft.thinking);
-    allTools.push(...draft.tools);
-    const usage = draft.usage ?? {
-      inputTokens: context.usage.usedTokens + estimateTokens(emittedText),
-      outputTokens: estimateTokens(
-        `${draft.content}\n${draft.tools.map((tool) => JSON.stringify(tool.input ?? {})).join('\n')}`,
-      ),
-    };
-    allUsage.inputTokens += usage.inputTokens;
-    allUsage.outputTokens += usage.outputTokens;
-    projectedCost += estimateAssistantUsageCredits(modelId, usage);
-  };
-  addDraftToTotals(currentDraft);
-
-  // A provider can report more usage than the preflight estimate. Reserve the
-  // difference before streaming so the running-cost guard stays meaningful.
-  if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
-    if (streams.get(requestId) === stream) streams.delete(requestId);
-    assistantActiveStreams.dec();
-    await releaseCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_release' }).catch((releaseError: unknown) => {
-      log.warn({ releaseError, userUuid }, 'failed to release assistant credit hold');
-    });
-    rejectInsufficientCredits();
-    return;
-  }
-
-  const settleCredits = async (): Promise<number> => {
-    if (settledCredits) return 0;
+  const settleCredits = (): Promise<number> => {
+    if (settlementPromise) return settlementPromise;
     settledCredits = true;
-    await releaseCredits(userUuid, reservedCredits, undefined, { referenceId: requestId, reason: 'assistant_stream_release' }).catch((error: unknown) => {
-      log.warn({ error, userUuid }, 'failed to release assistant credit hold');
+    settlementPromise = (async () => {
+      if (!holdSucceeded || reservedCredits <= 0) return 0;
+      const pricingDate = new Date();
+      const cost = Math.min(
+        reservedCredits,
+        estimateAssistantUsageCredits(
+          context.usage.modelId,
+          {
+            inputTokens: allUsage.inputTokens || context.usage.usedTokens,
+            outputTokens: allUsage.outputTokens || estimateTokens(emittedText),
+          },
+          pricingDate,
+        ),
+      );
+      return settleCreditHold(userUuid, reservedCredits, cost, {
+        referenceId: requestId,
+        reason: 'assistant_stream',
+      });
+    })().catch((error: unknown) => {
+      log.warn({ error, userUuid, requestId }, 'assistant credit settlement failed');
+      return -1;
     });
-    // The hold was sized to cover every round. Capping the final charge keeps
-    // settlement from failing after a response has already been delivered if a
-    // provider reports slightly more usage than the estimate.
-    const cost = Math.min(
-      reservedCredits,
-      estimateAssistantUsageCredits(modelId, {
-        inputTokens: allUsage.inputTokens || context.usage.usedTokens,
-        outputTokens: allUsage.outputTokens || estimateTokens(emittedText),
-      }),
-    );
-    const result = await consumeCredits(userUuid, cost, undefined, { referenceId: requestId, reason: 'assistant_stream_charge' });
-    if (cost > 0 && !result?.changed) return -1;
-    return cost;
+    return settlementPromise;
   };
+  // Install the fallback as soon as the stream is registered; before the
+  // provider call it is a no-op, afterwards it releases any successful hold.
   stream.onSettle = settleCredits;
 
-  let index = 0;
-  let toolCursor = 0;
-  let completed = false;
-  let pendingToolId: string | null = null;
+  const overallTimer = setTimeout(() => {
+    if (stream.cancelled || completed || stream.detached) return;
+    stream.onAbort?.();
+    send(ws, { type: 'error', requestId, error: 'Assistant took too long to respond' });
+    stream.cancelled = true;
+    detachStream(ws, requestId, stream);
+    assistantStreamsTotal.labels(mode, variant, 'error').inc();
+    void settleCredits();
+    notifyFailure();
+    resolveAsyncCompletion();
+  }, streamTimeoutMs());
+  stream.timers.add(overallTimer);
 
-  const needsPermission = (name: string) => {
-    if (permissionLevel === 'never-ask') return false;
-    if (allowedToolNames.has(name)) return false;
-    if (permissionLevel === 'always-ask') return true;
-    const definition =
-      ASSISTANT_TOOL_DEFINITIONS[name as keyof typeof ASSISTANT_TOOL_DEFINITIONS];
-    return Boolean(definition?.sensitive || definition?.interactive);
-  };
+  const toolKey = (id: string) => `${round}:${id}`;
 
-  const stageIndexFor = (length: number) => {
-    if (length === 0) return -1;
-    if (tokens.length === 0) return 0;
-    return Math.min(length - 1, Math.floor((index / tokens.length) * length));
-  };
+  try {
+    const state = await getAssistantState(userUuid);
+    if (stream.cancelled) return;
 
-  const emitThinking = (forceDone = false) => {
-    const active = stageIndexFor(currentDraft.thinking.length);
-    currentDraft.thinking.forEach((base, stageIndex) => {
-      const status: AssistantThinkingStatus = forceDone
-        ? 'done'
-        : stageIndex < active
-          ? 'done'
-          : stageIndex === active
-            ? 'running'
-            : 'pending';
-      if (thinkingStatuses.get(base.id) === status) return;
-      thinkingStatuses.set(base.id, status);
+    // Preferences are authoritative on the server. Client-supplied
+    // permissionLevel/allowedTools/notificationLevel are deliberately ignored.
+    const preferences = state?.preferences ?? DEFAULT_ASSISTANT_PREFERENCES;
+    effectivePermissionLevel = isOneOf(ASSISTANT_PERMISSION_LEVELS, preferences.permissionLevel)
+      ? preferences.permissionLevel
+      : DEFAULT_ASSISTANT_PREFERENCES.permissionLevel;
+    allowedToolNames = new Set(preferences.allowedTools.filter(isAssistantToolName));
+    effectiveNotificationLevel = isOneOf(ASSISTANT_NOTIFICATION_LEVELS, preferences.notificationLevel)
+      ? preferences.notificationLevel
+      : DEFAULT_ASSISTANT_PREFERENCES.notificationLevel;
+
+    for (const category of promptCategories) {
+      assistantSafetyEventsTotal.labels(category, 'user').inc();
+    }
+    for (const category of promptCategories) seenSafetyCategories.add(category);
+
+    const promptNotice = shouldShortCircuitPrompt(promptCategories)
+      ? noticeForSafetyCategories(promptCategories)
+      : undefined;
+    if (promptNotice) {
+      const content = safeContentForNotice(promptNotice);
+      reportSafety(promptNotice);
+      for (const token of splitAssistantResponseIntoTokens(content)) {
+        if (stream.cancelled) return;
+        send(ws, { type: 'token', requestId, token, index: emittedTokenCount });
+        emittedTokenCount += 1;
+      }
+      if (chatId && messageId !== undefined) {
+        await persistStreamResult({
+          userUuid,
+          chatId,
+          messageId,
+          prompt: redactedPrompt,
+          mode,
+          variant,
+          content,
+          safetyNotice: promptNotice,
+          durationMs: Math.max(1, Date.now() - startedAt),
+          creditCost: 0,
+          notificationLevel: taskNotificationLevel(),
+          link: notificationLink,
+        });
+      }
       send(ws, {
-        type: 'thinking',
+        type: 'done',
         requestId,
-        step: {
-          ...base,
-          status,
-          durationMs: status === 'done' ? base.durationMs : undefined,
-        },
+        durationMs: Math.max(1, Date.now() - startedAt),
+        creditCost: 0,
       });
-    });
-  };
+      if (stream.cancelled) return;
+      assistantStreamsTotal.labels(mode, variant, 'success').inc();
+      return;
+    }
 
-  const emitTool = (
-    tool: (typeof currentDraft.tools)[number],
-    status: AssistantToolStatus,
-    permission?: AssistantToolPermission,
-    detail?: string,
-    error?: string,
-  ) => {
-    const signature = `${status}|${permission ?? ''}|${detail ?? ''}|${error ?? ''}`;
-    if (toolSignatures.get(tool.id) === signature) return;
-    toolSignatures.set(tool.id, signature);
+    context = await prepareContext(userUuid, chatId, variant, prompt, 'stream', state);
+    if (stream.cancelled) return;
     send(ws, {
-      type: 'tool',
+      type: 'context',
       requestId,
-      tool: {
-        ...tool,
-        status,
-        detail,
-        error,
-        durationMs: status === 'done' ? tool.durationMs : undefined,
-        permission,
-      },
+      usage: context.usage,
+      ...(context.summary ? { summary: context.summary } : {}),
     });
-  };
 
-  const waitForToolResponse = (toolId: string, question: AssistantUserQuestion) =>
-    new Promise<Record<string, string>>((resolve, reject) => {
-      if (stream.cancelled) {
-        reject(new Error('Stream cancelled'));
+    const modelId = context.usage.modelId;
+    const pricingDate = new Date();
+    const systemPromptTokens = estimateTokens(buildAssistantSystemPrompt());
+    const toolSchemaTokens = estimateTokens(JSON.stringify(ASSISTANT_TOOL_DEFINITIONS));
+    const estimateFor = (inputTokens: number, outputTokens: number) =>
+      estimateAssistantUsageCredits(modelId, { inputTokens, outputTokens }, pricingDate);
+
+    // Reserve enough credits for the first request before any model work happens.
+    // Each continuation round reserves its own estimate before the provider call.
+    reservedCredits = estimateFor(
+      context.usage.usedTokens + systemPromptTokens + toolSchemaTokens,
+      Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
+    );
+    const creditBalance = await getCreditBalanceFromUuid(userUuid);
+    if (stream.cancelled) return;
+    if (!creditBalance || creditBalance.available < reservedCredits) {
+      rejectInsufficientCredits();
+      return;
+    }
+    const hold = await holdCredits(userUuid, reservedCredits, undefined, {
+      referenceId: requestId,
+      reason: 'assistant_stream_reserve',
+    });
+    // The settlement fallback is already installed; an early cancel during
+    // these awaits settles the hold exactly once.
+    if (stream.cancelled) {
+      await settleCredits();
+      return;
+    }
+    if (!hold?.changed) {
+      rejectInsufficientCredits();
+      return;
+    }
+    holdSucceeded = true;
+    if (stream.cancelled) {
+      await settleCredits();
+      return;
+    }
+
+    /**
+     * Reserves credits for a continuation round. The additional hold is included
+     * in the final settlement and in the running-cost interruption check.
+     */
+    const holdMoreCredits = async (amount: number): Promise<boolean> => {
+      if (stream.cancelled) return false;
+      if (!Number.isFinite(amount) || amount <= 0) return true;
+      const balance = await getCreditBalanceFromUuid(userUuid);
+      if (stream.cancelled) return false;
+      if (!balance || balance.available < amount) return false;
+      const additional = await holdCredits(userUuid, amount, undefined, {
+        referenceId: requestId,
+        reason: 'assistant_stream_continuation',
+      });
+      reservedCredits += additional?.changed ? amount : 0;
+      return !stream.cancelled && Boolean(additional?.changed);
+    };
+
+    /** Serials are numeric and can look like phone numbers to PII redaction. */
+    const collectSerials = (value: unknown) => {
+      if (Array.isArray(value)) {
+        value.forEach(collectSerials);
         return;
       }
+      if (typeof value !== 'object' || value === null) return;
+      for (const [key, item] of Object.entries(value)) {
+        if (
+          (key === 'serial' || key === 'deviceSerial' || key === 'deviceId') &&
+          (typeof item === 'number' || typeof item === 'string') &&
+          /^\d{6,16}$/.test(String(item))
+        ) {
+          knownSerials.add(String(item));
+        }
+        collectSerials(item);
+      }
+    };
 
-      send(ws, { type: 'user_question', requestId, toolId, question });
-      notifyUserQuestion(userUuid, notificationLink, notificationLevel);
+    /** Emits one already-validated token to the client in arrival order. */
+    const emitLiveToken = (token: string) => {
+      if (stream.cancelled || textStopped) return;
+      const safeToken = scrubInternalDetails(token, requestId);
+      if (!safeToken) return;
+      const tokenIndex = emittedTokenCount;
+      emittedText += safeToken;
+      emittedTokenCount += 1;
+      send(ws, { type: 'token', requestId, token: safeToken, index: tokenIndex });
+    };
 
-      toolResponseHandlers.set(requestId, (answeredToolId, answers, customAnswer) => {
-        if (answeredToolId !== toolId) return;
-        toolResponseHandlers.delete(requestId);
-        stream.onOrphaned = undefined;
-        resolve({ ...answers, ...(customAnswer ? { custom: customAnswer } : {}) });
-      });
-      stream.onOrphaned = () => {
-        toolResponseHandlers.delete(requestId);
-        reject(new Error('No answer received'));
-      };
-    });
+    /** Holds back the tail so PII patterns cannot span redaction boundaries. */
+    const flushRawText = (final = false) => {
+      const keep = final ? 0 : 48;
+      if (rawBuffer.length <= keep) return;
+      const cut = rawBuffer.length - keep;
+      const chunk = rawBuffer.slice(0, cut);
+      rawBuffer = rawBuffer.slice(cut);
+      const safe = redactPII(chunk, [...knownSerials]);
+      if (!safe) return;
+      const assistantCategories = detectSafetyCategories(safe);
+      const notice = noticeForSafetyCategories(assistantCategories);
+      if (notice) {
+        textStopped = true;
+        countAssistantSafety(assistantCategories);
+        emittedText = emittedText.slice(0, roundTextStart);
+        emittedTokenCount = roundTokenStart;
+        reportSafety(notice);
+        return;
+      }
+      // Whitespace-only live chunks must be kept so words cannot join.
+      for (const token of splitAssistantResponseIntoTokens(safe, { preserveWhitespaceOnly: true })) {
+        emitLiveToken(token);
+      }
+    };
 
-  /** Writes a team audit entry for each successful assistant mutation. */
-  const auditToolMutation = async (
-    base: (typeof currentDraft.tools)[number],
-    result: AssistantToolResult,
-  ) => {
-    if (!isAssistantMutationTool(base.name) || result.status !== 'ok') return;
+    const generateDraft = (options: {
+      continuation?: AssistantModelDraft['continuation'];
+      toolResults?: AssistantModelToolResult[];
+      disableTools?: boolean;
+    }): Promise<AssistantModelDraft> =>
+      getAssistantModelAdapter().generate(
+        {
+          mode,
+          variant,
+          modelId,
+          messages: context.contextMessages,
+          usage: context.usage,
+          signal: abortController.signal,
+          ...options,
+        },
+        {
+          onTextDelta: (delta) => {
+            if (stream.cancelled || textStopped) return;
+            rawBuffer += delta;
+            flushRawText();
+          },
+        },
+      );
+
+    /**
+     * Final safety pass on the assembled draft. Live text was already validated
+     * and redacted while streaming, so this mainly protects tool-only rounds.
+     * If it fires, roll the round's emitted tokens back to the round start so
+     * the persisted content matches the safety card.
+     */
+    const applyDraftSafety = (draft: AssistantModelDraft): boolean => {
+      const assistantCategories = detectSafetyCategories(draft.content);
+      countAssistantSafety(assistantCategories);
+      const notice = noticeForSafetyCategories(assistantCategories);
+      if (notice) {
+        reportSafety(notice);
+        draft.content = '';
+        draft.thinking = [];
+        draft.tools = [];
+        draft.continuation = undefined;
+        emittedText = emittedText.slice(0, roundTextStart);
+        emittedTokenCount = roundTokenStart;
+        textStopped = true;
+        rawBuffer = '';
+      }
+      draft.content = redactPII(draft.content, [...knownSerials]);
+      return Boolean(notice);
+    };
+
     try {
-      const user = await getUserFromUuid(userUuid);
-      if (!user) return;
-      const team = await getTeamForUser(user);
-      if (!team) return;
-      await logTeamAudit({
-        teamId: team.id,
-        actorUuid: user.uuid,
-        actorUsername: user.username,
-        action: `assistant.${base.name}`,
-        details: {
+      currentDraft = withToolPreviews(await generateDraft({}), [...knownSerials]);
+    } catch (error) {
+      if (stream.cancelled) return;
+      log.warn({ error, userUuid, chatId, variant }, 'assistant model request failed');
+      send(ws, {
+        type: 'error',
+        requestId,
+        error: error instanceof Error && error.message.includes('GEMINI_API_KEY')
+          ? error.message
+          : 'Model request failed',
+      });
+      notifyFailure();
+      return;
+    }
+    if (stream.cancelled) return;
+
+    flushRawText(true);
+    stopAfterRound = applyDraftSafety(currentDraft);
+
+    // Text was emitted live from provider deltas. Keep the scheduler's token
+    // list empty so it advances straight to tool execution and completion.
+    tokens = [];
+
+    /** Accumulates a round's output and its projected cost for credit tracking. */
+    const addDraftToTotals = (draft: AssistantModelDraft) => {
+      allThinking.push(...draft.thinking);
+      allTools.push(...draft.tools);
+      const usage = draft.usage ?? {
+        inputTokens:
+          context.usage.usedTokens +
+          systemPromptTokens +
+          toolSchemaTokens +
+          estimateTokens(JSON.stringify(draft.continuation?.steps ?? [])) +
+          estimateTokens(emittedText),
+        outputTokens: estimateTokens(
+          `${draft.content}\n${draft.tools.map((tool) => JSON.stringify(tool.input ?? {})).join('\n')}`,
+        ),
+      };
+      allUsage.inputTokens += usage.inputTokens;
+      allUsage.outputTokens += usage.outputTokens;
+      projectedCost += estimateFor(usage.inputTokens, usage.outputTokens);
+    };
+    addDraftToTotals(currentDraft);
+
+    // A provider can report more usage than the preflight estimate. Reserve the
+    // difference before streaming so the running-cost guard stays meaningful.
+    if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
+      if (!stream.cancelled) rejectInsufficientCredits();
+      return;
+    }
+    if (stream.cancelled) return;
+
+    const needsPermission = (name: string) => {
+      if (effectivePermissionLevel === 'never-ask') return false;
+      if (allowedToolNames.has(name)) return false;
+      if (effectivePermissionLevel === 'always-ask') return true;
+      const definition =
+        ASSISTANT_TOOL_DEFINITIONS[name as keyof typeof ASSISTANT_TOOL_DEFINITIONS];
+      return Boolean(definition?.sensitive || definition?.interactive);
+    };
+
+    const stageIndexFor = (length: number) => {
+      if (length === 0) return -1;
+      if (tokens.length === 0) return 0;
+      return Math.min(length - 1, Math.floor((index / tokens.length) * length));
+    };
+
+    const emitThinking = (forceDone = false) => {
+      const active = stageIndexFor(currentDraft.thinking.length);
+      currentDraft.thinking.forEach((base, stageIndex) => {
+        const status: AssistantThinkingStatus = forceDone
+          ? 'done'
+          : stageIndex < active
+            ? 'done'
+            : stageIndex === active
+              ? 'running'
+              : 'pending';
+        if (thinkingStatuses.get(base.id) === status) return;
+        thinkingStatuses.set(base.id, status);
+        send(ws, {
+          type: 'thinking',
           requestId,
-          toolId: base.id,
-          summary: result.summary,
-          preview: base.preview ?? describeAssistantToolChange(base.name, base.input ?? {}),
+          step: {
+            ...base,
+            status,
+            durationMs: status === 'done' ? base.durationMs : undefined,
+          },
+        });
+      });
+    };
+
+    const emitTool = (
+      tool: (typeof currentDraft.tools)[number],
+      status: AssistantToolStatus,
+      permission?: AssistantToolPermission,
+      detail?: string,
+      error?: string,
+    ) => {
+      const key = toolKey(tool.id);
+      const signature = `${status}|${permission ?? ''}|${detail ?? ''}|${error ?? ''}`;
+      if (toolSignatures.get(key) === signature) return;
+      toolSignatures.set(key, signature);
+      send(ws, {
+        type: 'tool',
+        requestId,
+        tool: {
+          ...tool,
+          status,
+          detail,
+          error,
+          durationMs: status === 'done' ? tool.durationMs : undefined,
+          permission,
         },
       });
-    } catch (error) {
-      log.warn({ error, userUuid, name: base.name }, 'failed to record assistant tool audit');
-    }
-  };
+    };
 
-  const recordToolResult = (
-    base: (typeof currentDraft.tools)[number],
-    result: AssistantToolResult,
-    permission?: AssistantToolPermission,
-  ) => {
-    if (stream.cancelled) return;
-    collectSerials(base.input);
-    collectSerials(result.data);
-    void auditToolMutation(base, result);
-    toolResults.set(base.id, result);
-    send(ws, { type: 'tool_result', requestId, toolId: base.id, result });
-    emitTool(
-      base,
-      result.status === 'ok' ? 'done' : 'error',
-      permission,
-      result.summary,
-      result.error,
-    );
-  };
+    /** Removes PII and internal IDs from JSON string values, preserving keys. */
+    const scrubForProvider = (value: unknown, preserve: readonly string[]): unknown => {
+      if (typeof value === 'string') {
+        return scrubInternalDetails(redactPII(value, [...preserve]), requestId);
+      }
+      if (Array.isArray(value)) return value.map((item) => scrubForProvider(item, preserve));
+      if (isRecord(value)) {
+        return Object.fromEntries(
+          Object.entries(value).map(([key, item]) => [key, scrubForProvider(item, preserve)]),
+        );
+      }
+      return value;
+    };
 
-  const runTool = (
-    base: (typeof currentDraft.tools)[number],
-    permission?: AssistantToolPermission,
-  ) => {
-    void executeAssistantTool(base.name, {
-      userUuid,
-      chatId,
-      requestId,
-      toolId: base.id,
-      input: base.input ?? {},
-      askUser: (question) => waitForToolResponse(base.id, question),
-    })
-      .then((result) => recordToolResult(base, result, permission))
-      .catch((error: unknown) => {
-        recordToolResult(base, {
-          toolId: base.id,
-          name: base.name,
-          status: 'error',
-          summary: 'The tool failed.',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        }, permission);
+    const waitForToolResponse = (toolId: string, question: AssistantUserQuestion) =>
+      new Promise<Record<string, string>>((resolve, reject) => {
+        if (stream.cancelled) {
+          reject(new Error('Stream cancelled'));
+          return;
+        }
+        send(ws, { type: 'user_question', requestId, toolId, question });
+        notifyUserQuestion(userUuid, notificationLink, effectiveNotificationLevel);
+
+        const timer = setTimeout(() => {
+          handlersFor(toolResponseHandlers, ws)?.delete(requestId);
+          stream.onOrphaned = undefined;
+          stream.timers.delete(timer);
+          reject(new Error('No answer received'));
+        }, USER_QUESTION_TIMEOUT_MS);
+        stream.timers.add(timer);
+        const clear = () => {
+          clearTimeout(timer);
+          stream.timers.delete(timer);
+          handlersFor(toolResponseHandlers, ws)?.delete(requestId);
+          stream.onOrphaned = undefined;
+        };
+        const handlers = handlersFor(toolResponseHandlers, ws, true)!;
+        handlers.set(requestId, (answeredToolId, answers, customAnswer) => {
+          if (answeredToolId !== toolId || stream.cancelled) return;
+          clear();
+          resolve({ ...answers, ...(customAnswer ? { custom: customAnswer } : {}) });
+        });
+        // The direct rejection does not depend on the handler map, so
+        // cancellation can safely reject before the maps are deleted.
+        stream.onOrphaned = () => {
+          clear();
+          reject(new Error('No answer received'));
+        };
+      });
+
+    /** Writes a team audit entry at execution time with normalized input. */
+    const auditToolMutation = async (
+      base: (typeof currentDraft.tools)[number],
+      result: AssistantToolResult,
+      normalizedInput: Record<string, unknown>,
+    ) => {
+      if (!isAssistantMutationTool(base.name)) return;
+      try {
+        const user = await getUserFromUuid(userUuid);
+        if (!user) return;
+        const team = await getTeamForUser(user);
+        if (!team) return;
+        await logTeamAudit({
+          teamId: team.id,
+          actorUuid: user.uuid,
+          actorUsername: user.username,
+          action: `assistant.${base.name}`,
+          details: {
+            requestId,
+            toolId: base.id,
+            status: result.status,
+            input: normalizedInput,
+            summary: result.summary,
+            preview: base.preview ?? describeAssistantToolChange(base.name, normalizedInput),
+          },
+        });
+      } catch (error) {
+        log.warn({ error, userUuid, name: base.name }, 'failed to record assistant tool audit');
+      }
+    };
+
+    const recordToolResult = (
+      base: (typeof currentDraft.tools)[number],
+      result: AssistantToolResult,
+      permission?: AssistantToolPermission,
+      options: { audit?: boolean } = {},
+    ) => {
+      if (stream.cancelled) return;
+      collectSerials(base.input);
+      collectSerials(result.data);
+      if (options.audit !== false && isAssistantMutationTool(base.name)) {
+        let normalizedInput: Record<string, unknown> = {};
+        try {
+          normalizedInput = normalizeAssistantToolInput(base.name, base.input ?? {}) as unknown as Record<string, unknown>;
+        } catch (error) {
+          log.warn({ error, name: base.name }, 'invalid mutation input omitted from audit');
+        }
+        pendingAudits.push(auditToolMutation(base, result, normalizedInput));
+      }
+      toolResults.set(toolKey(base.id), result);
+      send(ws, { type: 'tool_result', requestId, toolId: base.id, result });
+      emitTool(
+        base,
+        result.status === 'ok' ? 'done' : 'error',
+        permission,
+        result.summary,
+        result.error,
+      );
+    };
+
+    const runTool = (
+      base: (typeof currentDraft.tools)[number],
+      permission?: AssistantToolPermission,
+    ) => {
+      void executeAssistantTool(base.name, {
+        userUuid,
+        chatId,
+        requestId,
+        toolId: base.id,
+        input: base.input ?? {},
+        askUser: (question) => waitForToolResponse(base.id, question),
       })
-      .finally(() => {
-        if (stream.cancelled) return;
-        pendingToolId = null;
+        .then((result) => recordToolResult(base, result, permission))
+        .catch((error: unknown) => {
+          recordToolResult(base, {
+            toolId: base.id,
+            name: base.name,
+            status: 'error',
+            summary: 'The tool failed.',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }, permission);
+        })
+        .finally(() => {
+          if (stream.cancelled) return;
+          pendingToolId = null;
+          toolCursor += 1;
+          if (tokens.length === 0 && toolCursor < currentDraft.tools.length) {
+            emitTools();
+          } else {
+            emitToken();
+          }
+        });
+    };
+
+    const denyTool = (
+      base: (typeof currentDraft.tools)[number],
+      permission: AssistantToolPermission,
+    ) => {
+      emitTool(base, 'denied', permission, 'Denied by you');
+      recordToolResult(base, {
+        toolId: base.id,
+        name: base.name,
+        status: 'error',
+        summary: 'You denied this tool.',
+        error: 'Denied by you',
+      }, permission, { audit: false });
+    };
+
+    const handlePermissionDecision = (
+      base: (typeof currentDraft.tools)[number],
+      decision: AssistantToolPermissionDecision,
+    ) => {
+      if (stream.cancelled || pendingToolId !== base.id) return;
+      pendingToolId = null;
+      permissionDecisions.set(toolKey(base.id), decision);
+      if (decision === 'deny') {
+        denyTool(base, 'denied');
         toolCursor += 1;
         if (tokens.length === 0 && toolCursor < currentDraft.tools.length) {
           emitTools();
         } else {
           emitToken();
         }
-      });
-  };
+        return;
+      }
+      const permission = decision === 'allow_always' ? 'allowed_always' : 'allowed_once';
+      const label = decision === 'allow_always' ? 'Allowed always' : 'Allowed once';
+      emitTool(base, 'running', permission, label);
+      pendingToolId = base.id;
+      runTool(base, permission);
+    };
 
-  const denyTool = (
-    base: (typeof currentDraft.tools)[number],
-    permission: AssistantToolPermission,
-  ) => {
-    emitTool(base, 'denied', permission, 'Denied by you');
-    recordToolResult(base, {
-      toolId: base.id,
-      name: base.name,
-      status: 'error',
-      summary: 'You denied this tool.',
-      error: 'Denied by you',
-    }, permission);
-  };
-
-  const emitTools = (forceDone = false) => {
-    const active =
-      tokens.length === 0
-        ? Math.min(toolCursor, currentDraft.tools.length - 1)
-        : stageIndexFor(currentDraft.tools.length);
-    currentDraft.tools.forEach((base, stageIndex) => {
-      if (pendingToolId !== null && base.id !== pendingToolId) return;
-
-      if (forceDone) {
-        const decision = permissionDecisions.get(base.id);
-        const result = toolResults.get(base.id);
-        if (decision === 'deny') {
-          emitTool(base, 'denied', 'denied', 'Denied by you');
+    const waitForPermission = (
+      base: (typeof currentDraft.tools)[number],
+    ): Promise<AssistantToolPermissionDecision> =>
+      new Promise((resolve, reject) => {
+        if (stream.cancelled) {
+          reject(new Error('Stream cancelled'));
           return;
         }
-        if (result) {
-          emitTool(
-            base,
-            result.status === 'ok' ? 'done' : 'error',
-            decision === 'allow_always'
+        const timer = setTimeout(() => {
+          handlersFor(toolPermissionHandlers, ws)?.delete(requestId);
+          stream.onOrphaned = undefined;
+          stream.timers.delete(timer);
+          reject(new Error('Permission request timed out'));
+        }, USER_QUESTION_TIMEOUT_MS);
+        stream.timers.add(timer);
+        const clear = () => {
+          clearTimeout(timer);
+          stream.timers.delete(timer);
+          handlersFor(toolPermissionHandlers, ws)?.delete(requestId);
+          stream.onOrphaned = undefined;
+        };
+        const handlers = handlersFor(toolPermissionHandlers, ws, true)!;
+        handlers.set(requestId, (toolId, decision) => {
+          if (toolId !== base.id || stream.cancelled) return;
+          clear();
+          resolve(decision);
+        });
+        stream.onOrphaned = () => {
+          clear();
+          reject(new Error('Permission request orphaned'));
+        };
+      });
+
+    const emitTools = (forceDone = false) => {
+      const active =
+        tokens.length === 0
+          ? Math.min(toolCursor, currentDraft.tools.length - 1)
+          : stageIndexFor(currentDraft.tools.length);
+      currentDraft.tools.forEach((base, stageIndex) => {
+        if (pendingToolId !== null && base.id !== pendingToolId) return;
+
+        if (forceDone) {
+          const decision = permissionDecisions.get(toolKey(base.id));
+          const result = toolResults.get(toolKey(base.id));
+          if (decision === 'deny') {
+            emitTool(base, 'denied', 'denied', 'Denied by you');
+            return;
+          }
+          if (result) {
+            emitTool(
+              base,
+              result.status === 'ok' ? 'done' : 'error',
+              decision === 'allow_always'
+                ? 'allowed_always'
+                : decision === 'allow_once'
+                  ? 'allowed_once'
+                  : undefined,
+              result.summary,
+              result.error,
+            );
+            return;
+          }
+          // A tool that never ran must not be reported as completed.
+          emitTool(base, decision ? 'running' : 'pending', undefined, 'Not run');
+          return;
+        }
+
+        if (stageIndex < active) {
+          const decision = permissionDecisions.get(toolKey(base.id));
+          const result = toolResults.get(toolKey(base.id));
+          const permission = decision
+            ? decision === 'allow_always'
               ? 'allowed_always'
               : decision === 'allow_once'
                 ? 'allowed_once'
-                : undefined,
-            result.summary,
-            result.error,
+                : 'denied'
+            : undefined;
+          emitTool(
+            base,
+            result ? (result.status === 'ok' ? 'done' : 'error') : decision === 'deny' ? 'denied' : 'done',
+            permission,
+            result?.summary,
+            result?.error,
           );
           return;
         }
-        if (decision) {
-          const permission = decision === 'allow_always' ? 'allowed_always' : 'allowed_once';
-          emitTool(base, 'done', permission);
+
+        if (stageIndex !== active || pendingToolId !== null) return;
+
+        if (needsPermission(base.name) && !permissionDecisions.has(toolKey(base.id))) {
+          emitTool(base, 'awaiting_permission', 'pending', 'Waiting for your approval');
+          pendingToolId = base.id;
+          void waitForPermission(base)
+            .then((decision) => handlePermissionDecision(base, decision))
+            .catch(() => {});
+          send(ws, {
+            type: 'tool_permission_request',
+            requestId,
+            tool: {
+              ...base,
+              status: 'awaiting_permission',
+              detail: 'Waiting for your approval',
+              permission: 'pending',
+            },
+          });
           return;
         }
-        emitTool(base, 'done');
-        return;
-      }
 
-      if (stageIndex < active) {
-        const decision = permissionDecisions.get(base.id);
-        const result = toolResults.get(base.id);
-        const permission = decision
-          ? decision === 'allow_always'
+        const decision = permissionDecisions.get(toolKey(base.id));
+        const permission =
+          decision === 'allow_always'
             ? 'allowed_always'
             : decision === 'allow_once'
               ? 'allowed_once'
-              : 'denied'
-          : undefined;
-        emitTool(
-          base,
-          result ? (result.status === 'ok' ? 'done' : 'error') : decision === 'deny' ? 'denied' : 'done',
-          permission,
-          result?.summary,
-          result?.error,
-        );
-        return;
-      }
-
-      if (stageIndex !== active || pendingToolId !== null) return;
-
-      if (needsPermission(base.name) && !permissionDecisions.has(base.id)) {
-        emitTool(base, 'awaiting_permission', 'pending', 'Waiting for your approval');
-        pendingToolId = base.id;
-        toolPermissionHandlers.set(requestId, (toolId, decision) => {
-          if (toolId !== pendingToolId || stream.cancelled) return;
-          pendingToolId = null;
-          stream.onOrphaned = undefined;
-          toolPermissionHandlers.delete(requestId);
-          permissionDecisions.set(toolId, decision);
-
-          if (decision === 'deny') {
-            denyTool(base, 'denied');
-            toolCursor += 1;
-            if (tokens.length === 0 && toolCursor < currentDraft.tools.length) {
-              emitTools();
-            } else {
-              emitToken();
-            }
-            return;
-          }
-
-          const permission = decision === 'allow_always' ? 'allowed_always' : 'allowed_once';
-          const label = decision === 'allow_always' ? 'Allowed always' : 'Allowed once';
-          emitTool(base, 'running', permission, label);
-          pendingToolId = base.id;
-          runTool(base, permission);
-        });
-        stream.onOrphaned = () => {
-          toolPermissionHandlers.get(requestId)?.(base.id, 'deny');
-        };
-        send(ws, {
-          type: 'tool_permission_request',
-          requestId,
-          tool: {
-            ...base,
-            status: 'awaiting_permission',
-            detail: 'Waiting for your approval',
-            permission: 'pending',
-          },
-        });
-        return;
-      }
-
-      const decision = permissionDecisions.get(base.id);
-      const permission =
-        decision === 'allow_always'
-          ? 'allowed_always'
-          : decision === 'allow_once'
-            ? 'allowed_once'
-            : undefined;
-      emitTool(base, 'running', permission, 'Reading data');
-      pendingToolId = base.id;
-      runTool(base, permission);
-    });
-  };
-
-  const failStream = (error: string) => {
-    if (completed || stream.cancelled) return;
-    stream.cancelled = true;
-    clearTimers(stream.timers);
-    if (streams.get(requestId) === stream) streams.delete(requestId);
-    toolPermissionHandlers.delete(requestId);
-    toolResponseHandlers.delete(requestId);
-    // Reject any in-flight interactive tool so its executor can unwind.
-    stream.onOrphaned?.();
-    stream.onOrphaned = undefined;
-    assistantActiveStreams.dec();
-    assistantStreamsTotal.labels(mode, variant, 'error').inc();
-    void settleCredits().finally(() => {
-      send(ws, { type: 'error', requestId, error });
-      notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, false);
-    });
-  };
-
-  const complete = async () => {
-    if (completed || stream.cancelled) return;
-    completed = true;
-
-    emitThinking(true);
-    emitTools(true);
-    clearTimers(stream.timers);
-    if (streams.get(requestId) === stream) streams.delete(requestId);
-    toolPermissionHandlers.delete(requestId);
-    toolResponseHandlers.delete(requestId);
-
-    const durationMs = Math.max(1, Date.now() - startedAt);
-    assistantActiveStreams.dec();
-
-    const creditCost = await settleCredits();
-    if (creditCost < 0) {
-      rejectInsufficientCredits();
-      return;
-    }
-
-    const finalTools: AssistantToolCall[] = allTools.map((base) => {
-      const decision = permissionDecisions.get(base.id);
-      const result = toolResults.get(base.id);
-      const permission =
-        decision === 'allow_always'
-          ? ('allowed_always' as const)
-          : decision === 'allow_once'
-            ? ('allowed_once' as const)
-            : decision === 'deny'
-              ? ('denied' as const)
               : undefined;
+        emitTool(base, 'running', permission, 'Reading data');
+        pendingToolId = base.id;
+        runTool(base, permission);
+      });
+    };
 
-      if (result) {
-        return {
-          ...base,
-          status: result.status === 'ok' ? ('done' as const) : ('error' as const),
-          ...(permission ? { permission } : {}),
-          detail: result.summary,
-          error: result.error,
-          result,
-        };
-      }
-      if (decision === 'deny') {
-        return {
-          ...base,
-          status: 'denied' as const,
-          permission: 'denied' as const,
-          detail: 'Denied by you',
-        };
-      }
-      if (decision) {
-        return {
-          ...base,
-          status: 'done' as const,
-          permission,
-        };
-      }
-      return { ...base, status: 'done' as const };
-    });
+    const failStream = (error: string) => {
+      if (completed || stream.cancelled) return;
+      stream.cancelled = true;
+      detachStream(ws, requestId, stream);
+      assistantStreamsTotal.labels(mode, variant, 'error').inc();
+      void settleCredits().finally(() => {
+        send(ws, { type: 'error', requestId, error });
+        notifyFailure();
+        resolveAsyncCompletion();
+      });
+    };
 
-    assistantStreamsTotal.labels(mode, variant, 'success').inc();
-    assistantStreamDuration.labels(mode, variant).observe(durationMs / 1000);
-    assistantStreamTokensTotal.labels(variant).inc(emittedTokenCount);
-    for (let stepIndex = 0; stepIndex < allThinking.length; stepIndex += 1) {
-      assistantThinkingStepsTotal.labels('done').inc();
-    }
-    for (const tool of finalTools) {
-      assistantToolCallsTotal.labels(tool.name, tool.status).inc();
-    }
+    const complete = async () => {
+      if (completed || stream.cancelled) return;
+      completed = true;
 
-    if (chatId && messageId !== undefined) {
-      if (stream.persistStart) await stream.persistStart;
-      await persistStreamResult({
-        userUuid,
-        chatId,
-        messageId,
-        prompt: redactedPrompt,
-        mode,
-        variant,
-        content: emittedText,
-        safetyNotice,
-        thinking: allThinking.map((step) => ({ ...step, status: 'done' as const })),
-        tools: finalTools,
+      emitThinking(true);
+      emitTools(true);
+      detachStream(ws, requestId, stream);
+
+      const durationMs = Math.max(1, Date.now() - startedAt);
+      let creditCost = 0;
+      let settlementFailed = false;
+      try {
+        const settled = await settleCredits();
+        settlementFailed = settled < 0;
+        if (!settlementFailed) creditCost = settled;
+      } catch (error) {
+        log.warn({ error, userUuid, requestId }, 'unexpected assistant settlement error');
+        settlementFailed = true;
+      }
+      try {
+        await Promise.all(pendingAudits);
+      } catch (error) {
+        log.warn({ error, userUuid, requestId }, 'unexpected assistant audit error');
+      }
+      if (stream.cancelled) return;
+
+      const finalTools: AssistantToolCall[] = allTools.map((base) => {
+        const decision = permissionDecisions.get(toolKey(base.id));
+        const result = toolResults.get(toolKey(base.id));
+        const permission =
+          decision === 'allow_always'
+            ? ('allowed_always' as const)
+            : decision === 'allow_once'
+              ? ('allowed_once' as const)
+              : decision === 'deny'
+                ? ('denied' as const)
+                : undefined;
+
+        if (result) {
+          return {
+            ...base,
+            status: result.status === 'ok' ? ('done' as const) : ('error' as const),
+            ...(permission ? { permission } : {}),
+            detail: result.summary,
+            error: result.error,
+            result,
+          };
+        }
+        if (decision === 'deny') {
+          return {
+            ...base,
+            status: 'denied' as const,
+            permission: 'denied' as const,
+            detail: 'Denied by you',
+          };
+        }
+        // Never claim an unexecuted tool succeeded.
+        return { ...base, status: 'pending' as const, detail: 'Not run' };
+      });
+
+      assistantStreamsTotal.labels(mode, variant, settlementFailed ? 'error' : 'success').inc();
+      if (!settlementFailed) {
+        assistantStreamDuration.labels(mode, variant).observe(durationMs / 1000);
+        assistantStreamTokensTotal.labels(variant).inc(emittedTokenCount);
+        for (let stepIndex = 0; stepIndex < allThinking.length; stepIndex += 1) {
+          assistantThinkingStepsTotal.labels('done').inc();
+        }
+        for (const tool of finalTools) {
+          assistantToolCallsTotal.labels(tool.name, tool.status).inc();
+        }
+      }
+
+      if (chatId && messageId !== undefined) {
+        await persistStreamResult({
+          userUuid,
+          chatId,
+          messageId,
+          prompt: redactedPrompt,
+          mode,
+          variant,
+          content: emittedText,
+          safetyNotice,
+          thinking: allThinking.map((step) => ({ ...step, status: 'done' as const })),
+          tools: finalTools,
+          durationMs,
+          creditCost,
+          notificationLevel: taskNotificationLevel(),
+          link: notificationLink,
+        });
+      }
+
+      if (settlementFailed) {
+        send(ws, { type: 'error', requestId, error: 'Failed to settle assistant credits' });
+        notifyFailure();
+        resolveAsyncCompletion();
+        return;
+      }
+
+      notifyTaskUser(userUuid, notificationLink, taskNotificationLevel(), true);
+      send(ws, {
+        type: 'done',
+        requestId,
         durationMs,
         creditCost,
-        notificationLevel: effectiveNotificationLevel,
+      });
+      resolveAsyncCompletion();
+    };
+
+    /** Redacts a tool result before replaying it to the provider. */
+    const redactToolContent = (base: (typeof currentDraft.tools)[number], result: AssistantToolResult) => {
+      let content: string;
+      try {
+        content = JSON.stringify(
+          scrubForProvider(
+            result.status === 'error'
+              ? { error: result.error ?? result.summary }
+              : result.data ?? { summary: result.summary },
+            [...knownSerials],
+          ),
+        );
+      } catch {
+        content = scrubInternalDetails(redactPII(result.summary, [...knownSerials]), requestId);
+      }
+      return { toolId: base.id, name: base.name, content, isError: result.status === 'error' };
+    };
+
+    /** Starts a fresh model round with its own tool cursors. */
+    function startRound(nextDraft: AssistantModelDraft, nextRound: number) {
+      if (stream.cancelled) return;
+      currentDraft = withToolPreviews(nextDraft, [...knownSerials]);
+      round = nextRound;
+      index = 0;
+      toolCursor = 0;
+      pendingToolId = null;
+      // The next round's text was streamed live while the draft was generated.
+      tokens = [];
+
+      emitThinking();
+      emitTools();
+      if (pendingToolId === null) emitToken();
+    }
+
+    /** Feeds this round's tool results back to the model, or finishes the stream. */
+    async function finishRound() {
+      if (completed || stream.cancelled) return;
+
+      emitThinking(true);
+
+      const roundToolResults: AssistantModelToolResult[] = currentDraft.tools.flatMap((base) => {
+        const result = toolResults.get(toolKey(base.id));
+        if (!result) return [];
+        return [redactToolContent(base, result)];
+      });
+
+      const limit = maxToolRounds(mode);
+      const canContinue =
+        !stopAfterRound &&
+        currentDraft.tools.length > 0 &&
+        roundToolResults.length > 0 &&
+        round + 1 < limit;
+
+      if (!canContinue) {
+        void complete();
+        return;
+      }
+
+      const nextRound = round + 1;
+      const nextInputTokens =
+        context.usage.usedTokens +
+        systemPromptTokens +
+        toolSchemaTokens +
+        estimateTokens(emittedText) +
+        estimateTokens(roundToolResults.map((result) => result.content).join('\n')) +
+        estimateTokens(JSON.stringify(currentDraft.continuation?.steps ?? []));
+      const nextCost = estimateFor(
+        nextInputTokens,
+        Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
+      );
+      if (!(await holdMoreCredits(nextCost))) {
+        if (!stream.cancelled) failStream('insufficient credits');
+        return;
+      }
+      if (stream.cancelled) return;
+
+      // Text for the next round streams live during generateDraft, so prepare the
+      // round boundary and safety state before the provider request starts.
+      if (emittedText && !emittedText.endsWith('\n') && !textStopped) {
+        emittedText += '\n\n';
+        emittedTokenCount += 1;
+        send(ws, { type: 'token', requestId, token: '\n\n', index: emittedTokenCount - 1 });
+      }
+      roundTextStart = emittedText.length;
+      roundTokenStart = emittedTokenCount;
+      textStopped = Boolean(stopAfterRound);
+      rawBuffer = '';
+
+      let nextDraft: AssistantModelDraft;
+      try {
+        nextDraft = await generateDraft({
+          continuation: currentDraft.continuation,
+          toolResults: roundToolResults,
+          // On the last allowed round, force the model to answer with what it has.
+          disableTools: nextRound + 1 >= limit,
+        });
+      } catch (error) {
+        if (stream.cancelled) return;
+        log.warn({ error, userUuid, chatId, variant, round: nextRound }, 'assistant continuation failed');
+        // Earlier rounds already streamed content; keep that answer instead of
+        // leaving the client waiting for a response that will never arrive.
+        void complete();
+        return;
+      }
+      if (stream.cancelled) return;
+
+      flushRawText(true);
+      if (applyDraftSafety(nextDraft)) stopAfterRound = true;
+
+      addDraftToTotals(nextDraft);
+      if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
+        if (!stream.cancelled) failStream('insufficient credits');
+        return;
+      }
+      if (stream.cancelled) return;
+      startRound(nextDraft, nextRound);
+    }
+
+    /** Text is streamed live; this only advances to tools or round completion. */
+    const emitToken = () => {
+      if (stream.cancelled) return;
+      if (projectedCost > reservedCredits) {
+        failStream('insufficient credits');
+        return;
+      }
+
+      if (currentDraft.tools.length > 0 && toolCursor < currentDraft.tools.length) {
+        emitTools();
+        return;
+      }
+      void finishRound();
+    };
+
+    if (chatId) {
+      void persistStreamResult({
+        userUuid,
+        chatId,
+        messageId: messageId ?? 2,
+        prompt: redactedPrompt,
+        safetyNotice,
+        mode,
+        variant,
+        notificationLevel: taskNotificationLevel(),
         link: notificationLink,
       });
     }
 
-    notifyTaskUser(userUuid, notificationLink, effectiveNotificationLevel, true);
-
-    send(ws, {
-      type: 'done',
-      requestId,
-      durationMs,
-      creditCost,
-    });
-  };
-
-  /** Starts a fresh model round with its own tool cursors. */
-  function startRound(nextDraft: AssistantModelDraft, nextRound: number) {
-    currentDraft = withToolPreviews(nextDraft, [...knownSerials]);
-    round = nextRound;
-    index = 0;
-    toolCursor = 0;
-    pendingToolId = null;
-    // The next round's text was streamed live while the draft was generated.
-    tokens = [];
-
     emitThinking();
     emitTools();
-    if (pendingToolId === null) emitToken();
-  }
 
-  /** Feeds this round's tool results back to the model, or finishes the stream. */
-  async function finishRound() {
-    if (completed || stream.cancelled) return;
-
-    // Close out this round's thinking before moving on; the next round starts
-    // with a fresh set of steps and cursors.
-    emitThinking(true);
-
-    const roundToolResults: AssistantModelToolResult[] = currentDraft.tools.flatMap((base) => {
-      const result = toolResults.get(base.id);
-      if (!result) return [];
-      let content: string;
-      try {
-        content = JSON.stringify(
-          result.status === 'error'
-            ? { error: result.error ?? result.summary }
-            : result.data ?? { summary: result.summary },
-        );
-      } catch {
-        content = result.summary;
-      }
-      return [
-        {
-          toolId: base.id,
-          name: base.name,
-          content,
-          isError: result.status === 'error',
-        },
-      ];
-    });
-
-    const limit = maxToolRounds(mode);
-    const canContinue =
-      !stopAfterRound &&
-      currentDraft.tools.length > 0 &&
-      roundToolResults.length > 0 &&
-      round + 1 < limit;
-
-    if (!canContinue) {
-      void complete();
-      return;
+    if (pendingToolId === null) {
+      emitToken();
     }
-
-    const nextRound = round + 1;
-    const nextInputTokens =
-      context.usage.usedTokens +
-      estimateTokens(emittedText) +
-      estimateTokens(roundToolResults.map((result) => result.content).join('\n')) +
-      systemPromptTokens;
-    const nextCost = estimateRoundCredits(
-      nextInputTokens,
-      Math.min(getAssistantModel(modelId).maxOutputTokens, 4096),
-    );
-    if (!(await holdMoreCredits(nextCost))) {
-      failStream('insufficient credits');
-      return;
-    }
-
-    // Text for the next round streams live during generateDraft, so prepare the
-    // round boundary and safety state before the provider request starts.
-    if (emittedText && !emittedText.endsWith('\n') && !textStopped) {
-      emittedText += '\n\n';
-      emittedTokenCount += 1;
-      send(ws, { type: 'token', requestId, token: '\n\n', index: emittedTokenCount - 1 });
-    }
-    roundTextStart = emittedText.length;
-    textStopped = Boolean(stopAfterRound);
-    rawBuffer = '';
-
-    let nextDraft: AssistantModelDraft;
-    try {
-      nextDraft = await generateDraft({
-        continuation: currentDraft.continuation,
-        toolResults: roundToolResults,
-        // On the last allowed round, force the model to answer with what it has.
-        disableTools: nextRound + 1 >= limit,
+    await asyncCompletion;
+  } catch (error) {
+    if (stream.cancelled) return;
+    log.warn({ error, userUuid, requestId, chatId }, 'assistant stream preflight failed');
+    send(ws, { type: 'error', requestId, error: 'Assistant request failed' });
+    notifyFailure();
+  } finally {
+    if (holdSucceeded && !settledCredits) {
+      await settleCredits().catch((error: unknown) => {
+        log.warn({ error, userUuid, requestId }, 'failed to release assistant credit hold');
       });
-    } catch (error) {
-      log.warn({ error, userUuid, chatId, variant, round: nextRound }, 'assistant continuation failed');
-      // Earlier rounds already streamed content; keep that answer instead of
-      // leaving the client waiting for a response that will never arrive.
-      void complete();
-      return;
     }
-
-    flushRawText(true);
-    if (applyDraftSafety(nextDraft)) stopAfterRound = true;
-
-    addDraftToTotals(nextDraft);
-    if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
-      failStream('insufficient credits');
-      return;
-    }
-    startRound(nextDraft, nextRound);
-  }
-
-  /** Text is streamed live; this only advances to tools or round completion. */
-  const emitToken = () => {
-    if (projectedCost > reservedCredits) {
-      failStream('insufficient credits');
-      return;
-    }
-
-    if (currentDraft.tools.length > 0 && toolCursor < currentDraft.tools.length) {
-      emitTools();
-      return;
-    }
-    void finishRound();
-  };
-
-  if (chatId) {
-    stream.persistStart = persistStreamResult({
-      userUuid,
-      chatId,
-      messageId: messageId ?? 2,
-      prompt: redactedPrompt,
-      safetyNotice,
-      mode,
-      variant,
-      notificationLevel: effectiveNotificationLevel,
-      link: notificationLink,
-    });
-  }
-
-  emitThinking();
-  emitTools();
-
-  if (pendingToolId === null) {
-    emitToken();
+    detachStream(ws, requestId, stream);
   }
 };
 
@@ -1395,14 +1700,13 @@ const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayB
   }
 
   if (parsed.type === 'stream') {
+    // permissionLevel, allowedTools and notificationLevel are intentionally
+    // not forwarded: they come from server-side assistant preferences.
     await startStream(
       ws,
       parsed.requestId,
       parsed.mode ?? 'chat',
       parsed.variant ?? 'standard',
-      parsed.permissionLevel ?? 'always-ask',
-      parsed.allowedTools ?? [],
-      parsed.notificationLevel ?? 'always',
       parsed.chatId,
       parsed.messageId,
       parsed.prompt,
@@ -1412,12 +1716,12 @@ const handleMessage = async (ws: AssistantWebSocket, raw: string | Buffer<ArrayB
   }
 
   if (parsed.type === 'tool_permission') {
-    toolPermissionHandlers.get(parsed.requestId)?.(parsed.toolId, parsed.decision);
+    handlersFor(toolPermissionHandlers, ws)?.get(parsed.requestId)?.(parsed.toolId, parsed.decision);
     return;
   }
 
   if (parsed.type === 'tool_response') {
-    toolResponseHandlers.get(parsed.requestId)?.(
+    handlersFor(toolResponseHandlers, ws)?.get(parsed.requestId)?.(
       parsed.toolId,
       parsed.answers,
       parsed.customAnswer,
@@ -1440,12 +1744,17 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
   },
 
   message(ws, raw) {
-    // Cancellation must bypass the queue: a stream request awaits the provider
-    // response, so a queued cancel could never interrupt it.
+    // Interactive replies bypass the queue: stream requests now stay alive
+    // until completion, so queued approvals/answers/cancels would deadlock.
     if (ws.data.userUuid) {
       try {
         const parsed: unknown = JSON.parse(typeof raw === 'string' ? raw : raw.toString());
-        if (isRecord(parsed) && parsed.type === 'cancel') {
+        if (
+          isRecord(parsed) &&
+          (parsed.type === 'cancel' ||
+            parsed.type === 'tool_permission' ||
+            parsed.type === 'tool_response')
+        ) {
           void handleMessage(ws, raw).catch(() => {});
           return;
         }
@@ -1478,14 +1787,13 @@ export const assistantWebSocket: WebSocketHandler<AssistantSocketData> = {
     const streams = activeStreams.get(ws);
     if (streams) {
       for (const [requestId, stream] of [...streams.entries()]) {
-        // Every stream runs on the server. A closed socket only stops the live
-        // feed; timers, persistence and notifications continue in the background.
-        stream.orphaned = true;
-        stream.onOrphaned?.();
-        stream.onOrphaned = undefined;
-        streams.delete(requestId);
+        // The provider keeps working after the socket closes; only the live
+        // feed and interactive waits are detached. Completion still settles.
+        detachStream(ws, requestId, stream, { clearTimers: false });
       }
       activeStreams.delete(ws);
     }
+    toolPermissionHandlers.delete(ws);
+    toolResponseHandlers.delete(ws);
   },
 };

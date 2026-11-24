@@ -1,6 +1,7 @@
 import {
   forwardRef,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -51,7 +52,7 @@ import { UserQuestionCard } from './UserQuestionCard';
 import { formatDuration, formatMessageTime } from './utils';
 import { useDismiss } from '../../hooks/useDismiss';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
-import { AssistantMarkdown } from './AssistantMarkdown';
+import { AssistantMarkdown, type AssistantToolSlot } from './AssistantMarkdown';
 import './AssistantMessages.css';
 
 export interface AssistantMessagesProps {
@@ -207,15 +208,39 @@ const TOOL_PERMISSION_LABELS: Partial<Record<AssistantToolPermission, string>> =
 const ToolCallLine = ({
   tool,
   onToolPermission,
+  focusFallbackRef,
 }: {
   tool: AssistantToolCall;
   onToolPermission: (toolId: string, decision: AssistantToolPermissionDecision) => void;
+  focusFallbackRef?: RefObject<HTMLElement | null>;
 }) => {
   const permissionLabel = tool.permission ? TOOL_PERMISSION_LABELS[tool.permission] : undefined;
   const awaiting = tool.status === 'awaiting_permission';
+  const [decision, setDecision] = useState<AssistantToolPermissionDecision | null>(null);
+  const lineRef = useRef<HTMLDivElement>(null);
+  const wasAwaitingRef = useRef(awaiting);
+
+  useEffect(() => {
+    if (awaiting && !wasAwaitingRef.current) setDecision(null);
+    wasAwaitingRef.current = awaiting;
+  }, [awaiting]);
+
+  const respond = (next: AssistantToolPermissionDecision) => {
+    if (decision) return;
+    setDecision(next);
+    onToolPermission(tool.id, next);
+    // Move focus off the spent buttons onto the resulting tool status.
+    window.requestAnimationFrame(() => {
+      (lineRef.current ?? focusFallbackRef?.current)?.focus();
+    });
+  };
 
   return (
-    <div className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}>
+    <div
+      ref={lineRef}
+      tabIndex={-1}
+      className={`assistant-chat__tool-line assistant-chat__tool-line--${tool.status}`}
+    >
       {renderToolIcon(tool.name)}
       <span className="assistant-chat__tool-line-label">{tool.label ?? tool.name}</span>
       {tool.error && (
@@ -228,33 +253,43 @@ const ToolCallLine = ({
         <div className="assistant-chat__tool-preview">{tool.preview}</div>
       )}
       {awaiting && (
-        <div className="assistant-chat__tool-permission-actions">
-          <button
-            type="button"
-            onClick={() => onToolPermission(tool.id, 'allow_once')}
-            aria-label={`Allow ${tool.label ?? tool.name} once`}
-          >
-            <IconCheck size={12} strokeWidth={2} />
-            <span>Allow once</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onToolPermission(tool.id, 'allow_always')}
-            aria-label={`Always allow ${tool.label ?? tool.name}`}
-          >
-            <IconShieldStar size={12} strokeWidth={2} />
-            <span>Always allow</span>
-          </button>
-          <button
-            type="button"
-            className="assistant-chat__tool-permission-deny"
-            onClick={() => onToolPermission(tool.id, 'deny')}
-            aria-label={`Deny ${tool.label ?? tool.name}`}
-          >
-            <IconX size={12} strokeWidth={2} />
-            <span>Deny</span>
-          </button>
-        </div>
+        <>
+          {decision && (
+            <span className="assistant-chat__tool-awaiting" role="status">
+              Awaiting response…
+            </span>
+          )}
+          <div className="assistant-chat__tool-permission-actions">
+            <button
+              type="button"
+              disabled={Boolean(decision)}
+              onClick={() => respond('allow_once')}
+              aria-label={`Allow ${tool.label ?? tool.name} once`}
+            >
+              <IconCheck size={12} strokeWidth={2} />
+              <span>Allow once</span>
+            </button>
+            <button
+              type="button"
+              disabled={Boolean(decision)}
+              onClick={() => respond('allow_always')}
+              aria-label={`Always allow ${tool.label ?? tool.name}`}
+            >
+              <IconShieldStar size={12} strokeWidth={2} />
+              <span>Always allow</span>
+            </button>
+            <button
+              type="button"
+              className="assistant-chat__tool-permission-deny"
+              disabled={Boolean(decision)}
+              onClick={() => respond('deny')}
+              aria-label={`Deny ${tool.label ?? tool.name}`}
+            >
+              <IconX size={12} strokeWidth={2} />
+              <span>Deny</span>
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -269,22 +304,25 @@ const ToolGroup = ({
   active: boolean;
   onToolPermission: (toolId: string, decision: AssistantToolPermissionDecision) => void;
 }) => {
-  const [open, setOpen] = useState(active);
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const summaryRef = useRef<HTMLButtonElement>(null);
   const reachedIndex = latestReachedIndex(tools);
   const awaitingPermission = tools.find((tool) => tool.status === 'awaiting_permission');
   const latest = awaitingPermission ?? (reachedIndex >= 0 ? tools[reachedIndex] : undefined);
   const reachedCount = reachedIndex + 1;
+  const lastPermissionRequestRef = useRef<string | null>(null);
+  // Status changes never override an explicit user choice; only a new request
+  // reopens the preview so it cannot collapse while somebody is reading it.
+  const open = openOverride ?? (active || Boolean(awaitingPermission));
 
   useEffect(() => {
-    // Keep the newest tool visible while calls are still arriving, then fold
-    // the group away once the response finishes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOpen(active);
-    if (!active) {
-      setShowHistory(false);
+    const pendingId = awaitingPermission?.id ?? null;
+    if (pendingId && pendingId !== lastPermissionRequestRef.current) {
+      setOpenOverride(true);
     }
-  }, [active, reachedCount]);
+    lastPermissionRequestRef.current = pendingId;
+  }, [awaitingPermission?.id]);
 
   if (!latest) return null;
 
@@ -293,9 +331,10 @@ const ToolGroup = ({
   return (
     <div className="assistant-chat__tool-group">
       <button
+        ref={summaryRef}
         type="button"
         className="assistant-chat__disclosure-summary"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpenOverride(!open)}
         aria-expanded={open}
       >
         <span className="assistant-chat__disclosure-label">
@@ -326,9 +365,19 @@ const ToolGroup = ({
             <>
               {showHistory &&
                 earlierTools.map((tool) => (
-                  <ToolCallLine key={tool.id} tool={tool} onToolPermission={onToolPermission} />
+                  <ToolCallLine
+                    key={tool.id}
+                    tool={tool}
+                    onToolPermission={onToolPermission}
+                    focusFallbackRef={summaryRef}
+                  />
                 ))}
-              <ToolCallLine key={latest.id} tool={latest} onToolPermission={onToolPermission} />
+              <ToolCallLine
+                key={latest.id}
+                tool={latest}
+                onToolPermission={onToolPermission}
+                focusFallbackRef={summaryRef}
+              />
             </>
           ) : (
             tools.map((tool) => (
@@ -359,7 +408,7 @@ const SafetyCard = ({ notice, country }: { notice: 'refusal' | 'crisis' | 'csam'
     <div className={`assistant-safety-card assistant-safety-card--${notice}`}>
       {notice === 'crisis' && (
         <>
-          <h4>You deserve support right now</h4>
+          <h3>You deserve support right now</h3>
           <p>If you're in immediate danger, call your local emergency number.</p>
           {resources.length > 0 ? (
             <ul>
@@ -385,7 +434,7 @@ const SafetyCard = ({ notice, country }: { notice: 'refusal' | 'crisis' | 'csam'
       )}
       {notice === 'refusal' && (
         <>
-          <h4>I can't help with that</h4>
+          <h3>I can't help with that</h3>
           <p>
             I can't assist with violence, threats, abuse, sexual harm, or anything involving children.
           </p>
@@ -394,7 +443,7 @@ const SafetyCard = ({ notice, country }: { notice: 'refusal' | 'crisis' | 'csam'
       )}
       {notice === 'csam' && (
         <>
-          <h4>Child safety</h4>
+          <h3>Child safety</h3>
           <p>
             I can't engage with or provide content involving child sexual abuse material or exploitation of
             minors.
@@ -413,6 +462,84 @@ const SafetyCard = ({ notice, country }: { notice: 'refusal' | 'crisis' | 'csam'
         </>
       )}
     </div>
+  );
+};
+
+const PendingResponse = () => (
+  <span className="assistant-chat__pending" role="status">
+    <span className="assistant-chat__skeleton-line" />
+    <span className="assistant-chat__skeleton-line" />
+    <span className="assistant-chat__skeleton-line assistant-chat__skeleton-line--short" />
+  </span>
+);
+
+const renderMessageContent = (
+  message: LiveAssistantMessage,
+  isStreaming: boolean,
+  userCountry: string | undefined,
+  onToolPermission: (toolId: string, decision: AssistantToolPermissionDecision) => void,
+): ReactNode => {
+  if (message.safetyNotice) {
+    return <SafetyCard notice={message.safetyNotice} country={userCountry} />;
+  }
+
+  const groups =
+    message.toolGroups && message.toolGroups.length > 0
+      ? message.toolGroups
+      : message.tools && message.tools.length > 0
+        ? [message.tools]
+        : [];
+  const groupKey = (group: AssistantToolCall[], index: number) =>
+    `tool-group-${index}-${group.map((tool) => tool.id).join(',')}`;
+  const renderGroup = (group: AssistantToolCall[], index: number) => (
+    <ToolGroup
+      key={groupKey(group, index)}
+      tools={group}
+      active={isStreaming && index === groups.length - 1}
+      onToolPermission={onToolPermission}
+    />
+  );
+
+  const withOffsets = groups.filter((group) =>
+    group.some((tool) => typeof tool.contentOffset === 'number'),
+  );
+  const withoutOffsets = groups.filter(
+    (group) => !group.some((tool) => typeof tool.contentOffset === 'number'),
+  );
+
+  if (withOffsets.length === 0) {
+    return (
+      <>
+        {withoutOffsets.map(renderGroup)}
+        <div className="assistant-chat__bubble">
+          {message.content ? <AssistantMarkdown content={message.content} /> : isStreaming && <PendingResponse />}
+        </div>
+      </>
+    );
+  }
+
+  const toolSlots: Record<string, AssistantToolSlot> = {};
+  groups.forEach((group, index) => {
+    if (!withOffsets.includes(group)) return;
+    const offset = group.find((tool) => typeof tool.contentOffset === 'number')?.contentOffset ?? 0;
+    toolSlots[`slot-${index}`] = {
+      node: renderGroup(group, index),
+      offset: Math.max(0, Math.min(offset, message.content.length)),
+    };
+  });
+
+  const showMarkdown = Boolean(message.content) || Object.keys(toolSlots).length > 0 || !isStreaming;
+  return (
+    <>
+      {withoutOffsets.map(renderGroup)}
+      <div className="assistant-chat__bubble">
+        {showMarkdown ? (
+          <AssistantMarkdown content={message.content} toolSlots={toolSlots} />
+        ) : (
+          <PendingResponse />
+        )}
+      </div>
+    </>
   );
 };
 
@@ -614,7 +741,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
         ref={containerRef}
         onScroll={handleScroll}
         role="log"
-        aria-live="polite"
+        aria-live="off"
         aria-busy={streamingMessageId !== null}
       >
         <div className="assistant-chat__messages-inner" ref={innerRef}>
@@ -637,6 +764,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
           const displayedCreditCost = isStreaming
             ? message.liveCreditCost
             : message.creditCost;
+          const isEstimate = isStreaming || Boolean(message.interrupted) || Boolean(message.error);
 
           return (
             <div
@@ -663,104 +791,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   {message.thinking && message.thinking.length > 0 && (
                     <ThinkingPanel steps={message.thinking} streaming={isStreaming} />
                   )}
-                  {message.safetyNotice ? (
-                    <SafetyCard notice={message.safetyNotice} country={userCountry} />
-                  ) : (
-                    (() => {
-                    const groups =
-                      message.toolGroups && message.toolGroups.length > 0
-                        ? message.toolGroups
-                        : message.tools && message.tools.length > 0
-                          ? [message.tools]
-                          : [];
-                    const hasOffsets = groups.some((group) =>
-                      group.some((tool) => typeof tool.contentOffset === 'number'),
-                    );
-                    if (!hasOffsets) {
-                      return (
-                        <>
-                          {groups.map((group, index) => (
-                            <ToolGroup
-                              key={`tool-group-${index}-${group.map((tool) => tool.id).join(',')}`}
-                              tools={group}
-                              active={isStreaming && index === groups.length - 1}
-                              onToolPermission={onToolPermission}
-                            />
-                          ))}
-                          <div className="assistant-chat__bubble">
-                            {message.content ? (
-                              <AssistantMarkdown content={message.content} />
-                            ) : (
-                              isStreaming && (
-                                <span className="assistant-chat__pending" role="status">
-                                  <span className="assistant-chat__skeleton-line" />
-                                  <span className="assistant-chat__skeleton-line" />
-                                  <span className="assistant-chat__skeleton-line assistant-chat__skeleton-line--short" />
-                                </span>
-                              )
-                            )}
-                          </div>
-                        </>
-                      );
-                    }
-                    const ordered = groups
-                      .map((group, index) => ({
-                        group,
-                        index,
-                        offset: Math.max(
-                          0,
-                          Math.min(
-                            group.find((tool) => typeof tool.contentOffset === 'number')?.contentOffset ??
-                              0,
-                            message.content.length,
-                          ),
-                        ),
-                      }))
-                      .sort((a, b) => a.offset - b.offset);
-                    const nodes: ReactNode[] = [];
-                    let cursor = 0;
-                    ordered.forEach(({ group, index, offset }) => {
-                      const safeOffset = Math.max(cursor, Math.min(offset, message.content.length));
-                      if (safeOffset > cursor) {
-                        nodes.push(
-                          <div className="assistant-chat__bubble" key={`md-${cursor}`}>
-                            <AssistantMarkdown content={message.content.slice(cursor, safeOffset)} />
-                          </div>,
-                        );
-                      }
-                      nodes.push(
-                        <ToolGroup
-                          key={`tool-group-${index}-${group.map((tool) => tool.id).join(',')}`}
-                          tools={group}
-                          active={isStreaming && index === groups.length - 1}
-                          onToolPermission={onToolPermission}
-                        />,
-                      );
-                      cursor = safeOffset;
-                    });
-                    if (cursor < message.content.length) {
-                      nodes.push(
-                        <div className="assistant-chat__bubble" key={`md-${cursor}`}>
-                          <AssistantMarkdown content={message.content.slice(cursor)} />
-                        </div>,
-                      );
-                    }
-                    if (nodes.length === 0) {
-                      nodes.push(
-                        <div className="assistant-chat__bubble" key="pending">
-                          {isStreaming && (
-                            <span className="assistant-chat__pending" role="status">
-                              <span className="assistant-chat__skeleton-line" />
-                              <span className="assistant-chat__skeleton-line" />
-                              <span className="assistant-chat__skeleton-line assistant-chat__skeleton-line--short" />
-                            </span>
-                          )}
-                        </div>,
-                      );
-                    }
-                    return nodes;
-                  })()
-                  )}
+                  {renderMessageContent(message, isStreaming, userCountry, onToolPermission)}
                   {activeQuestion?.messageId === message.id && onToolAnswer && (
                     <UserQuestionCard
                       question={activeQuestion.question}
@@ -826,15 +857,34 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       </span>
                     </button>
                     <span className="assistant-chat__meta">
-                      <span>{ASSISTANT_DATA[message.variant ?? fallbackVariant].variantLabel}</span>
-                      <span>{formatDuration(displayedDurationMs)}</span>
-                      <span>
+                      <span className="sr-only">
+                        {isEstimate
+                          ? 'Live estimate. Credits are not settled yet.'
+                          : 'Settled response details.'}
+                      </span>
+                      <span title={isStreaming ? 'Model variant in use' : 'Model variant used'}>
+                        {ASSISTANT_DATA[message.variant ?? fallbackVariant].variantLabel}
+                        {isStreaming ? ' (draft)' : ''}
+                      </span>
+                      <span title={isEstimate ? 'Estimated elapsed time' : 'Total time'}>
+                        {isEstimate ? '~' : ''}{formatDuration(displayedDurationMs)}
+                      </span>
+                      <span title={isEstimate ? 'Estimated tokens per second' : 'Average tokens per second'}>
                         {tokensPerSecond == null
                           ? '— tok/s'
                           : `${tokensPerSecond.toFixed(1)} tok/s`}
                       </span>
                       {displayedCreditCost != null && (
-                        <span>{formatCreditCost(displayedCreditCost)}</span>
+                        <span
+                          title={
+                            isEstimate
+                              ? 'Estimated credits for this draft; not a settled charge'
+                              : 'Credits charged for this response'
+                          }
+                        >
+                          {isEstimate ? '~' : ''}{formatCreditCost(displayedCreditCost)}
+                          {isEstimate ? ' est.' : ''}
+                        </span>
                       )}
                     </span>
                   </div>

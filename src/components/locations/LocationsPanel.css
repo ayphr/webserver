@@ -48,7 +48,7 @@
   left: 0.65rem;
   color: var(--text-dim);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 
 .locations__filter-search .input-wrapper,
@@ -247,6 +247,11 @@
 .locations__location-card:hover {
   border-color: var(--border-focus);
   background: var(--bg-elevated);
+}
+
+.locations__location-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .locations__location-card__content {

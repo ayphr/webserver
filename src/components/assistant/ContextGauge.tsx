@@ -31,8 +31,8 @@ export const ContextGauge = ({ usage, onCompact, disabled = false }: ContextGaug
         type="button"
         className={`context-gauge__trigger context-gauge__trigger--${level}`}
         aria-label={`Context usage ${percent} percent. Open details.`}
-        aria-haspopup="dialog"
         aria-expanded={open}
+        aria-controls="context-gauge-details"
         disabled={!usage}
         onClick={() => setOpen((value) => !value)}
       >
@@ -50,7 +50,12 @@ export const ContextGauge = ({ usage, onCompact, disabled = false }: ContextGaug
       </button>
 
       {open && usage && (
-        <div className="select__menu context-gauge__menu" role="dialog" aria-label="Context usage">
+        <div
+          id="context-gauge-details"
+          className="select__menu context-gauge__menu"
+          role="group"
+          aria-label="Context usage details"
+        >
           <div className="context-gauge__header">
             <span className="context-gauge__title">Context usage</span>
             <span className={`context-gauge__percent context-gauge__percent--${level}`}>

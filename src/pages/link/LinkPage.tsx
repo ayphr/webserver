@@ -109,30 +109,44 @@ export const LinkPage = () => {
   };
 
   const inputRefs = useRef<HTMLInputElement[]>([]);
+  const lastEmittedCode = useRef(code);
+  const [codeSlots, setCodeSlots] = useState<string[]>(() => (
+    Array.from({ length: PAIRING_CODE_LENGTH }, (_, index) => code[index] ?? '')
+  ));
   const eligibleAccounts = storedAccounts.filter((account) => !isStoredAccountExpired(account));
   const visibleAccounts = eligibleAccounts.filter((account) => account.token !== activeTokenState);
   const accountsToShow = visibleAccounts.length > 0 ? visibleAccounts : eligibleAccounts;
 
+  // External changes rebuild the slots; our own compact emissions are ignored so
+  // clearing a middle character does not shift every later character left.
+  useEffect(() => {
+    if (code === lastEmittedCode.current) return;
+    lastEmittedCode.current = code;
+    setCodeSlots(Array.from({ length: PAIRING_CODE_LENGTH }, (_, index) => code[index] ?? ''));
+  }, [code]);
+
+  const commitCode = (next: string[]) => {
+    const compact = next.join('');
+    lastEmittedCode.current = compact;
+    setCodeSlots(next);
+    setCode(compact);
+  };
+
   const setCodeAt = (index: number, char: string) => {
-    setCode((prev) => {
-      const chars = prev.split('');
-      while (chars.length < PAIRING_CODE_LENGTH) chars.push('');
-      chars[index] = char ? char.toUpperCase().slice(0, 1) : '';
-      return chars.join('').slice(0, PAIRING_CODE_LENGTH);
-    });
+    const next = codeSlots.slice();
+    next[index] = char ? char.toUpperCase().slice(0, 1) : '';
+    commitCode(next);
   };
 
   const applyPaste = (startIndex: number, text: string) => {
     const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, PAIRING_CODE_LENGTH);
-    setCode((prev) => {
-      const chars = prev.split('');
-      while (chars.length < PAIRING_CODE_LENGTH) chars.push('');
-      for (let i = 0; i < cleaned.length; i++) {
-        const idx = startIndex + i;
-        if (idx < PAIRING_CODE_LENGTH) chars[idx] = cleaned[i];
-      }
-      return chars.join('').slice(0, PAIRING_CODE_LENGTH);
-    });
+    if (!cleaned) return;
+    const next = codeSlots.slice();
+    for (let i = 0; i < cleaned.length; i += 1) {
+      const index = startIndex + i;
+      if (index < PAIRING_CODE_LENGTH) next[index] = cleaned[i];
+    }
+    commitCode(next);
     const nextFocus = Math.min(startIndex + cleaned.length, PAIRING_CODE_LENGTH - 1);
     inputRefs.current[nextFocus]?.focus();
   };
@@ -153,10 +167,17 @@ export const LinkPage = () => {
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !(inputRefs.current[index]?.value) && index > 0) {
-      setCodeAt(index - 1, '');
-      inputRefs.current[index - 1]?.focus();
+    if (e.key === 'Backspace') {
       e.preventDefault();
+      if (codeSlots[index]) {
+        setCodeAt(index, '');
+      } else if (index > 0) {
+        setCodeAt(index - 1, '');
+        inputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === 'Delete') {
+      e.preventDefault();
+      setCodeAt(index, '');
     } else if (e.key === 'ArrowLeft' && index > 0) {
       inputRefs.current[index - 1]?.focus();
     } else if (e.key === 'ArrowRight' && index < PAIRING_CODE_LENGTH - 1) {
@@ -240,7 +261,7 @@ export const LinkPage = () => {
             )}
 
             {error && (
-              <div className="link-page__error">
+              <div className="link-page__error" role="alert">
                 <IconAlertCircle size={16} strokeWidth={1.75} />
                 <span>{error}</span>
               </div>
@@ -280,7 +301,7 @@ export const LinkPage = () => {
                       autoCapitalize="characters"
                       autoComplete="one-time-code"
                       maxLength={1}
-                      value={code[i] || ''}
+                      value={codeSlots[i] || ''}
                       onChange={(e) => handleChange(i, e)}
                       onPaste={(e) => handlePaste(i, e)}
                       onKeyDown={(e) => handleKeyDown(i, e)}

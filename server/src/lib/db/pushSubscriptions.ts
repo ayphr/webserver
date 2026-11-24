@@ -21,12 +21,6 @@ export async function listPushSubscriptions(userUuid: string): Promise<PushSubsc
     .toArray();
 }
 
-export async function countPushSubscriptions(userUuid: string): Promise<number> {
-  const subscriptions = await getCollection('pushSubscriptions');
-  trackMongoOperation('countDocuments', PUSH_SUBSCRIPTIONS_COLLECTION);
-  return subscriptions.countDocuments({ userUuid });
-}
-
 /** One record per endpoint per user; subscribing again refreshes its keys. */
 export async function savePushSubscription(
   userUuid: string,

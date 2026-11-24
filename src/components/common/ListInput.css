@@ -6,7 +6,7 @@
 
 .list-input__label {
   display: block;
-  color: hsl(180, 67%, 99%, 0.6);
+  color: var(--text-muted);
   font-weight: 500;
   font-size: 0.85rem;
   margin-bottom: 0.25rem;
@@ -26,8 +26,8 @@
 
 .list-input__input {
   flex: 1;
-  background-color: hsl(0, 0%, 10%);
-  border: 1px solid hsl(0, 0%, 16%);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 0.55rem 1rem;
   color: var(--text-primary);
@@ -36,12 +36,12 @@
   transition: border-color 0.15s ease, background-color 0.15s ease;
 
   &::placeholder {
-    color: hsl(0, 0%, 40%);
+    color: var(--text-dim);
   }
 
   &:focus {
-    background-color: hsl(0, 0%, 12%);
-    border-color: hsl(0, 0%, 28%);
+    background-color: var(--bg-elevated);
+    border-color: var(--border-focus);
     box-shadow: none;
     outline: none;
   }
@@ -54,7 +54,7 @@
   justify-content: center;
   background-color: transparent;
   color: var(--text-muted);
-  border: 1px solid hsl(0, 0%, 16%);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
   cursor: pointer;

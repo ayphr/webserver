@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { IconTrash, IconX } from '@tabler/icons-react';
 import './AuthPage.css';
-import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, UsernameDisplay, CodeInput } from '../../components/common';
+import { Button, Card, CardHeader, CardBody, CardFooter, Checkbox, Input, Modal, UsernameDisplay, CodeInput } from '../../components/common';
 import { getActiveToken, getStoredAccounts, removeStoredAccount, setActiveToken, type StoredAccount } from '../../lib/accounts';
 import { getSafeRedirect, stripInviteParam, withInviteParam } from '../../lib/redirects';
 import { api } from '../../lib/api';
@@ -127,6 +127,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
   const [authError, setAuthError] = useState<AuthErrorState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [storedAccounts, setStoredAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
+  const [accountToRemove, setAccountToRemove] = useState<StoredAccount | null>(null);
   const [codeExpiresAt, setCodeExpiresAt] = useState<Date | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const activeToken = getActiveToken();
@@ -214,18 +215,15 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     setFormData(nextData);
 
     if (mode === 'signup') {
-      setTouched((prev) => ({ ...prev, [field]: true }));
-      const fieldsToValidate: SignupField[] = field === 'password'
-        ? ['password', 'confirmPassword']
-        : SIGNUP_FIELDS.filter((item) => item === field);
-
+      // Don't show "required"/format errors while the user is still typing a
+      // field for the first time; validate it on blur or submit instead.
       setErrors((prev) => {
         const next = { ...prev };
-        for (const item of fieldsToValidate) {
-          if (!touched[item] && item !== field) continue;
-          const error = getSignupFieldError(item, nextData);
-          if (error) next[item] = error;
-          else delete next[item];
+        delete next[field];
+        if (field === 'password' && touched.confirmPassword) {
+          const confirmError = getSignupFieldError('confirmPassword', nextData);
+          if (confirmError) next.confirmPassword = confirmError;
+          else delete next.confirmPassword;
         }
         return next;
       });
@@ -268,12 +266,13 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     navigate(redirectTo);
   };
 
-  const handleRemoveAccount = (account: StoredAccount) => {
-    if (!window.confirm(`Remove ${account.user.username} from this device?`)) return;
-    const wasActive = account.token === activeToken;
-    removeStoredAccount(account.token);
+  const handleRemoveAccount = () => {
+    if (!accountToRemove) return;
+    const wasActive = accountToRemove.token === activeToken;
+    removeStoredAccount(accountToRemove.token);
     if (wasActive) api.users.invalidateMe();
     setStoredAccounts(getStoredAccounts());
+    setAccountToRemove(null);
   };
 
   const validateForm = (): boolean => {
@@ -386,10 +385,9 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
       setIsLoading(true);
       try {
         await api.auth.resetPassword({ identifier: identifier.trim(), code, newPassword: resetPassword });
-        setNotice('Your password has been reset. Sign in with your new password.');
         setStep('form');
         resetFormState();
-        // keep the notice
+        // Set after resetFormState so the success notice is not cleared.
         setNotice('Your password has been reset. Sign in with your new password.');
       } catch (error) {
         applyAuthError(error, 'Failed to reset password. Please try again.');
@@ -425,6 +423,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
         if ('requiresDeviceVerification' in result && result.requiresDeviceVerification) {
           setCode('');
           setCodeExpiry(result.expiresAt);
+          setResendCooldown(RESEND_COOLDOWN_SECONDS);
           setStep('device-code');
         } else {
           navigate(redirectTo);
@@ -547,7 +546,7 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
                         className="auth-accounts__remove"
                         aria-label={`Remove ${account.user.username} from this device`}
                         title="Remove from this device"
-                        onClick={() => handleRemoveAccount(account)}
+                        onClick={() => setAccountToRemove(account)}
                         disabled={isLoading}
                       >
                         <IconTrash size={15} strokeWidth={1.75} aria-hidden="true" />
@@ -819,6 +818,20 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
             </CardFooter>
           )}
         </Card>
+
+        <Modal
+          isOpen={accountToRemove !== null}
+          onClose={() => setAccountToRemove(null)}
+          onConfirm={handleRemoveAccount}
+          title="Remove account from this device?"
+          confirmText="Remove"
+          isDangerous
+        >
+          <p>
+            Remove {accountToRemove?.user.username ?? 'this account'} from this device? You can still
+            sign in again with its credentials.
+          </p>
+        </Modal>
 
         <div className="auth-page__footer">
           <p className="auth-page__links">

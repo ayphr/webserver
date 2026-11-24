@@ -1,11 +1,27 @@
 import type { Team, TeamMember, TeamRole, User } from '@common';
 
-export function getTeamMemberRole(user: Pick<User, 'uuid' | 'teamId' | 'teamRole' | 'teamRoles'>, team: Team): TeamRole {
-  const configuredRole = user.teamRoles?.[team.id] ?? user.teamRole;
+/**
+ * Team authorization is derived exclusively from the team-scoped role map.
+ * The legacy global `teamRole` is only a display hint for the active team and
+ * must never grant access to a different team.
+ */
+export function getTeamMemberRole(
+  user: Pick<User, 'uuid' | 'teamRoles'>,
+  team: Team,
+): TeamRole {
+  const configuredRole = user.teamRoles?.[team.id];
   if (configuredRole === 'member' || configuredRole === 'helper' || configuredRole === 'manager') {
     return configuredRole;
   }
   return user.uuid === team.managerUuid ? 'manager' : 'member';
+}
+
+/** True only when the team-scoped role (or manager identity) grants management. */
+export function canManageTeamRole(
+  user: Pick<User, 'uuid' | 'teamRoles'>,
+  team: Team,
+): boolean {
+  return getTeamMemberRole(user, team) === 'manager';
 }
 
 export function toTeamMember(user: User, team: Team): TeamMember {

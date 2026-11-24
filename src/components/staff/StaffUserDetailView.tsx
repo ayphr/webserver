@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { api } from '../../lib/api';
-import { Button, Select, Modal, PunishModal, Checkbox } from '../common';
+import { Button, createTabKeyDownHandler, Select, Modal, PunishModal, Checkbox } from '../common';
 import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
 import type { PublicUser, Team, CreditBalance } from '@common';
 import { PLAN_NAMES, SUBSCRIPTION_TIERS } from '@common';
@@ -23,6 +23,9 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
     if (routeTab === undefined) setInternalTab(next);
     onTabChange?.(next);
   };
+  const tabIdPrefix = useId();
+  const handleTabsKeyDown = createTabKeyDownHandler<StaffUserTab>(selectTab);
+
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
   const [devices, setDevices] = useState<{ count: number; dataPoints: number }>({ count: 0, dataPoints: 0 });
@@ -163,11 +166,17 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
         <h2>{user.username}</h2>
       </div>
 
-      <div className="ui-tabs" role="tablist" aria-label="User sections">
+      <div className="ui-tabs" role="tablist" aria-label="User sections" onKeyDown={handleTabsKeyDown}>
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
+            role="tab"
+            data-tab-id={t.id}
+            aria-selected={tab === t.id}
+            aria-controls={`${tabIdPrefix}-panel-${t.id}`}
+            id={`${tabIdPrefix}-tab-${t.id}`}
+            tabIndex={tab === t.id ? 0 : -1}
             className={`ui-tab${tab === t.id ? ' ui-tab--active' : ''}`}
             onClick={() => selectTab(t.id)}
           >
@@ -181,7 +190,13 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
       ) : (
         <>
           {tab === 'overview' && (
-            <div className="staff-user-detail__overview ui-tab-panel">
+            <div
+              className="staff-user-detail__overview ui-tab-panel"
+              role="tabpanel"
+              id={`${tabIdPrefix}-panel-overview`}
+              aria-labelledby={`${tabIdPrefix}-tab-overview`}
+              tabIndex={0}
+            >
               <div className="staff-user-detail__hero"><IconUser size={28} /><div><h3>{user.username}</h3><span>{user.role}</span></div></div>
               <div className="staff-user-detail__facts">
                 <div><span>Username</span><strong>{user.username}</strong></div>
@@ -194,7 +209,13 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
           )}
 
           {tab === 'teams' && (
-            <div className="staff-user-detail__teams">
+            <div
+              className="staff-user-detail__teams"
+              role="tabpanel"
+              id={`${tabIdPrefix}-panel-teams`}
+              aria-labelledby={`${tabIdPrefix}-tab-teams`}
+              tabIndex={0}
+            >
               {teams.length === 0 ? (
                 <p>No teams.</p>
               ) : (
@@ -221,7 +242,13 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
           )}
 
           {tab === 'usage' && (
-            <div className="staff-user-detail__usage ui-tab-panel">
+            <div
+              className="staff-user-detail__usage ui-tab-panel"
+              role="tabpanel"
+              id={`${tabIdPrefix}-panel-usage`}
+              aria-labelledby={`${tabIdPrefix}-tab-usage`}
+              tabIndex={0}
+            >
               <div className="staff-user-detail__usage-list">
                 <div><span>Plan</span><strong>{credits?.plan ?? 'Free'}</strong></div>
                 <div><span>Devices</span><strong>{devices.count}</strong></div>
@@ -233,7 +260,13 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
           )}
 
           {tab === 'actions' && (
-            <div className="staff-user-detail__actions ui-tab-panel">
+            <div
+              className="staff-user-detail__actions ui-tab-panel"
+              role="tabpanel"
+              id={`${tabIdPrefix}-panel-actions`}
+              aria-labelledby={`${tabIdPrefix}-tab-actions`}
+              tabIndex={0}
+            >
               <div className="staff-user-detail__action-row"><div><strong>Staff access</strong><span>Control whether this user can access staff tools.</span></div>
               <Select
                 value={user.role}
@@ -252,7 +285,7 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
               /></div>
               <div className="staff-user-detail__action-row"><div><strong>Punishment</strong><span>Restrict this user's access with a timed punishment.</span></div><Button variant="danger" onClick={() => setIsPunishOpen(true)}>Punish user</Button></div>
               <div className="staff-user-detail__action-row staff-user-detail__action-row--danger"><div><strong>Delete user</strong><span>Permanently remove this user and their account data.</span></div><Button variant="danger" onClick={() => setIsDeleteOpen(true)}>Delete user</Button></div>
-              {actionError && <p className="error">{actionError}</p>}
+              {actionError && <p className="error" role="alert">{actionError}</p>}
             </div>
           )}
         </>
@@ -290,7 +323,7 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
               checked={modalGifted}
               onChange={(e) => setModalGifted(e.target.checked)}
             />
-            {actionError && <p className="error">{actionError}</p>}
+            {actionError && <p className="error" role="alert">{actionError}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <Button onClick={saveModal} disabled={saving}>Save</Button>
               <Button variant="secondary" onClick={() => setTeamConfirmation({ title: 'Remove from team?', message: 'This user will lose access to this team.', action: () => void removeMember() })} disabled={saving}>Remove from team</Button>

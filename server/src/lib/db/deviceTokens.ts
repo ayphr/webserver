@@ -65,9 +65,3 @@ export async function markDeviceTokensInactive(serial: number, teamId: string, e
   trackMongoOperation('updateMany', DEVICE_TOKENS_COLLECTION);
   await tokens.updateMany(filter, { $set: { active: false, revokedAt: new Date() } });
 }
-
-export async function deleteDeviceTokensForSerial(serial: number, teamId: string) {
-  const tokens = await getCollection('deviceTokens');
-  trackMongoOperation('deleteMany', DEVICE_TOKENS_COLLECTION);
-  await tokens.deleteMany({ serial, teamId });
-}

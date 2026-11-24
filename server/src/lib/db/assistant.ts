@@ -150,9 +150,39 @@ export async function saveAssistantState(
   state: AssistantState,
 ): Promise<AssistantState> {
   const assistantStates = await getCollection('assistantStates');
+  trackMongoOperation('findOne', ASSISTANT_STATES_COLLECTION);
+  const existing = await assistantStates.findOne(
+    { userUuid },
+    { projection: { _id: 0, chats: 1 } },
+  );
+  // Compaction metadata is server-owned. A client state save may echo an old
+  // summary or invent a `compactedThroughMessageId`; neither may move the
+  // server-owned marker backwards.
+  const serverCompaction = new Map(
+    ((existing as AssistantStateDocument | null)?.chats ?? [])
+      .filter((chat) => chat.contextSummary !== undefined || chat.compactedThroughMessageId !== undefined)
+      .map((chat) => [
+        chat.id,
+        {
+          contextSummary: chat.contextSummary,
+          compactedThroughMessageId: chat.compactedThroughMessageId,
+        },
+      ]),
+  );
+  const chats = state.chats.map((chat) => {
+    const server = serverCompaction.get(chat.id);
+    const next = { ...chat };
+    if (server?.contextSummary !== undefined) next.contextSummary = server.contextSummary;
+    else delete next.contextSummary;
+    if (server?.compactedThroughMessageId !== undefined) {
+      next.compactedThroughMessageId = server.compactedThroughMessageId;
+    } else delete next.compactedThroughMessageId;
+    return next;
+  });
   trackMongoOperation('updateOne', ASSISTANT_STATES_COLLECTION);
   const document: AssistantStateDocument = {
     ...state,
+    chats,
     userUuid,
     updatedAt: new Date(),
   };
@@ -161,7 +191,7 @@ export async function saveAssistantState(
     { $set: document },
     { upsert: true },
   );
-  return state;
+  return { ...state, chats };
 }
 
 /**
@@ -169,23 +199,36 @@ export async function saveAssistantState(
  * field so concurrent streams cannot lose each other's updates, and client
  * state saves cannot overwrite them because they never touch `streamResults`.
  */
+/** Keeps the server-authored result store from growing without bound. */
+const MAX_STREAM_RESULTS = 200;
+
 export async function saveStreamResult(
   userUuid: string,
   record: StreamResultRecord,
 ): Promise<void> {
   const assistantStates = await getCollection('assistantStates');
-  trackMongoOperation('updateOne', ASSISTANT_STATES_COLLECTION);
-  await assistantStates.updateOne(
+  trackMongoOperation('findOne', ASSISTANT_STATES_COLLECTION);
+  const existing = await assistantStates.findOne(
     { userUuid },
-    {
-      $set: {
-        [`streamResults.${streamResultKey(record.chatId, record.messageId)}`]: record,
-        updatedAt: new Date(),
-      },
-      $setOnInsert: { ...createDefaultAssistantState(), userUuid },
-    },
-    { upsert: true },
+    { projection: { _id: 0, streamResults: 1 } },
   );
+  const key = streamResultKey(record.chatId, record.messageId);
+  const olderResults = Object.entries((existing as AssistantStateDocument | null)?.streamResults ?? {})
+    .filter(([resultKey]) => resultKey !== key)
+    .sort((left, right) => (right[1]?.updatedAt ?? 0) - (left[1]?.updatedAt ?? 0));
+  const unset = Object.fromEntries(
+    olderResults.slice(MAX_STREAM_RESULTS - 1).map(([resultKey]) => [`streamResults.${resultKey}`, '']),
+  );
+  const update: Record<string, unknown> = {
+    $set: {
+      [`streamResults.${key}`]: record,
+      updatedAt: new Date(),
+    },
+    $setOnInsert: { ...createDefaultAssistantState(), userUuid },
+  };
+  if (Object.keys(unset).length > 0) update.$unset = unset;
+  trackMongoOperation('updateOne', ASSISTANT_STATES_COLLECTION);
+  await assistantStates.updateOne({ userUuid }, update, { upsert: true });
 }
 
 export async function deleteAssistantChat(userUuid: string, chatId: string): Promise<AssistantState> {

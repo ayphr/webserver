@@ -7,7 +7,7 @@ import { applyGlobalRateLimit } from './globalRateLimit';
 import { bufferRequestBody, RequestBodyTooLargeError } from '../lib/bodyLimit';
 import { setClientIp } from '../lib/requestContext';
 import { createLogger } from '../lib/logger';
-import { TRUST_PROXY } from '../env';
+import { CORS_ALLOWED_ORIGINS, TRUST_PROXY } from '../env';
 import {
   httpRequestDuration,
   httpRequestsTotal,
@@ -20,12 +20,63 @@ import {
 const log = createLogger('http');
 const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 
-function resolveClientIp(request: Request, socketIp: string | null): string | null {
-  if (!TRUST_PROXY) return socketIp;
+function parseTrustedProxyHops(): number {
+  const raw = Bun.env.TRUST_PROXY_HOPS;
+  if (!raw) return 1;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+const TRUSTED_PROXY_HOPS = parseTrustedProxyHops();
+
+/**
+ * X-Forwarded-For is a list of hops in request order. The rightmost entry is
+ * the one your trusted reverse proxy appended, so it is the only safe value to
+ * use by default. If additional hops are trusted, set TRUST_PROXY_HOPS to the
+ * number of trusted hops on the right; every upstream value is client-controlled.
+ * TRUST_PROXY must only be enabled when all traffic arrives via that proxy.
+ */
+export function resolveClientIp(
+  request: Request,
+  socketIp: string | null,
+  trustProxy = TRUST_PROXY,
+  trustedHopCount = TRUSTED_PROXY_HOPS,
+): string | null {
+  if (!trustProxy) return socketIp;
 
   const forwarded = request.headers.get('x-forwarded-for');
-  const first = forwarded?.split(',')[0]?.trim();
-  return first || socketIp;
+  const hops = (forwarded ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (hops.length === 0) return socketIp;
+
+  const index = Math.max(0, hops.length - Math.max(1, trustedHopCount));
+  return hops[index] || socketIp;
+}
+
+/** Browser WebSocket upgrades always send Origin; reject anything not allowlisted. */
+export function isAllowedUpgradeOrigin(
+  request: Request,
+  allowedOrigins: readonly string[] = CORS_ALLOWED_ORIGINS,
+): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return false;
+
+  let normalized: string;
+  try {
+    normalized = new URL(origin).origin;
+  } catch {
+    return false;
+  }
+
+  return allowedOrigins.some((allowed) => {
+    try {
+      return new URL(allowed).origin === normalized;
+    } catch {
+      return false;
+    }
+  });
 }
 
 function getRequestBaseOrigin(request: Request): string {
@@ -75,6 +126,12 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
         url.pathname === ASSISTANT_STREAM_PATH &&
         request.headers.get('upgrade')?.toLowerCase() === 'websocket'
       ) {
+        if (!isAllowedUpgradeOrigin(request)) {
+          return addCorsHeaders(
+            Response.json({ error: 'WebSocket origin not allowed' }, { status: 403, headers: SECURITY_HEADERS }),
+            request,
+          );
+        }
         if (!server.upgrade(request, { data: { userUuid: null } })) {
           const response = Response.json(
             { error: 'WebSocket upgrade failed' },
@@ -86,18 +143,49 @@ export function setupServer(port: number, callback: () => void): Server<Assistan
       }
 
       const method = normalized.method;
-      const { template } = resolveRoute(normalized);
+      // Resolve once and reuse both the metric label and the handler. Calling
+      // resolveRoute again after buffering duplicated work and let the route
+      // change under a rewritten request.
+      const { template, dispatch } = resolveRoute(normalized);
 
       const endTimer = httpRequestDuration.startTimer({ method, route: template });
       httpRequestsInFlight.inc();
 
       try {
-        const bounded = await bufferRequestBody(normalized, MAX_REQUEST_BODY_BYTES);
-        setClientIp(bounded, clientIp);
-        const { dispatch } = resolveRoute(bounded);
+        const declaredLength = request.headers.get('content-length');
+        if (declaredLength !== null) {
+          const length = Number(declaredLength);
+          if (!Number.isFinite(length) || length < 0) {
+            const response = Response.json(
+              { error: 'Invalid Content-Length' },
+              { status: 400, headers: SECURITY_HEADERS },
+            );
+            httpRequestsTotal.inc({ method, route: template, status: '400' });
+            return addCorsHeaders(response, request);
+          }
+          if (length > MAX_REQUEST_BODY_BYTES) {
+            const response = Response.json(
+              { error: 'Request body too large' },
+              { status: 413, headers: SECURITY_HEADERS },
+            );
+            httpRequestsTotal.inc({ method, route: template, status: '413' });
+            return addCorsHeaders(response, request);
+          }
+        }
 
-        const rateLimited = await applyGlobalRateLimit(bounded, method, url.pathname, template);
-        const response = rateLimited ?? await dispatch();
+        // Coarse IP limiting runs before any body is buffered so an attacker
+        // cannot force repeated large allocations without hitting a limiter.
+        const rateLimited = await applyGlobalRateLimit(normalized, method, url.pathname, template);
+        if (rateLimited) {
+          httpRequestsTotal.inc({ method, route: template, status: rateLimited.status.toString() });
+          return addCorsHeaders(rateLimited, request);
+        }
+
+        // Buffer a clone purely to enforce the byte limit. The dispatch
+        // closure captured `normalized`, so its body stream must stay readable.
+        await bufferRequestBody(normalized.clone() as unknown as Request, MAX_REQUEST_BODY_BYTES);
+
+        const response = await dispatch();
 
         httpRequestsTotal.inc({ method, route: template, status: response.status.toString() });
 

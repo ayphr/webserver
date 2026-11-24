@@ -66,15 +66,6 @@ export async function countNotificationsForUserUuid(
   return notifications.countDocuments(buildNotificationQuery(userUuid, filter));
 }
 
-/** Backwards-compatible capped read helper. */
-export async function getNotificationsForUserUuid(
-  userUuid: string,
-  limit = 50,
-  filter: NotificationFilter = 'all',
-): Promise<UserNotification[]> {
-  return listNotificationsForUserUuid(userUuid, filter, { limit });
-}
-
 export async function getUnreadNotificationCount(userUuid: string): Promise<number> {
   const notifications = await getCollection('notifications');
   trackMongoOperation('countDocuments', NOTIFICATIONS_COLLECTION);

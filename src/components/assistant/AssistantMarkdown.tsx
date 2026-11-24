@@ -3,9 +3,17 @@ import { IconCheck, IconCopy } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
+import { buildToolSlotMarkdown, TOOL_SLOT_PATTERN } from './utils';
+
+export interface AssistantToolSlot {
+  node: ReactNode;
+  offset: number;
+}
 
 export interface AssistantMarkdownProps {
   content: string;
+  /** Tool cards are rendered as whole markdown blocks, never inside a fence. */
+  toolSlots?: Record<string, AssistantToolSlot>;
 }
 
 const getCodeText = (node: ReactNode): string => {
@@ -56,25 +64,37 @@ const CodeBlock = ({ children, ...props }: HTMLAttributes<HTMLPreElement>) => {
   );
 };
 
-export const AssistantMarkdown = memo(({ content }: AssistantMarkdownProps) => (
-  <div className="assistant-markdown">
-    <ReactMarkdown
-      skipHtml
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight]}
-      components={{
-        a: (props) => {
-          const { node, ...anchorProps } = props;
-          void node;
-          return <a {...anchorProps} target="_blank" rel="noopener noreferrer" />;
-        },
-        pre: ({ children, node, ...props }) => {
-          void node;
-          return <CodeBlock {...props}>{children}</CodeBlock>;
-        },
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  </div>
-));
+export const AssistantMarkdown = memo(({ content, toolSlots }: AssistantMarkdownProps) => {
+  const slots = Object.entries(toolSlots ?? {}).map(([id, slot]) => ({ id, offset: slot.offset }));
+  const markdown = buildToolSlotMarkdown(content, slots);
+
+  return (
+    <div className="assistant-markdown">
+      <ReactMarkdown
+        skipHtml
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={{
+          a: (props) => {
+            const { node, ...anchorProps } = props;
+            void node;
+            return <a {...anchorProps} target="_blank" rel="noopener noreferrer" />;
+          },
+          p: ({ children, node, ...props }) => {
+            void node;
+            const match = TOOL_SLOT_PATTERN.exec(getCodeText(children).trim());
+            const slot = match ? toolSlots?.[match[1] as string] : undefined;
+            if (slot) return <>{slot.node}</>;
+            return <p {...props}>{children}</p>;
+          },
+          pre: ({ children, node, ...props }) => {
+            void node;
+            return <CodeBlock {...props}>{children}</CodeBlock>;
+          },
+        }}
+      >
+        {markdown}
+      </ReactMarkdown>
+    </div>
+  );
+});

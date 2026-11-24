@@ -1,0 +1,4 @@
+[test]
+# Reuse the root bootstrap so server-only `bun test` matches the root suite.
+preload = ["../test-setup.ts"]
+environment = "node"

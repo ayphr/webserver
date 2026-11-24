@@ -13,6 +13,7 @@ import type {
   AssistantSendShortcut,
   AssistantVariant,
 } from '@common';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import { AssistantDropdown } from '../common';
 import { ContextGauge } from './ContextGauge';
 import './AssistantComposer.css';
@@ -33,12 +34,22 @@ type SpeechRecognitionLike = {
   lang: string;
   onresult?: (event: SpeechRecognitionEventLike) => void;
   onend?: () => void;
-  onerror?: () => void;
+  onerror?: (event?: { error?: string }) => void;
   start(): void;
   stop(): void;
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+const speechErrorMessage = (code?: string) => {
+  if (code === 'not-allowed' || code === 'service-not-allowed') {
+    return 'Microphone permission was denied. Speech input is unavailable.';
+  }
+  if (code === 'audio-capture' || code === 'no-speech') {
+    return 'No microphone was available. You can type your message instead.';
+  }
+  return 'Speech input stopped unexpectedly. You can type your message instead.';
+};
 
 type SpeechWindow = Window & {
   SpeechRecognition?: SpeechRecognitionConstructor;
@@ -100,11 +111,15 @@ export const AssistantComposer = ({
     el.style.height = `${nextHeight}px`;
   }, [value, textareaRef]);
 
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [listening, setListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const [levels, setLevels] = useState<number[]>([0.2, 0.2, 0.2, 0.2]);
+  const listeningRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const baseValueRef = useRef(value);
   const transcriptRef = useRef('');
+  const lastDictatedValueRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -115,7 +130,16 @@ export const AssistantComposer = ({
     speechWindow?.SpeechRecognition || speechWindow?.webkitSpeechRecognition,
   );
 
+  const setListeningState = (next: boolean) => {
+    listeningRef.current = next;
+    setListening(next);
+  };
+
   const startAudio = async () => {
+    if (prefersReducedMotion) {
+      setLevels([0.4, 0.4, 0.4, 0.4]);
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
@@ -145,7 +169,7 @@ export const AssistantComposer = ({
       };
       rafRef.current = requestAnimationFrame(tick);
     } catch {
-      // ignore mic errors
+      setSpeechError('Microphone access was blocked. You can type your message instead.');
     }
   };
 
@@ -164,6 +188,17 @@ export const AssistantComposer = ({
     setLevels([0.2, 0.2, 0.2, 0.2]);
   };
 
+  /** Drop any dictated text from the draft so it cannot leak into the next send. */
+  const resetSpeechDraft = () => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    stopAudio();
+    baseValueRef.current = '';
+    transcriptRef.current = '';
+    lastDictatedValueRef.current = null;
+    setListeningState(false);
+  };
+
   const startListening = () => {
     if (!supported) return;
     const SR = speechWindow?.SpeechRecognition ?? speechWindow?.webkitSpeechRecognition;
@@ -174,6 +209,8 @@ export const AssistantComposer = ({
     rec.lang = navigator.language || 'en-US';
     baseValueRef.current = value;
     transcriptRef.current = '';
+    lastDictatedValueRef.current = null;
+    setSpeechError(null);
     rec.onresult = (event) => {
       let final = transcriptRef.current;
       let interim = '';
@@ -183,50 +220,83 @@ export const AssistantComposer = ({
         else interim += t;
       }
       transcriptRef.current = final;
-      onValueChange(`${baseValueRef.current} ${final}${interim}`.trim());
+      const next = `${baseValueRef.current} ${final}${interim}`.trim();
+      lastDictatedValueRef.current = next;
+      onValueChange(next);
     };
     rec.onend = () => {
-      setListening(false);
+      setListeningState(false);
       stopAudio();
     };
-    rec.onerror = () => {
-      setListening(false);
+    rec.onerror = (event) => {
+      setSpeechError(speechErrorMessage(event?.error));
+      baseValueRef.current = '';
+      transcriptRef.current = '';
+      setListeningState(false);
       stopAudio();
     };
     recognitionRef.current = rec;
     try {
       rec.start();
-      setListening(true);
+      setListeningState(true);
       void startAudio();
     } catch {
-      setListening(false);
+      setSpeechError(speechErrorMessage());
+      setListeningState(false);
     }
   };
 
-  const stopListening = () => {
-    recognitionRef.current?.stop();
-    stopAudio();
-    setListening(false);
-  };
+  const stopListening = () => resetSpeechDraft();
+
+  useEffect(() => {
+    if (lastDictatedValueRef.current === value) {
+      // This change came from recognition itself; keep its running transcript.
+      lastDictatedValueRef.current = null;
+      return;
+    }
+    // Any other edit (including clearing the draft) becomes the new base text.
+    baseValueRef.current = value;
+    transcriptRef.current = '';
+    if (!value && listeningRef.current) resetSpeechDraft();
+    // resetSpeechDraft is intentionally excluded: reacting to its identity would
+    // restart the draft on every render while speech is active.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
       stopAudio();
+      listeningRef.current = false;
     };
   }, []);
 
+  const handleSendClick = () => {
+    resetSpeechDraft();
+    onSend();
+  };
+
+  const handleQueueClick = () => {
+    resetSpeechDraft();
+    onQueue();
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape' && listeningRef.current) {
+      e.preventDefault();
+      stopListening();
+      return;
+    }
     if (e.key !== 'Enter') return;
     if (e.metaKey || e.ctrlKey) {
       e.preventDefault();
-      onQueue();
+      handleQueueClick();
       return;
     }
     const shouldSend = sendShortcut === 'enter' ? !e.shiftKey : e.shiftKey;
     if (!shouldSend) return;
     e.preventDefault();
-    onSend();
+    handleSendClick();
   };
 
   return (
@@ -236,6 +306,7 @@ export const AssistantComposer = ({
           ref={textareaRef}
           className="assistant-input__textarea"
           placeholder={placeholder}
+          aria-label="Message Iris"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -273,9 +344,17 @@ export const AssistantComposer = ({
           {supported && (
             listening ? (
               <div className="assistant-input__listening">
+                <span className="sr-only" role="status">
+                  Listening for speech. Press Escape or stop listening when finished.
+                </span>
                 <span className="assistant-input__visualizer" aria-hidden="true">
                   {levels.map((level, index) => (
-                    <span key={index} style={{ height: `${Math.max(4, level * 16)}px` }} />
+                    <span
+                      key={index}
+                      style={{
+                        height: `${Math.max(4, (prefersReducedMotion ? 0.4 : level) * 16)}px`,
+                      }}
+                    />
                   ))}
                 </span>
                 <button
@@ -301,8 +380,10 @@ export const AssistantComposer = ({
           <button
             type="button"
             className={`assistant-input__send ${isGenerating ? 'assistant-input__send--stop' : ''}`}
-            aria-label={isGenerating ? 'Stop' : 'Send'}
-            onClick={onSend}
+            aria-label={isGenerating ? 'Stop generating' : 'Send message'}
+            title={!isGenerating && !value.trim() ? 'Type a message to send' : undefined}
+            disabled={!isGenerating && !value.trim()}
+            onClick={handleSendClick}
           >
             {isGenerating ? (
               <IconPlayerStop size={16} strokeWidth={2} />
@@ -311,6 +392,11 @@ export const AssistantComposer = ({
             )}
           </button>
         </div>
+        {speechError && (
+          <p className="assistant-input__speech-error" role="status">
+            {speechError}
+          </p>
+        )}
       </div>
       <p className="assistant-input__disclaimer">
         Iris is AI. By using it, you agree to our{' '}

@@ -1,6 +1,5 @@
-import { Children, useId, useRef, useState, isValidElement } from 'react';
-import type { ButtonHTMLAttributes, ChangeEvent, ReactNode, SelectHTMLAttributes } from 'react';
-import { useDismiss } from '../../hooks/useDismiss';
+import { Children, useId, isValidElement } from 'react';
+import type { ReactNode, SelectHTMLAttributes } from 'react';
 import './Select.css';
 
 export interface SelectOption {
@@ -30,6 +29,7 @@ function parseOptionChildren(children: ReactNode): SelectOption[] {
   return opts;
 }
 
+/** A native select gives us correct listbox, typeahead and keyboard behaviour for free. */
 export const Select = ({
   label,
   error,
@@ -40,75 +40,43 @@ export const Select = ({
   placeholder,
   className = '',
   value,
-  onChange,
-  disabled,
   ...props
 }: SelectProps) => {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const selectId = useId();
-
+  const generatedId = useId();
+  const selectId = props.id ?? generatedId;
   const resolvedOptions = options ?? parseOptionChildren(children);
-
-  useDismiss(containerRef, () => setOpen(false), { enabled: open });
-
-  const selectedOption = resolvedOptions.find((opt) => String(opt.value) === String(value ?? ''));
-  const display = selectedOption
-    ? selectedOption.label
-    : placeholder ?? resolvedOptions[0]?.label ?? 'Select';
-
-  const handleSelect = (optValue: string) => {
-    if (disabled) return;
-    const synthetic = { target: { value: optValue } } as unknown as ChangeEvent<HTMLSelectElement>;
-    onChange?.(synthetic);
-    setOpen(false);
-  };
+  const hasEmptyOption = resolvedOptions.some((option) => option.value === '');
+  const describedBy = [
+    error && `${selectId}-error`,
+    helperText && `${selectId}-helper`,
+    props['aria-describedby'],
+  ].filter(Boolean).join(' ') || undefined;
 
   return (
     <div
       className={`select-wrapper ${fullWidth ? 'select-wrapper--full-width' : ''}`}
-      ref={containerRef}
     >
       {label && <label className="select-label" htmlFor={selectId}>{label}</label>}
-      <button
-        type="button"
-        id={selectId}
-        className={`select ${error ? 'select--error' : ''} ${className}`}
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        {...(props as unknown as ButtonHTMLAttributes<HTMLButtonElement>)}
-        onClick={(e) => {
-          if (disabled) return;
-          (props as unknown as ButtonHTMLAttributes<HTMLButtonElement>)?.onClick?.(e);
-          setOpen((v) => !v);
-        }}
-      >
-        <span className="select__value">{display}</span>
+      <div className="select-control">
+        <select
+          {...props}
+          id={selectId}
+          className={`select ${error ? 'select--error' : ''} ${className}`}
+          value={value ?? ''}
+          aria-invalid={Boolean(error) || props['aria-invalid']}
+          aria-describedby={describedBy}
+        >
+          {placeholder && !hasEmptyOption && (
+            <option value="" disabled>{placeholder}</option>
+          )}
+          {resolvedOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
         <span className="select__chevron" aria-hidden="true">▾</span>
-      </button>
-      {open && (
-        <div className="select__menu" role="listbox">
-          {resolvedOptions.map((opt) => {
-            const active = String(opt.value) === String(value ?? '');
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="option"
-                aria-selected={active}
-                className={`select__item ${active ? 'select__item--active' : ''}`}
-                onClick={() => handleSelect(opt.value)}
-                disabled={disabled}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {error && <span className="select-error">{error}</span>}
-      {helperText && !error && <span className="select-helper">{helperText}</span>}
+      </div>
+      {error && <span className="select-error" id={`${selectId}-error`} role="alert">{error}</span>}
+      {helperText && !error && <span className="select-helper" id={`${selectId}-helper`}>{helperText}</span>}
     </div>
   );
 };

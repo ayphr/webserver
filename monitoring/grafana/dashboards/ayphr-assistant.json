@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Assistant (Iris) stream volume, latency, tokens, thinking/tool activity and WebSocket traffic.",
+  "description": "Assistant (Iris) stream volume, latency, tokens, thinking/tool activity and WebSocket traffic. Note: feedback, stream-error, rate-limit and resume counters are declared but not incremented yet; their panels are hidden until call sites instrument them.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -385,7 +385,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Messages, feedback and resumes",
+      "title": "Messages persisted",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -443,16 +443,6 @@
           "refId": "A",
           "expr": "sum by (role) (rate(ayphr_assistant_messages_total[$__rate_interval]))",
           "legendFormat": "messages {{role}}"
-        },
-        {
-          "refId": "B",
-          "expr": "sum by (feedback) (rate(ayphr_assistant_feedback_total[$__rate_interval]))",
-          "legendFormat": "feedback {{feedback}}"
-        },
-        {
-          "refId": "C",
-          "expr": "sum by (result) (rate(ayphr_assistant_resume_total[$__rate_interval]))",
-          "legendFormat": "resume {{result}}"
         }
       ],
       "gridPos": {
@@ -463,8 +453,27 @@
       }
     },
     {
+      "type": "text",
+      "title": "Dashboard notes",
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "The following counters are declared by the server but are not incremented by any call site yet, so their panels are hidden: `ayphr_assistant_feedback_total`, `ayphr_assistant_stream_errors_total`, `ayphr_assistant_rate_limited_total`, `ayphr_assistant_resume_total`. Re-enable the panels once the assistant call sites emit these events."
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
       "type": "timeseries",
-      "title": "Errors and rate limits",
+      "title": "Errors and rate limits (uninstrumented — hidden)",
+      "hide": true,
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -594,13 +603,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (category, source) (rate(ayphr_assistant_safety_events_total[$__rate_interval]))",
-          "legendFormat": "{{category}} ({{source}})"
+          "expr": "sum by (event, result) (rate(ayphr_assistant_websocket_events_total[$__rate_interval]))",
+          "legendFormat": "{{event}} {{result}}"
         },
         {
           "refId": "B",
-          "expr": "sum by (category, source) (rate(ayphr_assistant_safety_events_total[$__rate_interval]))",
-          "legendFormat": "{{category}} ({{source}})"
+          "expr": "sum(ayphr_assistant_active_streams)",
+          "legendFormat": "active streams"
         }
       ],
       "gridPos": {

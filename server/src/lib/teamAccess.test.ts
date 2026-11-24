@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { getTeamMemberRole, toTeamMember, toTeamMembers } from './teamAccess';
+import { canManageTeamRole, getTeamMemberRole, toTeamMember, toTeamMembers } from './teamAccess';
 import type { Team, User } from '@common';
 
 const team: Team = {
@@ -23,10 +23,20 @@ function user(overrides: Partial<User>): User {
 }
 
 describe('team access projections', () => {
-  test('prefers team-specific roles and falls back to manager identity', () => {
+  test('derives authorization from teamRoles and falls back to manager identity', () => {
     expect(getTeamMemberRole(user({ uuid: 'manager-1' }), team)).toBe('manager');
-    expect(getTeamMemberRole(user({ teamRole: 'helper' }), team)).toBe('helper');
+    expect(getTeamMemberRole(user({ teamRoles: { 'team-1': 'helper' } }), team)).toBe('helper');
     expect(getTeamMemberRole(user({ teamRoles: { 'team-1': 'manager' }, teamRole: 'member' }), team)).toBe('manager');
+  });
+
+  test('never trusts the global teamRole for team authorization', () => {
+    const globalManager = user({ teamRole: 'manager' });
+    expect(getTeamMemberRole(globalManager, team)).toBe('member');
+    expect(canManageTeamRole(globalManager, team)).toBe(false);
+
+    const helper = user({ teamRole: 'manager', teamRoles: { 'team-1': 'helper' } });
+    expect(getTeamMemberRole(helper, team)).toBe('helper');
+    expect(canManageTeamRole(helper, team)).toBe(false);
   });
 
   test('maps members into the public team shape', () => {
@@ -45,6 +55,6 @@ describe('team access projections', () => {
         joinedAt: new Date('2026-01-02T00:00:00Z'),
       },
     ]);
-    expect(toTeamMember(user({ teamRole: 'helper' }), team).role).toBe('helper');
+    expect(toTeamMember(user({ teamRoles: { 'team-1': 'helper' } }), team).role).toBe('helper');
   });
 });

@@ -15,8 +15,9 @@ import {
 import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, AssistantSendShortcut } from '@common';
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
-import { ProfileCard, Button, AssistantInput, Pagination, ProgressBar } from '../../components/common';
-import { AssistantSidebar, useAssistantState, type AssistantChatAction } from '../../components/assistant';
+import { ProfileCard, Button, ConfirmDialog, Pagination, ProgressBar } from '../../components/common';
+import { useAssistantState } from '../../components/assistant/useAssistantState';
+import type { AssistantChatAction } from '../../components/assistant/types';
 import { Sidebar } from '../../components/layout';
 import { SessionsModal, ChangePasswordModal, ChangeEmailModal, ChangeUsernameModal } from '../../components/settings';
 import { SettingsPanel } from '../../components/settings';
@@ -35,6 +36,8 @@ const IntegrationsPanel = lazy(() => import('../../components/integrations').the
 const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
 const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
 const RadioPanel = lazy(() => import('../../components/radio/RadioPanel').then((m) => ({ default: m.RadioPanel })));
+const AssistantInput = lazy(() => import('../../components/assistant/AssistantInput').then((m) => ({ default: m.AssistantInput })));
+const AssistantSidebar = lazy(() => import('../../components/assistant/AssistantSidebar').then((m) => ({ default: m.AssistantSidebar })));
 import './DashboardPage.css';
 
 function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | null; isPermanent: boolean }>) {
@@ -222,6 +225,7 @@ export const DashboardPage = () => {
   const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
   const acceptedInviteRef = useRef<string | null>(null);
   const [dismissedAssistantSyncError, setDismissedAssistantSyncError] = useState<string | null>(null);
+  const [punishmentToRemove, setPunishmentToRemove] = useState<{ id: string; label: string } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -246,11 +250,13 @@ export const DashboardPage = () => {
     void load();
   }, []);
 
+  const unreadPollUserId = user?.uuid;
   useEffect(() => {
-    if (!user) return;
+    if (!unreadPollUserId) return;
 
     let cancelled = false;
     const loadUnread = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const count = await api.notifications.unreadCount();
         if (!cancelled) setUnreadNotifications(count);
@@ -261,12 +267,14 @@ export const DashboardPage = () => {
 
     void loadUnread();
     const interval = setInterval(() => void loadUnread(), 60_000);
+    const handleVisibilityChange = () => { void loadUnread(); };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uuid]);
+  }, [unreadPollUserId]);
 
   // Each tab shares one scroll container; start new views at the top.
   useEffect(() => {
@@ -487,7 +495,7 @@ export const DashboardPage = () => {
 
   const navigate = useNavigate();
 
-  const navigateToDashboard = (value: string | DashboardTarget, options?: { replace?: boolean }) => {
+  const navigateToDashboard = useCallback((value: string | DashboardTarget, options?: { replace?: boolean }) => {
     const target: DashboardTarget = typeof value === 'string'
       ? (() => {
           // Accept the old `?tab=` ids and internal aliases everywhere.
@@ -508,7 +516,7 @@ export const DashboardPage = () => {
     params.delete('tab');
     const query = params.toString();
     navigate(`${targetPath}${query ? `?${query}` : ''}`, { replace: options?.replace ?? false });
-  };
+  }, [navigate, searchParams]);
 
   const changeTab = navigateToDashboard;
 
@@ -615,8 +623,7 @@ export const DashboardPage = () => {
     if (!isLoading && user && activePage === 'users' && user.role !== 'staff') {
       navigateToDashboard('overview', { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, user, activePage]);
+  }, [isLoading, user, activePage, navigateToDashboard]);
 
   const setDefaultTabPref = (value: string) => {
     const next = DASHBOARD_TABS.find((tab) => tab === value) ?? 'overview';
@@ -723,6 +730,7 @@ export const DashboardPage = () => {
         className={`dashboard-main${activePage === 'assistant' ? ' dashboard-main--assistant' : ''}`}
         id="main-content"
         ref={mainRef}
+        tabIndex={-1}
       >
         {inviteToken && inviteError && dismissedInviteError !== inviteError && (
           <DashboardBanner
@@ -771,32 +779,36 @@ export const DashboardPage = () => {
                 type="button"
                 className="dashboard-page__suspension-card__toggle"
                 onClick={() => setIsSuspensionDetailsOpen((open) => !open)}
+                aria-expanded={isSuspensionDetailsOpen}
+                aria-controls="suspension-details"
               >
                 {isSuspensionDetailsOpen ? 'Hide details' : 'More info'}
                 {isSuspensionDetailsOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
               </button>
-              {isSuspensionDetailsOpen && (
-                <div className="dashboard-page__suspension-card__meta">
-                  <div>
-                    <span className="dashboard-page__suspension-card__label">Issued by</span>
-                    <span className="dashboard-page__suspension-card__value">{activeSuspension.issuedByUsername}</span>
-                  </div>
-                  <div>
-                    <span className="dashboard-page__suspension-card__label">Issued</span>
-                    <span className="dashboard-page__suspension-card__value">{formatDisplayDate(activeSuspension.issuedAt)}</span>
-                  </div>
-                  <div>
-                    <span className="dashboard-page__suspension-card__label">Ends</span>
-                    <span className="dashboard-page__suspension-card__value">
-                      {activeSuspension.endsAt ? formatDisplayDate(activeSuspension.endsAt) : 'Permanent'}
-                    </span>
-                  </div>
+              <div
+                className="dashboard-page__suspension-card__meta"
+                id="suspension-details"
+                hidden={!isSuspensionDetailsOpen}
+              >
+                <div>
+                  <span className="dashboard-page__suspension-card__label">Issued by</span>
+                  <span className="dashboard-page__suspension-card__value">{activeSuspension.issuedByUsername}</span>
                 </div>
-              )}
+                <div>
+                  <span className="dashboard-page__suspension-card__label">Issued</span>
+                  <span className="dashboard-page__suspension-card__value">{formatDisplayDate(activeSuspension.issuedAt)}</span>
+                </div>
+                <div>
+                  <span className="dashboard-page__suspension-card__label">Ends</span>
+                  <span className="dashboard-page__suspension-card__value">
+                    {activeSuspension.endsAt ? formatDisplayDate(activeSuspension.endsAt) : 'Permanent'}
+                  </span>
+                </div>
+              </div>
             </div>
             {isStaff && (
               <Button
-                onClick={handleLiftSuspension}
+                onClick={() => setPunishmentToRemove({ id: activeSuspension.id, label: 'this suspension' })}
                 isLoading={isLiftingPunishment}
                 disabled={isLiftingPunishment}
                 variant="danger"
@@ -809,47 +821,49 @@ export const DashboardPage = () => {
         ) : (
           <>
             {activePage === 'assistant' && (
-              <div className="dashboard-assistant">
-                <div
-                  id="assistant-chat-list"
-                  className={`dashboard-assistant__sidebar-slot${isAssistantSidebarOpen ? ' dashboard-assistant__sidebar-slot--open' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="dashboard-assistant__sidebar-backdrop"
-                    aria-label="Close chat list"
-                    onClick={() => setIsAssistantSidebarOpen(false)}
-                  />
-                  <AssistantSidebar
-                    folders={assistant.state.folders}
-                    chats={assistant.state.chats}
-                    activeChatId={assistant.state.activeChatId}
-                    isAssistantView
-                    onNewChat={handleSidebarNewChat}
-                    onOpenChat={handleSidebarOpenChat}
-                    onRenameFolder={assistant.renameFolder}
-                    onDeleteFolder={assistant.deleteFolder}
-                    onRenameChat={assistant.renameChat}
-                    onDeleteChat={handleSidebarDeleteChat}
-                    onReorderFolders={assistant.reorderFolders}
-                    onReorderChat={assistant.reorderChat}
-                    onMoveChat={assistant.moveChat}
+              <Suspense fallback={<DashboardContentSkeleton />}>
+                <div className="dashboard-assistant">
+                  <div
+                    id="assistant-chat-list"
+                    className={`dashboard-assistant__sidebar-slot${isAssistantSidebarOpen ? ' dashboard-assistant__sidebar-slot--open' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="dashboard-assistant__sidebar-backdrop"
+                      aria-label="Close chat list"
+                      onClick={() => setIsAssistantSidebarOpen(false)}
+                    />
+                    <AssistantSidebar
+                      folders={assistant.state.folders}
+                      chats={assistant.state.chats}
+                      activeChatId={assistant.state.activeChatId}
+                      isAssistantView
+                      onNewChat={handleSidebarNewChat}
+                      onOpenChat={handleSidebarOpenChat}
+                      onRenameFolder={assistant.renameFolder}
+                      onDeleteFolder={assistant.deleteFolder}
+                      onRenameChat={assistant.renameChat}
+                      onDeleteChat={handleSidebarDeleteChat}
+                      onReorderFolders={assistant.reorderFolders}
+                      onReorderChat={assistant.reorderChat}
+                      onMoveChat={assistant.moveChat}
+                    />
+                  </div>
+                  <AssistantInput
+                    availableVariants={availableAssistantVariants}
+                    username={user.username}
+                    userCountry={user.country}
+                    defaultVariant={effectiveAssistantVariant}
+                    dataShared={getPlanFeaturesForUser(user).dataShared}
+                    sendShortcut={assistantSendShortcut}
+                    assistant={assistant}
+                    chatAction={chatAction}
+                    onChatCreated={handleChatCreated}
+                    onToggleSidebar={() => setIsAssistantSidebarOpen((open) => !open)}
+                    isSidebarOpen={isAssistantSidebarOpen}
                   />
                 </div>
-                <AssistantInput
-                  availableVariants={availableAssistantVariants}
-                  username={user.username}
-                  userCountry={user.country}
-                  defaultVariant={effectiveAssistantVariant}
-                  dataShared={getPlanFeaturesForUser(user).dataShared}
-                  sendShortcut={assistantSendShortcut}
-                  assistant={assistant}
-                  chatAction={chatAction}
-                  onChatCreated={handleChatCreated}
-                  onToggleSidebar={() => setIsAssistantSidebarOpen((open) => !open)}
-                  isSidebarOpen={isAssistantSidebarOpen}
-                />
-              </div>
+              </Suspense>
             )}
 
             {activePage === 'overview' && (
@@ -1082,14 +1096,20 @@ export const DashboardPage = () => {
                   </div>
                 ) : (
                   <div className="dashboard-page__appeal">
+                    <label className="dashboard-page__appeal-label" htmlFor="appeal-reason">
+                      Reason for appeal
+                    </label>
                     <textarea
+                      id="appeal-reason"
                       className="dashboard-page__appeal-textarea"
                       value={appealText}
                       onChange={(e) => setAppealText(e.target.value)}
                       rows={6}
                       placeholder="Explain why your suspension should be lifted..."
+                      aria-invalid={Boolean(appealError)}
+                      aria-describedby={appealError ? 'appeal-error' : undefined}
                     />
-                    {appealError && <p className="dashboard-page__error">{appealError}</p>}
+                    {appealError && <p className="dashboard-page__error" id="appeal-error" role="alert">{appealError}</p>}
                     <Button className="dashboard-page__appeal-submit" onClick={() => void handleSubmitAppeal()} isLoading={isSubmittingAppeal} disabled={isSubmittingAppeal || !appealText.trim()}>
                       Submit appeal
                     </Button>
@@ -1124,12 +1144,12 @@ export const DashboardPage = () => {
                             </div>
                             <p className="dashboard-page__appeal-item__text">{appeal.text}</p>
                             {appealResolveErrors[appeal.id] && (
-                              <p className="dashboard-page__error">{appealResolveErrors[appeal.id]}</p>
+                              <p className="dashboard-page__error" role="alert">{appealResolveErrors[appeal.id]}</p>
                             )}
                             <div className="dashboard-page__appeal-item__actions">
                               <Button
                                 variant="primary"
-                                onClick={() => void handleResolveStaffAppeal(appeal.id, 'lift')}
+                                onClick={() => setPunishmentToRemove({ id: appeal.id, label: appeal.userUsername })}
                                 isLoading={resolvingAppealId === appeal.id}
                                 disabled={resolvingAppealId !== null}
                               >
@@ -1191,6 +1211,28 @@ export const DashboardPage = () => {
           }}
         />
       )}
+      <ConfirmDialog
+        isOpen={punishmentToRemove !== null}
+        onCancel={() => setPunishmentToRemove(null)}
+        onConfirm={() => {
+          const target = punishmentToRemove;
+          setPunishmentToRemove(null);
+          if (!target) return;
+          if (target.id === activeSuspension?.id) {
+            void handleLiftSuspension();
+          } else {
+            void handleResolveStaffAppeal(target.id, 'lift');
+          }
+        }}
+        title="Remove punishment?"
+        confirmText="Remove punishment"
+        isDangerous
+      >
+        <p>
+          This will lift the punishment for {punishmentToRemove?.label ?? 'this user'}
+          {punishmentToRemove?.id === activeSuspension?.id ? '.' : ' and mark the appeal as accepted.'}
+        </p>
+      </ConfirmDialog>
     </div>
   );
 };

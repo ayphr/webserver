@@ -103,7 +103,7 @@ export function buildOpenApiDocument(routes: readonly RouteDefinition[]): OpenAp
       };
     }
     if (!PUBLIC_ROUTES.has(route.path) && route.path !== '/api/avatars/:uuid') {
-      operation.security = [{ sessionCookie: [] }];
+      operation.security = [{ bearerAuth: [] }];
     }
 
     pathItem[route.method.toLowerCase()] = operation;
@@ -123,11 +123,11 @@ export function buildOpenApiDocument(routes: readonly RouteDefinition[]): OpenAp
     paths,
     components: {
       securitySchemes: {
-        sessionCookie: {
-          type: 'apiKey',
-          in: 'cookie',
-          name: 'session',
-          description: `Session cookie issued by ${API_VERSION_PREFIX}/auth/login.`,
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'opaque session token',
+          description: `Bearer token returned by ${API_VERSION_PREFIX}/auth/login. Send it as \`Authorization: Bearer <token>\`.`,
         },
       },
     },

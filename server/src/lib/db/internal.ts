@@ -187,6 +187,38 @@ export function trackMongoOperation(operation: string, collection: string) {
   recordMongoOperation(operation, collection);
 }
 
+export type IndexSpec = {
+  collection: string;
+  label: string;
+  create: () => Promise<unknown>;
+};
+
+/**
+ * Required indexes (unique constraints and TTLs) are a correctness boundary:
+ * a missing unique index permits duplicate accounts/sessions/webhook events.
+ * Never serve traffic if one could not be created or reconciled.
+ */
+export async function ensureRequiredIndexes(
+  specs: readonly IndexSpec[],
+  onError: (error: unknown, spec: IndexSpec) => void = (error, spec) =>
+    log.error({ error, collection: spec.collection, index: spec.label }, 'required index setup failed'),
+): Promise<void> {
+  const failures: string[] = [];
+  for (const spec of specs) {
+    try {
+      await spec.create();
+    } catch (error) {
+      onError(error, spec);
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`${spec.collection}.${spec.label}: ${message}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`Required database indexes are unavailable:\n- ${failures.join('\n- ')}`);
+  }
+}
+
 /**
  * Ensures a `createdAt` TTL index has the expected expiry. Recreated indexes
  * with different options throw `IndexOptionsConflict`, so existing indexes are
@@ -360,6 +392,9 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [INTEGRATIONS_COLLECTION, () => cols.integrations.createIndex({ teamId: 1, createdAt: -1 })],
     [TEAMS_COLLECTION, () => cols.teams.createIndex({ id: 1 }, { unique: true })],
     [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ token: 1 }, { unique: true })],
+    // Unaccepted invites must disappear on their own; TTL deletion is delayed
+    // without this index and expired tokens would remain queryable forever.
+    [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
     [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ email: 1 })],
     [TEAM_INVITES_COLLECTION, () => cols.teamInvites.createIndex({ teamId: 1, createdAt: -1 })],
     [TEAM_AUDIT_LOGS_COLLECTION, () => cols.teamAuditLogs.createIndex({ teamId: 1, createdAt: -1 })],
@@ -374,24 +409,24 @@ export async function setupCollections(db: Db): Promise<Collections> {
     [RATE_LIMITS_COLLECTION, () => cols.rateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })],
   ];
 
-  await Promise.all(
-    indexSpecs.map(async ([collection, createIndex]) => {
-      trackMongoOperation('createIndex', collection);
-      return createIndex();
-    })
-  ).catch((error) => log.warn({ error }, 'failed to ensure indexes'));
+  await ensureRequiredIndexes(indexSpecs.map(([collection, create], index) => ({
+    collection,
+    label: `index-${index + 1}`,
+    create,
+  })));
 
-  try {
-    await ensureSessionIndexes(cols.sessions);
-  } catch (error) {
-    log.warn({ error }, 'failed to ensure sessions indexes');
-  }
-
-  try {
-    await ensureTeamIndexes(cols.teams);
-  } catch (error) {
-    log.warn({ error }, 'failed to ensure team indexes');
-  }
+  await ensureRequiredIndexes([
+    {
+      collection: SESSIONS_COLLECTION,
+      label: 'session indexes',
+      create: () => ensureSessionIndexes(cols.sessions),
+    },
+    {
+      collection: TEAMS_COLLECTION,
+      label: 'team indexes',
+      create: () => ensureTeamIndexes(cols.teams),
+    },
+  ]);
 
   return cols;
 }
@@ -459,10 +494,20 @@ export async function ensureSessionIndexes(sessions: Collection<Session>) {
     () => sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ];
 
+  const failures: string[] = [];
   await Promise.all(
-    indexSpecs.map(async (createIndex) => {
-      trackMongoOperation('createIndex', SESSIONS_COLLECTION);
-      return createIndex();
+    indexSpecs.map(async (createIndex, index) => {
+      try {
+        trackMongoOperation('createIndex', SESSIONS_COLLECTION);
+        await createIndex();
+      } catch (error) {
+        log.error({ error, collection: SESSIONS_COLLECTION, index: `index-${index + 1}` }, 'required session index failed');
+        failures.push(error instanceof Error ? error.message : String(error));
+      }
     })
   );
+
+  if (failures.length > 0) {
+    throw new Error(`Required session indexes are unavailable: ${failures.join('; ')}`);
+  }
 }

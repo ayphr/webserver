@@ -12,12 +12,6 @@ export async function createDomainVerification(verification: DomainVerification)
   return normalized;
 }
 
-export async function getDomainVerificationById(id: string) {
-  const domainVerifications = await getCollection('domainVerifications');
-  trackMongoOperation('findOne', COLLECTION);
-  return domainVerifications.findOne({ id }, { projection: { _id: 0 } });
-}
-
 export async function getLatestDomainVerification(userUuid: string, socialType: string, domain: string) {
   const domainVerifications = await getCollection('domainVerifications');
   trackMongoOperation('find', COLLECTION);

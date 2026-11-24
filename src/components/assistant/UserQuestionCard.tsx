@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IconArrowRight, IconCheck } from '@tabler/icons-react';
 import type { AssistantUserQuestion } from '@common';
 import './UserQuestionCard.css';
@@ -17,6 +17,18 @@ export const UserQuestionCard = ({ question, onSubmit, disabled = false }: UserQ
     ),
   );
   const [customs, setCustoms] = useState<Record<string, string>>({});
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const card = cardRef.current;
+      const target =
+        card?.querySelector<HTMLElement>('.user-question-card__answer:not(:disabled)') ??
+        card?.querySelector<HTMLElement>('.user-question-card__next:not(:disabled)');
+      target?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const step = question.steps[stepIndex];
   if (!step) return null;
@@ -32,7 +44,10 @@ export const UserQuestionCard = ({ question, onSubmit, disabled = false }: UserQ
   };
 
   return (
-    <div className="user-question-card">
+    <div className="user-question-card" ref={cardRef}>
+      <p className="sr-only" role="status" aria-live="polite">
+        Iris needs your answer.
+      </p>
       <p className="user-question-card__prompt">{question.prompt}</p>
       {question.steps.length > 1 && (
         <p className="user-question-card__progress">
@@ -40,7 +55,7 @@ export const UserQuestionCard = ({ question, onSubmit, disabled = false }: UserQ
         </p>
       )}
       <p className="user-question-card__step">{step.prompt}</p>
-      <div className="user-question-card__answers" role="group" aria-label={step.prompt}>
+      <div className="user-question-card__answers" role="group" aria-label={`Iris needs your answer: ${step.prompt}`}>
         {step.suggestedAnswers.map((answer) => {
           const selected = !custom && answers[step.id] === answer;
           return (

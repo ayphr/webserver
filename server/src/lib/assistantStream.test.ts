@@ -19,3 +19,9 @@ test('token splitting handles empty and whitespace-only responses', () => {
   expect(splitAssistantResponseIntoTokens('')).toEqual([]);
   expect(splitAssistantResponseIntoTokens('   \n  ')).toEqual([]);
 });
+
+test('live chunks keep whitespace-only deltas so words cannot join', () => {
+  expect(splitAssistantResponseIntoTokens(' ', { preserveWhitespaceOnly: true })).toEqual([' ']);
+  expect(splitAssistantResponseIntoTokens('\n', { preserveWhitespaceOnly: true })).toEqual(['\n']);
+  expect(splitAssistantResponseIntoTokens('  \n ', { preserveWhitespaceOnly: true })).toEqual(['  \n ']);
+});

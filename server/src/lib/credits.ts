@@ -3,6 +3,9 @@ import { getCreditPeriodStart, resolveCreditBalance } from '@common';
 import { getUserFromUuid } from './db';
 import { getTeamForUser, getTeamSharedSeats } from './db/teams';
 import { mutateCreditsAtomically } from './db/creditLedger';
+import { createLogger } from './logger';
+
+const log = createLogger('credits');
 
 type CreditUser = Pick<User, 'uuid' | 'teamId'>;
 
@@ -128,4 +131,64 @@ export async function consumeCredits(
   options?: CreditMutationOptions,
 ): Promise<CreditMutationResult | null> {
   return applyCreditMutation('charge', userUuid, amount, now, options);
+}
+
+const RELEASE_ATTEMPTS = 3;
+const CHARGE_ATTEMPTS = 3;
+
+/**
+ * Settles an assistant hold into an actual charge. Returns the number of
+ * credits charged, or `-1` when settlement could not be completed. A failed
+ * settlement must never be reported to the client as a successful stream: the
+ * held credits would otherwise stay reserved forever.
+ */
+export async function settleCreditHold(
+  userUuid: string,
+  heldCredits: number,
+  chargeCredits: number,
+  options: CreditMutationOptions = {},
+  now: Date = new Date(),
+): Promise<number> {
+  const held = Number.isFinite(heldCredits) ? Math.max(0, heldCredits) : 0;
+  const requested = Number.isFinite(chargeCredits) ? Math.max(0, chargeCredits) : 0;
+  const cost = Math.min(held, requested);
+
+  if (held <= 0) return cost > 0 ? -1 : 0;
+
+  let released = false;
+  for (let attempt = 0; attempt < RELEASE_ATTEMPTS; attempt += 1) {
+    const result = await releaseCredits(userUuid, held, now, {
+      ...options,
+      reason: options.reason ?? 'assistant_stream_release',
+    });
+    if (result?.changed) {
+      released = true;
+      break;
+    }
+  }
+  if (!released) {
+    log.warn({ userUuid, referenceId: options.referenceId }, 'failed to release assistant credit hold');
+    return -1;
+  }
+
+  if (cost <= 0) return 0;
+
+  for (let attempt = 0; attempt < CHARGE_ATTEMPTS; attempt += 1) {
+    const result = await consumeCredits(userUuid, cost, now, {
+      ...options,
+      reason: options.reason ?? 'assistant_stream_charge',
+    });
+    if (result?.changed) return cost;
+    log.warn(
+      { userUuid, attempt, referenceId: options.referenceId },
+      'assistant credit charge was rejected; reconciling hold and retrying',
+    );
+    // The hold may have been re-acquired by a concurrent stream; release it
+    // again before retrying the charge.
+    await releaseCredits(userUuid, held, now, {
+      ...options,
+      reason: options.reason ?? 'assistant_stream_release',
+    });
+  }
+  return -1;
 }

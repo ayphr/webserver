@@ -15,10 +15,14 @@
   /* Original subtle overlays used by the sidebar navigation. */
   --surface-hover-subtle: rgba(255, 255, 255, 0.015);
   --surface-active-subtle: rgba(255, 255, 255, 0.02);
+  --surface-overlay-subtle: rgba(255, 255, 255, 0.03);
+  --surface-overlay: rgba(255, 255, 255, 0.05);
+  --surface-overlay-strong: rgba(255, 255, 255, 0.08);
+  --surface-overlay-border: rgba(255, 255, 255, 0.12);
 
   --text-primary: hsla(180, 67%, 99%, 1);
-  --text-muted: hsl(180, 1%, 53%);
-  --text-dim: hsl(180, 1%, 45%);
+  --text-muted: hsl(180, 1%, 72%);
+  --text-dim: hsl(180, 1%, 64%);
 
   --accent-green: hsla(129, 77%, 43%, 0.75);
   --accent-yellow: hsla(41, 99%, 59%, 0.75);
@@ -57,22 +61,36 @@
 
   --focus-ring: hsl(145, 80%, 65%);
 
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 50;
   --z-dropdown: 100;
+  --z-tooltip: 1200;
   --z-modal-backdrop: 1000;
   --z-modal: 1001;
-  --z-tooltip: 900;
+  --z-skip-link: 11000;
 
   --container-shadow: 0 2px 0.5rem rgba(0, 0, 0, 0.3);
+  --modal-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  --backdrop-scrim: rgba(0, 0, 0, 0.75);
 
   --font-weight-li: 400;
   --font-weight-md: 600;
   --font-weight-hv: 800;
 
   --divider-color: rgba(255, 255, 255, 0.25);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-border: rgba(255, 255, 255, 0.15);
+  --chart-tooltip-bg: rgba(18, 18, 18, 0.96);
 
   --status-success: hsl(129, 77%, 60%);
+  --status-success-soft: hsla(129, 77%, 43%, 0.15);
+  --status-success-border: hsla(129, 77%, 43%, 0.3);
   --status-error: hsl(4, 100%, 71%);
   --status-error-bg: rgba(220, 53, 69, 0.08);
+  --status-error-soft: hsla(4, 100%, 71%, 0.15);
+  --status-error-border: hsla(4, 100%, 71%, 0.3);
+  --status-warning-soft: rgba(255, 193, 7, 0.15);
 
   /* Landing page palette */
   --landing-accent: #7ef09a;
@@ -146,7 +164,7 @@ button,
   position: fixed;
   top: 0.75rem;
   left: 0.75rem;
-  z-index: 10000;
+  z-index: var(--z-skip-link);
   width: auto;
   height: auto;
   margin: 0;
@@ -180,6 +198,22 @@ select {
 :where(html.keyboard-focus) :where(a[href], button, input, textarea, select, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
   outline: 2px solid var(--focus-ring) !important;
   outline-offset: 2px !important;
+}
+
+/* Keep touch targets finger-sized on small screens, including icon-only
+   buttons that would otherwise collapse to their SVG width. */
+@media (max-width: 640px) {
+  button,
+  [role='button'],
+  select,
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']),
+  textarea {
+    min-height: 44px;
+  }
+
+  button:has(> svg:only-child) {
+    min-width: 44px;
+  }
 }
 
 *::-webkit-scrollbar {

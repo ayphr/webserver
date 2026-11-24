@@ -5,6 +5,17 @@ import { createAppeal, getAppealByPunishmentId } from '../../lib/db/appeals';
 import { toSelfUser } from '../../lib/user';
 import { randomUUID } from 'node:crypto';
 
+const MAX_APPEAL_TEXT_LENGTH = 5000;
+
+/** Shared by the route so the bound can be tested without a database. */
+export function validateAppealText(text: string): string | null {
+  if (!text) return 'Appeal text is required';
+  if (text.length > MAX_APPEAL_TEXT_LENGTH) {
+    return `Appeal text must be ${MAX_APPEAL_TEXT_LENGTH} characters or fewer`;
+  }
+  return null;
+}
+
 const handleMe = requireAuth(async (_request, user) => {
   const punishments = await getPunishmentsForUserUuid(user.uuid);
   const now = Date.now();
@@ -50,8 +61,9 @@ const handleAppealSubmit = requireAuth(async (request, user) => {
 
   const body = await readJsonBody(request);
   const text = typeof body?.text === 'string' ? body.text.trim() : '';
-  if (!text) {
-    return json({ error: 'Appeal text is required' }, 400);
+  const textError = validateAppealText(text);
+  if (textError) {
+    return json({ error: textError }, 400);
   }
 
   const existing = await getAppealByPunishmentId(active.id);

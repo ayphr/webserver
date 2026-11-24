@@ -45,7 +45,7 @@
   text-transform: uppercase;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-overlay-subtle);
   color: var(--text-primary);
 }
 
@@ -69,7 +69,7 @@
 .link-page__token-value {
   flex: 1;
   padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-overlay);
   border-radius: 6px;
   word-break: break-all;
 }

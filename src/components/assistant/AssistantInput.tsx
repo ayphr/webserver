@@ -4,6 +4,7 @@ import {
   estimateStreamingCredits,
   type AssistantChat,
   type AssistantContextUsage,
+  type AssistantState,
   type AssistantThinkingStep,
   type AssistantToolCall,
   type AssistantToolPermissionDecision,
@@ -12,8 +13,9 @@ import {
   type AssistantVariant,
 } from '@common';
 import irisAnimation from '../../assets/animations/iris.webm';
-import { AssistantStreamClient } from '../../lib/assistantStream';
+import { AssistantStreamClient, OrderedTokenBuffer } from '../../lib/assistantStream';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+import { ConfirmDialog } from '../common';
 import { AssistantComposer } from './AssistantComposer';
 import { Link } from 'react-router-dom';
 import { AssistantMessages, type AssistantMessagesHandle } from './AssistantMessages';
@@ -161,6 +163,13 @@ export const AssistantInput = ({
     return chat?.messages ?? [];
   });
   const safetyLocked = messages.some((message) => Boolean(message.safetyNotice));
+  const safetyNotice = [...messages].reverse().find((message) => message.safetyNotice)?.safetyNotice;
+  const safetyReason =
+    safetyNotice === 'crisis'
+      ? 'Iris paused the answer to share crisis-support resources.'
+      : safetyNotice === 'csam'
+        ? 'Iris paused the answer to protect child safety.'
+        : 'Iris could not answer this request safely (violence, threats, abuse, sexual harm, or anything involving children).';
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
   const [subtitleSequence, setSubtitleSequence] = useState(() => ({
@@ -181,6 +190,8 @@ export const AssistantInput = ({
     toolId: string;
     question: AssistantUserQuestion;
   } | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const [confirmUndoSafety, setConfirmUndoSafety] = useState(false);
 
   const isMac =
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -195,10 +206,14 @@ export const AssistantInput = ({
   const serverRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const streamClientRef = useRef<AssistantStreamClient | null>(null);
   const streamRequestIdRef = useRef<string | null>(null);
-  const streamCompleteRef = useRef<(() => void) | null>(null);
+  const streamGenerationRef = useRef(0);
   const streamMessageIdRef = useRef<number | null>(null);
   const streamStartRef = useRef<number | null>(null);
   const streamLastEventWasToolRef = useRef(false);
+  const safetyTerminatedRequestRef = useRef<string | null>(null);
+  const safetyLockedRef = useRef(safetyLocked);
+  const tokenBufferRef = useRef(new OrderedTokenBuffer());
+  const announcementSequenceRef = useRef(0);
   const compactRequestIdRef = useRef<string | null>(null);
   const contextUsageRef = useRef<AssistantContextUsage | undefined>(undefined);
   const questionRequestIdRef = useRef<string | null>(null);
@@ -248,6 +263,22 @@ export const AssistantInput = ({
     [updateAssistant],
   );
 
+  // A zero-width suffix forces React to update the live region even when the
+  // same event repeats; screen readers ignore the character itself.
+  const announce = useCallback((text: string) => {
+    announcementSequenceRef.current += 1;
+    const suffix = announcementSequenceRef.current % 2 === 0 ? '\u200b' : '';
+    setAnnouncement(`${text}${suffix}`);
+  }, []);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    safetyLockedRef.current = safetyLocked;
+  }, [safetyLocked]);
+
   useEffect(() => {
     if (!availableVariants.includes(variant)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -292,6 +323,7 @@ export const AssistantInput = ({
     setShowJumpToLatest(false);
     const chat = state.chats.find((item) => item.id === state.activeChatId);
     currentChatIdRef.current = state.activeChatId;
+    safetyLockedRef.current = (chat?.messages ?? []).some((message) => Boolean(message.safetyNotice));
     setContextUsage(undefined);
     contextUsageRef.current = undefined;
     setActiveQuestion(null);
@@ -357,14 +389,16 @@ export const AssistantInput = ({
 
   const cancelStream = () => {
     clearServerRefresh();
+    streamGenerationRef.current += 1;
     streamLastEventWasToolRef.current = false;
+    tokenBufferRef.current.reset();
     setActiveQuestion(null);
     questionRequestIdRef.current = null;
     const requestId = streamRequestIdRef.current;
     const messageId = streamMessageIdRef.current;
     if (requestId) streamClientRef.current?.cancel(requestId);
     streamRequestIdRef.current = null;
-    streamCompleteRef.current = null;
+    safetyTerminatedRequestRef.current = null;
     streamMessageIdRef.current = null;
     streamStartRef.current = null;
     if (messageId !== null) {
@@ -386,8 +420,7 @@ export const AssistantInput = ({
     setIsGenerating(false);
   };
 
-  const handleStreamToken = (requestId: string, token: string) => {
-    if (requestId !== streamRequestIdRef.current) return;
+  const appendTokenText = (text: string) => {
     const messageId = streamMessageIdRef.current;
     if (messageId === null) return;
 
@@ -396,7 +429,7 @@ export const AssistantInput = ({
     commitMessages((previous) =>
       previous.map((m) => {
         if (m.id !== messageId) return m;
-        const content = m.content + token;
+        const content = m.content + text;
         const tokenCount = content.split(/\s+/).filter(Boolean).length;
         const usage = contextUsageRef.current;
         return {
@@ -410,6 +443,14 @@ export const AssistantInput = ({
         };
       }),
     );
+  };
+
+  const handleStreamToken = (requestId: string, token: string, index?: number) => {
+    if (requestId !== streamRequestIdRef.current) return;
+    if (safetyTerminatedRequestRef.current === requestId) return;
+    const ready = tokenBufferRef.current.push(token, index);
+    if (ready.length === 0) return;
+    appendTokenText(ready.join(''));
   };
 
   const handleStreamThinking = (requestId: string, step: AssistantThinkingStep) => {
@@ -430,6 +471,12 @@ export const AssistantInput = ({
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
     if (messageId === null) return;
+
+    safetyTerminatedRequestRef.current = requestId;
+    safetyLockedRef.current = true;
+    tokenBufferRef.current.reset();
+    setQueue([]);
+    announce('Iris stopped this response for safety reasons.');
     commitMessages((previous) =>
       previous.map((m) =>
         m.id === messageId && m.role === 'assistant' ? { ...m, safetyNotice: notice } : m,
@@ -444,7 +491,7 @@ export const AssistantInput = ({
     if (requestId === compactRequestIdRef.current) {
       compactRequestIdRef.current = null;
       setIsCompacting(false);
-      void assistant.refresh();
+      void refreshAndReconcile(currentChatIdRef.current);
     }
   };
 
@@ -572,24 +619,74 @@ export const AssistantInput = ({
     serverRefreshTimerRef.current = null;
   };
 
+  /** Replace local display state with the server's authoritative messages. */
+  const reconcileMessages = (
+    latest: AssistantState,
+    chatId: string | null,
+    messageIds?: readonly number[],
+  ) => {
+    const targetChatId = chatId ?? currentChatIdRef.current;
+    if (!targetChatId) return;
+    const chat = latest.chats.find((item) => item.id === targetChatId);
+    if (!chat) return;
+    commitMessages((previous) =>
+      previous.map((message) => {
+        if (messageIds && !messageIds.includes(message.id)) return message;
+        const authoritative = chat.messages.find(
+          (item) => item.id === message.id && item.role === message.role,
+        );
+        // A locally handled safety stop is a UI lock; keep it even if the stored
+        // message has not been rewritten by the server yet.
+        return authoritative
+          ? { ...message, ...authoritative, safetyNotice: message.safetyNotice ?? authoritative.safetyNotice }
+          : message;
+      }),
+    );
+  };
+
+  const refreshAndReconcile = async (
+    chatId: string | null,
+    messageIds?: readonly number[],
+    generation = streamGenerationRef.current,
+  ) => {
+    const latest = await assistant.refresh();
+    if (
+      generation !== streamGenerationRef.current ||
+      streamRequestIdRef.current !== null ||
+      (chatId !== null && currentChatIdRef.current !== chatId)
+    ) {
+      return;
+    }
+    reconcileMessages(latest, chatId, messageIds);
+  };
+
   /**
    * A disconnected socket only stops the live feed; the server keeps running and
    * persists the final response. Poll the authoritative state until it appears.
    */
   const waitForServerResult = (chatId: string, messageId: number, attempt = 0) => {
     clearServerRefresh();
+    const generation = streamGenerationRef.current;
     const delays = [1000, 2000, 4000, 8000, 12000];
     const delay = delays[Math.min(attempt, delays.length - 1)] ?? 12000;
     serverRefreshTimerRef.current = setTimeout(async () => {
       serverRefreshTimerRef.current = null;
-      if (streamRequestIdRef.current !== null || currentChatIdRef.current !== chatId) return;
+      if (
+        generation !== streamGenerationRef.current ||
+        streamRequestIdRef.current !== null ||
+        currentChatIdRef.current !== chatId
+      ) {
+        return;
+      }
       const latest = await assistant.refresh();
+      if (generation !== streamGenerationRef.current || streamRequestIdRef.current !== null) return;
       const chat = latest.chats.find((item) => item.id === chatId);
       const result = chat?.messages.find(
         (item) => item.id === messageId && item.role === 'assistant' && Boolean(item.content),
       );
       if (result) {
-        commitMessages(() => chat?.messages ?? []);
+        reconcileMessages(latest, chatId, [messageId]);
+        announce('Iris finished responding.');
         return;
       }
       waitForServerResult(chatId, messageId, attempt + 1);
@@ -604,44 +701,65 @@ export const AssistantInput = ({
   ) => {
     if (requestId !== streamRequestIdRef.current) return;
     const messageId = streamMessageIdRef.current;
+    const generation = streamGenerationRef.current;
     const elapsedMs = takeStreamDuration();
     const durationMs = serverDurationMs ?? elapsedMs;
-    const complete = streamCompleteRef.current;
     const isDisconnect = error === 'Stream disconnected';
+    const safetyTerminated = safetyTerminatedRequestRef.current === requestId;
+
+    // Release any out-of-order tail before the response is finalized.
+    const buffered = tokenBufferRef.current.flush();
+    if (buffered.length > 0) appendTokenText(buffered.join(''));
+
     streamRequestIdRef.current = null;
-    streamCompleteRef.current = null;
+    safetyTerminatedRequestRef.current = null;
     streamMessageIdRef.current = null;
     setStreamingMessageId(null);
     setActiveQuestion(null);
     questionRequestIdRef.current = null;
 
     if (messageId !== null) {
-      const next = messagesRef.current.map((m) =>
-        m.id === messageId
-          ? {
-              ...m,
-              durationMs: m.durationMs ?? durationMs,
-              liveDurationMs: undefined,
-              liveTokensPerSecond: undefined,
-              liveCreditCost: undefined,
-              creditCost: serverCreditCost ?? m.liveCreditCost,
-              ...(error && !isDisconnect ? { error } : {}),
-            }
-          : m,
+      // Streamed content is display-only; only the final fields are settled here.
+      commitMessages((previous) =>
+        previous.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                durationMs: m.durationMs ?? durationMs,
+                liveDurationMs: undefined,
+                liveTokensPerSecond: undefined,
+                liveCreditCost: undefined,
+                creditCost: serverCreditCost ?? m.liveCreditCost,
+                ...(error && !isDisconnect ? { error } : {}),
+              }
+            : m,
+        ),
       );
-      // Streamed content is display-only. The server persists the authoritative
-      // response, so do not write local messages back into assistant state.
-      commitMessages(() => next);
     }
 
-    // Every stream runs on the server; reload its authoritative result once done.
+    if (error) {
+      setQueue([]);
+      announce(
+        isDisconnect
+          ? 'The live connection dropped. Looking for the saved response.'
+          : `Iris could not respond. ${error}`,
+      );
+    }
+
     if (!error) {
-      void assistant.refresh();
+      void refreshAndReconcile(currentChatIdRef.current, messageId === null ? undefined : [messageId], generation);
+      if (!safetyTerminated) announce('Iris finished responding.');
     } else if (isDisconnect && currentChatIdRef.current && messageId !== null) {
       waitForServerResult(currentChatIdRef.current, messageId);
     }
-    if (complete) complete();
-    else setIsGenerating(false);
+
+    // Queued work and explicit interruptions are the only reasons to keep going.
+    if (error || safetyTerminated) {
+      setQueue([]);
+      setIsGenerating(false);
+    } else {
+      processQueueRef.current();
+    }
   };
 
   const handleStreamDone = (requestId: string, durationMs?: number, creditCost?: number) => {
@@ -675,24 +793,30 @@ export const AssistantInput = ({
     const durationMs = takeStreamDuration();
     cancelStream();
 
-    let next = messagesRef.current;
     if (messageId !== null) {
-      next = next.map((m) =>
-        m.id === messageId && m.role === 'assistant'
-          ? {
-              ...m,
-              interrupted: true,
-              durationMs: m.durationMs ?? durationMs,
-              liveDurationMs: undefined,
-              liveTokensPerSecond: undefined,
-              liveCreditCost: undefined,
-              creditCost: m.liveCreditCost,
-            }
-          : m,
+      commitMessages((previous) =>
+        previous.map((m) =>
+          m.id === messageId && m.role === 'assistant'
+            ? {
+                ...m,
+                interrupted: true,
+                durationMs: m.durationMs ?? durationMs,
+                liveDurationMs: undefined,
+                liveTokensPerSecond: undefined,
+                liveCreditCost: undefined,
+                creditCost: m.liveCreditCost,
+              }
+            : m,
+        ),
       );
-      commitMessages(() => next);
+      announce('Response stopped.');
     }
 
+    if (safetyLockedRef.current) {
+      setQueue([]);
+      setIsGenerating(false);
+      return;
+    }
     if (options.continueQueue && queuedMessagesRef.current.length > 0) processQueueRef.current();
     else setIsGenerating(false);
   };
@@ -708,10 +832,12 @@ export const AssistantInput = ({
     setQueue([]);
     commitMessages(() => []);
     currentChatIdRef.current = null;
+    safetyLockedRef.current = false;
     setValue('');
+    setConfirmUndoSafety(false);
     setOpenMenuId(null);
     assistant.update((current) => ({ ...current, activeChatId: null }));
-    textareaRef.current?.focus();
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleOpenChat = (id: string) => {
@@ -721,6 +847,7 @@ export const AssistantInput = ({
     setQueue([]);
     commitMessages(() => chat.messages);
     currentChatIdRef.current = chat.id;
+    safetyLockedRef.current = chat.messages.some((message) => Boolean(message.safetyNotice));
     nextIdRef.current = chat.messages.reduce((max, message) => Math.max(max, message.id), 0) + 1;
     assistant.update((current) => ({
       ...current,
@@ -762,54 +889,70 @@ export const AssistantInput = ({
   };
 
   const handleUndo = (messageId: number) => {
-    const index = messages.findIndex((m) => m.id === messageId);
+    const snapshot = messagesRef.current;
+    const index = snapshot.findIndex((m) => m.id === messageId);
     if (index === -1) return;
-    const userMessage = messages[index];
+    const userMessage = snapshot[index];
     const assistantMessage =
-      index + 1 < messages.length && messages[index + 1].role === 'assistant'
-        ? messages[index + 1]
+      index + 1 < snapshot.length && snapshot[index + 1].role === 'assistant'
+        ? snapshot[index + 1]
         : undefined;
 
-    const removedIds = new Set(messages.slice(index).map((m) => m.id));
+    const removedIds = new Set(snapshot.slice(index).map((m) => m.id));
     if (streamMessageIdRef.current !== null && removedIds.has(streamMessageIdRef.current)) {
       stopGeneration();
     }
     if (assistantMessage?.variant) {
       setVariant(assistantMessage.variant);
     }
-    setValue(userMessage.content);
+    setValue(userMessage?.content ?? '');
     setQueue([]);
+    safetyLockedRef.current = false;
 
-    const trimmed = messages.slice(0, index);
-    commitMessages(() => trimmed);
+    const trimmed = snapshot.slice(0, index);
+    commitMessages((previous) => {
+      const previousIndex = previous.findIndex((m) => m.id === messageId);
+      return previousIndex === -1 ? previous : previous.slice(0, previousIndex);
+    });
     persistMessages(currentChatIdRef.current, trimmed);
     setOpenMenuId(null);
-    textareaRef.current?.focus();
+    setConfirmUndoSafety(false);
+    announce('Last message undone.');
+    // The composer is mounted only after the lock is lifted.
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  const handleUndoSafety = () => {
+    const lastUserMessage = [...messagesRef.current].reverse().find((message) => message.role === 'user');
+    if (lastUserMessage) handleUndo(lastUserMessage.id);
+    setConfirmUndoSafety(false);
   };
 
   const handleRegenerate = (messageId: number) => {
-    if (messages[messages.length - 1]?.id !== messageId) return;
+    if (messagesRef.current[messagesRef.current.length - 1]?.id !== messageId) return;
     stopGeneration();
-    const reset = messagesRef.current.map((m) =>
+    const resetMessage = (m: LiveAssistantMessage) =>
       m.id === messageId && m.role === 'assistant'
         ? {
             ...m,
             content: '',
             interrupted: false,
             error: undefined,
-            feedback: null,
+            safetyNotice: undefined,
             durationMs: undefined,
+            creditCost: undefined,
             variant,
             thinking: [],
             tools: [],
+            toolGroups: [],
           }
-        : m,
-    );
-    commitMessages(() => reset);
+        : m;
+    commitMessages((previous) => previous.map(resetMessage));
     const previousUserMessage = messagesRef.current
       .filter((message) => message.role === 'user' && message.id < messageId)
       .pop();
-    startStreaming(messageId, processQueue, previousUserMessage?.content);
+    safetyLockedRef.current = false;
+    startStreaming(messageId, previousUserMessage?.content);
   };
 
   const copyMessage = async (messageId: number, content: string) => {
@@ -823,11 +966,13 @@ export const AssistantInput = ({
     }
   };
 
-  const startStreaming = (messageId: number, onComplete?: () => void, prompt?: string) => {
+  const startStreaming = (messageId: number, prompt?: string) => {
     clearServerRefresh();
+    streamGenerationRef.current += 1;
+    tokenBufferRef.current.reset();
+    safetyTerminatedRequestRef.current = null;
     const requestId = createId();
     streamRequestIdRef.current = requestId;
-    streamCompleteRef.current = onComplete ?? null;
     streamMessageIdRef.current = messageId;
     streamStartRef.current = Date.now();
     streamLastEventWasToolRef.current = false;
@@ -841,10 +986,13 @@ export const AssistantInput = ({
               thinking: [],
               tools: [],
               toolGroups: [],
+              interrupted: false,
+              durationMs: undefined,
               liveDurationMs: 0,
               liveTokensPerSecond: 0,
               liveCreditCost: 0,
               creditCost: undefined,
+              safetyNotice: undefined,
             }
           : m,
       ),
@@ -861,7 +1009,7 @@ export const AssistantInput = ({
     });
   };
 
-  const appendAndStream = (text: string, onComplete?: () => void) => {
+  const appendAndStream = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return false;
 
@@ -902,7 +1050,7 @@ export const AssistantInput = ({
     setValue('');
     setFollowSignal((signal) => signal + 1);
 
-    startStreaming(assistantId, onComplete, trimmed);
+    startStreaming(assistantId, trimmed);
     return true;
   };
 
@@ -910,8 +1058,14 @@ export const AssistantInput = ({
   // see the latest stream/variant state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const processQueue = () => {
+    if (safetyLockedRef.current) {
+      // A safety notice terminates the conversation: never replay queued input.
+      setQueue([]);
+      setIsGenerating(false);
+      return;
+    }
     const next = dequeueMessage();
-    if (next) appendAndStream(next, processQueue);
+    if (next) appendAndStream(next);
     else setIsGenerating(false);
   };
 
@@ -920,22 +1074,24 @@ export const AssistantInput = ({
   }, [processQueue]);
 
   const sendMessageText = (text: string) => {
-    if (appendAndStream(text, processQueue)) {
+    if (appendAndStream(text)) {
       textareaRef.current?.focus();
     }
   };
 
   const handleSend = () => {
-    if (safetyLocked) return;
+    // Keep the stop control usable while a safety notice is still streaming.
     if (isGenerating) {
       stopGeneration({ continueQueue: true });
       return;
     }
+    if (safetyLockedRef.current) return;
     const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
     sendMessageText(currentValue);
   };
 
   const queueCurrentMessage = () => {
+    if (safetyLockedRef.current) return;
     const currentValue = value.trim() ? value : (textareaRef.current?.value ?? '');
     const trimmed = currentValue.trim();
     if (!trimmed) return;
@@ -948,6 +1104,7 @@ export const AssistantInput = ({
   useEffect(
     () => () => {
       if (serverRefreshTimerRef.current) clearTimeout(serverRefreshTimerRef.current);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       streamClientRef.current?.close();
     },
     [],
@@ -955,6 +1112,9 @@ export const AssistantInput = ({
 
   return (
     <div className={`assistant-input ${isChat ? 'assistant-input--chat' : 'assistant-input--new-chat'} ${className}`}>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
       <div className="assistant-input__stack">
         {!isChat && (
           <div className="assistant-input__intro">
@@ -1020,16 +1180,26 @@ export const AssistantInput = ({
             showJumpToLatest={showJumpToLatest}
             onJumpToLatest={handleJumpToLatest}
           />
-          {safetyLocked ? (
-            <p className="assistant-input__disclaimer">
-              Iris is AI. By using it, you agree to our{' '}
-              <Link to="/policies/terms">Terms</Link> &amp;{' '}
-              <Link to="/policies/privacy">Privacy Policy</Link>.{' '}
-              {dataShared
-                ? 'Chats may be reviewed and used to improve our AI models and enforce the Terms.'
-                : 'Chats may be reviewed to enforce the Terms.'}
-            </p>
-          ) : (
+          {safetyLocked && (
+            <div className="assistant-input__safety-lock" aria-labelledby="assistant-safety-lock-title">
+              <h2 id="assistant-safety-lock-title">Conversation paused for safety</h2>
+              <p>{safetyReason}</p>
+              <div className="assistant-input__safety-lock-actions">
+                <button type="button" onClick={handleNewChat}>
+                  Start a new chat
+                </button>
+                <button type="button" onClick={() => setConfirmUndoSafety(true)}>
+                  Undo last message
+                </button>
+                {isGenerating && (
+                  <button type="button" onClick={() => stopGeneration()} aria-label="Stop generating">
+                    Stop
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {!safetyLocked && (
             <AssistantComposer
               placeholder={placeholder}
               value={value}
@@ -1052,6 +1222,26 @@ export const AssistantInput = ({
             />
           )}
         </div>
+        {safetyLocked && (
+          <p className="assistant-input__disclaimer">
+            Iris is AI. By using it, you agree to our{' '}
+            <Link to="/policies/terms">Terms</Link> &amp;{' '}
+            <Link to="/policies/privacy">Privacy Policy</Link>.{' '}
+            {dataShared
+              ? 'Chats may be reviewed and used to improve our AI models and enforce the Terms.'
+              : 'Chats may be reviewed to enforce the Terms.'}
+          </p>
+        )}
+        <ConfirmDialog
+          isOpen={confirmUndoSafety}
+          onCancel={() => setConfirmUndoSafety(false)}
+          onConfirm={handleUndoSafety}
+          title="Undo the last message?"
+          confirmText="Undo message"
+          isDangerous
+        >
+          <p>This removes your last message and Iris&apos;s reply so you can try again.</p>
+        </ConfirmDialog>
       </div>
     </div>
   );

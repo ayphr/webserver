@@ -110,9 +110,3 @@ export function removeStoredAccount(token: string) {
     setActiveToken(nextActive?.token ?? null);
   }
 }
-
-export function clearStoredAccounts() {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(ACCOUNTS_KEY);
-  window.localStorage.removeItem(ACTIVE_TOKEN_KEY);
-}

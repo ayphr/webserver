@@ -14,7 +14,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--bg-surface);
-  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  border-right: 1px solid var(--surface-overlay-subtle);
   transition:
     width 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     min-width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
@@ -61,9 +61,9 @@
   width: 100%;
   padding: 0.45rem 0.6rem;
   border-radius: 0.6rem;
-  border: 1px solid var(--border, rgba(255,255,255,0.12));
+  border: 1px solid var(--border);
   background: var(--bg-elevated);
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-family: inherit;
   cursor: pointer;
@@ -301,15 +301,15 @@
   bottom: calc(100% + 0.5rem);
   left: 0;
   right: 0;
-  z-index: 20;
+  z-index: var(--z-dropdown);
   background: var(--bg-surface);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 0.4rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--modal-shadow);
 }
 
 .n-sidebar__accountMenuItem {
@@ -333,7 +333,7 @@
 }
 
 .n-sidebar__accountSwitch:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-overlay);
 }
 
 .n-sidebar__accountSwitch.is-active {
@@ -358,7 +358,7 @@
 }
 
 .n-sidebar__accountLogout:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-overlay-strong);
   color: var(--text-primary);
 }
 
@@ -477,11 +477,11 @@
     align-items: center;
     gap: 0.35rem;
     overflow: visible;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--border-subtle);
     border-bottom: none;
     border-right: none;
     padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
-    z-index: 50;
+    z-index: var(--z-sticky);
   }
   .n-sidebar--collapsed:hover,
   .n-sidebar--collapsed:focus-within,
@@ -510,7 +510,8 @@
   }
   .n-sidebar__tab {
     flex: 0 0 auto;
-    min-width: 3.25rem;
+    min-width: 44px;
+    min-height: 44px;
     flex-direction: column;
     gap: 0.1rem;
     padding: 0.3rem 0.25rem;
@@ -538,8 +539,13 @@
     flex-wrap: nowrap;
     gap: 0.15rem;
   }
-  .n-sidebar__menuItem {
-    padding: 0.45rem;
+  .n-sidebar__menuItem,
+  .n-sidebar__accountButton,
+  .n-sidebar__accountSwitch,
+  .n-sidebar__accountLogout {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
   }
   .n-sidebar__menuLabel {
     display: none;

@@ -24,14 +24,15 @@ describe('Gemini adapter', () => {
     expect(getAssistantModelAdapter()).toBe(geminiAdapter);
   });
 
-  it('builds a multi-line system prompt with real newlines', () => {
+  it('builds a multi-line system prompt without internal identifiers', () => {
     const prompt = buildAssistantSystemPrompt();
     expect(prompt).toContain('You are Iris');
     expect(prompt).toContain('\n');
     expect(prompt).not.toContain('\\n');
-    expect(prompt).toContain('devices.list');
-    expect(prompt).toContain('user.question');
+    expect(prompt).toContain('look it up in the user’s workspace');
     expect(prompt).toContain('human-readable');
+    expect(prompt).not.toMatch(/\bdevices\.list\b|\buser\.question\b|\balerts\.create\b/);
+    expect(prompt).not.toMatch(/\bgemini-\d|\b\/v1beta\/|\bassistantStates\b/);
     expect(prompt).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
   });
 
@@ -160,6 +161,62 @@ describe('Gemini adapter', () => {
       frame('error', { error: { message: 'quota exceeded', code: 'resource_exhausted' } }),
     ]);
     await expect(readGeminiEventStream(response)).rejects.toThrow('quota exceeded');
+  });
+
+  it('creates unique fallback tool IDs for calls from different responses', async () => {
+    const responseForCall = () => sseResponse([
+      frame('step.start', { step: { type: 'function_call', name: 'devices.list', arguments: {} } }),
+      frame('step.delta', { delta: { type: 'arguments_delta', arguments: '{"limit":1}' } }),
+      frame('step.stop', {}),
+    ]);
+    const first = await readGeminiEventStream(responseForCall());
+    const second = await readGeminiEventStream(responseForCall());
+
+    expect(first.toolCalls).toHaveLength(1);
+    expect(second.toolCalls).toHaveLength(1);
+    const firstId = first.toolCalls[0]!.id!;
+    const secondId = second.toolCalls[0]!.id!;
+    expect(firstId).toMatch(/^gemini-tool-/);
+    expect(secondId).toMatch(/^gemini-tool-/);
+    expect(firstId).not.toBe(secondId);
+  });
+
+  it('does not collapse events without an index onto step 0', async () => {
+    const response = sseResponse([
+      frame('step.start', { index: 7, step: { type: 'function_call', name: 'devices.list', arguments: {} } }),
+      frame('step.delta', { delta: { type: 'arguments_delta', arguments: '{"limit":2}' } }),
+      frame('step.stop', {}),
+      frame('step.start', { step: { type: 'thought' } }),
+      frame('step.delta', { delta: { type: 'thought_signature', signature: 'sig-7' } }),
+      frame('step.stop', {}),
+    ]);
+
+    const result = await readGeminiEventStream(response);
+    expect(result.toolCalls).toEqual([
+      { id: result.toolCalls[0]!.id, name: 'devices.list', arguments: '{"limit":2}' },
+    ]);
+    expect(result.steps).toEqual([
+      { type: 'function_call', id: result.toolCalls[0]!.id, name: 'devices.list', arguments: { limit: 2 } },
+      { type: 'thought', signature: 'sig-7' },
+    ]);
+  });
+
+  it('only forwards model_output text to onTextDelta', async () => {
+    const response = sseResponse([
+      frame('step.start', { index: 0, step: { type: 'thought' } }),
+      frame('step.delta', { index: 0, delta: { type: 'text', text: 'internal reasoning' } }),
+      frame('step.stop', { index: 0 }),
+      frame('step.start', { index: 1, step: { type: 'model_output' } }),
+      frame('step.delta', { index: 1, delta: { type: 'text', text: 'Visible answer' } }),
+      frame('step.stop', { index: 1 }),
+    ]);
+
+    const seen: string[] = [];
+    const result = await readGeminiEventStream(response, {
+      onTextDelta: (delta) => seen.push(delta),
+    });
+    expect(seen).toEqual(['Visible answer']);
+    expect(result.content).toBe('Visible answer');
   });
 
   it('emits text deltas before the stream finishes', async () => {

@@ -337,7 +337,7 @@
 .devices__graphs-body.is-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 900;
+  z-index: var(--z-modal-backdrop);
   padding: 1.5rem;
   background: var(--bg-base);
   overflow-y: auto;
@@ -742,7 +742,7 @@
   position: absolute;
   inset: 0;
   cursor: crosshair;
-  z-index: 5;
+  z-index: var(--z-raised);
 }
 
 .devices__selection-rect {
@@ -761,7 +761,7 @@
 
 .devices__context-menu {
   position: absolute;
-  z-index: 10;
+  z-index: var(--z-dropdown);
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -779,7 +779,7 @@
 
 .devices__annotation-input {
   position: absolute;
-  z-index: 11;
+  z-index: calc(var(--z-dropdown) + 1);
   display: flex;
   gap: 0.25rem;
   background: var(--bg-elevated);
@@ -799,7 +799,7 @@
 
 .devices__annotation {
   position: absolute;
-  z-index: 6;
+  z-index: calc(var(--z-raised) + 1);
   pointer-events: auto;
   transform: translate(4px, -100%);
   background: var(--bg-base);

@@ -1,6 +1,6 @@
 import { json, parsePositiveInt, readJsonBody } from '../../lib/http';
 import { randomBytes, randomInt } from 'node:crypto';
-import { requireAuth } from '../auth';
+import { getUserFromRequest, requireAuth } from '../auth';
 import {
   createDevicePairing,
   createDeviceToken,
@@ -27,7 +27,13 @@ import {
   unlinkDevice,
   upsertDataPoints,
 } from '../../lib/db';
-import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamRole, getTeamSharedSeats } from '../../lib/db/teams';
+import {
+  DEVICE_PAIRINGS_COLLECTION,
+  getCollection,
+  trackMongoOperation,
+} from '../../lib/db/internal';
+import { getTeamScopeUuid, getTeamScopeUsername, getTeamForUser, getTeamSharedSeats } from '../../lib/db/teams';
+import { getTeamMemberRole } from '../../lib/teamAccess';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
@@ -90,9 +96,82 @@ const linkCodeLimiter = createRateLimiter(15 * 60 * 1000, 20, 'link-code');
 const fetchPairingTokenLimiter = createRateLimiter(15 * 60 * 1000, 20, 'fetch-pairing-token');
 const deviceQueryLimiter = createRateLimiter(60 * 1000, 60, 'device-query');
 const deviceUploadLimiter = createRateLimiter(60 * 1000, 120, 'device-upload');
+const deviceLogExportLimiter = createRateLimiter(60 * 1000, 10, 'device-log-export');
 
 const DEFAULT_DEVICE_LOG_PAGE_SIZE = 20;
 const MAX_DEVICE_LOG_PAGE_SIZE = 100;
+/** Logs are retained for 30 days; a wider export window has no useful data. */
+const MAX_EXPORT_SPAN_MS = 31 * 24 * 60 * 60 * 1000;
+
+export type PairingOwnershipOutcome =
+  | { kind: 'allowed'; teamId?: string; ownerUsername?: string }
+  | { kind: 'foreign_serial' };
+
+/**
+ * Device-initiated pairing stays unauthenticated for backward compatibility.
+ * When a session token is present, the serial must already belong to that
+ * user's team; the pairing is then stamped with the team/owner so link-time
+ * checks have an explicit ownership record. An unauthenticated request may
+ * still pair a serial, but only one unlinked pairing per serial is active at a
+ * time (see `invalidateSupersededPairings`), so a stale or squatting code is
+ * invalidated as soon as the real owner requests a new one.
+ */
+export async function resolvePairingOwnership(
+  serial: number,
+  user: User | null,
+  deps: {
+    getDevice: typeof getDeviceBySerial;
+    scopeUuid: (user: User) => Promise<string>;
+    scopeUsername: (user: User) => Promise<string>;
+  } = {
+    getDevice: getDeviceBySerial,
+    scopeUuid: getTeamScopeUuid,
+    scopeUsername: getTeamScopeUsername,
+  },
+): Promise<PairingOwnershipOutcome> {
+  const device = await deps.getDevice(serial);
+  if (!device) return { kind: 'allowed' };
+
+  if (user) {
+    const teamId = await deps.scopeUuid(user);
+    if (device.teamId !== teamId) return { kind: 'foreign_serial' };
+    return { kind: 'allowed', teamId, ownerUsername: await deps.scopeUsername(user) };
+  }
+
+  // Legacy firmware path: final authorization still happens in linkDevice(),
+  // which refuses to link a serial owned by another team.
+  return { kind: 'allowed', teamId: device.teamId };
+}
+
+type PairingInvalidationCollection = {
+  updateMany(filter: Record<string, unknown>, update: Record<string, unknown>): Promise<unknown>;
+};
+
+/** Exported for tests; invalidates unlinked pairings superseded by a new code. */
+export async function invalidateSupersededPairings(
+  serial: number,
+  now: Date,
+): Promise<void> {
+  const pairings = await getCollection('devicePairings') as unknown as PairingInvalidationCollection;
+  trackMongoOperation('updateMany', DEVICE_PAIRINGS_COLLECTION);
+  await pairings.updateMany(
+    { serial, linked: false, expiresAt: { $gt: now } },
+    { $set: { expiresAt: now, superseded: true } },
+  );
+}
+
+/** Bounds a user-selected export window so a single request cannot scan all history. */
+export function validateExportSpan(
+  from: Date | undefined,
+  to: Date | undefined,
+  maxSpanMs = MAX_EXPORT_SPAN_MS,
+): string | null {
+  if (!from || !to) return null;
+  const span = to.getTime() - from.getTime();
+  if (!Number.isFinite(span) || span < 0) return 'from must be before to';
+  if (span > maxSpanMs) return `export range must be ${Math.round(maxSpanMs / 86_400_000)} days or fewer`;
+  return null;
+}
 
 const handleRequestPairing = async (request: Request): Promise<Response> => {
   const ipCheck = await pairingRequestLimiter.check(`ip:${getClientIp(request)}`);
@@ -103,6 +182,12 @@ const handleRequestPairing = async (request: Request): Promise<Response> => {
   if (serial === null) return json({ error: 'invalid serial' }, 400);
 
   const name = parseName(body?.name) ?? `Device ${serial}`;
+
+  const user = await getUserFromRequest(request);
+  const ownership = await resolvePairingOwnership(serial, user);
+  if (ownership.kind === 'foreign_serial') {
+    return json({ error: 'serial belongs to another team' }, 403);
+  }
 
   let code = generateDevicePairingCode(randomInt);
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -115,6 +200,11 @@ const handleRequestPairing = async (request: Request): Promise<Response> => {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + PAIRING_CODE_TTL_MS);
 
+  // Only the newest unlinked code for a serial remains usable. This prevents
+  // a previously issued (or attacker-squatted) code from being redeemed after
+  // the real owner starts a new pairing.
+  await invalidateSupersededPairings(serial, now);
+
   await createDevicePairing({
     code,
     serial,
@@ -124,6 +214,8 @@ const handleRequestPairing = async (request: Request): Promise<Response> => {
     createdAt: now,
     expiresAt,
     linked: false,
+    ...(ownership.teamId ? { teamId: ownership.teamId } : {}),
+    ...(ownership.ownerUsername ? { ownerUsername: ownership.ownerUsername } : {}),
   });
 
   deviceClaimsTotal.inc({ event: 'created' });
@@ -258,6 +350,9 @@ const handleDeviceLogs = requireAuth(async (request, user: User, params) => {
 });
 
 const handleExportDeviceLogs = requireAuth(async (request, user: User, params) => {
+  const exportCheck = await deviceLogExportLimiter.check(`user:${user.uuid}`);
+  if (!exportCheck.allowed) return tooManyRequests(exportCheck.retryAfterMs);
+
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
 
@@ -274,6 +369,9 @@ const handleExportDeviceLogs = requireAuth(async (request, user: User, params) =
   const parsedFilter = parseDeviceLogFilter(query);
   if (parsedFilter.error) return json({ error: parsedFilter.error }, 400);
 
+  const spanError = validateExportSpan(parsedFilter.filter.from, parsedFilter.filter.to);
+  if (spanError) return json({ error: spanError }, 400);
+
   const { logs, truncated } = await listDeviceLogsForExport(serial, parsedFilter.filter);
   const body = format === 'csv' ? deviceLogsToCsv(logs) : JSON.stringify(logs);
   logExportCompleted('logs', serial, logs.length, truncated);
@@ -287,6 +385,9 @@ const handleExportDeviceLogs = requireAuth(async (request, user: User, params) =
 });
 
 const handleExportDeviceData = requireAuth(async (request, user: User, params) => {
+  const exportCheck = await deviceLogExportLimiter.check(`user:${user.uuid}`);
+  if (!exportCheck.allowed) return tooManyRequests(exportCheck.retryAfterMs);
+
   const serial = parseSerial(params.serial);
   if (serial === null) return json({ error: 'invalid serial' }, 400);
 
@@ -307,7 +408,8 @@ const handleExportDeviceData = requireAuth(async (request, user: User, params) =
   const to = parseIsoTimestamp(toParam);
   if (!from) return json({ error: 'invalid from timestamp' }, 400);
   if (!to) return json({ error: 'invalid to timestamp' }, 400);
-  if (from.getTime() > to.getTime()) return json({ error: 'from must be before to' }, 400);
+  const spanError = validateExportSpan(from, to);
+  if (spanError) return json({ error: spanError }, 400);
 
   const { points, truncated } = await getDataPointsForExport(serial, { since: from, until: to });
   const body = format === 'csv' ? dataPointsToCsv(points) : JSON.stringify(points);
@@ -665,11 +767,8 @@ const handleDeleteDeviceDataPoints = requireAuth(async (request, user: User, par
   if (!device) return json({ error: 'not found' }, 404);
   if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
-  if (team) {
-    const role = getTeamRole(user);
-    if (role !== 'manager') {
-      return json({ error: 'Forbidden' }, 403);
-    }
+  if (team && getTeamMemberRole(user, team) !== 'manager') {
+    return json({ error: 'Forbidden' }, 403);
   }
 
   const body = await readJsonBody(request);
@@ -734,11 +833,8 @@ const handleUnlinkDevice = requireAuth(async (_request, user: User, params) => {
   if (device.teamId !== scopeUuid) return json({ error: 'forbidden' }, 403);
 
   // Role check: deleting requires a team manager.
-  if (team) {
-    const role = getTeamRole(user);
-    if (role !== 'manager') {
-      return json({ error: 'Forbidden' }, 403);
-    }
+  if (team && getTeamMemberRole(user, team) !== 'manager') {
+    return json({ error: 'Forbidden' }, 403);
   }
 
   const unlinked = await unlinkDevice(serial, scopeUuid);

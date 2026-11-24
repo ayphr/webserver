@@ -22,10 +22,15 @@ describe('buildOpenApiDocument', () => {
     });
   });
 
-  test('adds request bodies and auth for protected mutations', () => {
+  test('adds request bodies and bearer auth for protected mutations', () => {
     expect(doc.paths['/devices/{serial}/alerts']?.post).toMatchObject({
       requestBody: { required: true },
-      security: [{ sessionCookie: [] }],
+      security: [{ bearerAuth: [] }],
     });
+    expect(doc.components.securitySchemes.bearerAuth).toMatchObject({
+      type: 'http',
+      scheme: 'bearer',
+    });
+    expect(doc.components.securitySchemes).not.toHaveProperty('sessionCookie');
   });
 });

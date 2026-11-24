@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './CodeInput.css';
 
 export interface CodeInputProps {
@@ -10,6 +10,11 @@ export interface CodeInputProps {
   ariaLabel?: string;
 }
 
+/** Keeps empty slots in place while still emitting a compact digit string. */
+function toSlots(value: string, length: number): string[] {
+  return Array.from({ length }, (_, index) => value[index] ?? '');
+}
+
 export const CodeInput = ({
   length = 6,
   value,
@@ -19,38 +24,51 @@ export const CodeInput = ({
   ariaLabel = 'Verification code',
 }: CodeInputProps) => {
   const inputRefs = useRef<HTMLInputElement[]>([]);
+  const lastEmitted = useRef(value);
+  const [slots, setSlots] = useState<string[]>(() => toSlots(value, length));
 
-  const chars: string[] = [];
-  for (let i = 0; i < length; i += 1) chars.push(value[i] ?? '');
+  // Only resynchronise when the parent changes the value to something we did not emit.
+  // This preserves empty middle slots while typing, without fighting parent updates.
+  useEffect(() => {
+    if (value === lastEmitted.current) return;
+    lastEmitted.current = value;
+    setSlots(toSlots(value, length));
+  }, [value, length]);
 
-  const setCodeAt = (index: number, char: string) => {
-    const arr = value.split('');
-    while (arr.length < length) arr.push('');
-    arr[index] = char;
-    onChange(arr.join('').slice(0, length));
+  const commit = (next: string[]) => {
+    setSlots(next);
+    const compact = next.join('');
+    lastEmitted.current = compact;
+    onChange(compact);
+  };
+
+  const setSlotAt = (index: number, char: string) => {
+    const next = slots.slice();
+    next[index] = char;
+    commit(next);
   };
 
   const applyPaste = (startIndex: number, text: string) => {
     const cleaned = text.replace(/\D/g, '').slice(0, length);
-    const arr = value.split('');
-    while (arr.length < length) arr.push('');
+    if (!cleaned) return;
+    const next = slots.slice();
     for (let i = 0; i < cleaned.length; i += 1) {
-      const idx = startIndex + i;
-      if (idx < length) arr[idx] = cleaned[i];
+      const index = startIndex + i;
+      if (index < length) next[index] = cleaned.charAt(i);
     }
-    onChange(arr.join('').slice(0, length));
+    commit(next);
     const nextFocus = Math.min(startIndex + cleaned.length, length - 1);
     inputRefs.current[nextFocus]?.focus();
   };
 
   const handleChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '');
-    if (val.length > 1) {
-      applyPaste(index, val);
+    const digit = e.target.value.replace(/\D/g, '').slice(-1);
+    if (e.target.value.replace(/\D/g, '').length > 1) {
+      applyPaste(index, e.target.value);
       return;
     }
-    setCodeAt(index, val);
-    if (val && index < length - 1) inputRefs.current[index + 1]?.focus();
+    setSlotAt(index, digit);
+    if (digit && index < length - 1) inputRefs.current[index + 1]?.focus();
   };
 
   const handlePaste = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -59,10 +77,17 @@ export const CodeInput = ({
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !(inputRefs.current[index]?.value) && index > 0) {
-      setCodeAt(index - 1, '');
-      inputRefs.current[index - 1]?.focus();
+    if (e.key === 'Backspace') {
       e.preventDefault();
+      if (slots[index]) {
+        setSlotAt(index, '');
+      } else if (index > 0) {
+        setSlotAt(index - 1, '');
+        inputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === 'Delete') {
+      e.preventDefault();
+      setSlotAt(index, '');
     } else if (e.key === 'ArrowLeft' && index > 0) {
       inputRefs.current[index - 1]?.focus();
     } else if (e.key === 'ArrowRight' && index < length - 1) {
@@ -72,7 +97,7 @@ export const CodeInput = ({
 
   return (
     <div className="code-input" role="group" aria-label={ariaLabel}>
-      {chars.map((char, i) => (
+      {slots.map((digit, i) => (
         <input
           key={i}
           ref={(el) => { if (el) inputRefs.current[i] = el; }}
@@ -82,13 +107,13 @@ export const CodeInput = ({
           pattern="[0-9]*"
           autoComplete="one-time-code"
           maxLength={1}
-          value={char}
+          value={digit}
           onChange={(e) => handleChange(i, e)}
           onPaste={(e) => handlePaste(i, e)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           disabled={disabled}
           autoFocus={autoFocus && i === 0}
-          aria-label={`Character ${i + 1}`}
+          aria-label={`Digit ${i + 1} of ${length}`}
         />
       ))}
     </div>

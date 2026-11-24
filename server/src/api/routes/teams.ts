@@ -23,6 +23,7 @@ import {
   createTeamForUser,
   enforceTeamMemberLimit,
 } from '../../lib/db/teams';
+import { InviteAcceptanceError } from '../../lib/teamInviteService';
 import {
   getSubscriptionPlans,
 } from '../../lib/stripe';
@@ -259,7 +260,30 @@ const handleTeamInviteAccept = requireAuth(async (request, user: User) => {
     return json({ error: 'already a member of 3 teams' }, 409);
   }
 
-  await acceptTeamInvite({ invite, user });
+  try {
+    await acceptTeamInvite({ invite, user });
+  } catch (error) {
+    // The guarded claim can still fail after the pre-checks above when two
+    // requests race or a seat is taken concurrently. Keep the public API
+    // errors consistent with those pre-checks.
+    if (error instanceof InviteAcceptanceError) {
+      switch (error.code) {
+        case 'already_used':
+          return json({ error: 'invite already used' }, 409);
+        case 'expired':
+          return json({ error: 'invite expired' }, 410);
+        case 'email_mismatch':
+          return json({ error: 'invite email does not match your account' }, 403);
+        case 'team_limit':
+          return json({ error: 'already a member of 3 teams' }, 409);
+        case 'seat_limit':
+          return json({ error: 'team has no available seats' }, 409);
+        case 'team_not_found':
+          return json({ error: 'invalid invite' }, 404);
+      }
+    }
+    throw error;
+  }
 
   return json({ accepted: true });
 });
@@ -400,7 +424,7 @@ const handleTeamPlanFree = requireAuth(async (_request, user: User) => {
     return json({ error: 'Unable to cancel the current Stripe subscription' }, 502);
   }
   // Successful cancellation is recorded by downgradeTeamToFree.
-  await enforceTeamMemberLimit(updatedTeam);
+  await enforceTeamMemberLimit(updatedTeam, { reason: 'team downgraded to free' });
   return json({ team: updatedTeam });
 });
 

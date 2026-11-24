@@ -24,7 +24,11 @@ export function summarizeAssistantContext(
   const bodyBudgetTokens = Math.max(1, maxTokens - prefixTokens);
   const maxChars = Math.max(1, bodyBudgetTokens * 4);
   let body = lines.join('\n');
-  if (body.length > maxChars) body = `${body.slice(0, maxChars - 1)}…`;
+  if (body.length > maxChars) {
+    // Slice by code point so a summary never ends with half of an emoji or
+    // other surrogate pair.
+    body = `${Array.from(body).slice(0, maxChars - 1).join('')}…`;
+  }
 
   return `${SUMMARY_PREFIX}${body}`;
 }

@@ -81,22 +81,23 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
     setIsModalOpen(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     const name = draft.name.trim();
     const url = draft.webhookUrl.trim();
+    setFormError(null);
     if (!name) {
       setFormError('Name is required');
-      return;
+      return false;
     }
     if (!url) {
       setFormError('Webhook URL is required');
-      return;
+      return false;
     }
     try {
       new URL(url);
     } catch {
       setFormError('Invalid webhook URL');
-      return;
+      return false;
     }
 
     try {
@@ -118,17 +119,22 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
         setIntegrations((prev) => [created, ...prev]);
       }
       setIsModalOpen(false);
+      return true;
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to save integration');
+      return false;
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<boolean> => {
+    setError(null);
     try {
       await api.integrations.remove(id);
       setIntegrations((prev) => prev.filter((item) => item.id !== id));
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete integration');
+      return false;
     }
   };
 
@@ -175,7 +181,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
         )}
       </div>
 
-      {error && <p className="integrations-panel__error">{error}</p>}
+      {error && <p className="integrations-panel__error" role="alert">{error}</p>}
 
       {integrations.length === 0 ? (
         <p className="integrations-panel__empty">No integrations yet.</p>
@@ -196,6 +202,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
                       label=""
                       checked={item.enabled}
                       disabled={!isManager}
+                      aria-label={`${item.name} enabled`}
                       title={isManager ? 'Enabled' : 'Manager only'}
                       onChange={(e) => void handleToggle(item, e.target.checked)}
                     />
@@ -206,10 +213,10 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
                   </Button>
                   {isManager && (
                     <>
-                      <Button variant="secondary" onClick={() => openEdit(item)}>
+                      <Button variant="secondary" onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`}>
                         <IconEdit size={14} />
                       </Button>
-                      <Button variant="danger" onClick={() => setDeleteTarget(item.id)}>
+                      <Button variant="danger" onClick={() => setDeleteTarget(item.id)} aria-label={`Delete ${item.name}`}>
                         <IconTrash size={14} />
                       </Button>
                     </>
@@ -217,7 +224,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
                 </div>
               </div>
               {testResult[item.id] && (
-                <p className="integrations-panel__test-result">{testResult[item.id]}</p>
+                <p className="integrations-panel__test-result" role="status">{testResult[item.id]}</p>
               )}
             </div>
           ))}
@@ -227,7 +234,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onConfirm={() => void handleSave()}
+        onConfirm={handleSave}
         title={editing ? 'Edit integration' : 'Add integration'}
         confirmText={editing ? 'Save' : 'Add'}
         cancelText="Close"
@@ -253,22 +260,28 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
             onChange={(e) => setDraft((d) => ({ ...d, webhookUrl: e.target.value }))}
             fullWidth
           />
-          {formError && <p className="integrations-panel__error">{formError}</p>}
+          {formError && <p className="integrations-panel__error" role="alert">{formError}</p>}
         </div>
       </Modal>
       <Modal
         isOpen={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
-          if (deleteTarget) void handleDelete(deleteTarget);
-          setDeleteTarget(null);
+          if (!deleteTarget) return false;
+          return handleDelete(deleteTarget).then((deleted) => {
+            if (deleted) setDeleteTarget(null);
+            return deleted;
+          });
         }}
         title="Delete integration?"
         confirmText="Delete"
         cancelText="Cancel"
         isDangerous
       >
-        <p>This integration will stop sending notifications and cannot be recovered.</p>
+        <>
+          <p>This integration will stop sending notifications and cannot be recovered.</p>
+          {error && <p className="integrations-panel__error" role="alert">{error}</p>}
+        </>
       </Modal>
     </div>
   );

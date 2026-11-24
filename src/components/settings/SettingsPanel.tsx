@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Button, Checkbox, ConfirmDialog, Input } from '../common';
+import { useId, useState } from 'react';
+import { Button, Checkbox, ConfirmDialog, createTabKeyDownHandler, Input } from '../common';
 import type { ButtonSettingsOption, SettingsSection } from '../../lib/settings';
 import '../common/Tabs.css';
 import './SettingsPanel.css';
@@ -30,6 +30,13 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
       : sections.some((section) => section.id === requested)
         ? requested
         : sections[0].id;
+
+  const tabIdPrefix = useId();
+  const selectTab = (id: string) => {
+    setRequestedId(id);
+    onTabChange?.(id);
+  };
+  const handleTabsKeyDown = createTabKeyDownHandler(selectTab);
 
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [confirmOption, setConfirmOption] = useState<ButtonSettingsOption | null>(null);
@@ -94,6 +101,7 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
           <Checkbox
             checked={option.checked}
             disabled={option.disabled}
+            aria-label={option.title ?? 'Toggle setting'}
             onChange={(e) => option.onChange(e.target.checked)}
           />
         );
@@ -102,6 +110,7 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
           <Input
             value={option.value}
             placeholder={option.placeholder}
+            aria-label={option.title ?? option.placeholder ?? 'Setting value'}
             type={option.inputType ?? 'text'}
             disabled={option.disabled}
             className="settings-option__input"
@@ -115,6 +124,7 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
         return (
           <select
             value={option.value}
+            aria-label={option.title ?? 'Setting value'}
             disabled={option.disabled}
             onChange={(e) => option.onChange(e.target.value)}
           >
@@ -141,9 +151,9 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
 
   return (
     <div className="settings">
-      {error && <div className="settings__error">{error}</div>}
+      {error && <div className="settings__error" role="alert">{error}</div>}
 
-      <div className="ui-tabs" role="tablist" aria-label="Settings sections">
+      <div className="ui-tabs" role="tablist" aria-label="Settings sections" onKeyDown={handleTabsKeyDown}>
         {sections.map((section) => {
           const isActive = section.id === activeId;
           return (
@@ -151,15 +161,13 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
               key={section.id}
               type="button"
               role="tab"
+              data-tab-id={section.id}
               aria-selected={isActive}
-              aria-controls={`settings-panel-${section.id}`}
-              id={`settings-tab-${section.id}`}
+              aria-controls={`${tabIdPrefix}-panel-${section.id}`}
+              id={`${tabIdPrefix}-tab-${section.id}`}
               tabIndex={isActive ? 0 : -1}
               className={`ui-tab ${isActive ? 'ui-tab--active' : ''}`}
-              onClick={() => {
-                setRequestedId(section.id);
-                onTabChange?.(section.id);
-              }}
+              onClick={() => selectTab(section.id)}
             >
               {section.title ?? section.id}
             </button>
@@ -171,8 +179,9 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
         <div
           className="ui-tab-panel"
           role="tabpanel"
-          id={`settings-panel-${activeSection.id}`}
-          aria-labelledby={`settings-tab-${activeSection.id}`}
+          id={`${tabIdPrefix}-panel-${activeSection.id}`}
+          aria-labelledby={`${tabIdPrefix}-tab-${activeSection.id}`}
+          tabIndex={0}
         >
           {activeSection.title && (
             <h3 className="settings__section-title">{activeSection.title}</h3>
@@ -221,6 +230,7 @@ export const SettingsPanel = ({ sections, defaultTab, onTabChange }: SettingsPan
             type="password"
             value={confirmPassword}
             placeholder="Enter your password"
+            aria-label="Confirm your password"
             className="settings-option__input"
             onChange={(e) => setConfirmPassword(e.target.value)}
           />

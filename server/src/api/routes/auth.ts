@@ -21,7 +21,7 @@ import { DEFAULT_BIO } from '@common/utils/bio';
 import { getPasswordValidationErrors } from '@common/utils/password';
 import { getUsernameValidationError } from '@common/utils/username';
 import { normalizeEmail, getEmailValidationError } from '@common/utils/email';
-import { verifyEmailCode, sendEmailCode } from '../../lib/email';
+import { verifyEmailCode, sendEmailCode, type SendEmailCodeResult } from '../../lib/email';
 import { notifyLogin } from '../../lib/notifications';
 import { hashToken } from '../../lib/tokens';
 import { getClientIp } from '../../lib/requestContext';
@@ -45,6 +45,25 @@ function deviceFingerprint(request: Request): string | null {
   return hashToken(userAgent);
 }
 const loginLimiter = createRateLimiter(15 * 60 * 1000, 20, 'login');
+
+type FailedDeviceVerification = Exclude<SendEmailCodeResult, { status: 'sent' }>;
+
+/**
+ * New-device logins must fail closed. If we cannot deliver a verification code
+ * we never trust the device or start a session; the client must retry or use
+ * the normal email/password recovery path.
+ */
+export function deviceVerificationFailure(result: FailedDeviceVerification): Response {
+  if (result.status === 'rate_limited') return tooManyRequests(result.retryAfterMs);
+
+  return json({
+    error: result.status === 'not_configured'
+      ? 'Device verification is unavailable because email delivery is not configured; please try again later or use account recovery.'
+      : 'Device verification is unavailable right now; please try again later or use account recovery.',
+    verificationUnavailable: true,
+  }, result.status === 'not_configured' ? 503 : 502);
+}
+
 async function handleRegister(request: Request) {
   const ipCheck = await registerLimiter.check(`ip:${getClientIp(request)}`);
   if (!ipCheck.allowed) {
@@ -231,12 +250,14 @@ async function handleLogin(request: Request) {
       authEventsTotal.inc({ event: 'login', result: 'device_verification' });
       return json({ requiresDeviceVerification: true, expiresAt: result.expiresAt }, 200);
     }
-    if (result.status === 'rate_limited') {
-      authEventsTotal.inc({ event: 'login', result: 'rate_limited' });
-      return tooManyRequests(result.retryAfterMs);
-    }
-    // Fall through to normal login if email delivery fails, to avoid lockout.
-    authEventsTotal.inc({ event: 'login', result: 'email_delivery_failed' });
+
+    // Fail closed: no session and no trusted-device mutation when the code
+    // could not be delivered.
+    authEventsTotal.inc({
+      event: 'login',
+      result: result.status === 'rate_limited' ? 'rate_limited' : 'verification_unavailable',
+    });
+    return deviceVerificationFailure(result);
   }
 
   // Trust this device (first login or already trusted).

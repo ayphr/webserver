@@ -14,7 +14,7 @@
 
 .forecast-tab__locked-message {
   margin: 0;
-  color: hsl(180, 1%, 70%);
+  color: var(--text-muted);
   font-size: 1rem;
 }
 
@@ -26,7 +26,7 @@
   justify-content: center;
   gap: 10px;
   padding: 48px 24px;
-  color: hsl(180, 1%, 70%);
+  color: var(--text-muted);
 }
 
 .forecast-tab__spin {
@@ -69,7 +69,7 @@
 
 .forecast-tab__control-label {
   font-size: 0.75rem;
-  color: hsl(180, 1%, 53%);
+  color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -78,7 +78,7 @@
   max-width: 360px;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-overlay-strong);
   overflow: hidden;
 }
 
@@ -98,5 +98,5 @@
 .forecast-tab__progress-caption {
   margin: 0;
   font-size: 0.9rem;
-  color: hsl(180, 1%, 70%);
+  color: var(--text-muted);
 }

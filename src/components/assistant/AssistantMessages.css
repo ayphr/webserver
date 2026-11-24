@@ -365,9 +365,18 @@
   pointer-events: none;
 }
 
-.assistant-chat__assistant-wrap:hover .assistant-chat__meta {
+.assistant-chat__assistant-wrap:hover .assistant-chat__meta,
+.assistant-chat__assistant-wrap:focus-within .assistant-chat__meta {
   opacity: 1;
   transform: translateX(0);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .assistant-chat__meta {
+    opacity: 1;
+    transform: none;
+    font-size: 0.68rem;
+  }
 }
 
 /* Rich assistant output ------------------------------------------------- */
@@ -887,6 +896,17 @@
   color: var(--text-primary);
 }
 
+.assistant-chat__tool-line:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.assistant-chat__tool-awaiting {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
 .assistant-chat__tool-line--denied .assistant-chat__tool-line-icon,
 .assistant-chat__tool-line--denied .assistant-chat__tool-line-label {
   color: var(--text-dim);
@@ -938,12 +958,17 @@
   transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-.assistant-chat__tool-permission-actions button:hover {
+.assistant-chat__tool-permission-actions button:hover:not(:disabled) {
   background-color: var(--bg-surface);
   color: var(--text-primary);
 }
 
-.assistant-chat__tool-permission-actions .assistant-chat__tool-permission-deny:hover {
+.assistant-chat__tool-permission-actions button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.assistant-chat__tool-permission-actions .assistant-chat__tool-permission-deny:hover:not(:disabled) {
   color: var(--status-error, var(--text-primary));
 }
 
@@ -1054,16 +1079,17 @@
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
 }
-.assistant-safety-card--crisis {
-  border-color: var(--status-error);
-  background: var(--status-error-bg);
-}
+/* Safety notices are supportive, not punitive: keep them out of error red. */
+.assistant-safety-card--crisis,
 .assistant-safety-card--csam {
-  border-color: var(--status-error);
-  background: var(--status-error-bg);
+  border-color: var(--border);
+  border-left: 2px solid var(--text-muted);
+  background: var(--bg-elevated);
 }
-.assistant-safety-card h4 {
+.assistant-safety-card h3 {
   margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: var(--font-weight-md);
 }
 .assistant-safety-card p {
   margin: 0.35rem 0;

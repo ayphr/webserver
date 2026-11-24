@@ -609,6 +609,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
                     step="0.1"
                     value={condition.value}
                     onChange={(event) => updateCondition(index, { value: event.target.value })}
+                    aria-label={`Value for condition ${index + 1}`}
                     fullWidth
                   />
                   <span className="alerts-tab__unit">{METRIC_META[condition.metric].unit}</span>
@@ -684,7 +685,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
 
         </div>
 
-        {formError && <p className="alerts-tab__error">{formError}</p>}
+        {formError && <p className="alerts-tab__error" role="alert">{formError}</p>}
 
         <div className="alerts-tab__form-actions">
           <Checkbox
@@ -749,7 +750,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
             </p>
           )}
 
-          {error && <p className="alerts-tab__error">{error}</p>}
+          {error && <p className="alerts-tab__error" role="alert">{error}</p>}
 
           {integrations.length === 0 && (
             <div className="alerts-tab__banner">
@@ -849,7 +850,10 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
                               variant="secondary"
                               onClick={() => toggleMuteMenu(alert)}
                               disabled={mutingId === alert.id}
+                              aria-haspopup="true"
                               aria-expanded={muteMenuId === alert.id}
+                              aria-controls={`alerts-mute-menu-${alert.id}`}
+                              aria-label={`Mute options for ${alert.name}`}
                             >
                               <IconBellOff size={14} strokeWidth={1.9} />
                               Mute until
@@ -887,7 +891,12 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
                     </div>
 
                     {muteMenuId === alert.id && canManage && (
-                      <div className="alerts-tab__mute-menu">
+                      <div
+                        className="alerts-tab__mute-menu"
+                        id={`alerts-mute-menu-${alert.id}`}
+                        role="group"
+                        aria-label={`Mute options for ${alert.name}`}
+                      >
                         <span className="alerts-tab__mute-label">Mute for</span>
                         <Button variant="secondary" onClick={() => muteFor(alert, 1)} disabled={mutingId === alert.id}>1h</Button>
                         <Button variant="secondary" onClick={() => muteFor(alert, 24)} disabled={mutingId === alert.id}>24h</Button>

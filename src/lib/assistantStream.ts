@@ -26,6 +26,49 @@ import {
 } from '@common';
 import { API_BASE_URL, api } from './api';
 
+/**
+ * Token events can arrive duplicated or out of order. Hold them until the next
+ * expected index is available so the rendered answer is assembled in order.
+ */
+export class OrderedTokenBuffer {
+  private nextIndex = 0;
+  private readonly pending = new Map<number, string>();
+
+  /** Returns every token that is now safe to append, in stream order. */
+  push(token: string, index?: number): string[] {
+    const hasIndex = typeof index === 'number' && Number.isInteger(index) && index >= 0;
+    const tokenIndex = hasIndex ? (index as number) : this.nextIndex;
+    if (tokenIndex < this.nextIndex || this.pending.has(tokenIndex)) return [];
+
+    this.pending.set(tokenIndex, token);
+    const ready: string[] = [];
+    while (this.pending.has(this.nextIndex)) {
+      ready.push(this.pending.get(this.nextIndex) as string);
+      this.pending.delete(this.nextIndex);
+      this.nextIndex += 1;
+    }
+    return ready;
+  }
+
+  /** Releases any buffered tail in index order when the stream settles. */
+  flush(): string[] {
+    const indexes = [...this.pending.keys()].sort((a, b) => a - b);
+    const ready = indexes.map((index) => this.pending.get(index) as string);
+    this.pending.clear();
+    if (indexes.length > 0) this.nextIndex = Math.max(this.nextIndex, (indexes.at(-1) as number) + 1);
+    return ready;
+  }
+
+  reset() {
+    this.nextIndex = 0;
+    this.pending.clear();
+  }
+
+  get pendingCount() {
+    return this.pending.size;
+  }
+}
+
 export type AssistantStreamHandlers = {
   onToken: (requestId: string, token: string, index?: number) => void;
   onThinking?: (requestId: string, step: AssistantThinkingStep) => void;

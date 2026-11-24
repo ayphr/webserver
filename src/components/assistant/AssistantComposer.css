@@ -133,8 +133,20 @@
   opacity: 1;
 }
 
-.assistant-input__send:hover {
+.assistant-input__send:hover:not(:disabled) {
   background-color: hsl(0, 0%, 24%);
+}
+
+.assistant-input__send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.assistant-input__speech-error {
+  margin: 0.35rem 0.25rem 0;
+  color: var(--status-error);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .assistant-input__send--stop {

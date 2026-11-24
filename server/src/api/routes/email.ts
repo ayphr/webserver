@@ -1,10 +1,17 @@
-import { json, readValidatedJsonBody } from '../../lib/http';
+import { isDuplicateKeyError, json, readValidatedJsonBody } from '../../lib/http';
 import { requireAuth, verifyPassword, createPasswordHash, endAllSessions } from '../auth';
 import {
   getUserByEmail,
   getUserFromUsername,
   updateUser,
 } from '../../lib/db';
+import {
+  getCollection,
+  invalidateUserCache,
+  trackMongoOperation,
+  USERS_COLLECTION,
+} from '../../lib/db/internal';
+import { invalidateAuthEntries } from '../../lib/authCache';
 import type { User } from '@common';
 import { optionalString, requireJsonObject, type JsonObject } from '@common';
 import { toSelfUser } from '../../lib/user';
@@ -259,6 +266,78 @@ const handleEmailChangeRequest = requireAuth(async (request, user) => {
   }
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
+type UserUpdateCollection = {
+  findOneAndUpdate(
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<User | null>;
+};
+
+export type EmailConfirmDeps = {
+  findByEmail: (email: string) => Promise<User | null>;
+  users: () => Promise<UserUpdateCollection>;
+  invalidateUser: (uuid: string) => Promise<void>;
+  invalidateAuth: () => Promise<void>;
+};
+
+export type EmailConfirmResult =
+  | { kind: 'ok'; user: User }
+  | { kind: 'conflict' }
+  | { kind: 'stale' };
+
+const defaultEmailConfirmDeps: EmailConfirmDeps = {
+  findByEmail: getUserByEmail,
+  users: async () => await getCollection('users') as unknown as UserUpdateCollection,
+  invalidateUser: invalidateUserCache,
+  invalidateAuth: invalidateAuthEntries,
+};
+
+/**
+ * Re-checks global email uniqueness, then claims the update with a conditional
+ * findOneAndUpdate. The unique index remains the final arbiter: a concurrent
+ * registration that wins the race surfaces as a duplicate key (409), never as
+ * a successful overwrite of another account's address.
+ */
+export async function confirmEmailChange(
+  user: User,
+  email: string,
+  deps: EmailConfirmDeps = defaultEmailConfirmDeps,
+): Promise<EmailConfirmResult> {
+  const existing = await deps.findByEmail(email);
+  if (existing && existing.uuid !== user.uuid) return { kind: 'conflict' };
+
+  try {
+    const users = await deps.users();
+    trackMongoOperation('findOneAndUpdate', USERS_COLLECTION);
+    const updated = await users.findOneAndUpdate(
+      {
+        uuid: user.uuid,
+        $or: [
+          { email: { $exists: false } },
+          { email: user.email ?? null },
+        ],
+      },
+      {
+        $set: {
+          email,
+          emailVerifiedAt: new Date(),
+          trustedDevices: [],
+        },
+      },
+      { returnDocument: 'after', projection: { _id: 0 } },
+    );
+    if (!updated) return { kind: 'stale' };
+
+    await deps.invalidateUser(user.uuid);
+    await deps.invalidateAuth();
+    return { kind: 'ok', user: updated };
+  } catch (error) {
+    if (isDuplicateKeyError(error)) return { kind: 'conflict' };
+    throw error;
+  }
+}
+
 const handleEmailConfirm = requireAuth(async (request, user) => {
   const parsed = await readValidatedJsonBody(request, validateEmailPayload);
   if ('error' in parsed) return parsed.error;
@@ -285,10 +364,21 @@ const handleEmailConfirm = requireAuth(async (request, user) => {
 
   const previousEmail = user.email && user.email !== email ? user.email : null;
 
-  user.email = email;
-  user.emailVerifiedAt = new Date();
-  user.trustedDevices = [];
-  await updateUser(user);
+  const result = await confirmEmailChange(user, email);
+  if (result.kind === 'conflict') {
+    authEventsTotal.inc({ event: 'email_confirm', result: 'conflict' });
+    return json({ error: 'email is already registered' }, 409);
+  }
+  if (result.kind === 'stale') {
+    authEventsTotal.inc({ event: 'email_confirm', result: 'conflict' });
+    return json({ error: 'email changed concurrently; request a new verification code' }, 409);
+  }
+
+  Object.assign(user, {
+    email: result.user.email,
+    emailVerifiedAt: result.user.emailVerifiedAt,
+    trustedDevices: result.user.trustedDevices,
+  });
 
   authEventsTotal.inc({ event: 'email_confirm', result: 'success' });
 

@@ -1,0 +1,32 @@
+{
+  // Dedicated typecheck for root-side Bun tests (frontend + shared common code).
+  // Server tests are already covered by server/tsconfig.json in the server CI job.
+  // Kept out of the build references so `npm run build` stays app-only.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "types": ["bun"],
+    "typeRoots": ["./server/node_modules/@types", "./node_modules/@types"],
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    // Test fixtures use intentional loose narrowing; app/server configs stay strict.
+    "strict": false,
+    "noFallthroughCasesInSwitch": true,
+    "ignoreDeprecations": "6.0",
+    "paths": { "@common": ["./common/index.ts"], "@common/*": ["./common/*"] }
+  },
+  "include": ["common/**/*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "server/scripts/*.test.ts"],
+  "exclude": [
+    "node_modules",
+    "server/node_modules",
+    "dist",
+    // Legacy assertions treat QueryResult as an array; it still runs in `bun test`.
+    "common/tql/tql.test.ts"
+  ]
+}

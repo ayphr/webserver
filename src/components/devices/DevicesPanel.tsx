@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -25,7 +25,7 @@ import { formatDuration, getPlanFeaturesForUser, type CreditBalance, type DataPo
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
-import { Button, Card, ConfirmDialog, Input, Pagination, Select, ToggleDropdown, Tooltip } from '../common';
+import { Button, Card, ConfirmDialog, createTabKeyDownHandler, Input, Pagination, Select, ToggleDropdown, Tooltip } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphScale } from '../graphs/types';
 import { SERIES_DEFINITIONS, type SeriesId, useEnabledSeries, getSeriesDefinition } from '../../lib/series';
@@ -221,10 +221,10 @@ function createMetricConfig(
         display: true,
         ...(zoomWindow ? { min: zoomWindow.initialMin, max: zoomWindow.initialMax } : {}),
         border: { display: showXAxis },
-        grid: { display: showGrid, color: CHART_COLORS.grid },
+        grid: { display: showGrid, color: resolveCssColor(CHART_COLORS.grid) },
         ticks: {
           display: showXAxis,
-          color: CHART_COLORS.mutedText,
+          color: resolveCssColor(CHART_COLORS.mutedText),
           maxTicksLimit: 8,
           callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
         },
@@ -234,9 +234,9 @@ function createMetricConfig(
         display: true,
         position: 'left' as const,
         border: { display: showAxes },
-        title: { display: showAxes, text: unit, color: CHART_COLORS.mutedText },
-        grid: { display: showGrid, color: CHART_COLORS.grid },
-        ticks: { display: showAxes, color: CHART_COLORS.mutedText },
+        title: { display: showAxes, text: unit, color: resolveCssColor(CHART_COLORS.mutedText) },
+        grid: { display: showGrid, color: resolveCssColor(CHART_COLORS.grid) },
+        ticks: { display: showAxes, color: resolveCssColor(CHART_COLORS.mutedText) },
       },
     },
   };
@@ -266,6 +266,8 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const detailTab: DetailTab = requestedDetailTab === 'alerts' && !canUseAlertsAndWebhooks
     ? 'graphs'
     : requestedDetailTab;
+  const detailTabIdPrefix = useId();
+  const visibleDetailTabs = DETAIL_TABS.filter((tab) => tab !== 'alerts' || canUseAlertsAndWebhooks);
   const atDeviceLimit = maxDevices !== null && devices.length >= maxDevices;
 
   // Telemetry graph state
@@ -427,6 +429,13 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     if (!activeDevice) return;
     onNavigate?.({ tab: 'devices', device: { ...activeDevice, ...patch } });
   };
+
+  const selectDetailTab = (tab: DetailTab) => updateDeviceRoute({
+    detailTab: tab,
+    alertId: undefined,
+    alertAction: undefined,
+  });
+  const handleDetailTabsKeyDown = createTabKeyDownHandler<DetailTab>(selectDetailTab);
 
   const closeDevice = () => {
     onNavigate?.({ tab: 'devices' });
@@ -695,6 +704,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         fill: false,
         borderWidth: 2,
         borderDash: def.dash,
+        pointStyle: def.pointStyle,
         pointRadius,
         pointHoverRadius: 4,
       })),
@@ -710,10 +720,10 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         display: true,
         ...(graphWindow ? { min: graphWindow.initialMin, max: graphWindow.initialMax } : {}),
         border: { display: showXAxis },
-        grid: { display: showGrid, color: CHART_COLORS.grid },
+        grid: { display: showGrid, color: resolveCssColor(CHART_COLORS.grid) },
         ticks: {
           display: showXAxis,
-          color: CHART_COLORS.mutedText,
+          color: resolveCssColor(CHART_COLORS.mutedText),
           maxTicksLimit: 8,
           callback: (value: string | number) => formatChartLabel(new Date(Number(value)), period),
         },
@@ -726,11 +736,11 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         display: true,
         position: i === 0 ? 'left' : 'right',
         border: { display: showAxes },
-        title: { display: showAxes, text: unit, color: CHART_COLORS.mutedText },
+        title: { display: showAxes, text: unit, color: resolveCssColor(CHART_COLORS.mutedText) },
         grid: i === 0
-          ? { display: showGrid, color: CHART_COLORS.grid }
+          ? { display: showGrid, color: resolveCssColor(CHART_COLORS.grid) }
           : { drawOnChartArea: false },
-        ticks: { display: showAxes, color: CHART_COLORS.mutedText },
+        ticks: { display: showAxes, color: resolveCssColor(CHART_COLORS.mutedText) },
       };
     });
     if (unitGroups.length === 0) {
@@ -739,9 +749,9 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         display: true,
         position: 'left',
         border: { display: showAxes },
-        title: { display: showAxes, text: '', color: CHART_COLORS.mutedText },
-        grid: { display: showGrid, color: CHART_COLORS.grid },
-        ticks: { display: showAxes, color: CHART_COLORS.mutedText },
+        title: { display: showAxes, text: '', color: resolveCssColor(CHART_COLORS.mutedText) },
+        grid: { display: showGrid, color: resolveCssColor(CHART_COLORS.grid) },
+        ticks: { display: showAxes, color: resolveCssColor(CHART_COLORS.mutedText) },
       };
     }
     return {
@@ -782,6 +792,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
               fill: false,
               borderWidth: 2,
               borderDash: def.dash,
+              pointStyle: def.pointStyle,
               pointRadius: dataPoints.length > 80 ? 0 : 2,
               pointHoverRadius: 4,
             },
@@ -1098,19 +1109,19 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         </div>
       </div>
 
-      <div className="ui-tabs" role="tablist" aria-label="Device sections">
-        {DETAIL_TABS.filter((tab) => tab !== 'alerts' || canUseAlertsAndWebhooks).map((tab) => (
+      <div className="ui-tabs" role="tablist" aria-label="Device sections" onKeyDown={handleDetailTabsKeyDown}>
+        {visibleDetailTabs.map((tab) => (
           <button
             key={tab}
             type="button"
             role="tab"
+            data-tab-id={tab}
             aria-selected={detailTab === tab}
+            aria-controls={`${detailTabIdPrefix}-panel`}
+            id={`${detailTabIdPrefix}-tab-${tab}`}
+            tabIndex={detailTab === tab ? 0 : -1}
             className={`ui-tab ${detailTab === tab ? 'ui-tab--active' : ''}`}
-            onClick={() => updateDeviceRoute({
-              detailTab: tab,
-              alertId: undefined,
-              alertAction: undefined,
-            })}
+            onClick={() => selectDetailTab(tab)}
           >
             {tab === 'graphs'
               ? 'Telemetry & Graphs'
@@ -1127,7 +1138,13 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         ))}
       </div>
 
-      <div className="devices__panel-body">
+      <div
+        className="devices__panel-body"
+        role="tabpanel"
+        id={`${detailTabIdPrefix}-panel`}
+        aria-labelledby={`${detailTabIdPrefix}-tab-${detailTab}`}
+        tabIndex={0}
+      >
         {/* GRAPHS TAB */}
         {detailTab === 'graphs' && (
           <div className="devices__graphs">
@@ -1384,6 +1401,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
                   value={settingsName}
                   onChange={(e) => setSettingsName(e.target.value)}
                   placeholder={`Device ${selectedDevice.serial}`}
+                  aria-label="Device name"
                 />
               </label>
 

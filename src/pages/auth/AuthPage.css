@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: hsl(0, 0%, 8%);
+  background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-family-base);
   overflow-y: auto;
@@ -33,7 +33,7 @@
 
   p {
     margin: 0;
-    color: hsl(180, 67%, 99%, 0.5);
+    color: var(--text-muted);
     font-size: 0.95rem;
     font-weight: 400;
   }
@@ -47,7 +47,7 @@
   &:has(a),
   &:has(a):hover {
     box-shadow: none;
-    border-color: hsl(0, 0%, 16%);
+    border-color: var(--border-subtle);
     cursor: default;
   }
 }
@@ -59,11 +59,11 @@
 }
 
 .auth-form__error-banner {
-  background-color: hsla(4, 100%, 71%, 0.15);
-  border: 1px solid hsla(4, 100%, 71%, 0.3);
+  background-color: var(--status-error-soft);
+  border: 1px solid var(--status-error-border);
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
-  color: hsl(4, 100%, 71%);
+  color: var(--status-error);
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
 }
@@ -126,7 +126,7 @@
 }
 
 .auth-page__footer-text {
-  color: hsl(180, 67%, 99%, 0.6);
+  color: var(--text-muted);
   font-size: 0.9rem;
   white-space: nowrap;
 }
@@ -134,7 +134,7 @@
 .auth-page__footer {
   text-align: center;
   padding-top: 1rem;
-  border-top: 1px solid hsl(0, 0%, 16%);
+  border-top: 1px solid var(--border-subtle);
   width: 100%;
 
   p {
@@ -302,11 +302,11 @@
 }
 
 .auth-form__notice {
-  background-color: hsla(129, 77%, 43%, 0.15);
-  border: 1px solid hsla(129, 77%, 43%, 0.3);
+  background-color: var(--status-success-soft);
+  border: 1px solid var(--status-success-border);
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
-  color: hsl(129, 77%, 60%);
+  color: var(--status-success);
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
 }
