@@ -13,7 +13,7 @@ import {
   releaseCredits,
   settleCreditHold,
 } from '../../lib/credits';
-import { getDeviceBySerial } from '../../lib/db';
+import { countDataPointsForDevice, getDeviceBySerial } from '../../lib/db';
 import { getTeamScopeUuid } from '../../lib/db/teams';
 import { parseSerial } from '../../lib/deviceValidation';
 import {
@@ -135,6 +135,27 @@ export const handleQueryAssist = requireAuth(async (request, user: User) => {
       parsed.request.from,
       parsed.request.to,
     );
+    if (deviceData.availablePointCount <= 0) {
+      return json({ error: 'No readings are available for the selected devices yet.' }, 422);
+    }
+
+    const countPoints = async (from: string, to: string): Promise<number> => {
+      if (from === parsed.request.from && to === parsed.request.to) {
+        return deviceData.totalPointCount;
+      }
+      const counts = await Promise.all(selected.map(async (device) => {
+        try {
+          return await countDataPointsForDevice(device.serial, {
+            since: new Date(from),
+            until: new Date(to),
+          });
+        } catch {
+          return 0;
+        }
+      }));
+      return counts.reduce((sum, count) => sum + count, 0);
+    };
+
     const authorInput = {
       ...parsed.request,
       deviceLabels: selected.map((device) => ({
@@ -143,6 +164,9 @@ export const handleQueryAssist = requireAuth(async (request, user: User) => {
       })),
       deviceData: deviceData.devices,
       totalPointCount: deviceData.totalPointCount,
+      availablePointCount: deviceData.availablePointCount,
+      availableFrom: deviceData.availableFrom,
+      availableTo: deviceData.availableTo,
     };
 
     reservedCredits = estimateQueryAuthorReserveCredits(authorInput, now);
@@ -161,7 +185,10 @@ export const handleQueryAssist = requireAuth(async (request, user: User) => {
     heldCredits = reservedCredits;
     holdPlaced = true;
 
-    const result = await generateTqlQuery(authorInput, { signal: request.signal });
+    const result = await generateTqlQuery(authorInput, {
+      signal: request.signal,
+      countPoints,
+    });
 
     const actualCost = estimateAssistantUsageCredits(
       QUERY_AUTHOR_MODEL_ID,

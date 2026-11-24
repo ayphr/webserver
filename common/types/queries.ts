@@ -60,9 +60,9 @@ export type QueryAssistResponse = {
   query: string;
   /** One short sentence explaining what the query does. */
   explanation: string;
-  /** ISO start time chosen by Iris for the query run. */
+  /** ISO start time chosen by Iris to include readings from the selected devices. */
   from: string;
-  /** ISO end time chosen by Iris for the query run. */
+  /** ISO end time chosen by Iris to include readings from the selected devices. */
   to: string;
   /** Query mode chosen by Iris for the query run. */
   type: QueryType;

@@ -42,7 +42,11 @@ export type QueryAuthorFieldSummary = {
 export type QueryAuthorDeviceData = {
   serial: number;
   name: string;
+  /** Points in the range currently selected in the editor. */
   pointCount: number;
+  availablePointCount?: number;
+  availableFrom?: string;
+  availableTo?: string;
   firstAt?: string;
   lastAt?: string;
   temperature?: QueryAuthorFieldSummary;
@@ -60,7 +64,7 @@ export type QueryAuthorDeviceData = {
 const SYSTEM_PROMPT = [
   'You are Iris, the assistant built into Ayphr. Write one TQL query for the Queries tab from the user’s plain-language request.',
   'Use the reference below. It is the only supported dialect.',
-  'You may choose the run time and query mode. Change them when the request or the observed telemetry calls for it; otherwise keep the supplied values.',
+  'You may choose the run time and query mode. Your From and To must contain actual readings for the selected devices. Use the availability summary when the supplied range has none; otherwise keep the supplied values unless the request or telemetry calls for a change.',
   'Reply with exactly four metadata lines followed by one fenced code block tagged tql, in this order:',
   'Explanation: <one short sentence>',
   'From: <ISO timestamp>',
@@ -88,12 +92,18 @@ export type QueryAuthorInput = QueryAssistRequest & {
   deviceData?: QueryAuthorDeviceData[];
   /** Total data points observed in the current range across selected devices. */
   totalPointCount?: number;
+  /** All-time availability across the selected devices; server-only. */
+  availableFrom?: string;
+  availableTo?: string;
+  availablePointCount?: number;
 };
 
 export type QueryAuthorOptions = {
   adapter?: AssistantModelAdapter;
   /** Cancels the provider request when the HTTP client disconnects. */
   signal?: AbortSignal;
+  /** Counts readings in a candidate range across the already-authorized devices. */
+  countPoints: (from: string, to: string) => Promise<number>;
 };
 
 export type QueryAuthorResult = {
@@ -138,9 +148,24 @@ const formatField = (label: string, field?: QueryAuthorFieldSummary): string | n
   return `${label} min=${round(field.min)} max=${round(field.max)} avg=${round(field.avg)} latest=${round(field.latest)}`;
 };
 
+const formatAvailability = (input: QueryAuthorInput): string => {
+  const availableCount = input.availablePointCount ?? 0;
+  if (availableCount <= 0) {
+    return 'No readings are available for the selected devices in any time range.';
+  }
+
+  const current = input.totalPointCount === 0
+    ? 'The selected time range contains no readings.'
+    : `The selected time range contains ${(input.totalPointCount ?? 0).toLocaleString()} readings.`;
+  const bounds = input.availableFrom && input.availableTo
+    ? ` from ${input.availableFrom} to ${input.availableTo}`
+    : '';
+  return `${current} Available readings span${bounds} (${availableCount.toLocaleString()} points). Choose From and To that contain readings; if the requested time has none, use the closest available window.`;
+};
+
 const formatDeviceData = (data: QueryAuthorDeviceData[] | undefined, total?: number): string => {
   if (!data || data.length === 0) {
-    return 'No telemetry preview is available for this range. Use the request and current time to choose the run time.';
+    return 'No telemetry preview is available for the selected range. Use the availability summary to choose the run time.';
   }
 
   const summary = data.map((device) => {
@@ -153,8 +178,11 @@ const formatDeviceData = (data: QueryAuthorDeviceData[] | undefined, total?: num
     const samples = (device.sample ?? []).map((point) => (
       `${point.at} temp=${round(point.temperature)} humidity=${round(point.humidity)} pressure=${round(point.airPressure)}`
     ));
+    const available = (device.availablePointCount ?? 0) > 0
+      ? `; ${device.availablePointCount!.toLocaleString()} readings available${device.availableFrom && device.availableTo ? ` from ${device.availableFrom} to ${device.availableTo}` : ''}`
+      : '; no readings available';
     return [
-      `- ${device.name} (serial ${device.serial}): ${device.pointCount.toLocaleString()} points${device.firstAt ? ` from ${device.firstAt} to ${device.lastAt}` : ''}`,
+      `- ${device.name} (serial ${device.serial}): ${device.pointCount.toLocaleString()} points in the selected range${available}`,
       fields.length > 0 ? `  ${fields.join('; ')}` : null,
       samples.length > 0 ? `  sample: ${samples.join(' | ')}` : null,
     ].filter(Boolean).join('\n');
@@ -192,11 +220,12 @@ const buildMessages = (
         `Current time: ${new Date().toISOString()}`,
         `Selected time range: ${input.from} to ${input.to}`,
         `Query mode: ${input.type}`,
+        `Available data: ${formatAvailability(input)}`,
         `Selected devices:\n${formatDeviceList(input.deviceLabels)}`,
         `\n${formatDeviceData(input.deviceData, input.totalPointCount)}`,
         existingQuery,
         correction,
-        'Choose From, To, and Mode from the request and the telemetry above, then return the four metadata lines and one fenced tql code block.',
+        'Choose From, To, and Mode from the request and the telemetry above. The chosen range must contain readings, then return the four metadata lines and one fenced tql code block.',
       ].filter(Boolean).join('\n\n'),
     },
   ];
@@ -275,6 +304,13 @@ const resolvePlan = (parsed: ParsedQueryAuthorResponse, input: QueryAuthorInput)
   return { from, to, type, problems };
 };
 
+const emptyRangeFeedback = (input: QueryAuthorInput): string => {
+  const bounds = input.availableFrom && input.availableTo
+    ? ` Available readings run from ${input.availableFrom} to ${input.availableTo}.`
+    : '';
+  return `The chosen range contains no readings for the selected devices.${bounds} Choose From and To inside that span.`;
+};
+
 const buildUsage = (
   messages: AssistantContextMessage[],
   modelId: AssistantModelId,
@@ -322,7 +358,7 @@ export const estimateQueryAuthorReserveCredits = (
  */
 export async function generateTqlQuery(
   input: QueryAuthorInput,
-  options: QueryAuthorOptions = {},
+  options: QueryAuthorOptions,
 ): Promise<QueryAuthorResult> {
   const prompt = input.prompt?.trim() ?? '';
   if (!prompt || prompt.length > QUERY_ASSIST_PROMPT_MAX_LENGTH) {
@@ -400,10 +436,13 @@ export async function generateTqlQuery(
       continue;
     }
 
-    const keptCurrentRange = plan.from === input.from && plan.to === input.to;
-    const observedPoints = input.totalPointCount ?? 0;
-    if (keptCurrentRange && plan.type === 'standard' && observedPoints > MAX_STANDARD_QUERY_POINTS) {
-      feedback = `The observed range contains ${observedPoints.toLocaleString()} points, which requires Boost. Set Mode: boost or choose a narrower range.`;
+    const observedPoints = await options.countPoints(plan.from, plan.to);
+    if (observedPoints <= 0) {
+      feedback = emptyRangeFeedback(input);
+      continue;
+    }
+    if (plan.type === 'standard' && observedPoints > MAX_STANDARD_QUERY_POINTS) {
+      feedback = `The chosen range contains ${observedPoints.toLocaleString()} points, which requires Boost. Set Mode: boost or choose a narrower range.`;
       continue;
     }
     if (plan.type === 'standard' && getQueryBoostRequiredSteps(formatted).length > 0) {
@@ -422,5 +461,8 @@ export async function generateTqlQuery(
     };
   }
 
+  if (feedback?.includes('no readings for the selected devices')) {
+    throw new QueryAuthorError('Iris could not find a time range with readings. Try a different request.');
+  }
   throw new QueryAuthorError('Iris could not write a valid query. Try describing it differently.');
 }

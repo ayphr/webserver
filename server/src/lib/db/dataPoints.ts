@@ -102,6 +102,58 @@ export async function getDataPointStats(
 }
 
 
+export type DataPointDeviceSummary = {
+  serial: number;
+  count: number;
+  firstAt: Date | null;
+  lastAt: Date | null;
+};
+
+/**
+ * Returns each device's all-time point count and observed timestamp bounds in
+ * one query. Used to choose an authoring range that actually contains readings.
+ */
+export async function getDataPointSummariesForDevices(
+  serials: number[],
+): Promise<DataPointDeviceSummary[]> {
+  const uniqueSerials = [...new Set(serials)];
+  if (uniqueSerials.length === 0) return [];
+
+  const dataPoints = await getCollection('dataPoints');
+  trackMongoOperation('aggregate', DATA_POINTS_COLLECTION);
+
+  const rows = await dataPoints.aggregate<{
+    _id: number;
+    count: number;
+    firstAt?: Date;
+    lastAt?: Date;
+  }>([
+    { $match: { deviceSerial: { $in: uniqueSerials } } },
+    {
+      $group: {
+        _id: '$deviceSerial',
+        count: { $sum: 1 },
+        firstAt: { $min: '$timestamp' },
+        lastAt: { $max: '$timestamp' },
+      },
+    },
+  ]).toArray();
+
+  const bySerial = new Map(rows.map((row) => [row._id, {
+    serial: row._id,
+    count: row.count,
+    firstAt: row.firstAt ?? null,
+    lastAt: row.lastAt ?? null,
+  }]));
+
+  return uniqueSerials.map((serial) => bySerial.get(serial) ?? {
+    serial,
+    count: 0,
+    firstAt: null,
+    lastAt: null,
+  });
+}
+
 export async function countActiveDevices(since: Date): Promise<number> {
   const devices = await getCollection('devices');
   trackMongoOperation('countDocuments', DEVICES_COLLECTION);

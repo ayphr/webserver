@@ -782,8 +782,8 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
             <div>
               <h2 id={assistHeadingId}>Write with Iris</h2>
               <p>
-                Describe what you need. Iris reads a small sample of the selected devices’ readings,
-                then writes the query and can adjust the time range and mode.
+                Describe what you need. Iris checks the selected devices’ readings and writes a query
+                with a time range and mode that have data.
               </p>
             </div>
             <span
