@@ -122,6 +122,27 @@
   margin-left: auto;
 }
 
+.queries-panel__assist-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  appearance: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.queries-panel__assist-toggle:hover,
+.queries-panel__assist-toggle.is-active {
+  border-color: var(--border-focus);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
 .queries-panel__assist {
   display: flex;
   flex-direction: column;

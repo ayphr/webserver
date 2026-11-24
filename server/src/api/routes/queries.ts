@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
-  QUERY_ASSIST_CREDIT_COST,
   QUERY_ASSIST_PROMPT_MAX_LENGTH,
   QUERY_TYPES,
+  estimateAssistantUsageCredits,
   type QueryAssistRequest,
   type QueryType,
   type User,
@@ -18,9 +18,12 @@ import { getTeamScopeUuid } from '../../lib/db/teams';
 import { parseSerial } from '../../lib/deviceValidation';
 import {
   MAX_QUERY_AUTHOR_CONTEXT_LENGTH,
+  QUERY_AUTHOR_MODEL_ID,
+  estimateQueryAuthorReserveCredits,
   generateTqlQuery,
   QueryAuthorError,
 } from '../../lib/queryAuthor';
+import { loadQueryAuthorDeviceData } from '../../lib/queryAuthorData';
 import { json, readJsonBody } from '../../lib/http';
 import { createLogger } from '../../lib/logger';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
@@ -97,12 +100,15 @@ export const handleQueryAssist = requireAuth(async (request, user: User) => {
 
   const referenceId = randomUUID();
   const now = new Date();
+  let reservedCredits = 0;
+  let heldCredits = 0;
   let holdPlaced = false;
 
   const releaseHold = async () => {
-    if (!holdPlaced) return;
+    if (!holdPlaced || heldCredits <= 0) return;
+    holdPlaced = false;
     try {
-      const released = await releaseCredits(user.uuid, QUERY_ASSIST_CREDIT_COST, now, {
+      const released = await releaseCredits(user.uuid, heldCredits, now, {
         reason: 'query_assist_release',
         referenceId,
       });
@@ -124,45 +130,79 @@ export const handleQueryAssist = requireAuth(async (request, user: User) => {
       selected.push(device);
     }
 
+    const deviceData = await loadQueryAuthorDeviceData(
+      selected,
+      parsed.request.from,
+      parsed.request.to,
+    );
+    const authorInput = {
+      ...parsed.request,
+      deviceLabels: selected.map((device) => ({
+        serial: device.serial,
+        name: device.name?.trim() || `Device ${device.serial}`,
+      })),
+      deviceData: deviceData.devices,
+      totalPointCount: deviceData.totalPointCount,
+    };
+
+    reservedCredits = estimateQueryAuthorReserveCredits(authorInput, now);
     const balance = await getCreditBalance(user, now);
-    if (balance.available < QUERY_ASSIST_CREDIT_COST) {
+    if (balance.available < reservedCredits) {
       return json({ error: 'You do not have enough credits to write a query.' }, 402);
     }
 
-    const hold = await holdCredits(user.uuid, QUERY_ASSIST_CREDIT_COST, now, {
+    const hold = await holdCredits(user.uuid, reservedCredits, now, {
       reason: 'query_assist_reserve',
       referenceId,
     });
     if (!hold?.changed) {
       return json({ error: 'You do not have enough credits to write a query.' }, 402);
     }
+    heldCredits = reservedCredits;
     holdPlaced = true;
 
-    const result = await generateTqlQuery({
-      ...parsed.request,
-      deviceLabels: selected.map((device) => ({
-        serial: device.serial,
-        name: device.name?.trim() || `Device ${device.serial}`,
-      })),
-    }, { signal: request.signal });
+    const result = await generateTqlQuery(authorInput, { signal: request.signal });
 
+    const actualCost = estimateAssistantUsageCredits(
+      QUERY_AUTHOR_MODEL_ID,
+      result.usage,
+      now,
+    );
+    if (actualCost > heldCredits) {
+      const topUpAmount = actualCost - heldCredits;
+      const topUp = await holdCredits(user.uuid, topUpAmount, now, {
+        reason: 'query_assist_topup',
+        referenceId,
+      });
+      if (topUp?.changed) heldCredits += topUpAmount;
+      else {
+        log.warn({ userUuid: user.uuid, referenceId }, 'query assist credit top-up was rejected');
+      }
+    }
+
+    const charge = Math.min(heldCredits, actualCost);
     const settled = await settleCreditHold(
       user.uuid,
-      QUERY_ASSIST_CREDIT_COST,
-      QUERY_ASSIST_CREDIT_COST,
+      heldCredits,
+      charge,
       { reason: 'query_assist_charge', referenceId },
       now,
     );
     if (settled < 0) {
       log.error({ userUuid: user.uuid, referenceId }, 'query assist credit settlement failed');
+      await releaseHold();
       return json({ error: 'Iris could not complete the request. Try again.' }, 500);
     }
     holdPlaced = false;
+    heldCredits = 0;
 
     return json({
       query: result.query,
       explanation: result.explanation,
-      creditCost: QUERY_ASSIST_CREDIT_COST,
+      from: result.from,
+      to: result.to,
+      type: result.type,
+      creditCost: settled,
     });
   } catch (error) {
     await releaseHold();

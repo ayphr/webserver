@@ -41,9 +41,6 @@ export function createDefaultQueryRange(now = new Date()): QueryRange {
 /** Maximum length of a plain-language query request sent to Iris. */
 export const QUERY_ASSIST_PROMPT_MAX_LENGTH = 1000;
 
-/** Flat credit cost for one Iris query-generation request. */
-export const QUERY_ASSIST_CREDIT_COST = 0.1;
-
 export type QueryAssistRequest = {
   /** The user's request in plain language. */
   prompt: string;
@@ -52,7 +49,7 @@ export type QueryAssistRequest = {
   /** ISO timestamps for the selected range. */
   from: string;
   to: string;
-  /** Query mode selected in the UI; advanced steps may still require Boost. */
+  /** Current query mode. Iris may choose a different mode in the response. */
   type: QueryType;
   /** Current editor contents, used as context for follow-up requests. */
   existingQuery?: string;
@@ -63,6 +60,12 @@ export type QueryAssistResponse = {
   query: string;
   /** One short sentence explaining what the query does. */
   explanation: string;
-  /** Credits charged for this generation. */
+  /** ISO start time chosen by Iris for the query run. */
+  from: string;
+  /** ISO end time chosen by Iris for the query run. */
+  to: string;
+  /** Query mode chosen by Iris for the query run. */
+  type: QueryType;
+  /** Credits settled from the model's actual token usage. */
   creditCost: number;
 };

@@ -26,7 +26,6 @@ import {
   MAX_BOOST_QUERY_POINTS,
   MAX_QUERY_POINTS_BY_TYPE,
   MAX_STANDARD_QUERY_POINTS,
-  QUERY_ASSIST_CREDIT_COST,
   QUERY_ASSIST_PROMPT_MAX_LENGTH,
   estimateQueryComputeUnits,
   formatBoostRequiredMessage,
@@ -277,13 +276,16 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const [sort, setSort] = useState<SortState>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [isAssistOpen, setIsAssistOpen] = useState(false);
   const [assistPrompt, setAssistPrompt] = useState('');
   const [isAssisting, setIsAssisting] = useState(false);
   const [assistExplanation, setAssistExplanation] = useState<string | null>(null);
   const [assistError, setAssistError] = useState<string | null>(null);
+  const [assistCost, setAssistCost] = useState<number | null>(null);
   const searchInputId = useId();
   const assistInputId = useId();
   const assistHeadingId = useId();
+  const assistPanelId = useId();
   const assistStatusId = useId();
   const assistErrorId = useId();
 
@@ -469,9 +471,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
       ? 'Select at least one device for Iris to use.'
       : rangeError
         ? rangeError
-        : credits && credits.available < QUERY_ASSIST_CREDIT_COST
-          ? 'You do not have enough credits to write a query.'
-          : null;
+        : null;
   const canAssist = !assistUnavailableReason && Boolean(assistPrompt.trim()) && !isAssisting;
 
   const patchDraft = (patch: Partial<QueryDraft>) => {
@@ -506,8 +506,13 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
         existingQuery: trimmedQuery || undefined,
       });
       const prepared = prepareAssistedQuery(response);
-      patchDraft({ query: prepared.query });
+      patchDraft({
+        query: prepared.query,
+        range: { from: prepared.from, to: prepared.to },
+        type: prepared.type,
+      });
       setAssistExplanation(prepared.explanation);
+      setAssistCost(prepared.creditCost);
       setAssistPrompt('');
 
       if (onCreditsChange) {
@@ -705,6 +710,17 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
                   : `${pointCount.toLocaleString()} points in range`}
             </span>
             <div className="queries-panel__run-group">
+              <button
+                type="button"
+                className={`queries-panel__assist-toggle ${isAssistOpen ? 'is-active' : ''}`}
+                onClick={() => setIsAssistOpen((open) => !open)}
+                aria-expanded={isAssistOpen}
+                aria-controls={assistPanelId}
+                aria-label={isAssistOpen ? 'Hide Iris query writer' : 'Show Iris query writer'}
+                title={isAssistOpen ? 'Hide Iris query writer' : 'Write a query with Iris'}
+              >
+                <IconSparkle2 size={16} strokeWidth={1.75} />
+              </button>
               <a
                 className="queries-panel__docs-link"
                 href={EXTERNAL_URLS.tqlDocs}
@@ -752,15 +768,30 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
           </div>
         </section>
 
-        <section className="queries-panel__assist" aria-labelledby={assistHeadingId}>
+        {isAssistOpen && (
+        <section
+          id={assistPanelId}
+          className="queries-panel__assist"
+          aria-labelledby={assistHeadingId}
+        >
           <div className="queries-panel__assist-heading">
             <div>
               <h2 id={assistHeadingId}>Write with Iris</h2>
-              <p>Describe the telemetry you want and Iris will draft a TQL query.</p>
+              <p>
+                Describe what you need. Iris reads a small sample of the selected devices’ readings,
+                then writes the query and can adjust the time range and mode.
+              </p>
             </div>
-            <span className="queries-panel__badge" title="Credits charged per query draft.">
+            <span
+              className="queries-panel__badge"
+              title={assistCost === null
+                ? 'Charged from actual model usage, like chat.'
+                : 'Credits charged for the last query draft.'}
+            >
               <IconCoin size={13} strokeWidth={2} />
-              {formatCredits(QUERY_ASSIST_CREDIT_COST)} credits
+              {assistCost === null
+                ? 'Usage-based'
+                : `${formatCredits(assistCost)} credits`}
             </span>
           </div>
           <form className="queries-panel__assist-form" onSubmit={(event) => void handleAssist(event)}>
@@ -805,6 +836,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
             </p>
           )}
         </section>
+        )}
 
         {(boostRequiredMessage || tooManyPointsMessage) && (
           <div className="queries-panel__warning" role="alert">
