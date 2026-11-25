@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <linearGradient id="bench" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171918" />
+      <stop offset="1" stop-color="#0a0b0b" />
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#4a514d" />
+      <stop offset="0.35" stop-color="#2e3431" />
+      <stop offset="1" stop-color="#121514" />
+    </linearGradient>
+    <linearGradient id="topEdge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#aab5ae" stop-opacity="0.55" />
+      <stop offset="1" stop-color="#aab5ae" stop-opacity="0.05" />
+    </linearGradient>
+    <radialGradient id="light" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#d8e2dc" stop-opacity="0.22" />
+      <stop offset="0.5" stop-color="#9aa9a2" stop-opacity="0.06" />
+      <stop offset="1" stop-color="#9aa9a2" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="led" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#e5ffed" />
+      <stop offset="0.45" stop-color="#7ef09a" />
+      <stop offset="1" stop-color="#285c39" />
+    </radialGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="26" />
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="#121212" />
+  <rect y="596" width="1600" height="304" fill="url(#bench)" />
+  <ellipse cx="1160" cy="430" rx="560" ry="350" fill="url(#light)" />
+  <ellipse cx="1190" cy="666" rx="300" ry="38" fill="#000000" opacity="0.82" filter="url(#shadow)" />
+
+  <g transform="translate(972 304) rotate(-6 220 130)">
+    <rect x="8" y="14" width="440" height="260" rx="34" fill="#050606" opacity="0.85" />
+    <rect x="0" y="0" width="440" height="260" rx="32" fill="url(#body)" stroke="#59635d" stroke-opacity="0.35" stroke-width="2" />
+    <path d="M34 4 H406" stroke="url(#topEdge)" stroke-width="2" stroke-linecap="round" />
+    <rect x="34" y="58" width="96" height="12" rx="6" fill="#78837c" opacity="0.2" />
+    <rect x="34" y="82" width="62" height="8" rx="4" fill="#78837c" opacity="0.12" />
+
+    <g fill="#0d100f" stroke="#69736d" stroke-opacity="0.22">
+      <rect x="300" y="60" width="76" height="42" rx="8" />
+      <rect x="300" y="118" width="76" height="42" rx="8" />
+    </g>
+    <g fill="#39413c" opacity="0.55">
+      <rect x="314" y="76" width="42" height="5" rx="2.5" />
+      <rect x="314" y="134" width="42" height="5" rx="2.5" />
+    </g>
+
+    <circle cx="382" cy="42" r="11" fill="#0a0c0b" stroke="#6d7871" stroke-opacity="0.45" />
+    <circle cx="382" cy="42" r="5" fill="url(#led)" />
+    <circle cx="40" cy="40" r="3" fill="#8a958e" opacity="0.3" />
+    <circle cx="400" cy="222" r="3" fill="#8a958e" opacity="0.22" />
+  </g>
+
+  <path d="M1414 472 C 1486 492, 1512 552, 1518 654" fill="none" stroke="#1d211f" stroke-width="14" stroke-linecap="round" />
+  <path d="M1414 472 C 1486 492, 1512 552, 1518 654" fill="none" stroke="#4a534d" stroke-opacity="0.32" stroke-width="3" stroke-linecap="round" />
+</svg>
