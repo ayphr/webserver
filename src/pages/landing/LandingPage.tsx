@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   IconActivity,
@@ -53,84 +53,17 @@ const LiveDot = ({ online = true, stale = false }: { online?: boolean; stale?: b
   />
 );
 
-const useReveal = () => {
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const targets = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
-    if (!targets.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) markVisible(entry.target);
-        });
-      },
-      { threshold: 0.08, rootMargin: '0px 0px -6% 0px' },
-    );
-    const markVisible = (target: Element) => {
-      target.classList.add('is-visible');
-      observer.unobserve(target);
-    };
-    const onScroll = () => {
-      targets.forEach((target) => {
-        if (target.classList.contains('is-visible')) return;
-        if (target.getBoundingClientRect().top < window.innerHeight) markVisible(target);
-      });
-    };
-    targets.forEach((target) => observer.observe(target));
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('scroll', onScroll);
-    };
-  }, []);
+const sparklinePath = (values: number[], width: number, height: number) => {
+  const min = Math.min(...values);
+  const span = Math.max(0.0001, Math.max(...values) - min);
+  return values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * width;
+      const y = height - 2 - ((value - min) / span) * (height - 4);
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(' ');
 };
-
-const TRACE_VALUES = [22.1, 22.3, 22.2, 22.5, 22.4, 22.6, 22.4, 22.7, 22.5, 22.8, 22.6, 22.4];
-const TRACE_POINTS = TRACE_VALUES.map((value, index) => {
-  const x = (index / (TRACE_VALUES.length - 1)) * 320;
-  const y = 48 - ((value - 21.8) / 1) * 36;
-  return `${x.toFixed(1)},${y.toFixed(1)}`;
-});
-const TRACE_LINE = `M ${TRACE_POINTS.join(' L ')}`;
-const TRACE_AREA = `${TRACE_LINE} L 320,64 L 0,64 Z`;
-const PREVIOUS_VALUES = [21.9, 22, 21.8, 22.1, 22, 22.2, 22.1, 22.3, 22.2, 22.4, 22.3, 22.1];
-const PREVIOUS_POINTS = PREVIOUS_VALUES.map((value, index) => {
-  const x = (index / (PREVIOUS_VALUES.length - 1)) * 320;
-  const y = 48 - ((value - 21.8) / 1) * 36;
-  return `${x.toFixed(1)},${y.toFixed(1)}`;
-});
-const PREVIOUS_LINE = `M ${PREVIOUS_POINTS.join(' L ')}`;
-
-const TraceChart = () => (
-  <div className="landing-device-panel__chart">
-    <div className="landing-device-panel__chart-head">
-      <span>Node-A1 · temperature</span>
-      <span className="landing-device-panel__legend">
-        <span className="landing-device-panel__legend-item landing-device-panel__legend-item--now">
-          now
-        </span>
-        <span className="landing-device-panel__legend-item">previous</span>
-      </span>
-    </div>
-    <svg viewBox="0 0 320 64" preserveAspectRatio="none" aria-hidden="true">
-      <g className="landing-device-panel__grid">
-        <line x1="0" y1="12" x2="320" y2="12" />
-        <line x1="0" y1="32" x2="320" y2="32" />
-        <line x1="0" y1="52" x2="320" y2="52" />
-      </g>
-      <path className="landing-device-panel__area" d={TRACE_AREA} />
-      <path className="landing-device-panel__trace landing-device-panel__trace--previous" d={PREVIOUS_LINE} />
-      <path className="landing-device-panel__trace" d={TRACE_LINE} />
-    </svg>
-    <div className="landing-device-panel__axis">
-      <span>09:00</span>
-      <span>12:00</span>
-      <span>now</span>
-    </div>
-  </div>
-);
 
 const FEATURES = [
   {
@@ -174,7 +107,7 @@ const STEPS = [
   {
     n: '02',
     title: 'Put it in your device',
-    desc: 'Add the token to your firmware.',
+    desc: 'Paste it into your firmware.',
   },
   {
     n: '03',
@@ -270,32 +203,120 @@ const FAQS = [
 
 const INTEGRATIONS = ['MQTT', 'REST API', 'Webhooks', 'Grafana', 'Slack', 'Discord'];
 
-const LOGOS = [
-  'MQTT',
-  'REST API',
+const PLATFORM_ITEMS = [
+  'Device tokens',
+  'Live charts',
+  'History',
+  'Queries',
+  'Assistant',
+  'Locations',
+  'Team management',
+  'Integrations',
+  'Alerts',
   'Webhooks',
+  'Permissions',
+  'Sharing',
   'CSV export',
   'JSON export',
-  'Device tokens',
+  'REST API',
+  'MQTT',
+  'Grafana',
+  'Slack',
+  'Discord',
+  'Notifications',
 ];
+
+const IncludedGroup = ({ duplicate = false }: { duplicate?: boolean }) => (
+  <div className="landing-logos__group" aria-hidden={duplicate || undefined}>
+    {PLATFORM_ITEMS.map((name) => (
+      <span key={name} className="landing-logos__item">
+        {name}
+      </span>
+    ))}
+  </div>
+);
 
 const SHOWCASE_DEVICES = [
-  { name: 'Node-A1', value: '22.4°C', sync: 'last sync 2s ago', online: true, stale: false },
-  { name: 'Node-B3', value: '48.2%', sync: 'last sync 6s ago', online: true, stale: false },
-  { name: 'Node-C7', value: '1013 hPa', sync: 'last sync 4m ago', online: false, stale: true },
-  { name: 'Node-D2', value: '20.1°C', sync: 'last sync 9s ago', online: true, stale: false },
+  {
+    name: 'Node-A1',
+    value: '22.4°C',
+    sync: '2s ago',
+    online: true,
+    stale: false,
+    series: [22.1, 22.3, 22.2, 22.5, 22.4, 22.6, 22.4, 22.7, 22.5, 22.8, 22.6, 22.4],
+  },
+  {
+    name: 'Node-B3',
+    value: '48.2%',
+    sync: '6s ago',
+    online: true,
+    stale: false,
+    series: [47.9, 48.1, 48, 48.4, 48.2, 48.3, 48.1, 48.5, 48.2, 48.4, 48.1, 48.2],
+  },
+  {
+    name: 'Node-C7',
+    value: '1013 hPa',
+    sync: '4m ago',
+    online: false,
+    stale: true,
+    series: [1012.8, 1013.1, 1012.9, 1013.4, 1013, 1012.7, 1013.2, 1013.5, 1013.1, 1012.9, 1013.3, 1013],
+  },
+  {
+    name: 'Node-D2',
+    value: '20.1°C',
+    sync: '9s ago',
+    online: true,
+    stale: false,
+    series: [19.9, 20, 19.8, 20.2, 20.1, 20.3, 20, 20.2, 19.9, 20.1, 20, 20.1],
+  },
 ];
 
-const DeviceRows = ({ devices }: { devices: typeof SHOWCASE_DEVICES }) => (
-  <div className="landing-device-list">
-    {devices.map((device) => (
-      <div className="landing-device-row" key={device.name}>
-        <LiveDot online={device.online} stale={device.stale} />
-        <span className="landing-device-row__name">{device.name}</span>
-        <span className="landing-device-row__value">{device.value}</span>
-        <span className="landing-device-row__sync">{device.sync}</span>
+const DETAIL_WIDTH = 600;
+const DETAIL_HEIGHT = 60;
+const DETAIL_LINE = sparklinePath(SHOWCASE_DEVICES[0].series, DETAIL_WIDTH, DETAIL_HEIGHT);
+const DETAIL_AREA = `${DETAIL_LINE} L ${DETAIL_WIDTH},${DETAIL_HEIGHT} L 0,${DETAIL_HEIGHT} Z`;
+
+const NodeRack = () => (
+  <div className="landing-device-panel landing-node-rack" aria-hidden="true">
+    <div className="landing-device-panel__head">
+      <span>Fleet · workshop</span>
+      <span className="landing-device-panel__count">
+        <LiveDot />4 nodes
+      </span>
+    </div>
+    <div className="landing-node-rack__grid">
+      {SHOWCASE_DEVICES.map((device, index) => (
+        <div
+          className={`landing-node ${index === 0 ? 'landing-node--active' : ''}`}
+          key={device.name}
+        >
+          <div className="landing-node__top">
+            <span>{device.name}</span>
+            <LiveDot online={device.online} stale={device.stale} />
+          </div>
+          <div className="landing-node__value">{device.value}</div>
+          <svg
+            className="landing-node__spark"
+            viewBox="0 0 100 24"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <path d={sparklinePath(device.series, 100, 24)} />
+          </svg>
+          <span className="landing-node__age">last sync {device.sync}</span>
+        </div>
+      ))}
+    </div>
+    <div className="landing-node-rack__detail">
+      <div className="landing-node-rack__detail-head">
+        <span>Node-A1 · temperature</span>
+        <span>last 6 hours</span>
       </div>
-    ))}
+      <svg viewBox={`0 0 ${DETAIL_WIDTH} ${DETAIL_HEIGHT}`} preserveAspectRatio="none" aria-hidden="true">
+        <path className="landing-node-rack__detail-area" d={DETAIL_AREA} />
+        <path className="landing-node-rack__detail-line" d={DETAIL_LINE} />
+      </svg>
+    </div>
   </div>
 );
 
@@ -304,8 +325,6 @@ export const LandingPage = () => {
   const [progress, setProgress] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-
-  useReveal();
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflowY;
@@ -425,7 +444,7 @@ export const LandingPage = () => {
           </div>
 
           <div className="landing-hero__copy">
-            <p className="landing-hero__note">First generation Geo pre-orders start 2027</p>
+            <p className="landing-hero__note">First-gen Geo sensors · pre-orders open 2027</p>
             <h1 id="hero-title" className="landing-hero__title">
               Sensor data, without the plumbing
             </h1>
@@ -451,26 +470,25 @@ export const LandingPage = () => {
 
         </section>
 
-        <section className="landing-logos" aria-label="Platform capabilities" data-reveal>
-          <p className="landing-logos__label">Works with</p>
-          <div className="landing-logos__items">
-            {LOGOS.map((name) => (
-              <span key={name} className="landing-logos__item">
-                {name}
-              </span>
-            ))}
+        <section className="landing-logos" aria-label="Included platform features">
+          <p className="landing-logos__label">Included</p>
+          <div className="landing-logos__viewport">
+            <div className="landing-logos__track">
+              <IncludedGroup />
+              <IncludedGroup duplicate />
+            </div>
           </div>
         </section>
 
         <section id="features" className="landing-features" aria-labelledby="features-title">
           <div className="landing-split">
-            <div className="landing-split__head" data-reveal>
+            <div className="landing-split__head">
               <SectionHead
                 id="features-title"
                 eyebrow="01 / Features"
                 title="From sensor to screen"
                 desc="A small set of tools for getting sensor readings from the field to a screen."
-                note="We make the hardware too: first-party Ayphr sensors work out of the box, with third-party and custom devices supported as a close second."
+                note="First-party sensors work out of the box. Third-party devices are welcome too, as long as they can POST JSON."
               />
             </div>
             <div className="landing-features__grid">
@@ -480,8 +498,6 @@ export const LandingPage = () => {
                   <article
                     className="landing-feature"
                     key={feature.title}
-                    data-reveal
-                    style={{ '--reveal-delay': `${(index % 2) * 80}ms` } as CSSProperties}
                   >
                     <span className="landing-feature__icon">
                       <Icon {...ICON} aria-hidden="true" />
@@ -502,7 +518,7 @@ export const LandingPage = () => {
 
         <section className="landing-how" aria-labelledby="how-title">
           <div className="landing-split">
-            <div className="landing-split__head" data-reveal>
+            <div className="landing-split__head">
               <SectionHead
                 id="how-title"
                 eyebrow="02 / How it works"
@@ -510,12 +526,10 @@ export const LandingPage = () => {
               />
             </div>
             <div className="landing-steps">
-              {STEPS.map((step, index) => (
+              {STEPS.map((step) => (
                 <div
                   className="landing-step"
                   key={step.n}
-                  data-reveal
-                  style={{ '--reveal-delay': `${index * 80}ms` } as CSSProperties}
                 >
                   <span className="landing-step__n">{step.n}</span>
                   <h3 className="landing-step__title">{step.title}</h3>
@@ -527,12 +541,12 @@ export const LandingPage = () => {
         </section>
 
         <section className="landing-showcase" aria-labelledby="showcase-title">
-          <div className="landing-showcase__copy" data-reveal>
+          <div className="landing-showcase__copy">
             <SectionHead
               id="showcase-title"
               eyebrow="03 / Platform"
               title="Readings, status and history together"
-              desc="Readings, device status, and history in one screen. Set alerts, export data, share with a teammate."
+              desc="Spot a problem, compare a trend, or export a range without switching tools."
             />
             <ul className="landing-checks">
               <li>
@@ -554,42 +568,30 @@ export const LandingPage = () => {
             </Button>
           </div>
 
-          <div className="landing-device-panel" data-reveal aria-hidden="true">
-            <div className="landing-device-panel__head">
-              <span>Devices</span>
-              <span className="landing-device-panel__count">
-                <LiveDot />
-                12 online
-              </span>
-            </div>
-            <TraceChart />
-            <DeviceRows devices={SHOWCASE_DEVICES} />
-          </div>
+          <NodeRack />
         </section>
 
         <section id="pricing" className="landing-pricing" aria-labelledby="pricing-title">
-          <div data-reveal>
+          <div>
             <SectionHead
               id="pricing-title"
               eyebrow="04 / Plans"
               title="Pricing"
               desc="Pick a plan. Cancel anytime."
-              note="Individual plans. A free plan with limited features is also available to get started."
+              note="Billed monthly in AUD. A limited free plan is available to try."
             />
           </div>
           <div className="landing-pricing__grid">
-            {PRICING.map((plan, index) => (
+            {PRICING.map((plan) => (
               <article
                 className={`landing-price-card ${plan.highlight ? 'landing-price-card--highlight' : ''}`}
                 key={plan.name}
-                data-reveal
-                style={{ '--reveal-delay': `${index * 80}ms` } as CSSProperties}
               >
                 {plan.highlight && <span className="landing-price-card__badge">Most popular</span>}
                 <h3 className="landing-price-card__name">{plan.name}</h3>
                 <div className="landing-price-card__price">
-                  <span className="landing-price-card__amount">{plan.price}</span>
                   <span className="landing-price-card__currency">{plan.currency}</span>
+                  <span className="landing-price-card__amount">{plan.price}</span>
                   <span className="landing-price-card__period">{plan.period}</span>
                 </div>
                 <p className="landing-price-card__desc">{plan.desc}</p>
@@ -614,15 +616,15 @@ export const LandingPage = () => {
         </section>
 
         <section className="landing-integrations" aria-labelledby="integrations-title">
-          <div data-reveal>
+          <div>
             <SectionHead
               id="integrations-title"
               eyebrow="05 / Connect"
               title="Integrations"
-              desc="Send data where you need it."
+              desc="Push readings into the tools you already use."
             />
           </div>
-          <div className="landing-integration-grid" data-reveal>
+          <div className="landing-integration-grid">
             <div className="landing-integration-source">
               <span>Ayphr</span>
               <span className="landing-integration-source__meta">readings out</span>
@@ -642,10 +644,10 @@ export const LandingPage = () => {
 
         <section id="faq" className="landing-faq" aria-labelledby="faq-title">
           <div className="landing-split">
-            <div className="landing-split__head" data-reveal>
+            <div className="landing-split__head">
               <SectionHead id="faq-title" eyebrow="06 / Questions" title="FAQ" />
             </div>
-            <div className="landing-faq__list" data-reveal>
+            <div className="landing-faq__list">
               {FAQS.map((faq, index) => {
                 const open = openFaq === index;
                 return (
@@ -687,10 +689,10 @@ export const LandingPage = () => {
         </section>
 
         <section className="landing-final-cta" aria-labelledby="final-cta-title">
-          <div className="landing-final-cta__panel" data-reveal>
+          <div className="landing-final-cta__panel">
             <div>
-              <h2 id="final-cta-title">Ready to send readings?</h2>
-              <p>Create an account and start sending readings.</p>
+              <h2 id="final-cta-title">Start with one sensor.</h2>
+              <p>Create an account, generate a token, and watch the first reading land.</p>
             </div>
             <div className="landing-final-cta__actions">
               <Button to="/auth/register" variant="primary">

@@ -13,25 +13,32 @@
       <stop offset="0" stop-color="#aab5ae" stop-opacity="0.55" />
       <stop offset="1" stop-color="#aab5ae" stop-opacity="0.05" />
     </linearGradient>
-    <radialGradient id="light" cx="0.5" cy="0.5" r="0.5">
+    <radialGradient id="light" cx="0.588" cy="0.5" r="0.5">
       <stop offset="0" stop-color="#d8e2dc" stop-opacity="0.22" />
       <stop offset="0.5" stop-color="#9aa9a2" stop-opacity="0.06" />
       <stop offset="1" stop-color="#9aa9a2" stop-opacity="0" />
     </radialGradient>
+    <linearGradient id="glowFalloff" gradientUnits="userSpaceOnUse" x1="360" y1="0" x2="1360" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.01" />
+      <stop offset="0.54" stop-color="#ffffff" stop-opacity="0.14" />
+      <stop offset="0.8" stop-color="#ffffff" stop-opacity="1" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="1" />
+    </linearGradient>
+    <mask id="glowMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1600" height="900">
+      <rect width="1600" height="900" fill="url(#glowFalloff)" />
+    </mask>
     <radialGradient id="led" cx="0.5" cy="0.5" r="0.5">
       <stop offset="0" stop-color="#e5ffed" />
       <stop offset="0.45" stop-color="#7ef09a" />
       <stop offset="1" stop-color="#285c39" />
     </radialGradient>
-    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="26" />
-    </filter>
   </defs>
 
   <rect width="1600" height="900" fill="#121212" />
   <rect y="596" width="1600" height="304" fill="url(#bench)" />
-  <ellipse cx="1160" cy="430" rx="560" ry="350" fill="url(#light)" />
-  <ellipse cx="1190" cy="666" rx="300" ry="38" fill="#000000" opacity="0.82" filter="url(#shadow)" />
+  <g mask="url(#glowMask)">
+    <ellipse cx="1040" cy="430" rx="680" ry="350" fill="url(#light)" />
+  </g>
 
   <g transform="translate(972 304) rotate(-6 220 130)">
     <rect x="8" y="14" width="440" height="260" rx="34" fill="#050606" opacity="0.85" />

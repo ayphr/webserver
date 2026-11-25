@@ -35,6 +35,16 @@ const luminance = (data: Uint8ClampedArray, index: number) =>
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+const smoothstep = (edge0: number, edge1: number, value: number) => {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+const smootherstep = (edge0: number, edge1: number, value: number) => {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * t * (t * (t * 6 - 15) + 10);
+};
+
 const drawCover = (
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -52,11 +62,11 @@ const drawCover = (
   if (imageRatio > targetRatio) {
     sh = img.naturalHeight / zoom;
     sw = sh * targetRatio;
-    sy = (img.naturalHeight - sh) * 0.44;
+    sy = (img.naturalHeight - sh) * 0.54;
   } else {
     sw = img.naturalWidth / zoom;
     sh = sw / targetRatio;
-    sy = (img.naturalHeight - sh) * 0.44;
+    sy = (img.naturalHeight - sh) * 0.54;
   }
 
   const sx = clamp(img.naturalWidth * focusX - sw / 2, 0, img.naturalWidth - sw);
@@ -168,6 +178,18 @@ export const GlyphScene = ({ src, cell = 10 }: { src: string; cell?: number }) =
       drawCover(sampleCtx, image, columns, rows);
       const data = sampleCtx.getImageData(0, 0, columns, rows).data;
 
+      // The workbench starts at y=596 in the 900px source scene. Keep it out of
+      // the left fade so it can run the full width of the hero.
+      const zoom = 1.45;
+      const imageRatio = image.naturalWidth / image.naturalHeight;
+      const targetRatio = columns / rows;
+      const cropHeight =
+        imageRatio > targetRatio
+          ? image.naturalHeight / zoom
+          : image.naturalWidth / zoom / targetRatio;
+      const cropTop = (image.naturalHeight - cropHeight) * 0.54;
+      const benchStart = clamp((596 - cropTop) / cropHeight, 0, 1);
+
       const background = luminance(data, 0);
       const values: number[] = [];
       const raws = new Float32Array(columns * rows);
@@ -206,8 +228,14 @@ export const GlyphScene = ({ src, cell = 10 }: { src: string; cell?: number }) =
       const shimmer: ShimmerCell[] = [];
       for (let y = 0; y < rows; y += 1) {
         for (let x = 0; x < columns; x += 1) {
-          const raw = raws[y * columns + x];
-          if (raw < 0 || raw <= 0.055) continue;
+          const source = raws[y * columns + x];
+          if (source < 0) continue;
+          const upperMask = 1 - smoothstep(benchStart - 0.03, benchStart + 0.03, y / Math.max(1, rows - 1));
+          const horizontalFade = smootherstep(0.12, 0.62, x / Math.max(1, columns - 1));
+          const fade = 1 - upperMask * (1 - horizontalFade);
+          const gate = smoothstep(0.02, 0.075, source * fade);
+          const raw = source * fade * gate;
+          if (raw <= 0) continue;
           const value = Math.pow(Math.min(1, raw), 0.68);
           const threshold = (BAYER[y % 4][x % 4] + 0.5) / 16 - 0.5;
           const level = Math.max(
@@ -216,7 +244,7 @@ export const GlyphScene = ({ src, cell = 10 }: { src: string; cell?: number }) =
           );
           if (level === 0) continue;
           const tone = value > 0.86 ? 2 : value > 0.34 ? 1 : 0;
-          const alpha = Math.min(0.98, 0.2 + value * 0.78);
+          const alpha = Math.min(0.98, 0.2 + value * 0.78) * fade * gate;
           drawGlyph(baseCtx, atlases[tone], level, alpha, x * step, y * step, step);
 
           if ((x * 13 + y * 7) % 47 === 0 && raw > 0.24 && tone < 2) {
