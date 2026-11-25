@@ -85,7 +85,7 @@ CI runs `bun run api:check` in both the server and root test jobs; it fails if t
 
 ## Observability
 
-Grafana dashboards live in `monitoring/grafana/dashboards/`. Counters that are declared but not yet incremented by the assistant (`ayphr_assistant_feedback_total`, `ayphr_assistant_stream_errors_total`, `ayphr_assistant_rate_limited_total`, `ayphr_assistant_resume_total`) have hidden panels and an explanatory note in the assistant dashboard until their call sites are instrumented.
+Grafana dashboards live in `monitoring/grafana/dashboards/`. The assistant dashboard includes feedback, error, rate-limit, and context-resume panels backed by server-side counters.
 
 ## Lockfile strategy
 

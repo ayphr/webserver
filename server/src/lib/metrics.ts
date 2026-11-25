@@ -421,7 +421,7 @@ export const assistantRateLimitedTotal = new Counter({
 
 export const assistantResumeTotal = new Counter({
   name: 'ayphr_assistant_resume_total',
-  help: 'Assistant stream resume attempts.',
+  help: 'Assistant chat context resumes, by source.',
   labelNames: ['result'],
   registers: [registry],
 });

@@ -28,6 +28,7 @@ import {
   type AssistantVariant,
 } from '@common';
 import { deleteAssistantChat, getAssistantState, saveAssistantState } from '../../lib/db';
+import { assistantFeedbackTotal } from '../../lib/metrics';
 import { json, readJsonBody } from '../../lib/http';
 import { requireAuth } from '../auth';
 import type { User } from '@common';
@@ -456,13 +457,34 @@ export const handleGetState = requireAuth(async (_request, user: User) => {
   return json({ state: state ?? createDefaultAssistantState() });
 });
 
+/** Counts only newly-set feedback so repeated state saves do not inflate metrics. */
+function countFeedbackChanges(previous: AssistantState | null, next: AssistantState): void {
+  const prior = new Map<string, AssistantMessageFeedback | undefined>();
+  for (const chat of previous?.chats ?? []) {
+    for (const message of chat.messages) {
+      prior.set(`${chat.id}:${message.id}`, message.feedback);
+    }
+  }
+
+  for (const chat of next.chats) {
+    for (const message of chat.messages) {
+      const feedback = message.feedback;
+      if (feedback !== 'like' && feedback !== 'dislike') continue;
+      if (prior.get(`${chat.id}:${message.id}`) === feedback) continue;
+      assistantFeedbackTotal.labels(feedback).inc();
+    }
+  }
+}
+
 export const handleSaveState = requireAuth(async (request, user: User) => {
   const body = await readJsonBody<unknown>(request);
   if (!isRecord(body)) return json({ error: 'request body must be valid JSON' }, 400);
 
   try {
     const state = parseAssistantState(body.state);
+    const previous = await getAssistantState(user.uuid);
     const saved = await saveAssistantState(user.uuid, state);
+    countFeedbackChanges(previous, saved);
     return json({ state: saved });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'invalid assistant state';

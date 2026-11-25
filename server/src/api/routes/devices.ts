@@ -47,6 +47,7 @@ import {
   telemetryUploadErrorsTotal,
 } from '../../lib/metrics';
 import { consumeCredits, getCreditBalance } from '../../lib/credits';
+import { consumeQueryBoostAllowance } from '../../lib/db/queryBoostUsage';
 import { PAIRING_CODE_TTL_MS } from '../../env';
 import {
   compileQuery,
@@ -667,6 +668,22 @@ async function executeDeviceQuery(
     const balance = await getCreditBalance(user);
     if (balance.available < creditCost) {
       return json({ error: 'insufficient credits' }, 402);
+    }
+  }
+
+  if (type === 'boost') {
+    const limit = features.sharedQueryBoostLimitMonthlyPerUser;
+    const usage = await consumeQueryBoostAllowance(user.uuid, limit);
+    if (!usage.allowed) {
+      if (limit <= 0) {
+        return json({ error: 'Boost queries are not available on your plan.' }, 403);
+      }
+      return json(
+        {
+          error: `You have reached the monthly Boost query limit (${limit}). It resets ${usage.resetAt.toISOString()}.`,
+        },
+        429,
+      );
     }
   }
 

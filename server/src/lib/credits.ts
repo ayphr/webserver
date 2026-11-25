@@ -181,14 +181,10 @@ export async function settleCreditHold(
     if (result?.changed) return cost;
     log.warn(
       { userUuid, attempt, referenceId: options.referenceId },
-      'assistant credit charge was rejected; reconciling hold and retrying',
+      'assistant credit charge was rejected after releasing its hold',
     );
-    // The hold may have been re-acquired by a concurrent stream; release it
-    // again before retrying the charge.
-    await releaseCredits(userUuid, held, now, {
-      ...options,
-      reason: options.reason ?? 'assistant_stream_release',
-    });
+    // Do not release again. Holds are stored as an aggregate `onHold` amount,
+    // so a second release could consume another stream's reservation.
   }
   return -1;
 }

@@ -285,6 +285,20 @@ describe('generateTqlQuery', () => {
     expect(result.type).toBe('boost');
   });
 
+  test('rejects a Boost range above the Boost point cap', async () => {
+    const { adapter, requests } = adapterWithResponses([
+      response('findAll(p -> { p.temperature > 20 })', { mode: 'boost' }),
+      response('findAll(p -> { p.temperature > 20 })', { mode: 'boost' }),
+    ]);
+
+    await expect(
+      generateTqlQuery(request, { adapter, countPoints: async () => 600_000 }),
+    ).rejects.toBeInstanceOf(QueryAuthorError);
+
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.messages[1]?.content).toContain('exceeds the Boost limit');
+  });
+
   test('retries once when the first query is invalid', async () => {
     const { adapter, requests } = adapterWithResponses([
       response('SELECT * FROM temperature'),

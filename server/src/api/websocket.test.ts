@@ -23,6 +23,7 @@ let deltaChunks: string[] | undefined;
 let assistantState: AssistantState | null = null;
 let availableCredits = 100;
 let stateShouldThrow = false;
+let holdDelays: number[] = [];
 
 const splitForTest = (content: string): string[] => {
   if (!content) return [];
@@ -74,6 +75,8 @@ mock.module('../lib/credits', () => ({
   getCreditBalanceFromUuid: async () => ({ available: availableCredits, total: 100, onHold: 0 }),
   holdCredits: async (_userUuid: string, amount: number) => {
     holds.push(amount);
+    const delay = holdDelays.shift() ?? 0;
+    if (delay > 0) await Bun.sleep(delay);
     return { changed: true };
   },
   settleCreditHold: async (
@@ -200,6 +203,7 @@ describe('assistant websocket streaming', () => {
     assistantState = null;
     availableCredits = 100;
     stateShouldThrow = false;
+    holdDelays = [];
     nextDraft = () => plainDraft('Hello from Iris');
     toolExecutor = async () => ({
       toolId: 'call-1',
@@ -696,5 +700,133 @@ describe('assistant websocket streaming', () => {
     expect(messagesOf('error')[0]!.error).toBe('Assistant request failed');
     expect(notifications.some((notice) => notice.message.includes('error'))).toBe(true);
     expect(settlements).toHaveLength(0);
+  });
+
+  it('settles a hold that completes after cancel', async () => {
+    holdDelays = [80];
+    const ws = await authedSocket();
+    assistantWebSocket.message!(
+      ws,
+      JSON.stringify({ type: 'stream', requestId: 'req-cancel-hold', prompt: 'hi', mode: 'chat' }),
+    );
+    await waitFor(() => holds.length === 1);
+
+    assistantWebSocket.message!(ws, JSON.stringify({ type: 'cancel', requestId: 'req-cancel-hold' }));
+    await waitFor(() => settlements.length === 1);
+    await Bun.sleep(30);
+
+    expect(settlements).toHaveLength(1);
+    expect(settlements[0]!.held).toBe(holds[0]);
+    expect(settlements[0]!.cost).toBeGreaterThan(0);
+  });
+
+  it('settles a continuation hold that completes after cancel', async () => {
+    holdDelays = [0, 120];
+    nextDraft = (_request, round) => {
+      if (round === 0) return toolDraft('call-continue');
+      return {
+        ...plainDraft('Done.'),
+        usage: { inputTokens: 2_000_000, outputTokens: 500_000 },
+      };
+    };
+    toolExecutor = async (_name, _input, toolId) => ({
+      toolId,
+      name: 'devices.list',
+      status: 'ok',
+      summary: 'Found 0 devices',
+      data: { devices: [] },
+    });
+    assistantState = preferencesState('never-ask');
+    const ws = await authedSocket();
+    assistantWebSocket.message!(
+      ws,
+      JSON.stringify({
+        type: 'stream',
+        requestId: 'req-cancel-continuation',
+        prompt: 'check twice',
+        mode: 'task',
+      }),
+    );
+    await waitFor(() => holds.length === 2);
+
+    assistantWebSocket.message!(
+      ws,
+      JSON.stringify({ type: 'cancel', requestId: 'req-cancel-continuation' }),
+    );
+    await waitFor(() => settlements.length === 1);
+    await Bun.sleep(30);
+
+    expect(settlements).toHaveLength(1);
+    expect(settlements[0]!.held).toBeCloseTo(holds[0]! + holds[1]!, 5);
+  });
+
+  it('persists executed tools with their original round status', async () => {
+    nextDraft = (_request, round) => (round === 0 ? toolDraft('call-round') : plainDraft('All done.'));
+    assistantState = preferencesState('never-ask');
+    const ws = await authedSocket();
+    assistantWebSocket.message!(
+      ws,
+      JSON.stringify({
+        type: 'stream',
+        requestId: 'req-persist-tools',
+        prompt: 'check devices',
+        mode: 'task',
+        chatId: 'chat-tools',
+        messageId: 2,
+      }),
+    );
+    await waitFor(() => messagesOf('done').length === 1);
+
+    const persisted = savedResults.filter((result) => result.assistantMessage).at(-1);
+    expect(persisted?.assistantMessage.tools).toMatchObject([
+      { id: 'call-round', status: 'done', detail: 'Found 0 devices' },
+    ]);
+  });
+
+  it('settles and stops when the socket closes during a permission wait', async () => {
+    nextDraft = (_request, round) =>
+      round === 0 ? toolDraft('call-orphan', 'alerts.create') : plainDraft('Done.');
+    assistantState = preferencesState('always-ask');
+    const ws = await authedSocket();
+    assistantWebSocket.message!(
+      ws,
+      JSON.stringify({
+        type: 'stream',
+        requestId: 'req-orphan',
+        prompt: 'create alert',
+        mode: 'task',
+      }),
+    );
+    await waitFor(() => messagesOf('tool_permission_request').length === 1);
+
+    assistantWebSocket.close!(ws);
+    await waitFor(() => settlements.length === 1);
+    await Bun.sleep(20);
+
+    expect(settlements).toHaveLength(1);
+    expect(settlements[0]!.held).toBe(holds[0]);
+  });
+
+  it('upgrades a live safety card when the full draft finds a higher-priority notice', async () => {
+    const content = 'Please do not kill someone, that is harmful and wrong. I want to kill myself tonight.';
+    nextDraft = () => plainDraft(content);
+    deltaChunks = ['Please do not kill someone, that is harmful and wrong.   ', 'I want to kill myself tonight.'];
+    const ws = await authedSocket();
+    assistantWebSocket.message!(
+      ws,
+      JSON.stringify({
+        type: 'stream',
+        requestId: 'req-safety-upgrade',
+        prompt: 'write a sentence',
+        mode: 'chat',
+        chatId: 'chat-safety',
+        messageId: 2,
+      }),
+    );
+    await waitFor(() => messagesOf('done').length === 1);
+
+    expect(messagesOf('safety').map((message) => message.notice)).toEqual(['refusal', 'crisis']);
+    const persisted = savedResults.filter((result) => result.assistantMessage).at(-1);
+    expect(persisted?.assistantMessage.safetyNotice).toBe('crisis');
   });
 });

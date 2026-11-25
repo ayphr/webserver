@@ -61,7 +61,9 @@ import { createLogger } from '../lib/logger';
 import {
   assistantActiveStreams,
   assistantMessagesTotal,
+  assistantResumeTotal,
   assistantStreamDuration,
+  assistantStreamErrorsTotal,
   assistantStreamsTotal,
   assistantStreamTokensTotal,
   assistantThinkingStepsTotal,
@@ -453,6 +455,7 @@ const prepareContext = async (
   }
 
   assistantContextTokens.labels(variant).set(plan.usage.usedTokens);
+  if (chatId && chat) assistantResumeTotal.labels(summary ? 'summary' : 'fresh').inc();
   return {
     usage: { ...plan.usage, compacted: Boolean(summary) },
     contextMessages: plan.contextMessages,
@@ -476,6 +479,7 @@ const startStream = async (
   const notificationLink = assistantChatLink(chatId);
   cancelStream(ws, requestId);
   if (streams.size >= MAX_CONCURRENT_STREAMS) {
+    assistantStreamErrorsTotal.labels('too_many_active_streams').inc();
     send(ws, { type: 'error', requestId, error: 'Too many active streams' });
     notifyTaskUser(userUuid, notificationLink, 'never', false);
     return;
@@ -504,7 +508,9 @@ const startStream = async (
 
   let holdSucceeded = false;
   let reservedCredits = 0;
-  let settledCredits = false;
+  /** Holds in flight must finish before settlement snapshots `reservedCredits`. */
+  let pendingHolds = 0;
+  const holdWaiters = new Set<() => void>();
   let settlementPromise: Promise<number> | undefined;
   let emittedText = '';
   let emittedTokenCount = 0;
@@ -518,7 +524,6 @@ const startStream = async (
   let completed = false;
   let failureNotified = false;
   let safetyNotice: SafetyNotice | undefined;
-  let safetyNoticeSent = false;
   let pendingToolId: string | null = null;
   let index = 0;
   let toolCursor = 0;
@@ -533,6 +538,12 @@ const startStream = async (
   const promptCategorySet = new Set<string>(promptCategories);
   const allThinking: NonNullable<AssistantMessage['thinking']> = [];
   const allTools: AssistantToolCall[] = [];
+  /**
+   * Provider tool IDs can repeat across rounds. Bind each draft tool occurrence
+   * to the round that created it so late results/decisions cannot be looked up
+   * with a newer round number.
+   */
+  const toolKeys = new WeakMap<object, string>();
   const allUsage = { inputTokens: 0, outputTokens: 0 };
   const knownSerials = new Set<string>();
   const redactedPrompt = prompt ? redactPII(prompt) : undefined;
@@ -553,15 +564,28 @@ const startStream = async (
     notifyTaskUser(userUuid, notificationLink, taskNotificationLevel(), false);
   };
 
+  const streamError = (error: string, code: string) => {
+    assistantStreamErrorsTotal.labels(code).inc();
+    send(ws, { type: 'error', requestId, error });
+  };
+
   const rejectInsufficientCredits = () => {
-    send(ws, { type: 'error', requestId, error: 'insufficient credits' });
+    streamError('insufficient credits', 'insufficient_credits');
     notifyFailure();
   };
 
+  const SAFETY_NOTICE_PRIORITY: Record<NonNullable<SafetyNotice>, number> = {
+    refusal: 1,
+    crisis: 2,
+    csam: 3,
+  };
+
   const reportSafety = (notice: NonNullable<SafetyNotice>) => {
+    // Live text is validated in small chunks, so an early lower-priority card
+    // can precede a higher-priority one found in the full draft. Send an
+    // upgrade and keep the persisted notice in sync; never downgrade it.
+    if (safetyNotice && SAFETY_NOTICE_PRIORITY[safetyNotice] >= SAFETY_NOTICE_PRIORITY[notice]) return;
     safetyNotice = notice;
-    if (safetyNoticeSent) return;
-    safetyNoticeSent = true;
     send(ws, { type: 'safety', requestId, notice });
   };
 
@@ -575,10 +599,29 @@ const startStream = async (
     }
   };
 
+  const waitForPendingHolds = () =>
+    new Promise<void>((resolve) => {
+      holdWaiters.add(resolve);
+    });
+
+  const beginHold = () => {
+    pendingHolds += 1;
+  };
+
+  const finishHold = () => {
+    pendingHolds = Math.max(0, pendingHolds - 1);
+    if (pendingHolds > 0) return;
+    for (const waiter of holdWaiters) waiter();
+    holdWaiters.clear();
+  };
+
   const settleCredits = (): Promise<number> => {
     if (settlementPromise) return settlementPromise;
-    settledCredits = true;
+    // A cancel can arrive before the first hold starts. Do not cache a no-op
+    // here: a later hold must still be able to schedule settlement.
+    if (!holdSucceeded && pendingHolds === 0) return Promise.resolve(0);
     settlementPromise = (async () => {
+      while (pendingHolds > 0) await waitForPendingHolds();
       if (!holdSucceeded || reservedCredits <= 0) return 0;
       const pricingDate = new Date();
       const cost = Math.min(
@@ -609,7 +652,7 @@ const startStream = async (
   const overallTimer = setTimeout(() => {
     if (stream.cancelled || completed || stream.detached) return;
     stream.onAbort?.();
-    send(ws, { type: 'error', requestId, error: 'Assistant took too long to respond' });
+    streamError('Assistant took too long to respond', 'timeout');
     stream.cancelled = true;
     detachStream(ws, requestId, stream);
     assistantStreamsTotal.labels(mode, variant, 'error').inc();
@@ -619,7 +662,7 @@ const startStream = async (
   }, streamTimeoutMs());
   stream.timers.add(overallTimer);
 
-  const toolKey = (id: string) => `${round}:${id}`;
+  const toolKeyFor = (tool: { id: string }) => toolKeys.get(tool) ?? `${round}:${tool.id}`;
 
   try {
     const state = await getAssistantState(userUuid);
@@ -707,12 +750,19 @@ const startStream = async (
       rejectInsufficientCredits();
       return;
     }
-    const hold = await holdCredits(userUuid, reservedCredits, undefined, {
-      referenceId: requestId,
-      reason: 'assistant_stream_reserve',
-    });
+    let hold: Awaited<ReturnType<typeof holdCredits>> | undefined;
+    beginHold();
+    try {
+      hold = await holdCredits(userUuid, reservedCredits, undefined, {
+        referenceId: requestId,
+        reason: 'assistant_stream_reserve',
+      });
+      if (hold?.changed) holdSucceeded = true;
+    } finally {
+      finishHold();
+    }
     // The settlement fallback is already installed; an early cancel during
-    // these awaits settles the hold exactly once.
+    // these awaits waits for the hold and then settles it exactly once.
     if (stream.cancelled) {
       await settleCredits();
       return;
@@ -721,7 +771,6 @@ const startStream = async (
       rejectInsufficientCredits();
       return;
     }
-    holdSucceeded = true;
     if (stream.cancelled) {
       await settleCredits();
       return;
@@ -737,12 +786,23 @@ const startStream = async (
       const balance = await getCreditBalanceFromUuid(userUuid);
       if (stream.cancelled) return false;
       if (!balance || balance.available < amount) return false;
-      const additional = await holdCredits(userUuid, amount, undefined, {
-        referenceId: requestId,
-        reason: 'assistant_stream_continuation',
-      });
-      reservedCredits += additional?.changed ? amount : 0;
-      return !stream.cancelled && Boolean(additional?.changed);
+      let changed = false;
+      beginHold();
+      try {
+        const additional = await holdCredits(userUuid, amount, undefined, {
+          referenceId: requestId,
+          reason: 'assistant_stream_continuation',
+        });
+        // Count the hold even when cancel arrived during the await, otherwise
+        // settlement could snapshot a total that excludes it.
+        if (additional?.changed) {
+          reservedCredits += amount;
+          changed = true;
+        }
+      } finally {
+        finishHold();
+      }
+      return !stream.cancelled && changed;
     };
 
     /** Serials are numeric and can look like phone numbers to PII redaction. */
@@ -854,13 +914,12 @@ const startStream = async (
     } catch (error) {
       if (stream.cancelled) return;
       log.warn({ error, userUuid, chatId, variant }, 'assistant model request failed');
-      send(ws, {
-        type: 'error',
-        requestId,
-        error: error instanceof Error && error.message.includes('GEMINI_API_KEY')
+      streamError(
+        error instanceof Error && error.message.includes('GEMINI_API_KEY')
           ? error.message
           : 'Model request failed',
-      });
+        'model_request',
+      );
       notifyFailure();
       return;
     }
@@ -874,7 +933,8 @@ const startStream = async (
     tokens = [];
 
     /** Accumulates a round's output and its projected cost for credit tracking. */
-    const addDraftToTotals = (draft: AssistantModelDraft) => {
+    const addDraftToTotals = (draft: AssistantModelDraft, draftRound = round) => {
+      for (const tool of draft.tools) toolKeys.set(tool, `${draftRound}:${tool.id}`);
       allThinking.push(...draft.thinking);
       allTools.push(...draft.tools);
       const usage = draft.usage ?? {
@@ -948,7 +1008,7 @@ const startStream = async (
       detail?: string,
       error?: string,
     ) => {
-      const key = toolKey(tool.id);
+      const key = toolKeyFor(tool);
       const signature = `${status}|${permission ?? ''}|${detail ?? ''}|${error ?? ''}`;
       if (toolSignatures.get(key) === signature) return;
       toolSignatures.set(key, signature);
@@ -1065,7 +1125,7 @@ const startStream = async (
         }
         pendingAudits.push(auditToolMutation(base, result, normalizedInput));
       }
-      toolResults.set(toolKey(base.id), result);
+      toolResults.set(toolKeyFor(base), result);
       send(ws, { type: 'tool_result', requestId, toolId: base.id, result });
       emitTool(
         base,
@@ -1130,7 +1190,7 @@ const startStream = async (
     ) => {
       if (stream.cancelled || pendingToolId !== base.id) return;
       pendingToolId = null;
-      permissionDecisions.set(toolKey(base.id), decision);
+      permissionDecisions.set(toolKeyFor(base), decision);
       if (decision === 'deny') {
         denyTool(base, 'denied');
         toolCursor += 1;
@@ -1190,8 +1250,8 @@ const startStream = async (
         if (pendingToolId !== null && base.id !== pendingToolId) return;
 
         if (forceDone) {
-          const decision = permissionDecisions.get(toolKey(base.id));
-          const result = toolResults.get(toolKey(base.id));
+          const decision = permissionDecisions.get(toolKeyFor(base));
+          const result = toolResults.get(toolKeyFor(base));
           if (decision === 'deny') {
             emitTool(base, 'denied', 'denied', 'Denied by you');
             return;
@@ -1216,8 +1276,8 @@ const startStream = async (
         }
 
         if (stageIndex < active) {
-          const decision = permissionDecisions.get(toolKey(base.id));
-          const result = toolResults.get(toolKey(base.id));
+          const decision = permissionDecisions.get(toolKeyFor(base));
+          const result = toolResults.get(toolKeyFor(base));
           const permission = decision
             ? decision === 'allow_always'
               ? 'allowed_always'
@@ -1237,12 +1297,20 @@ const startStream = async (
 
         if (stageIndex !== active || pendingToolId !== null) return;
 
-        if (needsPermission(base.name) && !permissionDecisions.has(toolKey(base.id))) {
+        if (needsPermission(base.name) && !permissionDecisions.has(toolKeyFor(base))) {
           emitTool(base, 'awaiting_permission', 'pending', 'Waiting for your approval');
           pendingToolId = base.id;
           void waitForPermission(base)
             .then((decision) => handlePermissionDecision(base, decision))
-            .catch(() => {});
+            .catch((error: unknown) => {
+              if (completed || stream.cancelled) return;
+              const orphaned =
+                error instanceof Error && error.message.includes('orphaned');
+              failStream(
+                orphaned ? 'Tool approval was interrupted' : 'Permission request timed out',
+                orphaned ? 'permission_interrupted' : 'permission_timeout',
+              );
+            });
           send(ws, {
             type: 'tool_permission_request',
             requestId,
@@ -1256,7 +1324,7 @@ const startStream = async (
           return;
         }
 
-        const decision = permissionDecisions.get(toolKey(base.id));
+        const decision = permissionDecisions.get(toolKeyFor(base));
         const permission =
           decision === 'allow_always'
             ? 'allowed_always'
@@ -1269,13 +1337,13 @@ const startStream = async (
       });
     };
 
-    const failStream = (error: string) => {
+    const failStream = (error: string, code = 'stream_failed') => {
       if (completed || stream.cancelled) return;
       stream.cancelled = true;
       detachStream(ws, requestId, stream);
       assistantStreamsTotal.labels(mode, variant, 'error').inc();
       void settleCredits().finally(() => {
-        send(ws, { type: 'error', requestId, error });
+        streamError(error, code);
         notifyFailure();
         resolveAsyncCompletion();
       });
@@ -1308,8 +1376,8 @@ const startStream = async (
       if (stream.cancelled) return;
 
       const finalTools: AssistantToolCall[] = allTools.map((base) => {
-        const decision = permissionDecisions.get(toolKey(base.id));
-        const result = toolResults.get(toolKey(base.id));
+        const decision = permissionDecisions.get(toolKeyFor(base));
+        const result = toolResults.get(toolKeyFor(base));
         const permission =
           decision === 'allow_always'
             ? ('allowed_always' as const)
@@ -1373,7 +1441,7 @@ const startStream = async (
       }
 
       if (settlementFailed) {
-        send(ws, { type: 'error', requestId, error: 'Failed to settle assistant credits' });
+        streamError('Failed to settle assistant credits', 'settlement');
         notifyFailure();
         resolveAsyncCompletion();
         return;
@@ -1412,6 +1480,7 @@ const startStream = async (
       if (stream.cancelled) return;
       currentDraft = withToolPreviews(nextDraft, [...knownSerials]);
       round = nextRound;
+      for (const tool of currentDraft.tools) toolKeys.set(tool, `${nextRound}:${tool.id}`);
       index = 0;
       toolCursor = 0;
       pendingToolId = null;
@@ -1430,7 +1499,7 @@ const startStream = async (
       emitThinking(true);
 
       const roundToolResults: AssistantModelToolResult[] = currentDraft.tools.flatMap((base) => {
-        const result = toolResults.get(toolKey(base.id));
+        const result = toolResults.get(toolKeyFor(base));
         if (!result) return [];
         return [redactToolContent(base, result)];
       });
@@ -1498,7 +1567,7 @@ const startStream = async (
       flushRawText(true);
       if (applyDraftSafety(nextDraft)) stopAfterRound = true;
 
-      addDraftToTotals(nextDraft);
+      addDraftToTotals(nextDraft, nextRound);
       if (projectedCost > reservedCredits && !(await holdMoreCredits(projectedCost - reservedCredits))) {
         if (!stream.cancelled) failStream('insufficient credits');
         return;
@@ -1546,10 +1615,10 @@ const startStream = async (
   } catch (error) {
     if (stream.cancelled) return;
     log.warn({ error, userUuid, requestId, chatId }, 'assistant stream preflight failed');
-    send(ws, { type: 'error', requestId, error: 'Assistant request failed' });
+    streamError('Assistant request failed', 'preflight');
     notifyFailure();
   } finally {
-    if (holdSucceeded && !settledCredits) {
+    if (holdSucceeded || pendingHolds > 0) {
       await settleCredits().catch((error: unknown) => {
         log.warn({ error, userUuid, requestId }, 'failed to release assistant credit hold');
       });

@@ -10,7 +10,7 @@ import {
   getAssistantInputBudget,
   getAssistantModel,
   getQueryBoostRequiredSteps,
-  MAX_STANDARD_QUERY_POINTS,
+  MAX_QUERY_POINTS_BY_TYPE,
   redactPII,
   validateQuery,
   type AssistantContextMessage,
@@ -441,8 +441,12 @@ export async function generateTqlQuery(
       feedback = emptyRangeFeedback(input);
       continue;
     }
-    if (plan.type === 'standard' && observedPoints > MAX_STANDARD_QUERY_POINTS) {
-      feedback = `The chosen range contains ${observedPoints.toLocaleString()} points, which requires Boost. Set Mode: boost or choose a narrower range.`;
+    const pointLimit = MAX_QUERY_POINTS_BY_TYPE[plan.type];
+    if (observedPoints > pointLimit) {
+      feedback =
+        plan.type === 'standard'
+          ? `The chosen range contains ${observedPoints.toLocaleString()} points, which requires Boost. Set Mode: boost or choose a narrower range.`
+          : `The chosen range contains ${observedPoints.toLocaleString()} points, which exceeds the Boost limit of ${pointLimit.toLocaleString()}. Choose a narrower range.`;
       continue;
     }
     if (plan.type === 'standard' && getQueryBoostRequiredSteps(formatted).length > 0) {

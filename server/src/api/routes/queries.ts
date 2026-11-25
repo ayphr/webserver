@@ -26,6 +26,7 @@ import {
 import { loadQueryAuthorDeviceData } from '../../lib/queryAuthorData';
 import { json, readJsonBody } from '../../lib/http';
 import { createLogger } from '../../lib/logger';
+import { assistantRateLimitedTotal } from '../../lib/metrics';
 import { createRateLimiter, tooManyRequests } from '../../lib/rateLimit';
 import { requireAuth } from '../auth';
 
@@ -92,7 +93,10 @@ export function parseQueryAssistBody(body: unknown): { request: QueryAssistReque
 
 export const handleQueryAssist = requireAuth(async (request, user: User) => {
   const limit = await queryAssistLimiter.check(`user:${user.uuid}`);
-  if (!limit.allowed) return tooManyRequests(limit.retryAfterMs);
+  if (!limit.allowed) {
+    assistantRateLimitedTotal.labels('query-assist').inc();
+    return tooManyRequests(limit.retryAfterMs);
+  }
 
   const body = await readJsonBody<unknown>(request);
   const parsed = parseQueryAssistBody(body);
@@ -215,13 +219,15 @@ export const handleQueryAssist = requireAuth(async (request, user: User) => {
       { reason: 'query_assist_charge', referenceId },
       now,
     );
-    if (settled < 0) {
-      log.error({ userUuid: user.uuid, referenceId }, 'query assist credit settlement failed');
-      await releaseHold();
-      return json({ error: 'Iris could not complete the request. Try again.' }, 500);
-    }
+    // settleCreditHold always releases the hold before attempting the charge,
+    // even when it returns -1. Clearing here prevents a second release from
+    // consuming another request's hold.
     holdPlaced = false;
     heldCredits = 0;
+    if (settled < 0) {
+      log.error({ userUuid: user.uuid, referenceId }, 'query assist credit settlement failed');
+      return json({ error: 'Iris could not complete the request. Try again.' }, 500);
+    }
 
     return json({
       query: result.query,

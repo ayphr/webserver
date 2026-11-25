@@ -453,27 +453,8 @@
       }
     },
     {
-      "type": "text",
-      "title": "Dashboard notes",
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 0,
-        "y": 27
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "The following counters are declared by the server but are not incremented by any call site yet, so their panels are hidden: `ayphr_assistant_feedback_total`, `ayphr_assistant_stream_errors_total`, `ayphr_assistant_rate_limited_total`, `ayphr_assistant_resume_total`. Re-enable the panels once the assistant call sites emit these events."
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      }
-    },
-    {
       "type": "timeseries",
-      "title": "Errors and rate limits (uninstrumented — hidden)",
-      "hide": true,
+      "title": "Errors and rate limits",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -543,6 +524,80 @@
         "w": 12,
         "x": 0,
         "y": 27
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Feedback and context resumes",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (feedback) (rate(ayphr_assistant_feedback_total[$__rate_interval]))",
+          "legendFormat": "feedback {{feedback}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (result) (rate(ayphr_assistant_resume_total[$__rate_interval]))",
+          "legendFormat": "resume {{result}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
       }
     },
     {
