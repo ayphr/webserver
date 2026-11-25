@@ -5,7 +5,9 @@ import {
   acceptTeamInvite,
   buildInviteClaimFilter,
   claimTeamInvite,
+  type InviteCollection,
   type InviteServiceDeps,
+  type TeamSeatReservationCollection,
 } from './teamInviteService';
 
 const NOW = Date.now();
@@ -43,20 +45,30 @@ const manager = makeUser({ uuid: 'manager-1', username: 'manager' });
 function fakeInvites(initial: TeamInvite = makeInvite()) {
   const state = new Map<string, TeamInvite>([[initial.id, initial]]);
   const collection = {
-    findOneAndUpdate: async (filter: Record<string, any>, update: Record<string, any>) => {
-      const current = state.get(filter.id);
-      if (!current || current.acceptedAt || filter.email !== current.email) return null;
-      if (current.expiresAt.getTime() <= filter.expiresAt.$gt.getTime()) return null;
-      const next = { ...current, ...update.$set } as TeamInvite;
-      state.set(filter.id, next);
+    findOneAndUpdate: async (
+      filter: Parameters<InviteCollection['findOneAndUpdate']>[0],
+      update: Parameters<InviteCollection['findOneAndUpdate']>[1],
+    ) => {
+      const id = filter.id as string;
+      const expiry = filter.expiresAt as { $gt: Date } | undefined;
+      const current = state.get(id);
+      if (!current || current.acceptedAt || filter.email !== current.email || !expiry) return null;
+      if (current.expiresAt.getTime() <= expiry.$gt.getTime()) return null;
+      const next = { ...current, ...(update.$set as Partial<TeamInvite>) } as TeamInvite;
+      state.set(id, next);
       return next;
     },
-    updateOne: async (filter: Record<string, any>, update: Record<string, any>) => {
-      const current = state.get(filter.id);
+    updateOne: async (
+      filter: Parameters<InviteCollection['updateOne']>[0],
+      update: Parameters<InviteCollection['updateOne']>[1],
+    ) => {
+      const id = filter.id as string;
+      const current = state.get(id);
       if (!current || current.acceptedByUuid !== filter.acceptedByUuid) return { modifiedCount: 0 };
-      const next = { ...current } as Record<string, unknown>;
-      for (const key of Object.keys(update.$unset ?? {})) delete next[key];
-      state.set(filter.id, next as TeamInvite);
+      const next: Record<string, unknown> = { ...current };
+      const unset = (update.$unset as Record<string, unknown> | undefined) ?? {};
+      for (const key of Object.keys(unset)) delete next[key];
+      state.set(id, next as TeamInvite);
       return { modifiedCount: 1 };
     },
   };
@@ -66,14 +78,24 @@ function fakeInvites(initial: TeamInvite = makeInvite()) {
 function fakeTeams() {
   let pending = 0;
   const collection = {
-    findOneAndUpdate: async (filter: Record<string, any>, update: Record<string, any>) => {
-      const available = filter.$expr.$lt[1] as number;
+    findOneAndUpdate: async (
+      filter: Parameters<TeamSeatReservationCollection['findOneAndUpdate']>[0],
+      update: Parameters<TeamSeatReservationCollection['findOneAndUpdate']>[1],
+    ) => {
+      const expr = filter.$expr as { $lt: [unknown, number] } | undefined;
+      const available = expr?.$lt[1];
+      if (available === undefined) throw new Error('seat-limit cutoff is missing from the filter');
       if (pending >= available) return null;
-      pending += update.$inc.pendingSeatClaims as number;
+      const increments = update.$inc as Record<string, number> | undefined;
+      pending += increments?.pendingSeatClaims ?? 0;
       return { id: 'team-1', pendingSeatClaims: pending };
     },
-    updateOne: async (_filter: Record<string, unknown>, update: Record<string, any>) => {
-      pending += update.$inc.pendingSeatClaims as number;
+    updateOne: async (
+      _filter: Parameters<TeamSeatReservationCollection['updateOne']>[0],
+      update: Parameters<TeamSeatReservationCollection['updateOne']>[1],
+    ) => {
+      const increments = update.$inc as Record<string, number> | undefined;
+      pending += increments?.pendingSeatClaims ?? 0;
       return { modifiedCount: 1 };
     },
   };

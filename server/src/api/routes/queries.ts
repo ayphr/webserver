@@ -104,7 +104,7 @@ export const handleQueryAssist = requireAuth(async (request, user: User) => {
 
   const referenceId = randomUUID();
   const now = new Date();
-  let reservedCredits = 0;
+  let reservedCredits: number;
   let heldCredits = 0;
   let holdPlaced = false;
 

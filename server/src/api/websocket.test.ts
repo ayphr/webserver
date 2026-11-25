@@ -1,15 +1,34 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import type { ServerWebSocket } from 'bun';
+import type {
+  AssistantState,
+  AssistantStreamServerMessage,
+  AssistantToolResult,
+  TeamAuditLog,
+} from '@common';
 import type { AssistantModelDraft, AssistantModelRequest, AssistantModelStreamHandlers } from '../lib/assistantModel';
-import type { AssistantState, AssistantToolResult } from '@common';
+import type { StreamResultRecord } from '../lib/db/internal';
+import type { CreateNotificationInput } from '../lib/db/notifications';
+import type { AssistantSocketData } from './websocket';
 
-type Sent = Record<string, any>;
+type Sent = AssistantStreamServerMessage;
+type Settlement = { held: number; cost: number; options: Record<string, unknown> };
+type TestAuditEntry = Omit<TeamAuditLog, 'id' | 'createdAt'> & {
+  details?: { input?: Record<string, unknown> };
+};
+type TestSocket = {
+  data: AssistantSocketData;
+  readyState: number;
+  send: (raw: string) => void;
+  close: (code?: number, reason?: string) => void;
+};
 
 const sent: Sent[] = [];
-const savedResults: Record<string, any>[] = [];
+const savedResults: StreamResultRecord[] = [];
 const holds: number[] = [];
-const settlements: Record<string, any>[] = [];
-const notifications: Record<string, any>[] = [];
-const auditEntries: Record<string, any>[] = [];
+const settlements: Settlement[] = [];
+const notifications: CreateNotificationInput[] = [];
+const auditEntries: TestAuditEntry[] = [];
 let nextDraft: (request: AssistantModelRequest, round: number) => AssistantModelDraft;
 let toolExecutor: (
   name: string,
@@ -66,7 +85,7 @@ mock.module('../lib/db/assistant', () => ({
     if (stateShouldThrow) throw new Error('database unavailable');
     return assistantState;
   },
-  saveStreamResult: async (_userUuid: string, record: Record<string, any>) => {
+  saveStreamResult: async (_userUuid: string, record: StreamResultRecord) => {
     savedResults.push(record);
   },
   updateAssistantChatContext: async () => {},
@@ -83,14 +102,14 @@ mock.module('../lib/credits', () => ({
     _userUuid: string,
     held: number,
     cost: number,
-    options: Record<string, any>,
+    options: Record<string, unknown>,
   ) => {
     settlements.push({ held, cost, options });
     return cost;
   },
 }));
 mock.module('../lib/notifications', () => ({
-  notifyUser: async (entry: Record<string, any>) => {
+  notifyUser: async (entry: CreateNotificationInput) => {
     notifications.push(entry);
   },
 }));
@@ -106,7 +125,7 @@ mock.module('../lib/db/teams', () => ({
   getTeamForUser: async () => ({ id: 'team-1' }),
 }));
 mock.module('../lib/teamAuditService', () => ({
-  logTeamAudit: async (entry: Record<string, any>) => {
+  logTeamAudit: async (entry: TestAuditEntry) => {
     auditEntries.push(entry);
     return { ...entry, id: 'audit-1', createdAt: new Date() };
   },
@@ -123,7 +142,7 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 3000) => {
 };
 
 const createSocket = () => {
-  const socket: Record<string, any> = {
+  const socket: TestSocket = {
     data: { userUuid: null },
     readyState: 1,
     send: (raw: string) => {
@@ -133,10 +152,16 @@ const createSocket = () => {
       socket.readyState = 3;
     },
   };
-  return socket as any;
+  return socket as unknown as ServerWebSocket<AssistantSocketData>;
 };
 
-const messagesOf = (type: string) => sent.filter((message) => message.type === type);
+const messagesOf = <T extends Sent['type']>(type: T) =>
+  sent.filter((message): message is Extract<Sent, { type: T }> => message.type === type);
+
+const persistedAssistant = (record: StreamResultRecord | undefined) => {
+  if (!record?.assistantMessage) throw new Error('assistant result was not persisted');
+  return record.assistantMessage;
+};
 
 const authedSocket = async () => {
   const ws = createSocket();
@@ -234,13 +259,13 @@ describe('assistant websocket streaming', () => {
     expect(seenDeltas.flat()).toEqual(['Hello f', 'rom Iris']);
     const tokens = messagesOf('token');
     expect(tokens.map((message) => message.token).join('')).toBe('Hello from Iris');
-    expect(tokens.map((message) => message.index)).toEqual([0, 1, 2, 3, 4]);
+    expect(tokens.map((message) => message.index ?? null)).toEqual([0, 1, 2, 3, 4]);
     expect(messagesOf('error')).toHaveLength(0);
     const done = messagesOf('done')[0]!;
     expect(done.durationMs).toBeGreaterThan(0);
     expect(done.creditCost).toBeGreaterThan(0);
     expect(settlements).toHaveLength(1);
-    expect(settlements[0]!.held).toBe(holds[0]);
+    expect(settlements[0]!.held).toBe(holds[0]!);
   });
 
   it('keeps a whitespace-only live chunk so words cannot join', async () => {
@@ -412,12 +437,13 @@ describe('assistant websocket streaming', () => {
     await waitFor(() => messagesOf('done').length === 1);
 
     expect(auditEntries).toHaveLength(1);
-    expect(auditEntries[0]!.details.input).toMatchObject({
+    const auditInput = auditEntries[0]?.details?.input;
+    expect(auditInput).toMatchObject({
       name: 'alerts.create',
       displayName: 'CPU spike',
       conditions: [{ metric: 'temperature', operator: 'gt', value: 80 }],
     });
-    expect(auditEntries[0]!.details.input.unexpected).toBeUndefined();
+    expect(auditInput?.unexpected).toBeUndefined();
   });
 
   it('scopes tool approvals to the socket that requested them', async () => {
@@ -496,10 +522,10 @@ describe('assistant websocket streaming', () => {
     expect(settlements).toHaveLength(0);
     expect(messagesOf('done')[0]!.creditCost).toBe(0);
     expect(messagesOf('token').map((message) => message.token).join('')).toContain('988');
-    const persisted = savedResults.find((result) => result.assistantMessage);
-    expect(persisted!.assistantMessage.safetyNotice).toBe('crisis');
-    expect(persisted!.assistantMessage.content).toContain('988');
-    expect(persisted!.assistantMessage.creditCost).toBe(0);
+    const assistant = persistedAssistant(savedResults.find((result) => result.assistantMessage));
+    expect(assistant.safetyNotice).toBe('crisis');
+    expect(assistant.content).toContain('988');
+    expect(assistant.creditCost).toBe(0);
   });
 
   it('classifies suicidal intent with violence as a crisis, not a refusal', async () => {
@@ -550,8 +576,8 @@ describe('assistant websocket streaming', () => {
     await waitFor(() => messagesOf('done').length === 1);
 
     expect(messagesOf('safety')[0]?.notice).toBe('crisis');
-    const persisted = savedResults.find((result) => result.assistantMessage);
-    expect(persisted!.assistantMessage.content).not.toContain('kill myself');
+    const assistant = persistedAssistant(savedResults.find((result) => result.assistantMessage));
+    expect(assistant.content).not.toContain('kill myself');
   });
 
   it('does not mark unexecuted tools as done on completion', async () => {
@@ -716,7 +742,7 @@ describe('assistant websocket streaming', () => {
     await Bun.sleep(30);
 
     expect(settlements).toHaveLength(1);
-    expect(settlements[0]!.held).toBe(holds[0]);
+    expect(settlements[0]!.held).toBe(holds[0]!);
     expect(settlements[0]!.cost).toBeGreaterThan(0);
   });
 
@@ -777,8 +803,8 @@ describe('assistant websocket streaming', () => {
     );
     await waitFor(() => messagesOf('done').length === 1);
 
-    const persisted = savedResults.filter((result) => result.assistantMessage).at(-1);
-    expect(persisted?.assistantMessage.tools).toMatchObject([
+    const assistant = persistedAssistant(savedResults.filter((result) => result.assistantMessage).at(-1));
+    expect(assistant.tools).toMatchObject([
       { id: 'call-round', status: 'done', detail: 'Found 0 devices' },
     ]);
   });
@@ -799,12 +825,12 @@ describe('assistant websocket streaming', () => {
     );
     await waitFor(() => messagesOf('tool_permission_request').length === 1);
 
-    assistantWebSocket.close!(ws);
+    assistantWebSocket.close!(ws, 1000, 'test complete');
     await waitFor(() => settlements.length === 1);
     await Bun.sleep(20);
 
     expect(settlements).toHaveLength(1);
-    expect(settlements[0]!.held).toBe(holds[0]);
+    expect(settlements[0]!.held).toBe(holds[0]!);
   });
 
   it('upgrades a live safety card when the full draft finds a higher-priority notice', async () => {
@@ -826,7 +852,7 @@ describe('assistant websocket streaming', () => {
     await waitFor(() => messagesOf('done').length === 1);
 
     expect(messagesOf('safety').map((message) => message.notice)).toEqual(['refusal', 'crisis']);
-    const persisted = savedResults.filter((result) => result.assistantMessage).at(-1);
-    expect(persisted?.assistantMessage.safetyNotice).toBe('crisis');
+    const assistant = persistedAssistant(savedResults.filter((result) => result.assistantMessage).at(-1));
+    expect(assistant.safetyNotice).toBe('crisis');
   });
 });

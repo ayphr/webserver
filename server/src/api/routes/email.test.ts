@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { User } from '@common';
-import { confirmEmailChange, type EmailConfirmDeps } from './email';
+import { confirmEmailChange, type EmailConfirmDeps, type UserUpdateCollection } from './email';
 
 function user(overrides: Partial<User> = {}): User {
   return {
@@ -17,15 +17,15 @@ function user(overrides: Partial<User> = {}): User {
 
 function makeDeps(options: {
   existing?: User | null;
-  update?: (...args: any[]) => Promise<User | null>;
+  update?: UserUpdateCollection['findOneAndUpdate'];
   invalidateUser?: () => Promise<void>;
   invalidateAuth?: () => Promise<void>;
 } = {}) {
   let calls = 0;
   const collection = {
-    findOneAndUpdate: options.update ?? (async (_filter: unknown, update: Record<string, any>) => {
+    findOneAndUpdate: options.update ?? (async (_filter: unknown, update: Record<string, unknown>) => {
       calls += 1;
-      return { ...user(), ...update.$set } as User;
+      return { ...user(), ...(update.$set as Record<string, unknown>) } as User;
     }),
   };
   const result: EmailConfirmDeps = {

@@ -11,10 +11,11 @@ const base = {
   amount: 10,
 };
 
-const creditsOf = (plan: ReturnType<typeof buildCreditMutation>) =>
-  (plan.update[0] as any).$set.credits;
-const guardOf = (plan: ReturnType<typeof buildCreditMutation>) =>
-  (plan.filter as any).$expr;
+const creditsOf = (plan: ReturnType<typeof buildCreditMutation>) => {
+  const set = plan.update[0]?.$set as Record<string, unknown> | undefined;
+  return set?.credits as Record<string, unknown> | undefined;
+};
+const guardOf = (plan: ReturnType<typeof buildCreditMutation>) => plan.filter.$expr;
 
 describe('atomic credit mutation', () => {
   it('derives the same Sydney month key used by the balance resolver', () => {
@@ -39,6 +40,7 @@ describe('atomic credit mutation', () => {
   it('splits a charge between monthly allowance and additional credits', () => {
     const plan = buildCreditMutation('charge', base);
     const stored = creditsOf(plan);
+    if (!stored) throw new Error('credit mutation did not produce a $set.credits pipeline');
     expect(JSON.stringify(stored.monthlyUsed)).toContain('$min');
     expect(JSON.stringify(stored.additional)).toContain('$subtract');
   });

@@ -1359,7 +1359,7 @@ const startStream = async (
 
       const durationMs = Math.max(1, Date.now() - startedAt);
       let creditCost = 0;
-      let settlementFailed = false;
+      let settlementFailed: boolean;
       try {
         const settled = await settleCredits();
         settlementFailed = settled < 0;

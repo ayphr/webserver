@@ -33,7 +33,7 @@ export class InviteAcceptanceError extends Error {
   }
 }
 
-type InviteCollection = {
+export type InviteCollection = {
   findOneAndUpdate(
     filter: Record<string, unknown>,
     update: Record<string, unknown>,
@@ -42,7 +42,7 @@ type InviteCollection = {
   updateOne(filter: Record<string, unknown>, update: Record<string, unknown>): Promise<unknown>;
 };
 
-type TeamSeatReservationCollection = {
+export type TeamSeatReservationCollection = {
   findOneAndUpdate(
     filter: Record<string, unknown>,
     update: Record<string, unknown>,
@@ -219,11 +219,11 @@ export async function acceptTeamInvite(params: {
   if (!claimed) throw new InviteAcceptanceError('already_used');
 
   let seatReserved = false;
-  let acceptedTeam: Team | null = null;
+  let acceptedTeam: Team;
   try {
     const team = await deps.getTeamById(invite.teamId);
-    acceptedTeam = team;
     if (!team) throw new InviteAcceptanceError('team_not_found');
+    acceptedTeam = team;
     const manager = await deps.getUserFromUuid(team.managerUuid);
     if (!manager) throw new InviteAcceptanceError('team_not_found');
 
@@ -268,7 +268,7 @@ export async function acceptTeamInvite(params: {
       details: { email: invite.email, role: invite.role },
     });
 
-    if (acceptedTeam && acceptedTeam.managerUuid !== user.uuid) {
+    if (acceptedTeam.managerUuid !== user.uuid) {
       await deps.notify({
         userUuid: acceptedTeam.managerUuid,
         type: 'team',

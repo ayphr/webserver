@@ -266,7 +266,7 @@ const handleEmailChangeRequest = requireAuth(async (request, user) => {
   }
 }, { allowSuspended: true, allowPolicyPending: true, allowEmailMissing: true });
 
-type UserUpdateCollection = {
+export type UserUpdateCollection = {
   findOneAndUpdate(
     filter: Record<string, unknown>,
     update: Record<string, unknown>,

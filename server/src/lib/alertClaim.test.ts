@@ -34,15 +34,20 @@ function fakeAlerts(initial: DeviceAlert) {
   let stored: DeviceAlert = { ...initial };
   const calls: Array<Record<string, unknown>> = [];
   const collection = {
-    findOneAndUpdate: async (filter: Record<string, any>, update: Record<string, any>) => {
+    findOneAndUpdate: async (
+      filter: Parameters<AlertNotificationCollection['findOneAndUpdate']>[0],
+      update: Parameters<AlertNotificationCollection['findOneAndUpdate']>[1],
+    ) => {
       calls.push(filter);
-      const repeatCutoff = filter.$or[3].lastNotifiedAt.$lte as Date;
+      const conditions = filter.$or as Array<{ lastNotifiedAt?: { $lte?: Date } }> | undefined;
+      const repeatCutoff = conditions?.[3]?.lastNotifiedAt?.$lte;
+      if (!repeatCutoff) throw new Error('repeat-window cutoff is missing from the claim filter');
       const eligible = stored.enabled
         && (stored.firing !== true
           || !stored.lastNotifiedAt
           || stored.lastNotifiedAt.getTime() <= repeatCutoff.getTime());
       if (!eligible) return null;
-      stored = { ...stored, ...update.$set } as DeviceAlert;
+      stored = { ...stored, ...(update.$set as Partial<DeviceAlert>) };
       return stored;
     },
   } as unknown as AlertNotificationCollection;
