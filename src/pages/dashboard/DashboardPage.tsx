@@ -78,7 +78,7 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
     return () => clearInterval(interval);
   }, [endsAt, isPermanent]);
 
-  return <span className="dashboard-page__countdown">{timeLeft}</span>;
+  return <span className="dashboard-page__countdown" aria-live="polite" aria-atomic="true">{timeLeft}</span>;
 }
 
 function getStoredDefaultTab(): DashboardTab {
