@@ -11,12 +11,13 @@ body:has(.landing-page),
 .landing-page {
   --lp-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --lp-primary-hover: color-mix(in srgb, var(--text-primary) 88%, var(--bg-base));
-  --lp-container: 1440px;
+  --lp-container: 1200px;
 
   height: 100dvh;
   min-height: 0;
   width: 100%;
-  overflow: hidden;
+  max-width: var(--lp-container);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-base);
@@ -249,8 +250,10 @@ body:has(.landing-page),
     bottom: auto;
     left: auto;
     flex: none;
-    width: 100%;
+    align-self: stretch;
+    width: 100vw;
     height: 260px;
+    margin-left: calc(50% - 50vw);
     opacity: 1;
     mask-image: linear-gradient(180deg, #000 0%, #000 60%, transparent 100%);
   }
