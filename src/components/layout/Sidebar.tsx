@@ -176,7 +176,7 @@ export const Sidebar: React.FC<Props> = ({
               aria-current={activeTab !== 'appeal' ? 'page' : undefined}
               {...tooltipHandlers('Suspension')}
             >
-              <span className="n-sidebar__icon">{iconFor('suspension')}</span>
+              <span className="n-sidebar__icon" aria-hidden="true">{iconFor('suspension')}</span>
               <span className="n-sidebar__label">Suspension</span>
             </button>
             <button
@@ -187,7 +187,7 @@ export const Sidebar: React.FC<Props> = ({
               aria-current={activeTab === 'appeal' ? 'page' : undefined}
               {...tooltipHandlers('Appeal')}
             >
-              <span className="n-sidebar__icon">{iconFor('appeal')}</span>
+              <span className="n-sidebar__icon" aria-hidden="true">{iconFor('appeal')}</span>
               <span className="n-sidebar__label">Appeal</span>
             </button>
           </>
@@ -202,7 +202,7 @@ export const Sidebar: React.FC<Props> = ({
               aria-current={activeTab === t.id ? 'page' : undefined}
               {...tooltipHandlers(t.name)}
             >
-              <span className="n-sidebar__icon">{iconFor(t.id)}</span>
+              <span className="n-sidebar__icon" aria-hidden="true">{iconFor(t.id)}</span>
               <span className="n-sidebar__label">{t.name}</span>
             </button>
           ))
@@ -219,7 +219,7 @@ export const Sidebar: React.FC<Props> = ({
         aria-current={activeTab === 'credits' ? 'page' : undefined}
         {...tooltipHandlers(credits ? `${formatCredits(credits.available)} credits available` : 'Credits')}
       >
-        <span className="n-sidebar__creditsIcon"><IconCoin size={18} strokeWidth={1.5} /></span>
+        <span className="n-sidebar__creditsIcon" aria-hidden="true"><IconCoin size={18} strokeWidth={1.5} /></span>
         <span className="n-sidebar__creditsAmount">{credits ? formatCredits(credits.available) : '—'}</span>
         <span className="n-sidebar__creditsLabel">credits</span>
       </button>
@@ -234,7 +234,7 @@ export const Sidebar: React.FC<Props> = ({
             aria-current={activeTab === 'profile' ? 'page' : undefined}
             {...tooltipHandlers('Profile')}
           >
-            <span className="n-sidebar__menuIcon"><IconUser size={16} strokeWidth={1.5} /></span>
+            <span className="n-sidebar__menuIcon" aria-hidden="true"><IconUser size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Profile</span>
           </button>
           <button
@@ -245,7 +245,7 @@ export const Sidebar: React.FC<Props> = ({
             aria-current={activeTab === 'settings' || activeTab === 'account-settings' ? 'page' : undefined}
             {...tooltipHandlers('Settings')}
           >
-            <span className="n-sidebar__menuIcon"><IconSettings size={16} strokeWidth={1.5} /></span>
+            <span className="n-sidebar__menuIcon" aria-hidden="true"><IconSettings size={16} strokeWidth={1.5} /></span>
             <span className="n-sidebar__menuLabel">Settings</span>
           </button>
           <button
@@ -256,7 +256,7 @@ export const Sidebar: React.FC<Props> = ({
             aria-current={activeTab === 'notifications' ? 'page' : undefined}
             {...tooltipHandlers(notificationsLabel)}
           >
-            <span className="n-sidebar__menuIcon">
+            <span className="n-sidebar__menuIcon" aria-hidden="true">
               <IconBell size={16} strokeWidth={1.5} />
               {unreadNotifications > 0 && <span className="n-sidebar__unreadDot" aria-hidden="true" />}
             </span>
