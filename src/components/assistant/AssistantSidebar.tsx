@@ -149,15 +149,15 @@ const resolveDropRowId = (event: DragOverEvent | DragEndEvent) => {
 const chatIcon = (chat: AssistantChat, isActive: boolean) => {
   if (chat.mode === 'task') {
     return isActive ? (
-      <IconClipboardListFilled size={15} strokeWidth={1.75} />
+      <IconClipboardListFilled aria-hidden="true" size={15} strokeWidth={1.75} />
     ) : (
-      <IconClipboardList size={15} strokeWidth={1.75} />
+      <IconClipboardList aria-hidden="true" size={15} strokeWidth={1.75} />
     );
   }
   return isActive ? (
-    <IconMessageCircleFilled size={15} strokeWidth={1.75} />
+    <IconMessageCircleFilled aria-hidden="true" size={15} strokeWidth={1.75} />
   ) : (
-    <IconMessageCircle size={15} strokeWidth={1.75} />
+    <IconMessageCircle aria-hidden="true" size={15} strokeWidth={1.75} />
   );
 };
 
@@ -205,7 +205,7 @@ const SortableRow = ({
           {...attributes}
           {...listeners}
         >
-          <IconGripVertical size={14} strokeWidth={1.75} />
+          <IconGripVertical aria-hidden="true" size={14} strokeWidth={1.75} />
         </SidebarDragHandle>
       }
     />
@@ -260,7 +260,7 @@ const SortableFolderSection = ({
             {...attributes}
             {...listeners}
           >
-            <IconGripVertical size={14} strokeWidth={1.75} />
+            <IconGripVertical aria-hidden="true" size={14} strokeWidth={1.75} />
           </SidebarDragHandle>
         }
       />
@@ -625,7 +625,7 @@ export const AssistantSidebar = ({
               confirmDelete(kind, id);
             }}
           >
-            <IconCheck size={14} strokeWidth={2} />
+            <IconCheck aria-hidden="true" size={14} strokeWidth={2} />
           </SidebarAction>
           <SidebarAction
             prefix={PREFIX}
@@ -635,7 +635,7 @@ export const AssistantSidebar = ({
               cancelDelete(kind, id);
             }}
           >
-            <IconX size={14} strokeWidth={2} />
+            <IconX aria-hidden="true" size={14} strokeWidth={2} />
           </SidebarAction>
         </>
       );
@@ -651,7 +651,7 @@ export const AssistantSidebar = ({
             startEditing(kind, id, name);
           }}
         >
-          <IconPencil size={14} strokeWidth={1.75} />
+          <IconPencil aria-hidden="true" size={14} strokeWidth={1.75} />
         </SidebarAction>
         <SidebarAction
           prefix={PREFIX}
@@ -662,7 +662,7 @@ export const AssistantSidebar = ({
             setDeleteState({ kind, id });
           }}
         >
-          <IconTrash size={14} strokeWidth={1.75} />
+          <IconTrash aria-hidden="true" size={14} strokeWidth={1.75} />
         </SidebarAction>
       </>
     );
@@ -731,7 +731,7 @@ export const AssistantSidebar = ({
           kind: 'folder',
           id: folder.id,
           label: folder.name,
-          icon: <IconFolderOpen size={16} strokeWidth={1.75} />,
+          icon: <IconFolderOpen aria-hidden="true" size={16} strokeWidth={1.75} />,
         });
       }
     }
@@ -803,7 +803,7 @@ export const AssistantSidebar = ({
         <div className="sidebar-list__row assistant-sidebar__search">
           <div className="sidebar-list__main assistant-sidebar__search-main">
             <span className="sidebar-list__icon assistant-sidebar__search-icon" aria-hidden="true">
-              <IconSearch size={16} strokeWidth={1.75} />
+              <IconSearch aria-hidden="true" size={16} strokeWidth={1.75} />
             </span>
             <input
               id="assistant-sidebar-search-input"
@@ -829,7 +829,7 @@ export const AssistantSidebar = ({
                 aria-label="Clear search"
                 onClick={clearSearch}
               >
-                <IconX size={14} strokeWidth={1.75} />
+                <IconX aria-hidden="true" size={14} strokeWidth={1.75} />
               </button>
             )}
           </div>
@@ -845,7 +845,7 @@ export const AssistantSidebar = ({
         onDragCancel={handleDragCancel}
       >
         <Row
-          icon={<IconPlus size={16} strokeWidth={2} />}
+          icon={<IconPlus aria-hidden="true" size={16} strokeWidth={2} />}
           active={isAssistantView && activeChatId === null}
           onClick={onNewChat}
           {...rowCommonProps(NEW_CHAT_ROW, 'New chat')}
@@ -858,7 +858,7 @@ export const AssistantSidebar = ({
         {showUncategorised && (
           <UncategorisedRow
             {...rowCommonProps(groupRowId(UNCATEGORISED_KEY), 'Uncategorised')}
-            icon={<IconFolders size={16} strokeWidth={1.75} />}
+            icon={<IconFolders aria-hidden="true" size={16} strokeWidth={1.75} />}
             onClick={() => toggleExpanded(UNCATEGORISED_KEY)}
             ariaExpanded={uncategorisedChats.length > 0 ? isGroupExpanded(UNCATEGORISED_KEY) : undefined}
             isDropTarget={dragState?.kind === 'chat' && dropTargetKey === UNCATEGORISED_KEY}
@@ -890,9 +890,9 @@ export const AssistantSidebar = ({
                 disabled={isSearching}
                 icon={
                   isExpanded ? (
-                    <IconFolderOpen size={16} strokeWidth={1.75} />
+                    <IconFolderOpen aria-hidden="true" size={16} strokeWidth={1.75} />
                   ) : (
-                    <IconFolder size={16} strokeWidth={1.75} />
+                    <IconFolder aria-hidden="true" size={16} strokeWidth={1.75} />
                   )
                 }
                 onClick={() => toggleExpanded(folder.id)}
