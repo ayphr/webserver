@@ -625,7 +625,7 @@
 }
 
 .assistant-markdown pre .hljs-strong {
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .assistant-markdown pre .hljs-link {

@@ -35,7 +35,7 @@
     margin: 0;
     color: var(--text-muted);
     font-size: 0.95rem;
-    font-weight: 400;
+    font-weight: var(--font-weight-li);
   }
 }
 
@@ -120,7 +120,7 @@
 
 .auth-form__submit {
   margin-top: 0.5rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   padding: 0.65rem 1rem;
   font-size: 0.95rem;
 }
@@ -203,7 +203,7 @@
 
 .auth-accounts__title {
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   margin-bottom: 0.5rem;
 }
 
@@ -320,7 +320,7 @@
 
 .auth-form__code-hint strong {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   word-break: break-all;
 }
 

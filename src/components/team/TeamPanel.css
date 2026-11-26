@@ -387,7 +387,7 @@
 .team-panel__plan-price span {
   color: var(--text-muted);
   font-size: 0.8rem;
-  font-weight: 400;
+  font-weight: var(--font-weight-li);
 }
 
 .team-panel__plan-features {

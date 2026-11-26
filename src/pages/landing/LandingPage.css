@@ -684,7 +684,7 @@ body:has(.landing-page),
 .landing-preview__device-place {
   font-size: 12px;
   line-height: 16px;
-  font-weight: 400;
+  font-weight: var(--font-weight-li);
   color: var(--text-dim);
 }
 .landing-preview__device-reading {

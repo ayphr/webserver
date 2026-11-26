@@ -59,7 +59,7 @@
 .button--danger {
   background-color: var(--accent-red);
   color: var(--bg-base);
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 
   &:hover:not(:disabled) {
     background-color: var(--status-error);

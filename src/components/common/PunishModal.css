@@ -13,7 +13,7 @@
 .punish-modal__label {
   color: var(--text-primary);
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .punish-modal__hint {

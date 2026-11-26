@@ -66,13 +66,13 @@
 }
 
 .tokens-tab__title {
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   color: var(--text-primary);
 }
 
 .tokens-tab__badge {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   border: 1px solid transparent;

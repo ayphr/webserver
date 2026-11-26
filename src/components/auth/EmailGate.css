@@ -48,7 +48,7 @@
 
 .email-gate__hint strong {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   word-break: break-all;
 }
 

@@ -16,7 +16,7 @@
 .modal-form__label {
   color: var(--text-primary);
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .modal-form__input {
@@ -84,7 +84,7 @@
 
 .modal-form__hint strong {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   word-break: break-all;
 }
 

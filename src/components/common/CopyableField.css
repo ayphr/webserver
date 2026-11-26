@@ -5,7 +5,7 @@
 .copyable-field__label {
   display: block;
   margin-bottom: 0.25rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .copyable-field__control {

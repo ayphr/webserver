@@ -157,7 +157,7 @@
 
 .locations__stat-value {
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .locations__device-list {
@@ -261,7 +261,7 @@
 }
 
 .locations__location-card__name {
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .locations__location-card__meta {

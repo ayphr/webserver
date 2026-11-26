@@ -19,7 +19,7 @@
 
 .data-fill__warning strong {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .data-fill__warning-icon {
@@ -63,7 +63,7 @@
 }
 
 .data-fill__value {
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .data-fill__error-text {

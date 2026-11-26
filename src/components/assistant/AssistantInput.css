@@ -46,7 +46,7 @@
   text-wrap: balance;
   color: var(--text-primary);
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
   animation: assistant-subtitle-in 0.45s ease;
 }
 

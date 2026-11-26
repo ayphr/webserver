@@ -48,7 +48,7 @@
 }
 
 .integrations-panel__name {
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .integrations-panel__provider {
