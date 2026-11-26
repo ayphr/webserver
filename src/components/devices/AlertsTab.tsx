@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   IconAlertCircle,
   IconBell,
@@ -23,6 +24,7 @@ import type { AlertTestResult } from '../../lib/api/alerts';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime } from '../../lib/deviceActivity';
 import type { AlertRouteAction } from '../../lib/dashboardRoutes';
+import { queryKeys } from '../../lib/query';
 import { Button, Checkbox, ConfirmDialog, Input, Select, Tooltip } from '../common';
 import './AlertsTab.css';
 
@@ -175,10 +177,14 @@ type Props = {
 };
 
 export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, onRouteChange }: Props) {
-  const [alerts, setAlerts] = useState<AlertWithMute[]>([]);
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const alertsQuery = useQuery({ queryKey: queryKeys.deviceAlerts(serial), queryFn: () => api.alerts.list(serial), meta: { persist: false } });
+  const integrationsQuery = useQuery({ queryKey: ['integrations', 'mine'], queryFn: () => api.integrations.listMine().catch(() => [] as Integration[]), meta: { persist: false } });
+  const alerts = (alertsQuery.data ?? []) as AlertWithMute[];
+  const integrations = integrationsQuery.data ?? [];
+  const isLoading = (!alertsQuery.data && alertsQuery.isPending) || (!integrationsQuery.data && integrationsQuery.isPending);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? (alertsQuery.error instanceof Error ? alertsQuery.error.message : alertsQuery.error ? 'Failed to load alerts' : null);
   const [statusFilter, setStatusFilter] = useState<AlertStatusFilter>('all');
   const [duplicateSourceId, setDuplicateSourceId] = useState<string | null>(null);
   const [muteMenuId, setMuteMenuId] = useState<string | null>(null);
@@ -234,48 +240,13 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DeviceAlert | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const [alertList, integrationList] = await Promise.all([
-          api.alerts.list(serial),
-          api.integrations.listMine().catch(() => [] as Integration[]),
-        ]);
-        if (cancelled) return;
-        setAlerts(alertList);
-        setIntegrations(integrationList);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load alerts');
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [serial]);
-
   // Keep firing status fresh while the tab stays open.
   useEffect(() => {
     const interval = setInterval(() => {
-      void api.alerts
-        .list(serial)
-        .then((list) => setAlerts(list))
-        .catch(() => {
-          // Silent refresh; the next poll or action surfaces errors.
-        });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deviceAlerts(serial) });
     }, 30_000);
-
     return () => clearInterval(interval);
-  }, [serial]);
+  }, [queryClient, serial]);
 
   useEffect(() => () => {
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
@@ -331,14 +302,14 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
 
   const updateMute = async (alert: AlertWithMute, mutedUntil: string | null) => {
     setMutingId(alert.id);
-    setError(null);
+    setActionError(null);
     try {
-      const updated = await api.alerts.update(serial, alert.id, { mutedUntil });
-      setAlerts((current) => current.map((item) => (item.id === alert.id ? updated : item)));
+      await api.alerts.update(serial, alert.id, { mutedUntil });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.deviceAlerts(serial) });
       setMuteMenuId(null);
       setCustomMuteValue('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update alert mute');
+      setActionError(err instanceof Error ? err.message : 'Failed to update alert mute');
     } finally {
       setMutingId(null);
     }
@@ -351,7 +322,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
   const muteCustom = (alert: AlertWithMute) => {
     const until = new Date(customMuteValue);
     if (!customMuteValue || Number.isNaN(until.getTime()) || until.getTime() <= Date.now()) {
-      setError('Choose a mute expiry in the future.');
+      setActionError('Choose a mute expiry in the future.');
       return;
     }
     void updateMute(alert, until.toISOString());
@@ -359,7 +330,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
 
   const handleTest = async (alert: AlertWithMute) => {
     setTestingId(alert.id);
-    setError(null);
+    setActionError(null);
     setTestResults((current) => {
       const next = { ...current };
       delete next[alert.id];
@@ -369,7 +340,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
       const results = await api.alerts.testAlert(serial, alert.id);
       setTestResults((current) => ({ ...current, [alert.id]: results }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send test alert');
+      setActionError(err instanceof Error ? err.message : 'Failed to send test alert');
     } finally {
       setTestingId(null);
     }
@@ -382,7 +353,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      setError('Unable to copy alert rule');
+      setActionError('Unable to copy alert rule');
     }
   };
 
@@ -461,7 +432,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
 
     try {
       if (editing) {
-        const updated = await api.alerts.update(serial, editing.id, {
+        await api.alerts.update(serial, editing.id, {
           name,
           enabled: draft.enabled,
           logic: draft.logic,
@@ -469,9 +440,8 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
           integrationIds: draft.integrationIds,
           repeatIntervalMinutes: draft.repeatIntervalMinutes,
         });
-        setAlerts((current) => current.map((alert) => (alert.id === editing.id ? updated : alert)));
       } else {
-        const created = await api.alerts.create(serial, {
+        await api.alerts.create(serial, {
           name,
           enabled: draft.enabled,
           logic: draft.logic,
@@ -479,8 +449,8 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
           integrationIds: draft.integrationIds,
           repeatIntervalMinutes: draft.repeatIntervalMinutes,
         });
-        setAlerts((current) => [created, ...current]);
       }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.deviceAlerts(serial) });
       clearForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to save alert');
@@ -491,12 +461,12 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
 
   const handleToggle = async (alert: DeviceAlert, enabled: boolean) => {
     setBusyId(alert.id);
-    setError(null);
+    setActionError(null);
     try {
-      const updated = await api.alerts.update(serial, alert.id, { enabled });
-      setAlerts((current) => current.map((item) => (item.id === alert.id ? updated : item)));
+      await api.alerts.update(serial, alert.id, { enabled });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.deviceAlerts(serial) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update alert');
+      setActionError(err instanceof Error ? err.message : 'Failed to update alert');
     } finally {
       setBusyId(null);
     }
@@ -507,12 +477,12 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
     const id = deleting.id;
     setDeleting(null);
     setBusyId(id);
-    setError(null);
+    setActionError(null);
     try {
       await api.alerts.remove(serial, id);
-      setAlerts((current) => current.filter((alert) => alert.id !== id));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.deviceAlerts(serial) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete alert');
+      setActionError(err instanceof Error ? err.message : 'Failed to delete alert');
     } finally {
       setBusyId(null);
     }

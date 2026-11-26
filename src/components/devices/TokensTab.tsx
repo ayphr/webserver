@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKey, IconMapPin, IconTrash, IconAlertCircle, IconClock } from '@tabler/icons-react';
 import type { DeviceUploadTokenInfo } from '@common';
 import { api } from '../../lib/api';
 import { formatDisplayDate, getRelativeTime, toDate } from '../../lib/date';
 import { formatLocation } from '../../lib/region';
+import { queryKeys } from '../../lib/query';
 import { Button, ConfirmDialog } from '../common';
 import './TokensTab.css';
 
@@ -13,43 +15,30 @@ type Props = {
 };
 
 export function TokensTab({ serial, deviceName }: Props) {
-  const [tokens, setTokens] = useState<DeviceUploadTokenInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+  const queryClient = useQueryClient();
+  const tokensQuery = useQuery({
+    queryKey: queryKeys.deviceTokens(serial),
+    queryFn: () => api.devices.listTokens(serial),
+    meta: { persist: false },
+  });
+  const tokens = tokensQuery.data ?? [];
+  const isLoading = !tokensQuery.data && tokensQuery.isPending;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? (tokensQuery.error instanceof Error ? tokensQuery.error.message : tokensQuery.error ? 'Failed to load tokens' : null);
   const [tokenToRevoke, setTokenToRevoke] = useState<DeviceUploadTokenInfo | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await api.devices.listTokens(serial);
-        if (!cancelled) setTokens(result);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load tokens');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [serial, reloadToken]);
 
   const handleRevoke = async () => {
     const token = tokenToRevoke;
     if (!token) return;
     setTokenToRevoke(null);
     setRevokingId(token.id);
-    setError(null);
+    setActionError(null);
     try {
       await api.devices.revokeToken(serial, token.id);
-      setReloadToken((value) => value + 1);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.deviceTokens(serial) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke token');
+      setActionError(err instanceof Error ? err.message : 'Failed to revoke token');
     } finally {
       setRevokingId(null);
     }

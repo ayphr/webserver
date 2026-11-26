@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { TeamAuditLogListPayload } from '@common';
 import { api } from '../../lib/api';
 import { Pagination } from '../common';
@@ -8,36 +9,27 @@ const PAGE_SIZE = 20;
 
 export function TeamAuditPanel() {
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<TeamAuditLogListPayload>({
+  const auditQuery = useQuery({
+    queryKey: ['teamAudit', page],
+    queryFn: () => api.teams.auditLogs({ page, pageSize: PAGE_SIZE }),
+    meta: { persist: false },
+  });
+  const data: TeamAuditLogListPayload = auditQuery.data ?? {
     logs: [],
     total: 0,
     page: 1,
     pageSize: PAGE_SIZE,
     totalPages: 1,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  };
+  const isLoading = !auditQuery.data && auditQuery.isPending;
+  const error = auditQuery.error instanceof Error ? auditQuery.error.message : auditQuery.error ? 'Failed to load audit log' : null;
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await api.teams.auditLogs({ page, pageSize: PAGE_SIZE });
-        if (cancelled) return;
-        setData(result);
-        if (page > Math.max(1, result.totalPages)) {
-          setPage(Math.max(1, result.totalPages));
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load audit log');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [page]);
+    if (auditQuery.data && page > Math.max(1, auditQuery.data.totalPages)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPage(Math.max(1, auditQuery.data.totalPages));
+    }
+  }, [auditQuery.data, page]);
 
   if (isLoading) return <p className="team-panel__loading">Loading audit log…</p>;
   if (error) return <p className="team-panel__error" role="alert">{error}</p>;

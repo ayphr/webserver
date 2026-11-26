@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   IconAlertCircle,
   IconAlertTriangle,
@@ -12,6 +13,7 @@ import type { DeviceLog, DeviceLogEvent, DeviceLogLevel, DeviceLogListPayload } 
 import { api } from '../../lib/api';
 import { getRelativeTime } from '../../lib/date';
 import { downloadTextFile, slugifyFilename, type ExportFormat } from '../../lib/export';
+import { queryKeys } from '../../lib/query';
 import { Button, Input, Pagination, Select, Tooltip } from '../common';
 import './DeviceLogsTab.css';
 
@@ -107,16 +109,6 @@ export function DeviceLogsTab({ serial }: Readonly<DeviceLogsTabProps>) {
   const [to, setTo] = useState('');
   const [autoRefresh, setAutoRefresh] = useState<0 | 10 | 30>(0);
   const [isHidden, setIsHidden] = useState(() => document.visibilityState === 'hidden');
-  const [data, setData] = useState<DeviceLogListPayload>({
-    logs: [],
-    total: 0,
-    page: 1,
-    pageSize: PAGE_SIZE,
-    totalPages: 1,
-  });
-  const [reloadToken, setReloadToken] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -128,46 +120,43 @@ export function DeviceLogsTab({ serial }: Readonly<DeviceLogsTabProps>) {
   const rangeInvalid = Boolean(fromIso && toIsoValue && new Date(fromIso) > new Date(toIsoValue));
   const hasFilters = Boolean(search || level || event || from || to);
 
+  const logsQuery = useQuery({
+    queryKey: [...queryKeys.deviceLogs(serial), { page, search, level, event, fromIso, toIsoValue }],
+    queryFn: () => api.devices.listLogs(serial, {
+      page,
+      pageSize: PAGE_SIZE,
+      ...(search ? { q: search } : {}),
+      ...(level ? { level } : {}),
+      ...(event ? { event } : {}),
+      ...(fromIso ? { from: fromIso } : {}),
+      ...(toIsoValue ? { to: toIsoValue } : {}),
+    }),
+    enabled: !rangeInvalid,
+    meta: { persist: false },
+  });
+
+  const data: DeviceLogListPayload = logsQuery.data ?? {
+    logs: [],
+    total: 0,
+    page: 1,
+    pageSize: PAGE_SIZE,
+    totalPages: 1,
+  };
+  const isLoading = logsQuery.isFetching;
+  const error = rangeInvalid
+    ? '"From" must be before "to".'
+    : logsQuery.error instanceof Error
+      ? logsQuery.error.message
+      : logsQuery.error
+        ? 'Failed to load device logs'
+        : null;
+
   useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      if (rangeInvalid) {
-        setIsLoading(false);
-        setError('"From" must be before "to".');
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await api.devices.listLogs(serial, {
-          page,
-          pageSize: PAGE_SIZE,
-          ...(search ? { q: search } : {}),
-          ...(level ? { level } : {}),
-          ...(event ? { event } : {}),
-          ...(fromIso ? { from: fromIso } : {}),
-          ...(toIsoValue ? { to: toIsoValue } : {}),
-        });
-        if (cancelled) return;
-        setData(result);
-        if (page > Math.max(1, result.totalPages)) {
-          setPage(Math.max(1, result.totalPages));
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load device logs');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [serial, page, reloadToken, search, level, event, fromIso, toIsoValue, rangeInvalid]);
+    if (logsQuery.data && page > Math.max(1, logsQuery.data.totalPages)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPage(Math.max(1, logsQuery.data.totalPages));
+    }
+  }, [logsQuery.data, page]);
 
   // Auto-refresh pauses entirely while the tab is hidden or a request is in flight.
   useEffect(() => {
@@ -177,10 +166,10 @@ export function DeviceLogsTab({ serial }: Readonly<DeviceLogsTabProps>) {
   }, []);
 
   useEffect(() => {
-    if (autoRefresh === 0 || isHidden || isLoading) return;
-    const timer = window.setInterval(() => setReloadToken((token) => token + 1), autoRefresh * 1000);
+    if (autoRefresh === 0 || isHidden || logsQuery.isFetching) return;
+    const timer = window.setInterval(() => { void logsQuery.refetch(); }, autoRefresh * 1000);
     return () => window.clearInterval(timer);
-  }, [autoRefresh, isHidden, isLoading]);
+  }, [autoRefresh, isHidden, logsQuery]);
 
   useEffect(() => () => {
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
@@ -193,7 +182,7 @@ export function DeviceLogsTab({ serial }: Readonly<DeviceLogsTabProps>) {
     setFrom('');
     setTo('');
     setPage(1);
-    setError(null);
+    setExportError(null);
   };
 
   const handleExport = async (format: ExportFormat) => {
@@ -237,7 +226,7 @@ export function DeviceLogsTab({ serial }: Readonly<DeviceLogsTabProps>) {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      setError('Unable to copy this log entry');
+      setExportError('Unable to copy this log entry');
     }
   };
 
@@ -261,7 +250,7 @@ export function DeviceLogsTab({ serial }: Readonly<DeviceLogsTabProps>) {
           />
           <Button
             variant="secondary"
-            onClick={() => setReloadToken((token) => token + 1)}
+            onClick={() => { void logsQuery.refetch(); }}
             disabled={isLoading || isExporting}
           >
             <IconRefresh size={15} strokeWidth={1.8} />
