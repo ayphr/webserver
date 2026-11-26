@@ -39,7 +39,7 @@ export const CopyableField = ({ label, value }: CopyableFieldProps) => {
           onClick={() => void handleCopy()}
           aria-label="Copy"
         >
-          {copied ? <IconCheck size={18} /> : <IconCopy size={18} />}
+          {copied ? <IconCheck size={18} aria-hidden="true" /> : <IconCopy size={18} aria-hidden="true" />}
         </button>
       </div>
     </div>
