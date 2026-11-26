@@ -338,8 +338,8 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   const locationsQuery = useLocationsMine();
   const devicesQuery = useDevicesMine();
   const meQuery = useQuery({ queryKey: queryKeys.bootstrap(), queryFn: () => api.users.me() });
-  const locations = locationsQuery.data ?? [];
-  const devices = devicesQuery.data ?? [];
+  const locations = useMemo(() => locationsQuery.data ?? [], [locationsQuery.data]);
+  const devices = useMemo(() => devicesQuery.data ?? [], [devicesQuery.data]);
   const user = meQuery.data?.user ?? null;
   const [locationPage, setLocationPage] = useState(1);
   const [locationDevicePage, setLocationDevicePage] = useState(1);

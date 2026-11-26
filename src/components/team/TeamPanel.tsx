@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { queryKeys } from '../../lib/query';
 import { Button, createTabKeyDownHandler, Input, Modal, Select, ProgressBar, Tooltip } from '../common';
 import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase, IconPlus, IconExternalLink, IconCopy } from '@tabler/icons-react';
 import type { Team, TeamMember, TeamRole, TeamInvite, CreditBalance, SubscriptionTier, SubscriptionPlan, BillingInterval, TeamSubscriptionPayload } from '@common';
@@ -71,9 +73,9 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
 
   const [teamName, setTeamName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
-  const [usageCredits, setUsageCredits] = useState<CreditBalance | null>(null);
-  const [usageDevices, setUsageDevices] = useState<{ count: number; dataPoints: number }>({ count: 0, dataPoints: 0 });
-  const [usageLocations, setUsageLocations] = useState(0);
+  const [usageCredits] = useState<CreditBalance | null>(null);
+  const [usageDevices] = useState<{ count: number; dataPoints: number }>({ count: 0, dataPoints: 0 });
+  const [usageLocations] = useState(0);
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameSuccess, setNameSuccess] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -163,29 +165,14 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
     };
   }, [activeTab, team, userUuid]);
 
-  useEffect(() => {
-    if (activeTab !== 'usage') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const credits = await api.credits.me();
-        const devices = await api.devices.listMine();
-        const locations = await api.locations.listMine();
-        if (cancelled) return;
-        setUsageCredits(credits);
-        setUsageDevices({
-          count: devices.length,
-          dataPoints: devices.reduce((sum, d) => sum + (d.dataPointCount ?? 0), 0),
-        });
-        setUsageLocations(locations.length);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab]);
+  const usageCreditsQuery = useQuery({ queryKey: queryKeys.creditsMe(), queryFn: () => api.credits.me(), enabled: activeTab === 'usage' });
+  const usageDevicesQuery = useQuery({ queryKey: queryKeys.devicesMine(), queryFn: () => api.devices.listMine(), enabled: activeTab === 'usage' });
+  const usageLocationsQuery = useQuery({ queryKey: queryKeys.locationsMine(), queryFn: () => api.locations.listMine(), enabled: activeTab === 'usage' });
+  const usageCreditsValue = usageCreditsQuery.data ?? usageCredits;
+  const usageDevicesValue = usageDevicesQuery.data
+    ? { count: usageDevicesQuery.data.length, dataPoints: usageDevicesQuery.data.reduce((sum, d) => sum + (d.dataPointCount ?? 0), 0) }
+    : usageDevices;
+  const usageLocationsValue = usageLocationsQuery.data ? usageLocationsQuery.data.length : usageLocations;
 
   const handleInvite = async (): Promise<boolean> => {
     const value = identifier.trim();
@@ -580,36 +567,36 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
               {
                 icon: <IconCoin size={20} />,
                 label: 'Monthly credits',
-                value: usageCredits ? `${usageCredits.monthlyUsed.toLocaleString()} / ${usageCredits.monthlyAllowance.toLocaleString()}` : '—',
-                used: usageCredits ? usageCredits.monthlyUsed : 0,
-                max: usageCredits ? usageCredits.monthlyAllowance || 1 : 1,
+                value: usageCreditsValue ? `${usageCreditsValue.monthlyUsed.toLocaleString()} / ${usageCreditsValue.monthlyAllowance.toLocaleString()}` : '—',
+                used: usageCreditsValue ? usageCreditsValue.monthlyUsed : 0,
+                max: usageCreditsValue ? usageCreditsValue.monthlyAllowance || 1 : 1,
               },
               {
                 icon: <IconCoin size={20} />,
                 label: 'Additional credits',
-                value: usageCredits ? `${usageCredits.additional.toLocaleString()} / ${usageCredits.additionalLimit.toLocaleString()}` : '—',
-                used: usageCredits ? usageCredits.additional : 0,
-                max: usageCredits ? usageCredits.additionalLimit || 1 : 1,
+                value: usageCreditsValue ? `${usageCreditsValue.additional.toLocaleString()} / ${usageCreditsValue.additionalLimit.toLocaleString()}` : '—',
+                used: usageCreditsValue ? usageCreditsValue.additional : 0,
+                max: usageCreditsValue ? usageCreditsValue.additionalLimit || 1 : 1,
               },
               {
                 icon: <IconDeviceDesktop size={20} />,
                 label: 'Devices',
                 value: `${usageDevices.count} / ${features.maxDevices}`,
-                used: usageDevices.count,
+                used: usageDevicesValue.count,
                 max: features.maxDevices,
               },
               {
                 icon: <IconMapPin size={20} />,
                 label: 'Locations',
-                value: `${usageLocations} / ${features.maxLocations}`,
-                used: usageLocations,
+                value: `${usageLocationsValue} / ${features.maxLocations}`,
+                used: usageLocationsValue,
                 max: features.maxLocations,
               },
               {
                 icon: <IconDatabase size={20} />,
                 label: 'Data points',
-                value: `${usageDevices.dataPoints.toLocaleString()} / ${features.sharedMaxDataPointsPerUser.toLocaleString()}`,
-                used: usageDevices.dataPoints,
+                value: `${usageDevicesValue.dataPoints.toLocaleString()} / ${features.sharedMaxDataPointsPerUser.toLocaleString()}`,
+                used: usageDevicesValue.dataPoints,
                 max: features.sharedMaxDataPointsPerUser,
               },
             ];

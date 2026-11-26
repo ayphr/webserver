@@ -265,8 +265,8 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const [error, setError] = useState<string | null>(null);
   const [creditsOverride, setCreditsOverride] = useState<CreditBalance | null>(initialCredits);
 
-  const devices = devicesQuery.data ?? [];
-  const locations = locationsQuery.data ?? [];
+  const devices = useMemo(() => devicesQuery.data ?? [], [devicesQuery.data]);
+  const locations = useMemo(() => locationsQuery.data ?? [], [locationsQuery.data]);
   const user = meQuery.data?.user ?? null;
   const credits = creditsOverride ?? meQuery.data?.credits ?? null;
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;

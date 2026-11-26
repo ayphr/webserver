@@ -268,7 +268,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const planFeatures = useMemo(() => getPlanFeaturesForUser(user), [user]);
   const queryClient = useQueryClient();
   const devicesQuery = useDevicesMine();
-  const devices = devicesQuery.data ?? [];
+  const devices = useMemo(() => devicesQuery.data ?? [], [devicesQuery.data]);
   const isDevicesLoading = !devicesQuery.data && devicesQuery.isPending;
   const [draft, setDraft] = useState<QueryDraft>(() => createQueryDraft());
   const [isRunning, setIsRunning] = useState(false);
