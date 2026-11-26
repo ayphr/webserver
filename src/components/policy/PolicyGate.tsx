@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { ApiError } from '../../lib/api/client';
 import type { PolicyKey, PolicyStatus } from '@common';
 import { Button, Card, CardBody, CardHeader, ConfirmDialog, Input } from '../common';
+import { bootstrapQueryOptions } from '../../lib/query/bootstrap';
+import { queryKeys } from '../../lib/query';
 import './PolicyGate.css';
 
 const POLICY_META: Record<PolicyKey, { title: string; to: string }> = {
@@ -22,77 +25,31 @@ export const PolicyGate = ({
   loadingFallback?: ReactNode;
 }) => {
   const navigate = useNavigate();
-  const [state, setState] = useState<GateState>('loading');
+  const queryClient = useQueryClient();
+  const bootstrap = useQuery({ ...bootstrapQueryOptions(api), retry: 2 });
   const [status, setStatus] = useState<PolicyStatus | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    if (bootstrap.data?.policyStatus) setStatus(bootstrap.data.policyStatus);
+  }, [bootstrap.data?.policyStatus]);
 
-    const load = async () => {
-      setLoadError(null);
-      setIsRetrying(false);
-      const MAX_ATTEMPTS = 3;
-      const DELAYS = [0, 700, 2000];
-
-      for (let i = 0; i < MAX_ATTEMPTS; i++) {
-        if (cancelled) return;
-        if (i > 0) {
-          setIsRetrying(true);
-          await new Promise<void>((resolve) => {
-            const t = setTimeout(resolve, DELAYS[i]);
-            // allow cleanup to cancel the pending retry
-            if (cancelled) clearTimeout(t);
-          });
-          if (cancelled) return;
-        }
-        try {
-          const { policyStatus } = await api.users.me();
-          if (cancelled) return;
-          setIsRetrying(false);
-          if (policyStatus && !policyStatus.upToDate) {
-            setStatus(policyStatus);
-            setState('required');
-          } else {
-            setState('ready');
-          }
-          return;
-        } catch (err) {
-          if (cancelled) return;
-          if (err instanceof ApiError && err.status === 401) {
-            setIsRetrying(false);
-            await navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
-            return;
-          }
-          // Transient failure: retry a few times before surfacing.
-          if (i === MAX_ATTEMPTS - 1) {
-            setIsRetrying(false);
-            setLoadError(err instanceof Error ? err.message : 'Failed to load your account. Please try again.');
-          }
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [navigate, retryKey]);
-
-  // Auto-retry when the network comes back online.
   useEffect(() => {
-    const handler = () => setRetryKey((k) => k + 1);
+    const err = bootstrap.error;
+    if (err instanceof ApiError && err.status === 401) {
+      void navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true });
+    }
+  }, [bootstrap.error, navigate]);
+
+  useEffect(() => {
+    const handler = () => { void queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() }); };
     window.addEventListener('online', handler);
     return () => window.removeEventListener('online', handler);
-  }, []);
+  }, [queryClient]);
 
   // Poll the session so this device is signed out shortly after another
   // device revokes it. A 401 triggers the global unauthorized handler.
@@ -102,7 +59,7 @@ export const PolicyGate = ({
     const start = () => {
       if (interval) return;
       interval = setInterval(() => {
-        void api.users.me().catch(() => undefined);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() });
       }, 20000);
     };
     const stop = () => {
@@ -121,7 +78,7 @@ export const PolicyGate = ({
       stop();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, []);
+  }, [queryClient]);
 
   const handleAccept = async () => {
     setIsAccepting(true);
@@ -129,7 +86,7 @@ export const PolicyGate = ({
 
     try {
       await api.auth.acceptPolicies();
-      setState('ready');
+      await queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to accept the updated policies');
     } finally {
@@ -165,7 +122,15 @@ export const PolicyGate = ({
     setDeletePassword('');
   };
 
-  if (loadError) {
+  const loadError = bootstrap.error instanceof ApiError && bootstrap.error.status === 401
+    ? null
+    : bootstrap.error instanceof Error
+      ? bootstrap.error.message
+      : bootstrap.error
+        ? 'Failed to load your account. Please try again.'
+        : null;
+
+  if (loadError && !bootstrap.data) {
     return (
       <div className="policy-gate">
         <div className="policy-gate__container">
@@ -176,8 +141,8 @@ export const PolicyGate = ({
             <CardBody>
               <p className="policy-gate__error" role="alert">{loadError}</p>
               <div className="policy-gate__actions">
-                <Button variant="primary" fullWidth isLoading={isRetrying} onClick={() => setRetryKey((k) => k + 1)}>
-                  {isRetrying ? 'Retrying...' : 'Try again'}
+                <Button variant="primary" fullWidth isLoading={bootstrap.isFetching} onClick={() => void queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() })}>
+                  {bootstrap.isFetching ? 'Retrying...' : 'Try again'}
                 </Button>
                 <Button variant="secondary" fullWidth onClick={() => navigate(`/auth/login?redirect=${encodeURIComponent(globalThis.location.pathname + globalThis.location.search)}`, { replace: true })}>
                   Back to sign in
@@ -190,7 +155,10 @@ export const PolicyGate = ({
     );
   }
 
-  if (state === 'loading') {
+  const policyStatus = bootstrap.data?.policyStatus ?? status;
+  const needsPolicy = Boolean(policyStatus && !policyStatus.upToDate);
+
+  if (!bootstrap.data && bootstrap.isPending) {
     if (loadingFallback) {
       return <>{loadingFallback}</>;
     }
@@ -204,7 +172,7 @@ export const PolicyGate = ({
     );
   }
 
-  if (state === 'ready' || !status) {
+  if (!needsPolicy || !policyStatus) {
     return <>{children}</>;
   }
 
@@ -218,12 +186,12 @@ export const PolicyGate = ({
           </CardHeader>
           <CardBody>
             <ul className="policy-gate__list">
-              {status.pending.map((key) => (
+              {policyStatus.pending.map((key) => (
                 <li key={key} className="policy-gate__item">
                   <a href={POLICY_META[key].to} target="_blank" rel="noreferrer">
                     {POLICY_META[key].title}
                   </a>
-                  <span className="policy-gate__version">Updated {status.updatedDates[key] ?? `v${status.current[key]}`}</span>
+                  <span className="policy-gate__version">Updated {policyStatus.updatedDates[key] ?? `v${policyStatus.current[key]}`}</span>
                 </li>
               ))}
             </ul>

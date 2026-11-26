@@ -2,6 +2,13 @@ import type { UserMePayload, PublicUser, SelfUser } from '@common';
 import type { RequestClient } from './client';
 import { API_PATHS, apiPath } from './generated/routes';
 
+type MeInvalidator = () => void | Promise<void>;
+let externalMeInvalidator: MeInvalidator | null = null;
+
+export function setUsersMeInvalidator(fn: MeInvalidator | null) {
+  externalMeInvalidator = fn;
+}
+
 export function createUsersApi(client: RequestClient) {
   // Deduplicate concurrent/shortly-repeated current-user requests. The
   // PolicyGate and the page it wraps both need this data, so sharing one
@@ -14,6 +21,7 @@ export function createUsersApi(client: RequestClient) {
 
   const invalidateMe = () => {
     cachedMe = null;
+    void externalMeInvalidator?.();
   };
 
   return {

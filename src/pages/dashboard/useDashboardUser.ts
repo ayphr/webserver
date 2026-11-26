@@ -1,7 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { getStoredAccounts, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
-import type { CreditBalance, Punishment, SelfUser } from '@common';
+import type { CreditBalance, Punishment, SelfUser, UserMePayload } from '@common';
+import { bootstrapQueryOptions } from '../../lib/query/bootstrap';
+import { queryKeys } from '../../lib/query';
 
 export type DashboardUserData = {
   user: SelfUser | null;
@@ -18,44 +21,56 @@ export type DashboardUserData = {
 };
 
 export function useDashboardUser(): DashboardUserData {
-  const [user, setUser] = useState<SelfUser | null>(null);
-  const [credits, setCredits] = useState<CreditBalance | null>(null);
-  const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
+  const queryClient = useQueryClient();
+  const bootstrap = useQuery(bootstrapQueryOptions(api));
   const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const userData = await api.users.me();
-      setUser(userData.user);
-      setCredits(userData.credits);
-      setActiveSuspension(userData.activeSuspension);
-      const token = api.getAuthToken();
-      if (token) updateStoredAccount(token, userData.user);
-      setAccounts(getStoredAccounts());
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
-      setLoadError(message);
-      console.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    const data = bootstrap.data;
+    if (!data) return;
+    const token = api.getAuthToken();
+    if (token) updateStoredAccount(token, data.user);
+    setAccounts(getStoredAccounts());
+  }, [bootstrap.data]);
 
-  return {
-    user,
-    credits,
-    activeSuspension,
+  const reload = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() });
+  }, [queryClient]);
+
+  const setUser = useCallback((user: SelfUser | null) => {
+    queryClient.setQueryData<UserMePayload | undefined>(queryKeys.bootstrap(), (old) => {
+      if (!old || !user) return old;
+      return { ...old, user };
+    });
+  }, [queryClient]);
+
+  const setCredits = useCallback((credits: CreditBalance | null) => {
+    queryClient.setQueryData<UserMePayload | undefined>(queryKeys.bootstrap(), (old) => {
+      if (!old || !credits) return old;
+      return { ...old, credits };
+    });
+  }, [queryClient]);
+
+  const setActiveSuspension = useCallback((activeSuspension: Punishment | null) => {
+    queryClient.setQueryData<UserMePayload | undefined>(queryKeys.bootstrap(), (old) => {
+      if (!old) return old;
+      return { ...old, activeSuspension };
+    });
+  }, [queryClient]);
+
+  const loadError = bootstrap.error instanceof Error ? bootstrap.error.message : bootstrap.error ? 'Failed to load dashboard data' : null;
+
+  return useMemo(() => ({
+    user: bootstrap.data?.user ?? null,
+    credits: bootstrap.data?.credits ?? null,
+    activeSuspension: bootstrap.data?.activeSuspension ?? null,
     accounts,
-    isLoading,
+    isLoading: !bootstrap.data && bootstrap.isPending,
     loadError,
     reload,
     setUser,
     setCredits,
     setActiveSuspension,
     setAccounts,
-  };
+  }), [accounts, bootstrap.data, bootstrap.error, bootstrap.isPending, loadError, reload, setActiveSuspension, setCredits, setUser]);
 }

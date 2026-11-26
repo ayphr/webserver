@@ -18,8 +18,9 @@ import { createAssistantApi } from './assistant';
 import { createQueriesApi } from './queries';
 import { getSafeRedirect } from '../redirects';
 import { API_PATHS, apiPath } from './generated/routes';
-import { queryClient } from '../query';
+import { queryClient, queryKeys } from '../query';
 import { clearAccountQueryCache, clearSensitiveQueryState } from '../query/cacheLifecycle';
+import { setUsersMeInvalidator } from './users';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:7233' : 'https://api.ayphr.com');
 
@@ -44,6 +45,7 @@ export type AyphrApiClient = RequestClient & {
 };
 
 export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
+  setUsersMeInvalidator(() => queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() }));
   const client = createRequestClient({
     baseUrl: API_BASE_URL,
     onUnauthorized: () => {
