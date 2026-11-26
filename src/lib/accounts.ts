@@ -10,6 +10,8 @@ export type StoredAccount = {
 
 const ACCOUNTS_KEY = STORAGE_KEYS.accounts;
 const ACTIVE_TOKEN_KEY = STORAGE_KEYS.activeToken;
+const AUTH_STORAGE_AREA = 'local' as const;
+const LEGACY_AUTH_STORAGE_AREA = 'session' as const;
 
 function isStoredAccount(value: unknown): value is StoredAccount {
   if (!value || typeof value !== 'object') return false;
@@ -32,11 +34,27 @@ export function isStoredAccountExpired(account: StoredAccount): boolean {
   return time <= Date.now();
 }
 
+export function migrateSessionAuthToPersistent(): void {
+  const persistentAccounts = readStorage(ACCOUNTS_KEY, AUTH_STORAGE_AREA);
+  const sessionAccounts = readStorage(ACCOUNTS_KEY, LEGACY_AUTH_STORAGE_AREA);
+  if (!persistentAccounts && sessionAccounts) {
+    writeStorage(ACCOUNTS_KEY, sessionAccounts, AUTH_STORAGE_AREA);
+  }
+
+  const persistentToken = readStorage(ACTIVE_TOKEN_KEY, AUTH_STORAGE_AREA);
+  const sessionToken = readStorage(ACTIVE_TOKEN_KEY, LEGACY_AUTH_STORAGE_AREA);
+  if (!persistentToken && sessionToken) {
+    writeStorage(ACTIVE_TOKEN_KEY, sessionToken, AUTH_STORAGE_AREA);
+  }
+
+  removeStorage(ACCOUNTS_KEY, LEGACY_AUTH_STORAGE_AREA);
+  removeStorage(ACTIVE_TOKEN_KEY, LEGACY_AUTH_STORAGE_AREA);
+}
+
 /** Returns every saved account, including tokens that have already expired. */
 export function getAllStoredAccounts(): StoredAccount[] {
-  if (typeof window === 'undefined') return [];
   try {
-    const raw = readStorage(ACCOUNTS_KEY, 'session');
+    const raw = readStorage(ACCOUNTS_KEY, AUTH_STORAGE_AREA);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -51,26 +69,25 @@ export function getStoredAccounts(): StoredAccount[] {
 }
 
 export function saveStoredAccounts(accounts: StoredAccount[]) {
-  if (typeof window === 'undefined') return;
-  writeStorage(ACCOUNTS_KEY, JSON.stringify(accounts), 'session');
+  writeStorage(ACCOUNTS_KEY, JSON.stringify(accounts), AUTH_STORAGE_AREA);
   try {
-    window.dispatchEvent(new CustomEvent('ayphr-accounts-changed'));
+    (globalThis as unknown as { window?: { dispatchEvent?: (e: unknown) => unknown } }).window?.dispatchEvent?.(
+      new CustomEvent('ayphr-accounts-changed'),
+    );
   } catch {
     // ignore
   }
 }
 
 export function getActiveToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return readStorage(ACTIVE_TOKEN_KEY, 'session');
+  return readStorage(ACTIVE_TOKEN_KEY, AUTH_STORAGE_AREA);
 }
 
 export function setActiveToken(token: string | null) {
-  if (typeof window === 'undefined') return;
   if (token) {
-    writeStorage(ACTIVE_TOKEN_KEY, token, 'session');
+    writeStorage(ACTIVE_TOKEN_KEY, token, AUTH_STORAGE_AREA);
   } else {
-    removeStorage(ACTIVE_TOKEN_KEY, 'session');
+    removeStorage(ACTIVE_TOKEN_KEY, AUTH_STORAGE_AREA);
   }
 }
 

@@ -7,6 +7,10 @@ export type ApiClientConfig = {
   storageKey?: string;
   /** Invoked when an authenticated request is rejected with a 401. */
   onUnauthorized?: () => void;
+  /** Invoked before switching active account after a 401. */
+  onAccountSwitch?: (previousToken: string, nextToken: string | null) => void | Promise<void>;
+  /** Invoked when auth is fully cleared. */
+  onAuthCleared?: () => void | Promise<void>;
 };
 
 export type RequestOptions = Omit<RequestInit, 'body'> & {
@@ -47,14 +51,14 @@ function normalizeBaseUrl(baseUrl?: string) {
 }
 
 function readStoredToken(storageKey: string) {
-  return readStorage(storageKey, 'session');
+  return readStorage(storageKey, 'local');
 }
 
 function writeStoredToken(storageKey: string, token: string | null) {
   if (token) {
-    writeStorage(storageKey, token, 'session');
+    writeStorage(storageKey, token, 'local');
   } else {
-    removeStorage(storageKey, 'session');
+    removeStorage(storageKey, 'local');
   }
 }
 
@@ -110,6 +114,8 @@ export function createRequestClient(config: ApiClientConfig = {}) {
   const baseUrl = normalizeBaseUrl(config.baseUrl);
   const storageKey = config.storageKey ?? 'ayphr-api-token';
   const onUnauthorized = config.onUnauthorized;
+  const onAccountSwitch = config.onAccountSwitch;
+  const onAuthCleared = config.onAuthCleared;
 
   async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const headers = new Headers(options.headers);
@@ -149,13 +155,17 @@ export function createRequestClient(config: ApiClientConfig = {}) {
         ?? `Request failed with status ${response.status}`;
 
       if (response.status === 401 && token) {
+        const previousToken = token;
         removeStoredAccount(token);
         writeStoredToken(storageKey, null);
         const remaining = getStoredAccounts();
-        if (remaining.length > 0) {
-          setActiveToken(remaining[0].token);
-          writeStoredToken(storageKey, remaining[0].token);
+        const nextToken = remaining[0]?.token ?? null;
+        await onAccountSwitch?.(previousToken, nextToken);
+        if (nextToken) {
+          setActiveToken(nextToken);
+          writeStoredToken(storageKey, nextToken);
         } else {
+          await onAuthCleared?.();
           onUnauthorized?.();
         }
       }

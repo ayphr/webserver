@@ -22,32 +22,40 @@ export const STORAGE_KEYS = {
 
 export type StorageArea = 'local' | 'session';
 
-function area(target: StorageArea): Storage {
-  return target === 'local' ? window.localStorage : window.sessionStorage;
+function resolveArea(target: StorageArea): Storage | null {
+  const g = globalThis as unknown as { localStorage?: Storage; sessionStorage?: Storage };
+  try {
+    return target === 'local' ? g.localStorage ?? null : g.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function readStorage(key: string, target: StorageArea = 'local'): string | null {
-  if (typeof window === 'undefined') return null;
+  const storage = resolveArea(target);
+  if (!storage) return null;
   try {
-    return area(target).getItem(key);
+    return storage.getItem(key);
   } catch {
     return null;
   }
 }
 
 export function writeStorage(key: string, value: string, target: StorageArea = 'local'): void {
-  if (typeof window === 'undefined') return;
+  const storage = resolveArea(target);
+  if (!storage) return;
   try {
-    area(target).setItem(key, value);
+    storage.setItem(key, value);
   } catch {
     // Ignore storage restrictions.
   }
 }
 
 export function removeStorage(key: string, target: StorageArea = 'local'): void {
-  if (typeof window === 'undefined') return;
+  const storage = resolveArea(target);
+  if (!storage) return;
   try {
-    area(target).removeItem(key);
+    storage.removeItem(key);
   } catch {
     // Ignore storage restrictions.
   }
