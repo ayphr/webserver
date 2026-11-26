@@ -142,6 +142,7 @@ const ThinkingPanel = ({
         <IconChevronDown
           size={13}
           strokeWidth={2}
+          aria-hidden="true"
           className={`assistant-chat__disclosure-chevron${open ? ' assistant-chat__disclosure-chevron--open' : ''}`}
         />
       </summary>
@@ -344,6 +345,7 @@ const ToolGroup = ({
         <IconChevronDown
           size={13}
           strokeWidth={2}
+          aria-hidden="true"
           className={`assistant-chat__disclosure-chevron${open ? ' assistant-chat__disclosure-chevron--open' : ''}`}
         />
       </button>
@@ -783,7 +785,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                     aria-haspopup="menu"
                     aria-expanded={openMenuId === message.id}
                   >
-                    <IconChevronDown size={14} strokeWidth={2} />
+                    <IconChevronDown size={14} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
               ) : (
