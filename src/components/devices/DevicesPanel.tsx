@@ -831,7 +831,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         <div className="devices__toolbar">
           <div className="devices__actions">
             <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
-              <IconRefresh size={16} strokeWidth={1.75} />
+              <IconRefresh size={16} strokeWidth={1.75} aria-hidden="true" />
               Refresh
             </Button>
             <Button
@@ -1048,7 +1048,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
             </Button>
           )}
           <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
-            <IconRefresh size={16} strokeWidth={1.75} />
+            <IconRefresh size={16} strokeWidth={1.75} aria-hidden="true" />
             Refresh
           </Button>
         </div>
@@ -1235,7 +1235,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
             {/* If initial load has not finished yet, show initial placeholder with stable height */}
             {!hasLoadedInitialData && isFetchingData ? (
               <div className="devices__chart-card devices__loading-box">
-                <IconRefresh className="devices__spin-icon" size={24} strokeWidth={2} />
+                <IconRefresh className="devices__spin-icon" size={24} strokeWidth={2} aria-hidden="true" />
                 <p>Loading telemetry history...</p>
               </div>
             ) : dataPoints.length === 0 || enabledDefs.length === 0 ? (
