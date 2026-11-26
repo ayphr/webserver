@@ -30,3 +30,6 @@ dist-ssr
 .kilo
 
 requests/
+
+# Local worktrees
+.worktrees/
