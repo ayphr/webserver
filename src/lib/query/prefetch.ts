@@ -11,3 +11,15 @@ export function prefetchIfNeeded(queryClient: QueryClient, opts: Parameters<Quer
   if (root && !shouldPrefetch(root)) return Promise.resolve();
   return queryClient.prefetchQuery(opts);
 }
+
+type LazyPreload = { preload?: () => Promise<unknown> };
+
+const dashboardPanelPreloads: Record<string, LazyPreload | undefined> = {};
+
+export function registerDashboardPanelPreloads(map: Record<string, LazyPreload | undefined>) {
+  Object.assign(dashboardPanelPreloads, map);
+}
+
+export function preloadDashboardTab(tab: string) {
+  void dashboardPanelPreloads[tab]?.preload?.();
+}

@@ -9,6 +9,7 @@ import { useDismiss } from '../../hooks/useDismiss';
 import { isStoredAccountExpired, type StoredAccount } from '../../lib/accounts';
 import { formatCredits } from '../../lib/credits';
 import type { BadgeId, CreditBalance } from '@common/types';
+import { preloadDashboardTab } from '../../lib/query/prefetch';
 
 type Tab = { id: string; name: string };
 
@@ -192,7 +193,9 @@ export const Sidebar: React.FC<Props> = ({
             </button>
           </>
         ) : (
-          visibleTabs.map((t) => (
+          visibleTabs.map((t) => {
+            const tt = tooltipHandlers(t.name) as any;
+            return (
             <button
               key={t.id}
               className={`n-sidebar__tab ${activeTab === t.id ? 'active' : ''} ${t.id === 'assistant' ? 'n-sidebar__tab--iris' : ''}`}
@@ -200,12 +203,14 @@ export const Sidebar: React.FC<Props> = ({
               type="button"
               aria-label={t.name}
               aria-current={activeTab === t.id ? 'page' : undefined}
-              {...tooltipHandlers(t.name)}
+              {...tt}
+              onMouseEnter={(e) => { preloadDashboardTab(t.id); tt.onMouseEnter?.(e); }}
+              onFocus={(e) => { preloadDashboardTab(t.id); tt.onFocus?.(e); }}
             >
               <span className="n-sidebar__icon" aria-hidden="true">{iconFor(t.id)}</span>
               <span className="n-sidebar__label">{t.name}</span>
             </button>
-          ))
+          );})
         )}
       </nav>
 

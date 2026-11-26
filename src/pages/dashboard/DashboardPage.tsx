@@ -27,19 +27,26 @@ import { useDashboardClock } from './useDashboardClock';
 import { buildSettingsSections } from './dashboardSettings';
 import { useDashboardUser } from './useDashboardUser';
 import { STORAGE_KEYS, readStorage, writeStorage, removeStorage } from '../../lib/storage';
+import { preloadDashboardTab, registerDashboardPanelPreloads } from '../../lib/query/prefetch';
 
-const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
-const QueriesPanel = lazy(() => import('../../components/queries').then((m) => ({ default: m.QueriesPanel })));
-const LocationsPanel = lazy(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
-const NotificationsPanel = lazy(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
-const CreditsPanel = lazy(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
-const TeamPanel = lazy(() => import('../../components/team/TeamPanel').then((m) => ({ default: m.TeamPanel })));
-const IntegrationsPanel = lazy(() => import('../../components/integrations').then((m) => ({ default: m.IntegrationsPanel })));
-const UsersPanel = lazy(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
-const GamesPanel = lazy(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
-const RadioPanel = lazy(() => import('../../components/radio/RadioPanel').then((m) => ({ default: m.RadioPanel })));
-const AssistantInput = lazy(() => import('../../components/assistant/AssistantInput').then((m) => ({ default: m.AssistantInput })));
-const AssistantSidebar = lazy(() => import('../../components/assistant/AssistantSidebar').then((m) => ({ default: m.AssistantSidebar })));
+function lazyWithPreload<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+  const Component = lazy(factory) as React.LazyExoticComponent<T> & { preload: () => Promise<{ default: T }> };
+  Component.preload = factory;
+  return Component;
+}
+
+const DevicesPanel = lazyWithPreload(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
+const QueriesPanel = lazyWithPreload(() => import('../../components/queries').then((m) => ({ default: m.QueriesPanel })));
+const LocationsPanel = lazyWithPreload(() => import('../../components/locations').then((m) => ({ default: m.LocationsPanel })));
+const NotificationsPanel = lazyWithPreload(() => import('../../components/notifications').then((m) => ({ default: m.NotificationsPanel })));
+const CreditsPanel = lazyWithPreload(() => import('../../components/credits').then((m) => ({ default: m.CreditsPanel })));
+const TeamPanel = lazyWithPreload(() => import('../../components/team/TeamPanel').then((m) => ({ default: m.TeamPanel })));
+const IntegrationsPanel = lazyWithPreload(() => import('../../components/integrations').then((m) => ({ default: m.IntegrationsPanel })));
+const UsersPanel = lazyWithPreload(() => import('../../components/staff').then((m) => ({ default: m.UsersPanel })));
+const GamesPanel = lazyWithPreload(() => import('../../components/games/GamesPanel').then((m) => ({ default: m.GamesPanel })));
+const RadioPanel = lazyWithPreload(() => import('../../components/radio/RadioPanel').then((m) => ({ default: m.RadioPanel })));
+const AssistantInput = lazyWithPreload(() => import('../../components/assistant/AssistantInput').then((m) => ({ default: m.AssistantInput })));
+const AssistantSidebar = lazyWithPreload(() => import('../../components/assistant/AssistantSidebar').then((m) => ({ default: m.AssistantSidebar })));
 import './DashboardPage.css';
 
 function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | null; isPermanent: boolean }>) {
@@ -236,6 +243,34 @@ export const DashboardPage = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    registerDashboardPanelPreloads({
+      assistant: AssistantInput,
+      devices: DevicesPanel,
+      queries: QueriesPanel,
+      locations: LocationsPanel,
+      notifications: NotificationsPanel,
+      credits: CreditsPanel,
+      team: TeamPanel,
+      integrations: IntegrationsPanel,
+      users: UsersPanel,
+      games: GamesPanel,
+      radio: RadioPanel,
+    });
+  }, []);
+
+  useEffect(() => {
+    const preload = () => {
+      ['assistant', 'devices', 'locations', 'notifications', 'credits', 'team'].forEach(preloadDashboardTab);
+    };
+    const id = globalThis.requestIdleCallback?.(preload);
+    const timeout = globalThis.setTimeout(preload, 1200);
+    return () => {
+      if (id !== undefined) globalThis.cancelIdleCallback?.(id);
+      globalThis.clearTimeout(timeout);
+    };
+  }, []);
 
   const unreadPollUserId = user?.uuid;
   useEffect(() => {
@@ -691,7 +726,7 @@ export const DashboardPage = () => {
     [credits, defaultTab, preferredDefaultTab, sidebarPinned, effectiveAssistantVariant, setAssistantVariantPref, availableAssistantVariants, assistantSendShortcut, setAssistantSendShortcutPref, chatRetentionDays, setChatRetentionDaysPref, piiRedactionEnabled, setPiiRedactionPref, navigate, isStaff, isTeamMember, user, now],
   );
 
-  if (isLoading || assistant.isLoading) {
+  if (isLoading) {
     return <DashboardLoadingSkeleton activeTab={activePage} />;
   }
 
