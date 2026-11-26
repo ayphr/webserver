@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { queryKeys } from '../../lib/query';
 import { Button, createTabKeyDownHandler, Input, Modal, Select, ProgressBar, Tooltip } from '../common';
@@ -51,7 +51,6 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<TeamInvite[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [editRole, setEditRole] = useState<TeamRole>('member');
@@ -70,6 +69,7 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
     onTabChange?.(tab);
   };
   const handleTabsKeyDown = createTabKeyDownHandler<TeamTab>(selectTab);
+  const queryClient = useQueryClient();
 
   const [teamName, setTeamName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
@@ -95,30 +95,35 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmation, setConfirmation] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
-  const load = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await api.teams.me();
-      setTeam(data.team);
-      setMembers(data.members);
-      setTeamName(data.team.name ?? '');
-      try {
-        setInvites(await api.teams.listInvites());
-      } catch {
-        setInvites([]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load team');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const teamQuery = useQuery({ queryKey: queryKeys.teams('me'), queryFn: () => api.teams.me() });
+  const invitesQuery = useQuery({ queryKey: ['teams', 'invites'], queryFn: () => api.teams.listInvites(), enabled: !!teamQuery.data });
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, []);
+    if (teamQuery.data) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTeam(teamQuery.data.team);
+      setMembers(teamQuery.data.members);
+      setTeamName(teamQuery.data.team.name ?? '');
+    }
+  }, [teamQuery.data]);
+  useEffect(() => {
+    if (invitesQuery.data) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInvites(invitesQuery.data);
+    }
+  }, [invitesQuery.data]);
+
+  const isLoading = !teamQuery.data && teamQuery.isPending;
+  const queryError = teamQuery.error instanceof Error ? teamQuery.error.message : teamQuery.error ? 'Failed to load team' : null;
+  const effectiveError = error ?? queryError;
+
+  const load = async () => {
+    setError(null);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams('me') }),
+      queryClient.invalidateQueries({ queryKey: ['teams', 'invites'] }),
+    ]);
+  };
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -378,7 +383,7 @@ export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange
   };
 
   if (isLoading) return <p className="team-panel__loading">Loading team…</p>;
-  if (error) return <p className="team-panel__error" role="alert">{error}</p>;
+  if (effectiveError) return <p className="team-panel__error" role="alert">{effectiveError}</p>;
   if (!team) return <p className="team-panel__empty">No team found. A team plan is required.</p>;
 
   const isTeamManager = !!userUuid && team?.managerUuid === userUuid;

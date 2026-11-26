@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -11,7 +11,7 @@ import {
   IconWifiOff,
 } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DataPoint, DeviceSummary, Location } from '@common';
+import type { DeviceSummary, Location } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
@@ -76,7 +76,6 @@ type LocationStats = {
 };
 
 const EMPTY_LOCATION_STATS: LocationStats = { deviceCount: 0, onlineCount: 0, lastActive: 0 };
-type HistorySeries = { serial: number; name: string; points: DataPoint[] };
 
 function average(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -111,11 +110,6 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [metric, setMetric] = useState<HistoryMetric>('temperature');
-  const [series, setSeries] = useState<HistorySeries[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [reloadToken, setReloadToken] = useState(0);
-  const requestRef = useRef(0);
 
   const rangeError = useMemo(() => {
     if (mode !== 'range') return null;
@@ -127,51 +121,27 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
     return null;
   }, [mode, from, to]);
 
-  const load = useCallback(async () => {
-    void reloadToken;
-    if (devices.length === 0) {
-      setSeries([]);
-      setError(null);
-      return;
-    }
-    if (rangeError) {
-      setSeries([]);
-      setError(rangeError);
-      return;
-    }
-
-    const request = ++requestRef.current;
-    setIsLoading(true);
-    setError(null);
-    try {
+  const serialsKey = useMemo(() => devices.map((d) => d.serial).sort((a, b) => a - b).join(','), [devices]);
+  const historyQuery = useQuery({
+    queryKey: ['locationHistory', serialsKey, mode, period, from, to],
+    queryFn: async () => {
       const options = mode === 'period' ? { period } : { from, to };
-      const loaded = await Promise.all(
+      return Promise.all(
         devices.map(async (device) => {
           const response = await api.devices.getDataPoints(device.serial, options);
-          return {
-            serial: device.serial,
-            name: deviceLabel(device),
-            points: response.dataPoints,
-          };
+          return { serial: device.serial, name: deviceLabel(device), points: response.dataPoints };
         }),
       );
-      if (request !== requestRef.current) return;
-      setSeries(loaded);
-    } catch (err) {
-      if (request !== requestRef.current) return;
-      setSeries([]);
-      setError(err instanceof Error ? err.message : 'Failed to load location history');
-    } finally {
-      if (request === requestRef.current) setIsLoading(false);
-    }
-  }, [devices, from, mode, period, rangeError, reloadToken, to]);
-
-  useEffect(() => {
-    // Telemetry must be requested when the history tab opens or its controls change.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-    return () => { requestRef.current += 1; };
-  }, [load]);
+    },
+    enabled: devices.length > 0 && !rangeError,
+    meta: { persist: false },
+  });
+  const series = useMemo(
+    () => (devices.length === 0 || rangeError ? [] : (historyQuery.data ?? [])),
+    [devices.length, rangeError, historyQuery.data],
+  );
+  const error = rangeError ?? (historyQuery.error instanceof Error ? historyQuery.error.message : historyQuery.error ? 'Failed to load location history' : null);
+  const isLoading = historyQuery.isFetching && devices.length > 0 && !rangeError;
 
   const activeMetric = HISTORY_METRICS.find((entry) => entry.value === metric) ?? HISTORY_METRICS[0];
   const totalPoints = series.reduce((sum, entry) => sum + entry.points.length, 0);
@@ -276,7 +246,7 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
         />
         <Button
           variant="secondary"
-          onClick={() => setReloadToken((value) => value + 1)}
+          onClick={() => { void historyQuery.refetch(); }}
           disabled={isLoading || devices.length === 0 || Boolean(rangeError)}
         >
           <IconRefresh aria-hidden="true" size={16} strokeWidth={1.75} />
@@ -302,7 +272,7 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
         <div className="locations__error" role="alert">
           <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
           <span>{error}</span>
-          <Button variant="secondary" onClick={() => setReloadToken((value) => value + 1)}>
+          <Button variant="secondary" onClick={() => { void historyQuery.refetch(); }}>
             Retry
           </Button>
         </div>
