@@ -1,22 +1,40 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
 import { PolicyGate } from './components/policy';
 import { EmailGate } from './components/auth/EmailGate';
 import { ModalProvider, RadioProvider, TooltipProvider, useTooltip } from './context';
 import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
 import { parseDashboardPath } from './lib/dashboardRoutes';
 
-const AuthPage = lazy(() => import('./pages/auth/AuthPage').then((m) => ({ default: m.AuthPage })));
-const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
-const ProfilePage = lazy(() => import('./pages/dashboard/ProfilePage').then((m) => ({ default: m.ProfilePage })));
-const PoliciesPage = lazy(() => import('./pages/policies/PoliciesPage').then((m) => ({ default: m.PoliciesPage })));
-const TermsPage = lazy(() => import('./pages/policies/TermsPage').then((m) => ({ default: m.TermsPage })));
-const PrivacyPage = lazy(() => import('./pages/policies/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
-const RefundPage = lazy(() => import('./pages/policies/RefundPage').then((m) => ({ default: m.RefundPage })));
-const LandingPage = lazy(() => import('./pages/landing/LandingPage').then((m) => ({ default: m.LandingPage })));
-const LinkPage = lazy(() => import('./pages/link/LinkPage').then((m) => ({ default: m.LinkPage })));
-const NotFoundPage = lazy(() => import('./pages/notFound/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+function lazyWithPreload<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+  const Component = lazy(factory) as React.LazyExoticComponent<T> & { preload: () => Promise<{ default: T }> };
+  Component.preload = factory;
+  return Component;
+}
+
+const AuthPage = lazyWithPreload(() => import('./pages/auth/AuthPage').then((m) => ({ default: m.AuthPage })));
+const DashboardPage = lazyWithPreload(() => import('./pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const ProfilePage = lazyWithPreload(() => import('./pages/dashboard/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const PoliciesPage = lazyWithPreload(() => import('./pages/policies/PoliciesPage').then((m) => ({ default: m.PoliciesPage })));
+const TermsPage = lazyWithPreload(() => import('./pages/policies/TermsPage').then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazyWithPreload(() => import('./pages/policies/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
+const RefundPage = lazyWithPreload(() => import('./pages/policies/RefundPage').then((m) => ({ default: m.RefundPage })));
+const LandingPage = lazyWithPreload(() => import('./pages/landing/LandingPage').then((m) => ({ default: m.LandingPage })));
+const LinkPage = lazyWithPreload(() => import('./pages/link/LinkPage').then((m) => ({ default: m.LinkPage })));
+const NotFoundPage = lazyWithPreload(() => import('./pages/notFound/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+
+export const routePreloads = {
+  landing: () => LandingPage.preload(),
+  auth: () => AuthPage.preload(),
+  dashboard: () => DashboardPage.preload(),
+  profile: () => ProfilePage.preload(),
+};
+
+export function preloadMainRoutes() {
+  void routePreloads.landing();
+  void routePreloads.auth();
+  void routePreloads.dashboard();
+}
 
 const DASHBOARD_TITLES: Record<string, string> = {
   overview: 'Overview',
@@ -143,6 +161,15 @@ function RouteFallback() {
 }
 
 function App() {
+  useEffect(() => {
+    const id = globalThis.requestIdleCallback?.(() => preloadMainRoutes());
+    const timeout = globalThis.setTimeout(() => preloadMainRoutes(), 1500);
+    return () => {
+      if (id !== undefined) globalThis.cancelIdleCallback?.(id);
+      globalThis.clearTimeout(timeout);
+    };
+  }, []);
+
   const dashboardElement = (
     <PolicyGate loadingFallback={<DashboardLoadingSkeleton />}>
       <EmailGate loadingFallback={<DashboardLoadingSkeleton />}>

@@ -18,6 +18,8 @@ import { createAssistantApi } from './assistant';
 import { createQueriesApi } from './queries';
 import { getSafeRedirect } from '../redirects';
 import { API_PATHS, apiPath } from './generated/routes';
+import { queryClient } from '../query';
+import { clearAccountQueryCache, clearSensitiveQueryState } from '../query/cacheLifecycle';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:7233' : 'https://api.ayphr.com');
 
@@ -45,11 +47,18 @@ export function createApiClient(config: ApiClientConfig = {}): AyphrApiClient {
   const client = createRequestClient({
     baseUrl: API_BASE_URL,
     onUnauthorized: () => {
+      void clearSensitiveQueryState(queryClient);
       if (globalThis.window === undefined) return;
       if (!globalThis.location.pathname.startsWith('/auth')) {
         const redirect = encodeURIComponent(getSafeRedirect(globalThis.location.pathname + globalThis.location.search));
         globalThis.location.assign(`/auth/login?redirect=${redirect}`);
       }
+    },
+    onAccountSwitch: async () => {
+      await clearAccountQueryCache(queryClient);
+    },
+    onAuthCleared: async () => {
+      await clearSensitiveQueryState(queryClient);
     },
     ...config,
   });
