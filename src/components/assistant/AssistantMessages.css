@@ -69,6 +69,8 @@
 .assistant-chat__message {
   display: flex;
   animation: assistant-message-in 0.3s ease both;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 80px;
 }
 
 .assistant-chat__message:nth-child(2) { animation-delay: 0.03s; }
