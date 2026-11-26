@@ -292,11 +292,17 @@
 }
 
 .locations__history-graph {
-  height: 320px;
+  height: 360px;
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
+}
+
+.locations__history-graph .line-graph,
+.locations__history-graph canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .locations__history-summary {

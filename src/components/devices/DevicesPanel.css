@@ -573,6 +573,12 @@
   overflow: hidden;
 }
 
+.devices__chart-container .line-graph,
+.devices__chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .devices__separate-charts {
   display: flex;
   flex-direction: column;
@@ -581,8 +587,8 @@
 }
 
 .devices__chart-container--separate {
-  height: 250px;
-  min-height: 250px;
+  height: 300px;
+  min-height: 300px;
 }
 
 @media (max-width: 720px) {

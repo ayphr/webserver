@@ -37,9 +37,11 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
     queryFn: () => api.teams.pendingInvites().catch(() => []),
   });
   const devicesData = devicesQuery.data;
+  const locationsData = locationsQuery.data;
+  const invitesData = invitesQuery.data;
   const devices = useMemo(() => devicesData ?? [], [devicesData]);
-  const locations = useMemo(() => locationsQuery.data ?? [], [locationsQuery.data]);
-  const pendingInvites = useMemo(() => invitesQuery.data ?? [], [invitesQuery.data]);
+  const locations = useMemo(() => locationsData ?? [], [locationsData]);
+  const pendingInvites = useMemo(() => invitesData ?? [], [invitesData]);
   const isLoading = (!devicesQuery.data && devicesQuery.isPending) || (!locationsQuery.data && locationsQuery.isPending);
   const error = devicesQuery.error instanceof Error ? devicesQuery.error.message : devicesQuery.error ? 'Failed to load devices' : null;
   const [inviteError, setInviteError] = useState<string | null>(null);

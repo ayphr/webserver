@@ -261,12 +261,14 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const view: 'list' | 'detail' = selectedSerial === null ? 'list' : 'detail';
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDataFillOpen, setIsDataFillOpen] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creditsOverride, setCreditsOverride] = useState<CreditBalance | null>(initialCredits);
 
-  const devices = useMemo(() => devicesQuery.data ?? [], [devicesQuery.data]);
-  const locations = useMemo(() => locationsQuery.data ?? [], [locationsQuery.data]);
+  const devicesData = devicesQuery.data;
+  const locationsData = locationsQuery.data;
+  const devices = useMemo(() => devicesData ?? [], [devicesData]);
+  const locations = useMemo(() => locationsData ?? [], [locationsData]);
+  const isRefreshing = (devicesQuery.isFetching || locationsQuery.isFetching || meQuery.isFetching) && !!devicesData;
   const user = meQuery.data?.user ?? null;
   const credits = creditsOverride ?? meQuery.data?.credits ?? null;
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;
@@ -548,7 +550,6 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   }, [selectedDevice, view, selectedSerial]);
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     await loadAll();
     if (selectedDevice && selectedSerial !== null) {
       try {
@@ -565,7 +566,6 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         setDataError(err instanceof Error ? err.message : 'Failed to load telemetry data');
       }
     }
-    setIsRefreshing(false);
   };
 
   const handleSelectDevice = (device: DeviceSummary) => {

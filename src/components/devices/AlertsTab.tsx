@@ -180,9 +180,11 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
   const queryClient = useQueryClient();
   const alertsQuery = useQuery({ queryKey: queryKeys.deviceAlerts(serial), queryFn: () => api.alerts.list(serial), meta: { persist: false } });
   const integrationsQuery = useQuery({ queryKey: ['integrations', 'mine'], queryFn: () => api.integrations.listMine().catch(() => [] as Integration[]), meta: { persist: false } });
-  const alerts = (alertsQuery.data ?? []) as AlertWithMute[];
-  const integrations = integrationsQuery.data ?? [];
-  const isLoading = (!alertsQuery.data && alertsQuery.isPending) || (!integrationsQuery.data && integrationsQuery.isPending);
+  const alertsData = alertsQuery.data;
+  const integrationsData = integrationsQuery.data;
+  const alerts = useMemo(() => (alertsData ?? []) as AlertWithMute[], [alertsData]);
+  const integrations = useMemo(() => integrationsData ?? [], [integrationsData]);
+  const isLoading = (!alertsData && alertsQuery.isPending) || (!integrationsData && integrationsQuery.isPending);
   const [actionError, setActionError] = useState<string | null>(null);
   const error = actionError ?? (alertsQuery.error instanceof Error ? alertsQuery.error.message : alertsQuery.error ? 'Failed to load alerts' : null);
   const [statusFilter, setStatusFilter] = useState<AlertStatusFilter>('all');

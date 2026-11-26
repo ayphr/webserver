@@ -61,12 +61,25 @@ const HISTORY_METRICS = [
 ] as const;
 type HistoryMetric = (typeof HISTORY_METRICS)[number]['value'];
 
-/** Monochrome dataset styling: tone, dash and marker shape keep devices distinct. */
-const HISTORY_LINE_STYLES: Array<{ color: string; dash?: number[]; pointStyle: NonNullable<LineGraphData['datasets'][number]['pointStyle']> }> = [
-  { color: 'var(--text-primary)', pointStyle: 'circle' },
-  { color: 'var(--text-muted)', dash: [6, 4], pointStyle: 'rect' },
-  { color: 'var(--text-dim)', dash: [2, 4], pointStyle: 'triangle' },
-  { color: 'var(--border-focus)', dash: [10, 4], pointStyle: 'cross' },
+const HISTORY_LINE_COLORS = [
+  'var(--accent-green-solid)',
+  'var(--accent-yellow-solid)',
+  'var(--accent-red-solid)',
+  'var(--accent-blue-solid)',
+  'var(--accent-purple-solid)',
+  'var(--accent-orange-solid)',
+  'var(--accent-teal-solid)',
+  'var(--accent-pink-solid)',
+  'var(--accent-aqua-solid)',
+  'var(--accent-indigo-solid)',
+  'var(--accent-lime-solid)',
+  'var(--accent-amber-solid)',
+  'var(--accent-rose-solid)',
+  'var(--accent-cyan-solid)',
+] as const;
+
+const HISTORY_POINT_STYLES: Array<NonNullable<LineGraphData['datasets'][number]['pointStyle']>> = [
+  'circle', 'rect', 'triangle', 'rectRot', 'star', 'cross', 'dash', 'rectRounded', 'crossRot', 'line',
 ];
 
 type LocationStats = {
@@ -148,7 +161,8 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
 
   const chartData = useMemo<LineGraphData>(() => ({
     datasets: series.map((entry, index) => {
-      const style = HISTORY_LINE_STYLES[index % HISTORY_LINE_STYLES.length]!;
+      const color = HISTORY_LINE_COLORS[index % HISTORY_LINE_COLORS.length]!;
+      const pointStyle = HISTORY_POINT_STYLES[index % HISTORY_POINT_STYLES.length]!;
       return {
         label: `${entry.name} (#${entry.serial})`,
         data: entry.points
@@ -157,10 +171,9 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
           .sort((a, b) => a.x - b.x),
         parsing: false,
         normalized: true,
-        borderColor: resolveCssColor(style.color),
+        borderColor: resolveCssColor(color),
         backgroundColor: 'transparent',
-        borderDash: style.dash,
-        pointStyle: style.pointStyle,
+        pointStyle,
         tension: 0.25,
         borderWidth: 2,
         pointRadius: 0,
@@ -308,15 +321,17 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   const locationsQuery = useLocationsMine();
   const devicesQuery = useDevicesMine();
   const meQuery = useQuery({ queryKey: queryKeys.bootstrap(), queryFn: () => api.users.me() });
-  const locations = useMemo(() => locationsQuery.data ?? [], [locationsQuery.data]);
-  const devices = useMemo(() => devicesQuery.data ?? [], [devicesQuery.data]);
+  const locationsData = locationsQuery.data;
+  const devicesData = devicesQuery.data;
+  const locations = useMemo(() => locationsData ?? [], [locationsData]);
+  const devices = useMemo(() => devicesData ?? [], [devicesData]);
   const user = meQuery.data?.user ?? null;
   const [locationPage, setLocationPage] = useState(1);
   const [locationDevicePage, setLocationDevicePage] = useState(1);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<LocationFilter>('all');
   const [sort, setSort] = useState<LocationSort>('name');
-  const isLoading = (!locationsQuery.data && locationsQuery.isPending) || (!devicesQuery.data && devicesQuery.isPending);
+  const isLoading = (!locationsData && locationsQuery.isPending) || (!devicesData && devicesQuery.isPending);
   const isRefreshing = (locationsQuery.isFetching || devicesQuery.isFetching) && !isLoading;
   const [actionError, setActionError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
