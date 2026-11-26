@@ -185,7 +185,7 @@ export const DashboardPage = () => {
   const inviteToken = searchParams.get('invite');
   const isStaff = user?.role === 'staff';
   const isTeamMember = Boolean(user?.teamId);
-  const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
+  const [defaultTab, setDefaultTab] = useState<DashboardTab>(getStoredDefaultTab);
   // A stored preference for a tab the account cannot open falls back to Overview.
   const preferredDefaultTab: DashboardTab = defaultTab === 'team' && !isTeamMember
     ? 'overview'
