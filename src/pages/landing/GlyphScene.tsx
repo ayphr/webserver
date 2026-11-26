@@ -50,11 +50,11 @@ const drawCover = (
   img: HTMLImageElement,
   width: number,
   height: number,
+  focusX: number,
+  zoom: number,
 ) => {
   const imageRatio = img.naturalWidth / img.naturalHeight;
   const targetRatio = width / height;
-  const zoom = 1.45;
-  const focusX = 0.62;
   let sy: number;
   let sw: number;
   let sh: number;
@@ -69,7 +69,9 @@ const drawCover = (
     sy = (img.naturalHeight - sh) * 0.54;
   }
 
-  const sx = clamp(img.naturalWidth * focusX - sw / 2, 0, img.naturalWidth - sw);
+  const sx = img.naturalWidth * focusX - sw / 2;
+  ctx.fillStyle = '#121212';
+  ctx.fillRect(0, 0, width, height);
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
 };
 
@@ -175,12 +177,20 @@ export const GlyphScene = ({ src, cell = 10 }: { src: string; cell?: number }) =
       sample.height = rows;
       const sampleCtx = sample.getContext('2d', { willReadFrequently: true });
       if (!sampleCtx) return;
-      drawCover(sampleCtx, image, columns, rows);
+      const style = getComputedStyle(canvas);
+      const setting = (name: string, fallback: number) => {
+        const value = Number.parseFloat(style.getPropertyValue(name));
+        return Number.isFinite(value) ? value : fallback;
+      };
+      const focusX = setting('--glyph-focus-x', 0.62);
+      const zoom = setting('--glyph-zoom', 1.45);
+      const fadeStart = setting('--glyph-fade-start', 0.12);
+      const fadeEnd = setting('--glyph-fade-end', 0.62);
+      drawCover(sampleCtx, image, columns, rows, focusX, zoom);
       const data = sampleCtx.getImageData(0, 0, columns, rows).data;
 
       // The workbench starts at y=596 in the 900px source scene. Keep it out of
       // the left fade so it can run the full width of the hero.
-      const zoom = 1.45;
       const imageRatio = image.naturalWidth / image.naturalHeight;
       const targetRatio = columns / rows;
       const cropHeight =
@@ -231,7 +241,7 @@ export const GlyphScene = ({ src, cell = 10 }: { src: string; cell?: number }) =
           const source = raws[y * columns + x];
           if (source < 0) continue;
           const upperMask = 1 - smoothstep(benchStart - 0.03, benchStart + 0.03, y / Math.max(1, rows - 1));
-          const horizontalFade = smootherstep(0.12, 0.62, x / Math.max(1, columns - 1));
+          const horizontalFade = smootherstep(fadeStart, fadeEnd, x / Math.max(1, columns - 1));
           const fade = 1 - upperMask * (1 - horizontalFade);
           const gate = smoothstep(0.02, 0.075, source * fade);
           const raw = source * fade * gate;
