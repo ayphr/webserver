@@ -662,7 +662,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
                   onKeyDown={(event) => handleLocationCardKeyDown(event, location.id)}
                 >
                   <div className="locations__location-card__content">
-                    <IconMapPin size={18} strokeWidth={1.75} />
+                    <IconMapPin size={18} strokeWidth={1.75} aria-hidden="true" />
                     <div>
                       <div className="locations__location-card__name">{location.name}</div>
                       <div className="locations__location-card__meta">
