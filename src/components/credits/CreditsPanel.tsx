@@ -71,7 +71,7 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
   if (!credits) {
     return (
       <div className="credits__error" role="alert">
-        <IconAlertCircle size={18} />
+        <IconAlertCircle aria-hidden="true" size={18} />
         <span>{error ?? 'Could not load your credits.'}</span>
       </div>
     );
@@ -85,7 +85,7 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
     <div className="credits">
       {error && (
         <div className="credits__error" role="alert">
-          <IconAlertCircle size={18} />
+          <IconAlertCircle aria-hidden="true" size={18} />
           <span>{error}</span>
         </div>
       )}

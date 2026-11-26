@@ -138,7 +138,7 @@ const DashboardBanner = ({
   onDismiss,
 }: DashboardBannerProps) => (
   <div className="dashboard-page__banner" role="alert">
-    <IconAlertCircle size={18} strokeWidth={1.75} />
+    <IconAlertCircle aria-hidden="true" size={18} strokeWidth={1.75} />
     <div className="dashboard-page__banner-body">
       <strong className="dashboard-page__banner-title">{title}</strong>
       <span className="dashboard-page__banner-message">{message}</span>

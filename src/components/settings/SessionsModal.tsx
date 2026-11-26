@@ -121,7 +121,7 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
 
         {!isLoading && error && (
           <div className="sessions-modal__error" role="alert">
-            <IconAlertCircle size={18} strokeWidth={1.75} />
+            <IconAlertCircle aria-hidden="true" size={18} strokeWidth={1.75} />
             <span>{error}</span>
           </div>
         )}

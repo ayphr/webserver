@@ -120,7 +120,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({ isOpen, onCl
             </div>
             {error && (
               <div className="modal-form__error" role="alert">
-                <IconAlertCircle size={18} strokeWidth={1.75} />
+                <IconAlertCircle aria-hidden="true" size={18} strokeWidth={1.75} />
                 <span>{error}</span>
               </div>
             )}
@@ -141,7 +141,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({ isOpen, onCl
             <CodeInput value={code} onChange={setCode} disabled={isSaving} />
             {error && (
               <div className="modal-form__error" role="alert">
-                <IconAlertCircle size={18} strokeWidth={1.75} />
+                <IconAlertCircle aria-hidden="true" size={18} strokeWidth={1.75} />
                 <span>{error}</span>
               </div>
             )}

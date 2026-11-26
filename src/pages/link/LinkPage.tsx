@@ -262,7 +262,7 @@ export const LinkPage = () => {
 
             {error && (
               <div className="link-page__error" role="alert">
-                <IconAlertCircle size={16} strokeWidth={1.75} />
+                <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
                 <span>{error}</span>
               </div>
             )}

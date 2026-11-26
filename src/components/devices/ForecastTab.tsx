@@ -380,7 +380,7 @@ const historyOptions = [
         </div>
       ) : error ? (
         <div className="forecast-tab forecast-tab--error">
-          <IconAlertCircle size={16} strokeWidth={1.75} />
+          <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
       ) : !forecast || forecast.samples.length === 0 ? (

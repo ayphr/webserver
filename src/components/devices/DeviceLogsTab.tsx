@@ -47,7 +47,7 @@ const REFRESH_OPTIONS = [
 function LevelIcon({ level }: Readonly<{ level: DeviceLogLevel }>) {
   if (level === 'info') return <IconCheck size={15} strokeWidth={2} />;
   if (level === 'warning') return <IconAlertTriangle size={15} strokeWidth={1.9} />;
-  return <IconAlertCircle size={15} strokeWidth={1.9} />;
+  return <IconAlertCircle aria-hidden="true" size={15} strokeWidth={1.9} />;
 }
 
 function formatDetailValue(value: unknown): string {
@@ -347,14 +347,14 @@ export function DeviceLogsTab({ serial }: Readonly<DeviceLogsTabProps>) {
 
       {exportError && (
         <div className="device-logs__error" role="alert">
-          <IconAlertCircle size={17} strokeWidth={1.75} />
+          <IconAlertCircle aria-hidden="true" size={17} strokeWidth={1.75} />
           <span>{exportError}</span>
         </div>
       )}
 
       {error && (
         <div className="device-logs__error" role="alert">
-          <IconAlertCircle size={17} strokeWidth={1.75} />
+          <IconAlertCircle aria-hidden="true" size={17} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
       )}

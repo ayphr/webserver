@@ -835,7 +835,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
           )}
           {assistError && (
             <p id={assistErrorId} className="queries-panel__assist-error" role="alert">
-              <IconAlertCircle size={14} strokeWidth={1.75} />
+              <IconAlertCircle aria-hidden="true" size={14} strokeWidth={1.75} />
               {assistError}
             </p>
           )}
@@ -844,7 +844,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
 
         {(boostRequiredMessage || tooManyPointsMessage) && (
           <div className="queries-panel__warning" role="alert">
-            <IconAlertCircle size={17} strokeWidth={1.75} />
+            <IconAlertCircle aria-hidden="true" size={17} strokeWidth={1.75} />
             <span>{boostRequiredMessage ?? tooManyPointsMessage}</span>
             {boostRequiredMessage && (
               <Button variant="secondary" onClick={() => patchDraft({ type: 'boost' })}>
@@ -857,7 +857,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
 
         {errors.length > 0 && (
           <div className="queries-panel__error" role="alert">
-            <IconAlertCircle size={17} strokeWidth={1.75} />
+            <IconAlertCircle aria-hidden="true" size={17} strokeWidth={1.75} />
             <div className="queries-panel__error-list">
               {errors.map((message) => (
                 <div key={message} className="queries-panel__error-item">{message}</div>

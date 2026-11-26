@@ -71,7 +71,7 @@ export function TokensTab({ serial, deviceName }: Props) {
     <div className="tokens-tab">
       {error && (
         <div className="tokens-tab__error">
-          <IconAlertCircle size={16} strokeWidth={1.75} />
+          <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
       )}

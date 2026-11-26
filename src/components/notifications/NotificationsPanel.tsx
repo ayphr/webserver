@@ -313,7 +313,7 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
         <>
           {preferencesError && (
             <div className="notifications-panel__error" role="alert">
-              <IconAlertCircle size={18} strokeWidth={1.75} />
+              <IconAlertCircle aria-hidden="true" size={18} strokeWidth={1.75} />
               <span>{preferencesError}</span>
             </div>
           )}
@@ -441,7 +441,7 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
 
       {error && (
         <div className="notifications-panel__error" role="alert">
-          <IconAlertCircle size={18} strokeWidth={1.75} />
+          <IconAlertCircle aria-hidden="true" size={18} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
       )}

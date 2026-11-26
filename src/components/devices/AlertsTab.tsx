@@ -979,7 +979,7 @@ export function AlertsTab({ serial, deviceName, canManage, onNavigate, route, on
                             >
                               {result.ok
                                 ? <IconCheck size={14} strokeWidth={2} />
-                                : <IconAlertCircle size={14} strokeWidth={1.9} />}
+                                : <IconAlertCircle aria-hidden="true" size={14} strokeWidth={1.9} />}
                               <strong>{integration?.name ?? result.integrationId}</strong>
                               <span>
                                 {result.ok

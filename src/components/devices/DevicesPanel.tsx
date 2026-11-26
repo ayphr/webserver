@@ -812,7 +812,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     return (
       <div className="devices">
         <div className="devices__empty devices__empty--not-found">
-          <IconAlertCircle size={28} strokeWidth={1.5} />
+          <IconAlertCircle aria-hidden="true" size={28} strokeWidth={1.5} />
           <h3>Device not found or not shared with your team</h3>
           <p>The device may have been unlinked, or it is no longer shared with your team.</p>
           <Button variant="secondary" onClick={closeDevice}>
@@ -916,7 +916,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
 
         {error && (
           <div className="devices__error" role="alert">
-            <IconAlertCircle size={16} strokeWidth={1.75} />
+            <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
             <span>{error}</span>
           </div>
         )}
@@ -1000,7 +1000,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     <div className="devices devices--detail">
       {error && (
         <div className="devices__error" role="alert">
-          <IconAlertCircle size={16} strokeWidth={1.75} />
+          <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
       )}
@@ -1227,7 +1227,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
 
             {dataError && (
               <div className="devices__error" role="alert">
-                <IconAlertCircle size={16} strokeWidth={1.75} />
+                <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
                 <span>{dataError}</span>
               </div>
             )}
