@@ -267,7 +267,7 @@ const ToolCallLine = ({
               onClick={() => respond('allow_once')}
               aria-label={`Allow ${tool.label ?? tool.name} once`}
             >
-              <IconCheck size={12} strokeWidth={2} />
+              <IconCheck aria-hidden="true" size={12} strokeWidth={2} />
               <span>Allow once</span>
             </button>
             <button
@@ -276,7 +276,7 @@ const ToolCallLine = ({
               onClick={() => respond('allow_always')}
               aria-label={`Always allow ${tool.label ?? tool.name}`}
             >
-              <IconShieldStar size={12} strokeWidth={2} />
+              <IconShieldStar aria-hidden="true" size={12} strokeWidth={2} />
               <span>Always allow</span>
             </button>
             <button
@@ -286,7 +286,7 @@ const ToolCallLine = ({
               onClick={() => respond('deny')}
               aria-label={`Deny ${tool.label ?? tool.name}`}
             >
-              <IconX size={12} strokeWidth={2} />
+              <IconX aria-hidden="true" size={12} strokeWidth={2} />
               <span>Deny</span>
             </button>
           </div>
@@ -785,7 +785,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                     aria-haspopup="menu"
                     aria-expanded={openMenuId === message.id}
                   >
-                    <IconChevronDown size={14} strokeWidth={2} aria-hidden="true" />
+                    <IconChevronDown aria-hidden="true" size={14} strokeWidth={2} />
                   </button>
                 </div>
               ) : (
@@ -818,9 +818,9 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       disabled={isStreaming}
                     >
                       {message.feedback === 'like' ? (
-                        <IconThumbUpFilled size={15} strokeWidth={1.75} />
+                        <IconThumbUpFilled aria-hidden="true" size={15} strokeWidth={1.75} />
                       ) : (
-                        <IconThumbUp size={15} strokeWidth={1.75} />
+                        <IconThumbUp aria-hidden="true" size={15} strokeWidth={1.75} />
                       )}
                     </button>
                     <button
@@ -832,9 +832,9 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       disabled={isStreaming}
                     >
                       {message.feedback === 'dislike' ? (
-                        <IconThumbDownFilled size={15} strokeWidth={1.75} />
+                        <IconThumbDownFilled aria-hidden="true" size={15} strokeWidth={1.75} />
                       ) : (
-                        <IconThumbDown size={15} strokeWidth={1.75} />
+                        <IconThumbDown aria-hidden="true" size={15} strokeWidth={1.75} />
                       )}
                     </button>
                     {isLatestAssistant && !isStreaming && (
@@ -844,7 +844,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                         onClick={() => onRegenerate(message.id)}
                         aria-label="Regenerate response"
                       >
-                        <IconRefresh size={15} strokeWidth={1.75} />
+                        <IconRefresh aria-hidden="true" size={15} strokeWidth={1.75} />
                       </button>
                     )}
                     <button
@@ -854,8 +854,8 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       aria-label={copiedId === message.id ? 'Copied' : 'Copy response'}
                     >
                       <span className="assistant-chat__copy-icons">
-                        <IconCopy size={15} strokeWidth={1.75} className="assistant-chat__copy-icon" />
-                        <IconCopyCheck size={15} strokeWidth={1.75} className="assistant-chat__copied-icon" />
+                        <IconCopy aria-hidden="true" size={15} strokeWidth={1.75} className="assistant-chat__copy-icon" />
+                        <IconCopyCheck aria-hidden="true" size={15} strokeWidth={1.75} className="assistant-chat__copied-icon" />
                       </span>
                     </button>
                     <span className="assistant-chat__meta">
@@ -920,14 +920,14 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                     }}
                     aria-label="Save queued message"
                   >
-                    <IconCheck size={12} strokeWidth={2} />
+                    <IconCheck aria-hidden="true" size={12} strokeWidth={2} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingQueuedIndex(null)}
                     aria-label="Cancel editing queued message"
                   >
-                    <IconX size={12} strokeWidth={2} />
+                    <IconX aria-hidden="true" size={12} strokeWidth={2} />
                   </button>
                 </div>
               </div>
@@ -945,7 +945,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       }}
                       aria-label="Edit queued message"
                     >
-                      <IconTool size={12} strokeWidth={2} />
+                      <IconTool aria-hidden="true" size={12} strokeWidth={2} />
                     </button>
                     <button
                       type="button"
@@ -953,7 +953,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       disabled={index === 0}
                       aria-label="Move queued message earlier"
                     >
-                      <IconArrowUp size={12} strokeWidth={2} />
+                      <IconArrowUp aria-hidden="true" size={12} strokeWidth={2} />
                     </button>
                     <button
                       type="button"
@@ -961,14 +961,14 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                       disabled={index === queuedMessages.length - 1}
                       aria-label="Move queued message later"
                     >
-                      <IconArrowDown size={12} strokeWidth={2} />
+                      <IconArrowDown aria-hidden="true" size={12} strokeWidth={2} />
                     </button>
                     <button
                       type="button"
                       onClick={() => onRemoveQueued(index)}
                       aria-label="Remove queued message"
                     >
-                      <IconX size={12} strokeWidth={2} />
+                      <IconX aria-hidden="true" size={12} strokeWidth={2} />
                     </button>
                   </div>
                 </div>
@@ -1002,7 +1002,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   closeMenu();
                 }}
               >
-                <IconArrowBackUp size={14} strokeWidth={2} />
+                <IconArrowBackUp aria-hidden="true" size={14} strokeWidth={2} />
                 <span>Undo</span>
               </button>
               <button
@@ -1014,7 +1014,7 @@ export const AssistantMessages = forwardRef<AssistantMessagesHandle, AssistantMe
                   closeMenu();
                 }}
               >
-                <IconCopy size={14} strokeWidth={2} />
+                <IconCopy aria-hidden="true" size={14} strokeWidth={2} />
                 <span>Copy message</span>
               </button>
             </div>,
