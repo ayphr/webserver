@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Button, Input, Select, Modal, Checkbox, Tooltip } from '../common';
 import { IconPlugConnected, IconBrandDiscord, IconBrandSlack, IconPlus, IconTrash, IconEdit, IconSend } from '@tabler/icons-react';
@@ -35,8 +36,11 @@ function providerIcon(provider: IntegrationProvider) {
 }
 
 export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }) {
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const integrationsQuery = useQuery({ queryKey: ['integrations', 'mine'], queryFn: () => api.integrations.listMine() });
+  const integrations = integrationsQuery.data ?? [];
+  const isLoading = !integrationsQuery.data && integrationsQuery.isPending;
+  const queryError = integrationsQuery.error instanceof Error ? integrationsQuery.error.message : integrationsQuery.error ? 'Failed to load integrations' : null;
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Integration | null>(null);
@@ -47,21 +51,11 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const load = async () => {
-    setIsLoading(true);
     setError(null);
-    try {
-      const list = await api.integrations.listMine();
-      setIntegrations(list);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load integrations');
-    } finally {
-      setIsLoading(false);
-    }
+    await queryClient.invalidateQueries({ queryKey: ['integrations', 'mine'] });
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  const effectiveError = error ?? queryError;
 
   const openCreate = () => {
     setEditing(null);
@@ -280,7 +274,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
       >
         <>
           <p>This integration will stop sending notifications and cannot be recovered.</p>
-          {error && <p className="integrations-panel__error" role="alert">{error}</p>}
+          {effectiveError && <p className="integrations-panel__error" role="alert">{effectiveError}</p>}
         </>
       </Modal>
     </div>

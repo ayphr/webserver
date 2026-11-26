@@ -424,18 +424,8 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   }, [onCreditsChange, queryClient]);
 
   useEffect(() => {
-    if (devicesQuery.data || devicesQuery.error || locationsQuery.data || locationsQuery.error) {
-      setIsLoading(!devicesQuery.data && devicesQuery.isPending);
-    }
-  }, [devicesQuery.data, devicesQuery.error, devicesQuery.isPending, locationsQuery.data, locationsQuery.error]);
-
-  useEffect(() => {
-    if (!devicesQuery.data && !devicesQuery.error && devicesQuery.isPending) {
-      setIsLoading(true);
-    } else {
-      setIsLoading(false);
-    }
-  }, [devicesQuery.data, devicesQuery.error, devicesQuery.isPending]);
+    setIsLoading(!devicesQuery.data && devicesQuery.isPending);
+  }, [devicesQuery.data, devicesQuery.isPending]);
 
   const selectedDevice = useMemo(
     () => devices.find((d) => d.serial === selectedSerial) ?? null,
