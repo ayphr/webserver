@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   IconDeviceDesktop,
   IconDeviceLaptop,
@@ -9,6 +9,7 @@ import {
   IconAlertCircle,
   IconLogout2,
 } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { SessionInfo } from '@common';
 import { api } from '../../lib/api';
 import { getRelativeTime } from '../../lib/date';
@@ -45,41 +46,21 @@ function describeClient(session: SessionInfo): string {
 }
 
 export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+  const queryClient = useQueryClient();
+  const sessionsQuery = useQuery({
+    queryKey: ['sessions'],
+    queryFn: () => api.sessions.list(),
+    enabled: isOpen,
+  });
+  const sessions = sessionsQuery.data ?? [];
+  const isLoading = !sessionsQuery.data && sessionsQuery.isPending;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const error = actionError ?? (sessionsQuery.error instanceof Error ? sessionsQuery.error.message : sessionsQuery.error ? 'Failed to load sessions' : null);
   const [sessionToRevoke, setSessionToRevoke] = useState<SessionInfo | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [isLogoutOthersOpen, setIsLogoutOthersOpen] = useState(false);
   const [isSigningOutOthers, setIsSigningOutOthers] = useState(false);
   const otherSessionCount = sessions.filter((session) => !session.current).length;
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let cancelled = false;
-
-    const load = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const result = await api.sessions.list();
-        if (!cancelled) setSessions(result);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load sessions');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, reloadToken]);
 
   const handleRevoke = async () => {
     const session = sessionToRevoke;
@@ -87,13 +68,13 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
 
     setSessionToRevoke(null);
     setRevokingId(session.id);
-    setError(null);
+    setActionError(null);
 
     try {
       await api.sessions.remove(session.id);
-      setReloadToken((token) => token + 1);
+      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign out session');
+      setActionError(err instanceof Error ? err.message : 'Failed to sign out session');
     } finally {
       setRevokingId(null);
     }
@@ -102,13 +83,13 @@ export const SessionsModal = ({ isOpen, onClose }: SessionsModalProps) => {
   const handleLogoutOthers = async () => {
     setIsLogoutOthersOpen(false);
     setIsSigningOutOthers(true);
-    setError(null);
+    setActionError(null);
 
     try {
       await api.auth.logoutOthers();
       window.location.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign out other sessions');
+      setActionError(err instanceof Error ? err.message : 'Failed to sign out other sessions');
     } finally {
       setIsSigningOutOthers(false);
     }

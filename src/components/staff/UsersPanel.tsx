@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { IconEye, IconFilter, IconSearch, IconUser } from '@tabler/icons-react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type {
   PublicUser,
@@ -65,80 +66,39 @@ export const UsersPanel = ({ routeUser, onRouteUserChange }: Props) => {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<PagedUsers>({ users: [], total: 0, totalPages: 1 });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const [punishTarget, setPunishTarget] = useState<PublicUser | null>(null);
-  const [viewedUser, setViewedUser] = useState<PublicUser | null>(null);
-  const [isLoadingViewedUser, setIsLoadingViewedUser] = useState(false);
   const routeUuid = routeUser?.uuid ?? null;
   const [passwordTarget, setPasswordTarget] = useState<PublicUser | null>(null);
+
   useEffect(() => {
     const handle = setTimeout(() => {
       setDebouncedSearch(filters.search.trim());
     }, 300);
-
     return () => clearTimeout(handle);
   }, [filters.search]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const listQuery = useQuery({
+    queryKey: ['staff', 'users', { debouncedSearch, role: filters.role, tier: filters.tier, status: filters.status, page }],
+    queryFn: () => api.staff.listUsers({
+      search: debouncedSearch || undefined,
+      role: filters.role || undefined,
+      tier: filters.tier || undefined,
+      status: filters.status || undefined,
+      page,
+      pageSize: PAGE_SIZE,
+    }),
+  });
+  const data: PagedUsers = listQuery.data ? { users: listQuery.data.users, total: listQuery.data.total, totalPages: listQuery.data.totalPages } : { users: [], total: 0, totalPages: 1 };
+  const isLoading = !listQuery.data && listQuery.isPending;
+  const error = listQuery.error instanceof Error ? listQuery.error.message : listQuery.error ? 'Failed to load users' : null;
 
-    const load = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const result = await api.staff.listUsers({
-          search: debouncedSearch || undefined,
-          role: filters.role || undefined,
-          tier: filters.tier || undefined,
-          status: filters.status || undefined,
-          page,
-          pageSize: PAGE_SIZE,
-        });
-
-        if (cancelled) return;
-        setData({ users: result.users, total: result.total, totalPages: result.totalPages });
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load users');
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedSearch, filters.role, filters.tier, filters.status, page, reloadToken]);
-
-  // The inspected user lives in the URL so the detail view survives refreshes
-  // and browser back/forward navigation.
-  useEffect(() => {
-    if (!routeUuid) return;
-
-    let cancelled = false;
-    const load = async () => {
-      setViewedUser(null);
-      setIsLoadingViewedUser(true);
-      try {
-        const { user } = await api.users.getByUuid(routeUuid);
-        if (!cancelled) setViewedUser(user);
-      } catch {
-        if (!cancelled) setViewedUser(null);
-      } finally {
-        if (!cancelled) setIsLoadingViewedUser(false);
-      }
-    };
-    void load();
-
-    return () => { cancelled = true; };
-  }, [routeUuid]);
+  const viewedUserQuery = useQuery({
+    queryKey: ['users', 'byUuid', routeUuid],
+    queryFn: async () => (await api.users.getByUuid(routeUuid!)).user,
+    enabled: !!routeUuid,
+  });
+  const viewedUser = viewedUserQuery.data ?? null;
+  const isLoadingViewedUser = !!routeUuid && !viewedUserQuery.data && viewedUserQuery.isPending;
 
   const hasFilters = useMemo(
     () => Object.values(filters).some((value) => value !== ''),
@@ -155,11 +115,8 @@ export const UsersPanel = ({ routeUser, onRouteUserChange }: Props) => {
     setPage(1);
   };
 
-  const replaceUser = (updated: PublicUser) => {
-    setData((current) => ({
-      ...current,
-      users: current.users.map((user) => (user.uuid === updated.uuid ? updated : user)),
-    }));
+  const replaceUser = () => {
+    void listQuery.refetch();
   };
 
   if (routeUuid && !viewedUser) {
@@ -299,7 +256,7 @@ export const UsersPanel = ({ routeUser, onRouteUserChange }: Props) => {
           onClose={() => setPunishTarget(null)}
           onPunish={() => {
             setPunishTarget(null);
-            setReloadToken((token) => token + 1);
+            void listQuery.refetch();
           }}
         />
       )}
@@ -312,7 +269,7 @@ export const UsersPanel = ({ routeUser, onRouteUserChange }: Props) => {
           username={passwordTarget.username}
           onClose={() => setPasswordTarget(null)}
           onChanged={(updated) => {
-            if (updated) replaceUser(updated);
+            if (updated) replaceUser();
             setPasswordTarget(null);
           }}
         />

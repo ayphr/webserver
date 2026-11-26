@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../common';
 import { api } from '../../lib/api';
 import type { GameId } from '../../lib/dashboardRoutes';
@@ -119,25 +120,14 @@ function createMemoryCards(): MemoryCard[] {
 }
 
 function MemoryGame() {
+  const queryClient = useQueryClient();
   const [cards, setCards] = useState<MemoryCard[]>(() => createMemoryCards());
   const [flipped, setFlipped] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
   const [locked, setLocked] = useState(false);
-  const [bestMoves, setBestMoves] = useState<number | null>(null);
   const [deckKey, setDeckKey] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    api.games
-      .getBests()
-      .then((res) => {
-        if (active) setBestMoves(res.bests.memory?.value ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+  const bestsQuery = useQuery({ queryKey: ['games', 'bests'], queryFn: () => api.games.getBests() });
+  const bestMoves = bestsQuery.data?.bests.memory?.value ?? null;
 
   const matchedCount = cards.filter((c) => c.matched).length;
 
@@ -178,9 +168,9 @@ function MemoryGame() {
       const newMoves = moves + 1;
       if (matchedCount + 2 === cards.length) {
         if (bestMoves === null || newMoves < bestMoves) {
-          api.games
+          void api.games
             .updateBest('memory', newMoves)
-            .then((res) => setBestMoves(res.bests.memory?.value ?? newMoves))
+            .then(() => queryClient.invalidateQueries({ queryKey: ['games', 'bests'] }))
             .catch(() => {});
         }
       }
@@ -321,25 +311,14 @@ function floodReveal(board: MsCell[][], r: number, c: number) {
 }
 
 function MinesweeperGame() {
+  const queryClient = useQueryClient();
   const [board, setBoard] = useState<MsCell[][]>(() => createEmptyMsBoard());
   const [status, setStatus] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [firstClick, setFirstClick] = useState(true);
   const [flagCount, setFlagCount] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [bestTime, setBestTime] = useState<number | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    api.games
-      .getBests()
-      .then((res) => {
-        if (active) setBestTime(res.bests.minesweeper?.value ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+  const bestsQuery = useQuery({ queryKey: ['games', 'bests'], queryFn: () => api.games.getBests() });
+  const bestTime = bestsQuery.data?.bests.minesweeper?.value ?? null;
 
   useEffect(() => {
     if (status !== 'playing') return;
@@ -386,9 +365,9 @@ function MinesweeperGame() {
       setStatus('won');
       const time = elapsed;
       if (bestTime === null || time < bestTime) {
-        api.games
+        void api.games
           .updateBest('minesweeper', time)
-          .then((res) => setBestTime(res.bests.minesweeper?.value ?? time))
+          .then(() => queryClient.invalidateQueries({ queryKey: ['games', 'bests'] }))
           .catch(() => {});
       }
     } else {
@@ -424,9 +403,9 @@ function MinesweeperGame() {
       setStatus('won');
       const time = elapsed;
       if (bestTime === null || time < bestTime) {
-        api.games
+        void api.games
           .updateBest('minesweeper', time)
-          .then((res) => setBestTime(res.bests.minesweeper?.value ?? time))
+          .then(() => queryClient.invalidateQueries({ queryKey: ['games', 'bests'] }))
           .catch(() => {});
       }
     }

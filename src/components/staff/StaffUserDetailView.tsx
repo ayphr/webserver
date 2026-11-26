@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Button, createTabKeyDownHandler, Select, Modal, PunishModal, Checkbox } from '../common';
 import { IconArrowLeft, IconEye, IconTrash, IconUser } from '@tabler/icons-react';
-import type { PublicUser, Team, CreditBalance } from '@common';
+import type { PublicUser, Team } from '@common';
 import { PLAN_NAMES, SUBSCRIPTION_TIERS } from '@common';
 import type { StaffUserTab } from '../../lib/dashboardRoutes';
 import '../common/Tabs.css';
@@ -26,11 +27,20 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
   const tabIdPrefix = useId();
   const handleTabsKeyDown = createTabKeyDownHandler<StaffUserTab>(selectTab);
 
-  const [teams, setTeams] = useState<TeamEntry[]>([]);
-  const [credits, setCredits] = useState<CreditBalance | null>(null);
-  const [devices, setDevices] = useState<{ count: number; dataPoints: number }>({ count: 0, dataPoints: 0 });
-  const [locations, setLocations] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const teamsQuery = useQuery({ queryKey: ['staff', 'user', user.uuid, 'teams'], queryFn: () => api.staff.users.teams(user.uuid) });
+  const creditsQuery = useQuery({ queryKey: ['staff', 'user', user.uuid, 'credits'], queryFn: () => api.staff.users.credits(user.uuid) });
+  const devicesQuery = useQuery({ queryKey: ['staff', 'user', user.uuid, 'devices'], queryFn: () => api.staff.users.devices(user.uuid) });
+  const locationsQuery = useQuery({ queryKey: ['staff', 'user', user.uuid, 'locations'], queryFn: () => api.staff.users.locations(user.uuid) });
+  const teams = teamsQuery.data ?? [];
+  const credits = creditsQuery.data ?? null;
+  const devices = {
+    count: devicesQuery.data?.length ?? 0,
+    dataPoints: (devicesQuery.data ?? []).reduce((sum, dev) => sum + (dev.dataPointCount ?? 0), 0),
+  };
+  const locations = locationsQuery.data?.length ?? 0;
+  const loading = [teamsQuery, creditsQuery, devicesQuery, locationsQuery].some((q) => !q.data && q.isPending);
+
   const [modalTeam, setModalTeam] = useState<TeamEntry | null>(null);
   const [modalRole, setModalRole] = useState('member');
   const [modalTier, setModalTier] = useState<string>('');
@@ -42,43 +52,11 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [teamConfirmation, setTeamConfirmation] = useState<{ title: string; message: string; action: () => void } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const t = await api.staff.users.teams(user.uuid);
-      setTeams(t);
-      try {
-        const c = await api.staff.users.credits(user.uuid);
-        setCredits(c);
-      } catch {
-        setCredits(null);
-      }
-      try {
-        const d = await api.staff.users.devices(user.uuid);
-        setDevices({
-          count: d.length,
-          dataPoints: d.reduce((sum, dev) => sum + (dev.dataPointCount ?? 0), 0),
-        });
-      } catch {
-        setDevices({ count: 0, dataPoints: 0 });
-      }
-      try {
-        const l = await api.staff.users.locations(user.uuid);
-        setLocations(l.length);
-      } catch {
-        setLocations(0);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [user.uuid]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [load]);
+  const load = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['staff', 'user', user.uuid] }),
+    ]);
+  };
 
   const openModal = (entry: TeamEntry) => {
     setModalTeam(entry);
