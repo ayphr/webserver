@@ -454,7 +454,7 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
       >
         {data.notifications.length === 0 ? (
           <div className="notifications-panel__empty">
-            <IconBell size={28} strokeWidth={1.5} />
+            <IconBell size={28} strokeWidth={1.5} aria-hidden="true" />
             <p>{activeTab === 'unread' ? 'No unread notifications.' : 'No notifications yet.'}</p>
             <span>
               {activeTab === 'unread'
