@@ -20,7 +20,7 @@ export const Pagination = ({ page, totalPages, onPageChange, disabled = false }:
         disabled={disabled || page === 1}
         aria-label="Previous page"
       >
-        <IconChevronLeft size={16} />
+        <IconChevronLeft size={16} aria-hidden="true" />
         <span>Previous</span>
       </Button>
       <span className="pagination__indicator" aria-live="polite">
@@ -33,7 +33,7 @@ export const Pagination = ({ page, totalPages, onPageChange, disabled = false }:
         aria-label="Next page"
       >
         <span>Next</span>
-        <IconChevronRight size={16} />
+        <IconChevronRight size={16} aria-hidden="true" />
       </Button>
     </nav>
   );
