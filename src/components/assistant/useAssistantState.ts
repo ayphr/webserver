@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createDefaultAssistantState,
   moveAssistantChatsToFolder,
@@ -13,7 +14,9 @@ import {
   type AssistantState,
 } from '@common';
 import { api } from '../../lib/api';
-import { STORAGE_KEYS, removeStorage } from '../../lib/storage';
+import { STORAGE_KEYS, readStorage, removeStorage, writeStorage } from '../../lib/storage';
+import { queryKeys } from '../../lib/query';
+import { mergeAssistantState, type AssistantDirtyMeta } from '../../lib/query/assistantMerge';
 import { createId, toPersistableMessage } from './utils';
 
 export type AssistantSyncStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -46,6 +49,7 @@ export type AssistantController = {
 };
 
 const SAVE_DELAY_MS = 500;
+const ASSISTANT_DIRTY_KEY = 'ayphr-assistant-dirty-v1';
 
 const LEGACY_ASSISTANT_STORAGE_KEYS = [
   STORAGE_KEYS.assistantFolders,
@@ -64,28 +68,77 @@ const toPersistableState = (state: AssistantState): AssistantState => ({
   })),
 });
 
+function readDirtyMeta(): AssistantDirtyMeta {
+  try {
+    const raw = readStorage(ASSISTANT_DIRTY_KEY, 'local');
+    if (!raw) return { dirtyChatIds: [] };
+    const parsed = JSON.parse(raw) as AssistantDirtyMeta;
+    return { dirtyChatIds: Array.isArray(parsed.dirtyChatIds) ? parsed.dirtyChatIds : [], dirtyPreferences: !!parsed.dirtyPreferences, dirtyFolders: !!parsed.dirtyFolders };
+  } catch {
+    return { dirtyChatIds: [] };
+  }
+}
+
+function writeDirtyMeta(meta: AssistantDirtyMeta) {
+  if (!meta.dirtyChatIds.length && !meta.dirtyPreferences && !meta.dirtyFolders) {
+    removeStorage(ASSISTANT_DIRTY_KEY, 'local');
+    return;
+  }
+  writeStorage(ASSISTANT_DIRTY_KEY, JSON.stringify(meta), 'local');
+}
+
 export const useAssistantState = (): AssistantController => {
-  const [state, setState] = useState<AssistantState>(createDefaultAssistantState);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const assistantQuery = useQuery({
+    queryKey: queryKeys.assistantState(),
+    queryFn: () => api.assistant.getState(),
+    staleTime: 30_000,
+  });
+
+  const cached = queryClient.getQueryData<AssistantState>(queryKeys.assistantState()) ?? assistantQuery.data ?? createDefaultAssistantState();
+  const [state, setState] = useState<AssistantState>(cached);
   const [syncStatus, setSyncStatus] = useState<AssistantSyncStatus>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const stateRef = useRef(state);
   const pendingRef = useRef<AssistantState | null>(null);
+  const dirtyMetaRef = useRef<AssistantDirtyMeta>(readDirtyMeta());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const saveGenerationRef = useRef(0);
-  const loadGenerationRef = useRef(0);
   const retryRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    const incoming = assistantQuery.data;
+    if (!incoming) return;
+    const dirty = dirtyMetaRef.current;
+    const hasDirty = dirty.dirtyChatIds.length > 0 || !!dirty.dirtyPreferences || !!dirty.dirtyFolders || !!pendingRef.current;
+    const next = hasDirty ? mergeAssistantState(stateRef.current, incoming, dirty) : incoming;
+    if (JSON.stringify(next) !== JSON.stringify(stateRef.current)) {
+      stateRef.current = next;
+      setState(next);
+      queryClient.setQueryData(queryKeys.assistantState(), next);
+    }
+  }, [assistantQuery.data, queryClient]);
 
   const persist = useCallback(function persist(next: AssistantState): Promise<void> {
     const generation = ++saveGenerationRef.current;
     setSyncStatus('saving');
     setSyncError(null);
-    // Serialize saves so a slow request cannot overwrite a newer state.
     const operation = saveQueueRef.current.then(async () => {
       try {
-        await api.assistant.saveState(toPersistableState(next));
+        const saved = await api.assistant.saveState(toPersistableState(next));
         if (generation === saveGenerationRef.current) {
+          dirtyMetaRef.current = { dirtyChatIds: [] };
+          writeDirtyMeta(dirtyMetaRef.current);
+          pendingRef.current = null;
+          const merged = mergeAssistantState(stateRef.current, saved, dirtyMetaRef.current);
+          stateRef.current = merged;
+          setState(merged);
+          queryClient.setQueryData(queryKeys.assistantState(), merged);
           setSyncStatus('saved');
           setSyncError(null);
           retryRef.current = null;
@@ -100,7 +153,7 @@ export const useAssistantState = (): AssistantController => {
     });
     saveQueueRef.current = operation;
     return operation;
-  }, []);
+  }, [queryClient]);
 
   const flush = useCallback((): Promise<void> => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -110,54 +163,51 @@ export const useAssistantState = (): AssistantController => {
     return pending ? persist(pending) : Promise.resolve();
   }, [persist]);
 
-  const loadState = useCallback(async function loadState(
-    isRetry = false,
-    force = false,
-  ): Promise<AssistantState> {
-    const generation = ++loadGenerationRef.current;
-    if (!isRetry) setIsLoading(true);
-    try {
-      const loaded = await api.assistant.getState();
-      if (generation !== loadGenerationRef.current || (!force && pendingRef.current)) {
-        return stateRef.current;
-      }
-      stateRef.current = loaded;
-      setState(loaded);
-      setSyncStatus('saved');
-      setSyncError(null);
-      retryRef.current = null;
-      return loaded;
-    } catch (err) {
-      if (generation !== loadGenerationRef.current) return stateRef.current;
-      setSyncStatus('error');
-      setSyncError(err instanceof Error ? err.message : 'Failed to load assistant data');
-      retryRef.current = () => {
-        // Unsaved local changes take priority over re-fetching the old state.
-        if (pendingRef.current) void flush();
-        else void loadState(true);
-      };
-      return stateRef.current;
-    } finally {
-      if (generation === loadGenerationRef.current && !isRetry) setIsLoading(false);
-    }
-  }, [flush]);
-
   const refresh = useCallback(async (): Promise<AssistantState> => {
     await flush();
-    return loadState(true, true);
-  }, [flush, loadState]);
+    const res = await queryClient.fetchQuery({ queryKey: queryKeys.assistantState(), queryFn: () => api.assistant.getState(), staleTime: 0 });
+    const dirty = dirtyMetaRef.current;
+    const hasDirty = dirty.dirtyChatIds.length > 0 || !!dirty.dirtyPreferences || !!dirty.dirtyFolders;
+    const merged = hasDirty ? mergeAssistantState(stateRef.current, res, dirty) : res;
+    stateRef.current = merged;
+    setState(merged);
+    queryClient.setQueryData(queryKeys.assistantState(), merged);
+    return merged;
+  }, [flush, queryClient]);
 
   const retrySync = useCallback(() => {
     const retry = retryRef.current;
     retryRef.current = null;
-    retry?.();
+    if (retry) retry();
+    else if (pendingRef.current) void flush();
+  }, [flush]);
+
+  const markDirty = useCallback((prev: AssistantState, next: AssistantState) => {
+    const dirty = dirtyMetaRef.current;
+    const dirtyChatIds = new Set(dirty.dirtyChatIds);
+    const prevChats = new Map(prev.chats.map((c) => [c.id, c]));
+    for (const chat of next.chats) {
+      if (JSON.stringify(prevChats.get(chat.id)) !== JSON.stringify(chat)) dirtyChatIds.add(chat.id);
+    }
+    for (const id of prevChats.keys()) {
+      if (!next.chats.some((c) => c.id === id)) dirtyChatIds.add(id);
+    }
+    dirtyMetaRef.current = {
+      dirtyChatIds: Array.from(dirtyChatIds),
+      dirtyPreferences: dirty.dirtyPreferences || JSON.stringify(prev.preferences) !== JSON.stringify(next.preferences),
+      dirtyFolders: dirty.dirtyFolders || JSON.stringify(prev.folders) !== JSON.stringify(next.folders),
+    };
+    writeDirtyMeta(dirtyMetaRef.current);
   }, []);
 
   const update = useCallback(
     (updater: (current: AssistantState) => AssistantState) => {
-      const next = updater(stateRef.current);
+      const prev = stateRef.current;
+      const next = updater(prev);
+      markDirty(prev, next);
       stateRef.current = next;
       setState(next);
+      queryClient.setQueryData(queryKeys.assistantState(), next);
       pendingRef.current = next;
 
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -168,7 +218,7 @@ export const useAssistantState = (): AssistantController => {
         if (pending) void persist(pending);
       }, SAVE_DELAY_MS);
     },
-    [persist],
+    [markDirty, persist, queryClient],
   );
 
   const updatePreferences = useCallback(
@@ -315,9 +365,6 @@ export const useAssistantState = (): AssistantController => {
 
   const deleteChat = useCallback(
     (id: string) => {
-      // Optimistically remove the chat from the local state. The server is the
-      // source of truth for stream results, so also ask it to delete the chat and
-      // any server-authored results that would otherwise resurrect it on reload.
       update((current) => ({
         ...current,
         chats: current.chats.filter((chat) => chat.id !== id),
@@ -328,29 +375,21 @@ export const useAssistantState = (): AssistantController => {
       const operation = (async () => {
         try {
           await previousQueue;
-
-          if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-          }
+          if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
           const pending = pendingRef.current;
           pendingRef.current = null;
-
           if (pending) {
             setSyncStatus('saving');
-            setSyncError(null);
-            const savedState = await api.assistant.saveState(toPersistableState(pending));
-            stateRef.current = savedState;
-            setState(savedState);
-            setSyncStatus('saved');
-            setSyncError(null);
+            await api.assistant.saveState(toPersistableState(pending));
           }
-
           setSyncStatus('saving');
-          setSyncError(null);
           const saved = await api.assistant.deleteChat(id);
-          stateRef.current = saved;
-          setState(saved);
+          dirtyMetaRef.current = { dirtyChatIds: dirtyMetaRef.current.dirtyChatIds.filter((cid) => cid !== id), dirtyPreferences: dirtyMetaRef.current.dirtyPreferences, dirtyFolders: dirtyMetaRef.current.dirtyFolders };
+          writeDirtyMeta(dirtyMetaRef.current);
+          const merged = mergeAssistantState(stateRef.current, saved, dirtyMetaRef.current);
+          stateRef.current = merged;
+          setState(merged);
+          queryClient.setQueryData(queryKeys.assistantState(), merged);
           setSyncStatus('saved');
           setSyncError(null);
           retryRef.current = null;
@@ -363,7 +402,7 @@ export const useAssistantState = (): AssistantController => {
 
       saveQueueRef.current = operation;
     },
-    [update],
+    [queryClient, update],
   );
 
   deleteChatRef.current = deleteChat;
@@ -400,19 +439,16 @@ export const useAssistantState = (): AssistantController => {
 
   useEffect(() => {
     for (const key of LEGACY_ASSISTANT_STORAGE_KEYS) removeStorage(key, 'local');
-
-    void loadState();
-    return () => {
-      loadGenerationRef.current += 1;
-      void flush();
-    };
-  }, [flush, loadState]);
+    return () => { void flush(); };
+  }, [flush]);
 
   useEffect(() => {
     const handlePageHide = () => void flush();
     window.addEventListener('pagehide', handlePageHide);
     return () => window.removeEventListener('pagehide', handlePageHide);
   }, [flush]);
+
+  const isLoading = !assistantQuery.data && assistantQuery.isPending;
 
   return useMemo(
     () => ({
