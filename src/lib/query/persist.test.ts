@@ -15,5 +15,7 @@ describe('shouldPersistQueryKey', () => {
   test('includes normal list/bootstrap keys', () => {
     expect(shouldPersistQueryKey(queryKeys.bootstrap())).toBe(true);
     expect(shouldPersistQueryKey(queryKeys.devicesMine())).toBe(true);
+    expect(shouldPersistQueryKey(queryKeys.locationsMine())).toBe(true);
+    expect(shouldPersistQueryKey(queryKeys.notificationsUnread())).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   IconAlertCircle,
   IconCalendar,
@@ -8,9 +8,9 @@ import {
   IconRefresh,
 } from '@tabler/icons-react';
 import { PLAN_NAMES, type CreditBalance } from '@common';
-import { api } from '../../lib/api';
 import { formatCreditDateTime, formatCredits } from '../../lib/credits';
 import { Button } from '../common';
+import { useCreditsMe } from '../../lib/query/hooks/useCredits';
 import './CreditsPanel.css';
 
 type Props = {
@@ -19,49 +19,18 @@ type Props = {
 };
 
 export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) => {
-  const [credits, setCredits] = useState<CreditBalance | null>(initialCredits);
-  const [isLoading, setIsLoading] = useState(initialCredits === null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const creditsQuery = useCreditsMe(initialCredits);
+  const credits = creditsQuery.data ?? initialCredits;
+  const isLoading = !credits && creditsQuery.isPending;
+  const isRefreshing = creditsQuery.isFetching && !!credits;
+  const error = creditsQuery.error instanceof Error ? creditsQuery.error.message : creditsQuery.error ? 'Failed to load your credits' : null;
 
   useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const data = await api.credits.me();
-        if (cancelled) return;
-        setCredits(data);
-        onCreditsChange?.(data);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load your credits');
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [onCreditsChange]);
+    if (creditsQuery.data) onCreditsChange?.(creditsQuery.data);
+  }, [creditsQuery.data, onCreditsChange]);
 
   const refresh = async () => {
-    setIsRefreshing(true);
-    setError(null);
-
-    try {
-      const data = await api.credits.me();
-      setCredits(data);
-      onCreditsChange?.(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load your credits');
-    } finally {
-      setIsRefreshing(false);
-    }
+    await creditsQuery.refetch();
   };
 
   if (isLoading && !credits) {

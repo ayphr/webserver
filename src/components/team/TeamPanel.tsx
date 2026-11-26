@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Button, createTabKeyDownHandler, Input, Modal, Select, ProgressBar, Tooltip } from '../common';
 import { IconUserPlus, IconEdit, IconCoin, IconDeviceDesktop, IconMapPin, IconDatabase, IconPlus, IconExternalLink, IconCopy } from '@tabler/icons-react';
@@ -45,6 +46,7 @@ type TeamPanelProps = {
 type TeamTab = TeamSection;
 
 export function TeamPanel({ isManager = false, userUuid, initialTab, onTabChange }: TeamPanelProps) {
+  const queryClient = useQueryClient();
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<TeamInvite[]>([]);

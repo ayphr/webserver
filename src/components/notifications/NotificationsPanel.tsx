@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   IconAlertCircle,
   IconBan,
@@ -83,16 +84,20 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<NotificationFilter>('unread');
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<NotificationListPayload>({
+  const queryClient = useQueryClient();
+  const listQuery = useQuery({
+    queryKey: ['notifications', activeTab, page, PAGE_SIZE],
+    queryFn: () => api.notifications.list({ filter: activeTab, page, pageSize: PAGE_SIZE }),
+  });
+  const data: NotificationListPayload = listQuery.data ?? {
     notifications: [],
     total: 0,
     unreadCount: 0,
     page: 1,
     pageSize: PAGE_SIZE,
     totalPages: 1,
-  });
-  const [reloadToken, setReloadToken] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  };
+  const isLoading = !listQuery.data && listQuery.isPending;
   const [error, setError] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -109,44 +114,23 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
   const tabIdPrefix = useId();
 
   const applyUnreadCount = (count: number) => {
-    setData((current) => ({ ...current, unreadCount: count }));
+    queryClient.setQueryData<NotificationListPayload>(['notifications', activeTab, page, PAGE_SIZE], (current) => current ? { ...current, unreadCount: count } : current);
     onUnreadChange?.(count);
   };
 
   useEffect(() => {
-    let cancelled = false;
+    if (listQuery.data) onUnreadChange?.(listQuery.data.unreadCount);
+  }, [listQuery.data, onUnreadChange]);
 
-    const load = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const payload = await api.notifications.list({
-          filter: activeTab,
-          page,
-          pageSize: PAGE_SIZE,
-        });
-        if (cancelled) return;
-        setData(payload);
-        onUnreadChange?.(payload.unreadCount);
-        if (page > Math.max(1, payload.totalPages)) {
-          setPage(Math.max(1, payload.totalPages));
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load notifications');
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
+  useEffect(() => {
+    if (listQuery.error) setError(listQuery.error instanceof Error ? listQuery.error.message : 'Failed to load notifications');
+  }, [listQuery.error]);
 
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, page, reloadToken]);
+  useEffect(() => {
+    if (listQuery.data && page > Math.max(1, listQuery.data.totalPages)) {
+      setPage(Math.max(1, listQuery.data.totalPages));
+    }
+  }, [listQuery.data, page]);
 
   const handleTabChange = (tab: NotificationFilter) => {
     setActiveTab(tab);
@@ -157,60 +141,32 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
 
   const handleSelect = async (notification: UserNotification) => {
     if (!notification.read) {
-      const previous = data;
       setPendingId(notification.id);
-      setData((current) => {
-        const total = activeTab === 'unread' ? Math.max(0, current.total - 1) : current.total;
-        return {
-          ...current,
-          total,
-          totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
-          notifications: activeTab === 'unread'
-            ? current.notifications.filter((item) => item.id !== notification.id)
-            : current.notifications.map((item) => (
-              item.id === notification.id ? { ...item, read: true } : item
-            )),
-        };
-      });
       try {
         const unreadCount = await api.notifications.markRead(notification.id);
-        applyUnreadCount(unreadCount);
-        setReloadToken((token) => token + 1);
-      } catch {
-        setData(previous);
+        onUnreadChange?.(unreadCount);
+        await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       } finally {
         setPendingId(null);
       }
     }
 
     if (!notification.link) return;
-
     const target = new URL(notification.link, globalThis.location.origin);
     const tab = target.searchParams.get('tab');
-    if (tab && onNavigate) {
-      onNavigate(tab);
-    } else {
-      navigate(notification.link);
-    }
+    if (tab && onNavigate) onNavigate(tab);
+    else navigate(notification.link);
   };
 
   const handleMarkAllRead = async () => {
-    const previous = data;
     setIsMarkingAll(true);
     setError(null);
     try {
       const unreadCount = await api.notifications.markAllRead();
-      applyUnreadCount(unreadCount);
+      onUnreadChange?.(unreadCount);
       setPage(1);
-      setData((current) => activeTab === 'unread'
-        ? { ...current, notifications: [], total: 0, totalPages: 1 }
-        : {
-          ...current,
-          notifications: current.notifications.map((item) => ({ ...item, read: true })),
-        });
-      setReloadToken((token) => token + 1);
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
-      setData(previous);
       setError(err instanceof Error ? err.message : 'Failed to mark notifications as read');
     } finally {
       setIsMarkingAll(false);

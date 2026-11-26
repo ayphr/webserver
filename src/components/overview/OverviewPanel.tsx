@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   IconArrowRight,
   IconCoin,
@@ -6,12 +7,14 @@ import {
   IconDeviceDesktop,
   IconMapPin,
 } from '@tabler/icons-react';
-import { PLAN_NAMES, type CreditBalance, type DeviceSummary, type Location, type PublicUser, type TeamInvite } from '@common';
+import { PLAN_NAMES, type CreditBalance, type PublicUser } from '@common';
 import { api } from '../../lib/api';
 import { formatCredits } from '../../lib/credits';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { UsernameDisplay } from '../common';
+import { useDevicesMine } from '../../lib/query/hooks/useDevices';
+import { useLocationsMine } from '../../lib/query/hooks/useLocations';
 import './OverviewPanel.css';
 
 function deviceLabel(device: DeviceSummary): string {
@@ -26,43 +29,19 @@ type Props = {
 };
 
 export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: Props) => {
-  const [devices, setDevices] = useState<DeviceSummary[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const devicesQuery = useDevicesMine();
+  const locationsQuery = useLocationsMine();
+  const invitesQuery = useQuery({
+    queryKey: ['teams', 'pendingInvites'],
+    queryFn: () => api.teams.pendingInvites().catch(() => []),
+  });
+  const devices = devicesQuery.data ?? [];
+  const locations = locationsQuery.data ?? [];
+  const pendingInvites = invitesQuery.data ?? [];
+  const isLoading = (!devicesQuery.data && devicesQuery.isPending) || (!locationsQuery.data && locationsQuery.isPending);
+  const error = devicesQuery.error instanceof Error ? devicesQuery.error.message : devicesQuery.error ? 'Failed to load devices' : null;
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [retry, setRetry] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-
-    const load = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [loadedDevices, loadedLocations, loadedInvites] = await Promise.all([
-          api.devices.listMine(),
-          api.locations.listMine().catch(() => []),
-          api.teams.pendingInvites().catch(() => []),
-        ]);
-        if (!active) return;
-        setDevices(loadedDevices);
-        setLocations(loadedLocations);
-        setPendingInvites(loadedInvites);
-      } catch (err) {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : 'Failed to load devices');
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [retry]);
 
   const onlineCount = useMemo(() => devices.filter(isDeviceOnline).length, [devices]);
 
@@ -86,7 +65,8 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
     setInviteError(null);
     try {
       await api.teams.acceptInvite(token);
-      setPendingInvites((prev) => prev.filter((i) => i.token !== token));
+      queryClient.setQueryData(['teams', 'pendingInvites'], (prev: any[] | undefined) => (prev ?? []).filter((i) => i.token !== token));
+      void queryClient.invalidateQueries({ queryKey: ['teams'] });
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : 'Failed to accept invite');
     }
@@ -187,7 +167,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
         ) : error ? (
           <>
             <p className="overview__error" role="alert">{error}</p>
-            <button type="button" className="overview__text-button" onClick={() => setRetry((value) => value + 1)}>
+            <button type="button" className="overview__text-button" onClick={() => { void devicesQuery.refetch(); void locationsQuery.refetch(); }}>
               Retry
             </button>
           </>

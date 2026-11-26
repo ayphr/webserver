@@ -10,6 +10,7 @@ import {
   IconWifi,
   IconWifiOff,
 } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DataPoint, DeviceSummary, Location, PublicUser } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
@@ -21,6 +22,9 @@ import type { DashboardTarget, LocationDetailTab, LocationRouteState } from '../
 import { Button, Card, ConfirmDialog, createTabKeyDownHandler, Input, Modal, Pagination, Select, Tooltip, type SelectOption } from '../common';
 import { LineGraph } from '../graphs';
 import type { LineGraphData } from '../graphs/types';
+import { useDevicesMine } from '../../lib/query/hooks/useDevices';
+import { useLocationsMine } from '../../lib/query/hooks/useLocations';
+import { queryKeys } from '../../lib/query';
 import '../common/Tabs.css';
 import './LocationsPanel.css';
 
@@ -330,16 +334,20 @@ type Props = {
 };
 
 export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: Props) => {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [devices, setDevices] = useState<DeviceSummary[]>([]);
+  const queryClient = useQueryClient();
+  const locationsQuery = useLocationsMine();
+  const devicesQuery = useDevicesMine();
+  const meQuery = useQuery({ queryKey: queryKeys.bootstrap(), queryFn: () => api.users.me() });
+  const locations = locationsQuery.data ?? [];
+  const devices = devicesQuery.data ?? [];
+  const user = meQuery.data?.user ?? null;
   const [locationPage, setLocationPage] = useState(1);
   const [locationDevicePage, setLocationDevicePage] = useState(1);
-  const [user, setUser] = useState<PublicUser | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<LocationFilter>('all');
   const [sort, setSort] = useState<LocationSort>('name');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isLoading = (!locationsQuery.data && locationsQuery.isPending) || (!devicesQuery.data && devicesQuery.isPending);
+  const isRefreshing = (locationsQuery.isFetching || devicesQuery.isFetching) && !isLoading;
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
@@ -353,29 +361,21 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   const detailTab: LocationDetailTab = locationRoute?.detailTab ?? 'overview';
   const tabIdPrefix = useId();
 
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const [loadedLocations, loadedDevices, userData] = await Promise.all([
-        api.locations.listMine(),
-        api.devices.listMine(),
-        api.users.me().catch(() => null),
-      ]);
-      setLocations(loadedLocations);
-      setDevices(loadedDevices);
-      if (userData) setUser(userData.user);
-    } catch (err) {
+  useEffect(() => {
+    if (locationsQuery.error || devicesQuery.error) {
+      const err = locationsQuery.error ?? devicesQuery.error;
       setError(err instanceof Error ? err.message : 'Failed to load locations');
     }
-  }, []);
+  }, [devicesQuery.error, locationsQuery.error]);
 
-  useEffect(() => {
-    void (async () => {
-      setIsLoading(true);
-      await load();
-      setIsLoading(false);
-    })();
-  }, [load]);
+  const load = useCallback(async () => {
+    setError(null);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.locationsMine() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.devicesMine() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() }),
+    ]);
+  }, [queryClient]);
 
   // A stale location deep link falls back to the canonical plain locations route.
   useEffect(() => {

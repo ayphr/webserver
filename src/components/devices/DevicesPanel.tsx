@@ -21,8 +21,12 @@ import {
   IconWifi,
   IconWifiOff,
 } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDuration, getPlanFeaturesForUser, type CreditBalance, type DataPoint, type DeviceSummary, type DeviceUptime, type Location, type PublicUser } from '@common';
 import { api } from '../../lib/api';
+import { useDevicesMine } from '../../lib/query/hooks/useDevices';
+import { useLocationsMine } from '../../lib/query/hooks/useLocations';
+import { queryKeys } from '../../lib/query';
 import { STORAGE_KEYS, readStorage, writeStorage } from '../../lib/storage';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
@@ -244,6 +248,10 @@ function createMetricConfig(
 }
 
 export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initialCredits = null, onCreditsChange }: Props) => {
+  const queryClient = useQueryClient();
+  const devicesQuery = useDevicesMine();
+  const locationsQuery = useLocationsMine();
+  const meQuery = useQuery({ queryKey: queryKeys.bootstrap(), queryFn: () => api.users.me() });
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [devicePage, setDevicePage] = useState(1);
@@ -260,6 +268,16 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<PublicUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(initialCredits);
+
+  useEffect(() => { if (devicesQuery.data) setDevices(devicesQuery.data); }, [devicesQuery.data]);
+  useEffect(() => { if (locationsQuery.data) setLocations(locationsQuery.data); }, [locationsQuery.data]);
+  useEffect(() => {
+    if (meQuery.data) {
+      setUser(meQuery.data.user);
+      setCredits(meQuery.data.credits);
+      if (meQuery.data.credits && onCreditsChange) onCreditsChange(meQuery.data.credits);
+    }
+  }, [meQuery.data, onCreditsChange]);
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;
   const canUseAlertsAndWebhooks = planFeatures?.alertsAndWebhooks ?? false;
   const maxDevices = planFeatures?.maxDevices ?? null;
@@ -389,9 +407,9 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     setError(null);
     try {
       const [loadedDevices, loadedLocations, userData] = await Promise.all([
-        api.devices.listMine(),
-        api.locations.listMine().catch(() => []),
-        api.users.me().catch(() => null)
+        queryClient.fetchQuery({ queryKey: queryKeys.devicesMine(), queryFn: () => api.devices.listMine() }),
+        queryClient.fetchQuery({ queryKey: queryKeys.locationsMine(), queryFn: () => api.locations.listMine().catch(() => []) }),
+        queryClient.fetchQuery({ queryKey: queryKeys.bootstrap(), queryFn: () => api.users.me() }).catch(() => null),
       ]);
       setDevices(loadedDevices);
       setLocations(loadedLocations);
@@ -403,15 +421,21 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
     }
-  }, [onCreditsChange]);
+  }, [onCreditsChange, queryClient]);
 
   useEffect(() => {
-    void (async () => {
+    if (devicesQuery.data || devicesQuery.error || locationsQuery.data || locationsQuery.error) {
+      setIsLoading(!devicesQuery.data && devicesQuery.isPending);
+    }
+  }, [devicesQuery.data, devicesQuery.error, devicesQuery.isPending, locationsQuery.data, locationsQuery.error]);
+
+  useEffect(() => {
+    if (!devicesQuery.data && !devicesQuery.error && devicesQuery.isPending) {
       setIsLoading(true);
-      await loadAll();
+    } else {
       setIsLoading(false);
-    })();
-  }, [loadAll]);
+    }
+  }, [devicesQuery.data, devicesQuery.error, devicesQuery.isPending]);
 
   const selectedDevice = useMemo(
     () => devices.find((d) => d.serial === selectedSerial) ?? null,
