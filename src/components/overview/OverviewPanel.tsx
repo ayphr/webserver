@@ -222,7 +222,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
                   <span className="overview__device-reading">
                     {reading ? `${reading.temperature.toFixed(1)}°C · ${reading.humidity.toFixed(0)}%` : 'No data'}
                   </span>
-                  <IconArrowRight size={14} strokeWidth={1.75} className="overview__device-arrow" />
+                  <IconArrowRight size={14} strokeWidth={1.75} className="overview__device-arrow" aria-hidden="true" />
                 </button>
               );
             })}

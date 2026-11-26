@@ -788,7 +788,7 @@ export const DashboardPage = () => {
                 aria-controls="suspension-details"
               >
                 {isSuspensionDetailsOpen ? 'Hide details' : 'More info'}
-                {isSuspensionDetailsOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+                {isSuspensionDetailsOpen ? <IconChevronUp size={14} aria-hidden="true" /> : <IconChevronDown size={14} aria-hidden="true" />}
               </button>
               <div
                 className="dashboard-page__suspension-card__meta"
