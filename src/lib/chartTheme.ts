@@ -62,6 +62,7 @@ export type LineGraphConfigOptions = {
   zoomWindow?: ChartZoomWindow | null;
   tooltipCallbacks?: ChartTooltipCallbacks;
   tooltipFilter?: (item: ChartTooltipItem) => boolean;
+  enableDecimation?: boolean;
 };
 
 /**
@@ -76,6 +77,7 @@ export function createLineGraphConfig({
   zoomWindow,
   tooltipCallbacks,
   tooltipFilter,
+  enableDecimation = true,
 }: LineGraphConfigOptions) {
   return {
     responsive: true,
@@ -90,7 +92,7 @@ export function createLineGraphConfig({
     interaction: { mode: 'index' as const, intersect: false },
     plugins: {
       decimation: {
-        enabled: true,
+        enabled: enableDecimation,
         algorithm: 'lttb' as const,
         samples: 300,
         threshold: 350,

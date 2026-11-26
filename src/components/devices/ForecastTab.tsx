@@ -230,7 +230,6 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
   }, [dataPoints, forecastSamples]);
 
   const combinedConfig: LineGraphConfig = useMemo(() => {
-    const boundary = dataPoints.length;
     const scales: Record<string, unknown> = {
       x: {
         type: 'linear',
@@ -271,19 +270,13 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
       },
     };
 
-    const anchorMs = forecast ? toDate(forecast.anchorTimestamp).getTime() : Number.POSITIVE_INFINITY;
     return {
       ...createLineGraphConfig({
         showLegend: true,
         styledLegend: true,
         zoomMinRange: FORECAST_MAX_ZOOM_IN_MS,
         zoomWindow: axisWindow,
-        tooltipFilter: (item) => {
-          const x = item.parsed.x;
-          if (typeof x !== 'number') return true;
-          if (x <= anchorMs) return item.dataIndex < boundary;
-          return item.dataIndex >= boundary - 1;
-        },
+        enableDecimation: false,
         tooltipCallbacks: {
           title: (items) => {
             const x = items[0]?.parsed?.x;
@@ -309,7 +302,7 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
       }),
       scales: scales as LineGraphConfig['scales'],
     };
-  }, [axisWindow, dataPoints.length, forecast]);
+  }, [axisWindow]);
 
   if (locked) {
     return (
