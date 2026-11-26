@@ -327,11 +327,11 @@ export const AssistantComposer = ({
                 {isMac ? 'Queue with Command Enter' : 'Queue with Control Enter'}
               </span>
               {isMac ? (
-                <IconCommand size={13} strokeWidth={1.75} />
+                <IconCommand aria-hidden="true" size={13} strokeWidth={1.75} />
               ) : (
-                <IconKey size={13} strokeWidth={1.75} />
+                <IconKey aria-hidden="true" size={13} strokeWidth={1.75} />
               )}
-              <IconCornerDownLeft size={13} strokeWidth={1.75} />
+              <IconCornerDownLeft aria-hidden="true" size={13} strokeWidth={1.75} />
             </span>
           )}
           {showContextGauge && onCompact && (
@@ -363,7 +363,7 @@ export const AssistantComposer = ({
                   aria-label="Stop listening"
                   onClick={stopListening}
                 >
-                  <IconPlayerStop size={14} strokeWidth={2} />
+                  <IconPlayerStop aria-hidden="true" size={14} strokeWidth={2} />
                 </button>
               </div>
             ) : (
@@ -373,7 +373,7 @@ export const AssistantComposer = ({
                 aria-label="Start speech to text"
                 onClick={startListening}
               >
-                <IconMicrophone size={16} strokeWidth={2} />
+                <IconMicrophone aria-hidden="true" size={16} strokeWidth={2} />
               </button>
             )
           )}
@@ -386,9 +386,9 @@ export const AssistantComposer = ({
             onClick={handleSendClick}
           >
             {isGenerating ? (
-              <IconPlayerStop size={16} strokeWidth={2} />
+              <IconPlayerStop aria-hidden="true" size={16} strokeWidth={2} />
             ) : (
-              <IconArrowUp size={18} strokeWidth={2} />
+              <IconArrowUp aria-hidden="true" size={18} strokeWidth={2} />
             )}
           </button>
         </div>
