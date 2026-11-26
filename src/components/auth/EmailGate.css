@@ -1,60 +1,165 @@
 .email-gate {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-base);
-  padding: 2rem 1rem;
+  padding: 2.5rem 1rem;
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255, 255, 255, 0.035), transparent 70%),
+    var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
   overflow-y: auto;
 }
 
 .email-gate__container {
   width: 100%;
-  max-width: 460px;
+  max-width: 28rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.email-gate__card {
+.email-gate__brand {
+  display: flex;
+  justify-content: center;
+}
+
+.email-gate__logo {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: contain;
+}
+
+.email-gate__card.card {
   width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border-color: var(--border-subtle);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 30%), var(--bg-surface);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 24px 48px -24px rgba(0, 0, 0, 0.55);
+  cursor: default;
+}
+
+.email-gate__card.card:hover,
+.email-gate__card.card:has(a),
+.email-gate__card.card:has(a):hover {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 24px 48px -24px rgba(0, 0, 0, 0.55);
+  border-color: var(--border-subtle);
+  cursor: default;
+}
+
+.email-gate__card-header.card__header {
+  margin: 0;
+  padding: 1.75rem 1.75rem 0;
+}
+
+.email-gate__eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-md);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.email-gate__title {
+  margin: 0;
+  font-size: 1.625rem;
+  font-weight: var(--font-weight-hv);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.email-gate__subtitle {
+  margin: 0.625rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.925rem;
+  line-height: 1.55;
+  max-width: 36ch;
+}
+
+.email-gate__card .card__body {
+  padding: 1.5rem 1.75rem 1.75rem;
 }
 
 .email-gate__loading {
   text-align: center;
   color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 .email-gate__error {
-  background-color: hsla(4, 100%, 71%, 0.15);
-  border: 1px solid hsla(4, 100%, 71%, 0.3);
+  padding: 0.8125rem 1rem;
   border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
-  color: hsl(4, 100%, 71%);
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0 0 1.25rem;
+  background-color: var(--status-error-bg);
+  border: 1px solid var(--status-error-border);
+  color: var(--status-error);
 }
 
 .email-gate__form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.125rem;
 }
 
 .email-gate__hint {
+  margin: 0;
   color: var(--text-muted);
   font-size: 0.9rem;
-  line-height: 1.5;
-  margin: 0;
+  line-height: 1.6;
 }
 
 .email-gate__hint strong {
   color: var(--text-primary);
   font-weight: var(--font-weight-md);
-  word-break: break-all;
+  word-break: break-word;
 }
 
+.email-gate__actions,
 .email-gate__resend {
   display: flex;
-  gap: 0.5rem;
-  justify-content: center;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 0.5rem;
+}
+
+.email-gate__actions--stack {
+  flex-direction: column;
+}
+
+.email-gate__actions .button--secondary,
+.email-gate__resend .button--secondary {
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 480px) {
+  .email-gate {
+    padding: 1.25rem 0.875rem;
+    align-items: flex-start;
+  }
+
+  .email-gate__container {
+    gap: 1.25rem;
+    padding-top: 1rem;
+  }
+
+  .email-gate__card-header.card__header {
+    padding: 1.5rem 1.25rem 0;
+  }
+
+  .email-gate__card .card__body {
+    padding: 1.25rem 1.25rem 1.5rem;
+  }
+
+  .email-gate__title {
+    font-size: 1.5rem;
+  }
 }

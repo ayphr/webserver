@@ -59,6 +59,28 @@
   overflow: hidden;
 }
 
+.forecast-tab__chart-container .line-graph,
+.forecast-tab__chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.forecast-tab.is-fullscreen {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.forecast-tab__chart-card {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.forecast-tab__chart-container--fullscreen {
+  flex: 1 1 auto;
+  height: clamp(24rem, 62vh, 52rem);
+  min-height: 24rem;
+}
+
 .forecast-tab .devices__graphs-controls {
   justify-content: flex-start;
 }

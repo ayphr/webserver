@@ -43,9 +43,15 @@ export type ChartZoomWindow = {
   limitMax: number;
 };
 
+export type ChartTooltipItem = {
+  datasetIndex: number;
+  dataIndex: number;
+  parsed: { x: number | null; y: number | null };
+};
+
 export type ChartTooltipCallbacks = {
-  title?: (items: Array<{ parsed: { x: number | null } }>) => string;
-  label?: (item: { datasetIndex: number; dataIndex: number; parsed: { y: number | null } }) => string;
+  title?: (items: ChartTooltipItem[]) => string;
+  label?: (item: ChartTooltipItem) => string;
 };
 
 export type LineGraphConfigOptions = {
@@ -55,6 +61,7 @@ export type LineGraphConfigOptions = {
   zoomMinRange: number;
   zoomWindow?: ChartZoomWindow | null;
   tooltipCallbacks?: ChartTooltipCallbacks;
+  tooltipFilter?: (item: ChartTooltipItem) => boolean;
 };
 
 /**
@@ -68,6 +75,7 @@ export function createLineGraphConfig({
   zoomMinRange,
   zoomWindow,
   tooltipCallbacks,
+  tooltipFilter,
 }: LineGraphConfigOptions) {
   return {
     responsive: true,
@@ -101,6 +109,7 @@ export function createLineGraphConfig({
         borderWidth: 1,
         padding: 10,
         callbacks: tooltipCallbacks ?? {},
+        ...(tooltipFilter ? { filter: tooltipFilter } : {}),
       },
       zoom: {
         zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' as const },

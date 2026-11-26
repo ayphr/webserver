@@ -127,13 +127,18 @@ export const EmailGate = ({
     return (
       <div className="email-gate">
         <div className="email-gate__container">
+          <header className="email-gate__brand">
+            <img src="/logo.png" alt="Ayphr" className="email-gate__logo" />
+          </header>
           <Card elevated className="email-gate__card">
-            <CardHeader>
-              <h1>Couldn&apos;t load your account</h1>
+            <CardHeader className="email-gate__card-header">
+              <p className="email-gate__eyebrow">Account check</p>
+              <h1 className="email-gate__title">Couldn&apos;t load your account</h1>
+              <p className="email-gate__subtitle">We couldn&apos;t confirm your account state. Try again or return to sign in.</p>
             </CardHeader>
             <CardBody>
               <p className="email-gate__error" role="alert">{loadError}</p>
-              <div className="email-gate__actions">
+              <div className="email-gate__actions email-gate__actions--stack">
                 <Button variant="primary" fullWidth isLoading={bootstrap.isFetching} onClick={() => void queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() })}>
                   {bootstrap.isFetching ? 'Retrying...' : 'Try again'}
                 </Button>
@@ -164,10 +169,18 @@ export const EmailGate = ({
   return (
     <div className="email-gate">
       <div className="email-gate__container">
+        <header className="email-gate__brand">
+          <img src="/logo.png" alt="Ayphr" className="email-gate__logo" />
+        </header>
         <Card elevated className="email-gate__card">
-          <CardHeader>
-            <h1>Add your email</h1>
-            <p>Ayphr now requires a verified email address on every account. Add one to continue.</p>
+          <CardHeader className="email-gate__card-header">
+            <p className="email-gate__eyebrow">Account security</p>
+            <h1 className="email-gate__title">{step === 'code' ? 'Verify your email' : 'Add your email'}</h1>
+            <p className="email-gate__subtitle">
+              {step === 'code'
+                ? 'Enter the code we sent to confirm your email address.'
+                : 'Add a verified email to recover access and receive important account notifications.'}
+            </p>
           </CardHeader>
           <CardBody>
             {error && <div className="email-gate__error" role="alert">{error}</div>}
@@ -182,7 +195,7 @@ export const EmailGate = ({
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="Enter your email"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -212,7 +225,7 @@ export const EmailGate = ({
             {step === 'code' && (
               <form className="email-gate__form" onSubmit={(e) => { e.preventDefault(); void handleConfirm(); }}>
                 <p className="email-gate__hint">
-                  We sent a {EMAIL_CODE_LENGTH}-digit code to <strong>{email}</strong>. Enter it to verify your email.
+                  We sent a {EMAIL_CODE_LENGTH}-digit code to <strong>{email}</strong>.
                 </p>
                 <CodeInput value={code} onChange={setCode} disabled={isLoading} autoFocus />
                 <Button variant="primary" fullWidth isLoading={isLoading} type="submit">

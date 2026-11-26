@@ -508,22 +508,40 @@ export const AuthPage = ({ initialMode }: AuthPageProps = {}) => {
     !resetPasswordChecks.number ||
     !resetPasswordChecks.symbol;
 
-  let title = isSignup ? 'Sign Up' : 'Log In';
-  if (isSignup && step === 'email-code') title = 'Verify Your Email';
-  if (mode === 'login' && step === 'forgot') title = 'Reset Password';
-  if (mode === 'login' && step === 'forgot-code') title = 'Reset Password';
-  if (mode === 'login' && step === 'device-code') title = 'Verify Your Login';
+  let title = isSignup ? 'Create your account' : 'Sign in';
+  let subtitle = isSignup
+    ? 'Set up your Ayphr account to monitor devices and collaborate with your team.'
+    : 'Access your dashboard, devices, and team workspace.';
+  if (isSignup && step === 'email-code') {
+    title = 'Verify your email';
+    subtitle = 'Enter the code we sent to confirm your email address.';
+  }
+  if (mode === 'login' && step === 'forgot') {
+    title = 'Reset your password';
+    subtitle = 'Enter your account email or username and we’ll send a reset code.';
+  }
+  if (mode === 'login' && step === 'forgot-code') {
+    title = 'Choose a new password';
+    subtitle = 'Enter the reset code and set a new password for your account.';
+  }
+  if (mode === 'login' && step === 'device-code') {
+    title = 'Verify this device';
+    subtitle = 'Confirm the sign-in with the code sent to your email.';
+  }
 
   return (
     <div className="auth-page">
       <div className="auth-page__container">
-        <div className="auth-page__header">
-          <h1>Ayphr</h1>
-        </div>
+        <header className="auth-page__brand">
+          <img src="/logo.png" alt="Ayphr" className="auth-page__logo" />
+          <p className="auth-page__brand-copy">Telemetry, alerts, and device operations in one workspace.</p>
+        </header>
 
         <Card elevated className="auth-page__card">
-          <CardHeader>
-            <h2 aria-live="polite">{title}</h2>
+          <CardHeader className="auth-page__card-header">
+            <p className="auth-page__eyebrow">{isSignup ? 'Get started' : 'Welcome back'}</p>
+            <h1 className="auth-page__title" aria-live="polite">{title}</h1>
+            <p className="auth-page__subtitle">{subtitle}</p>
           </CardHeader>
 
           <CardBody>

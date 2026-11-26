@@ -187,13 +187,13 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
 
     for (const m of METRICS) {
       const color = resolveCssColor(m.def.color);
-      // One dataset per metric so `index` tooltips stay aligned across the
-      // recorded and forecast regions; `segment` styles the forecast portion.
+      // One dataset per metric keeps index tooltips aligned across recorded and
+      // forecast regions; `segment` styles only the forecast portion.
       const data = [
         ...dataPoints.map((p) => ({ x: toDate(p.timestamp).getTime(), y: m.actual(p) })),
         ...forecastSamples.map((s) => ({ x: toDate(s.timestamp).getTime(), y: m.forecast(s) })),
       ];
-      const isForecast = (ctx: ScriptableLineSegmentContext) => ctx.p0DataIndex >= boundary - 1;
+      const isForecastSegment = (ctx: ScriptableLineSegmentContext) => ctx.p0DataIndex >= boundary - 1;
 
       datasets.push({
         label: m.shortLabel,
@@ -206,13 +206,13 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
         tension: 0.25,
         fill: false,
         borderWidth: 2,
-        borderDash: m.def.dash,
+        borderDash: [],
         pointStyle: m.def.pointStyle,
         pointRadius,
         pointHoverRadius: 4,
         segment: {
-          borderColor: (ctx: ScriptableLineSegmentContext) => (isForecast(ctx) ? fade(color, 0.55) : color),
-          borderDash: (ctx: ScriptableLineSegmentContext) => (isForecast(ctx) ? [6, 4] : undefined),
+          borderColor: (ctx: ScriptableLineSegmentContext) => (isForecastSegment(ctx) ? fade(color, 0.7) : color),
+          borderDash: (ctx: ScriptableLineSegmentContext) => (isForecastSegment(ctx) ? [6, 4] : []),
         },
       });
     }
@@ -271,12 +271,19 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
       },
     };
 
+    const anchorMs = forecast ? toDate(forecast.anchorTimestamp).getTime() : Number.POSITIVE_INFINITY;
     return {
       ...createLineGraphConfig({
         showLegend: true,
         styledLegend: true,
         zoomMinRange: FORECAST_MAX_ZOOM_IN_MS,
         zoomWindow: axisWindow,
+        tooltipFilter: (item) => {
+          const x = item.parsed.x;
+          if (typeof x !== 'number') return true;
+          if (x <= anchorMs) return item.dataIndex < boundary;
+          return item.dataIndex >= boundary - 1;
+        },
         tooltipCallbacks: {
           title: (items) => {
             const x = items[0]?.parsed?.x;
@@ -296,14 +303,13 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
             if (!metric) return '';
             const value = item.parsed.y;
             if (value === null || !Number.isFinite(value)) return '';
-            const region = item.dataIndex >= boundary ? 'forecast' : 'recorded';
-            return `${metric.shortLabel} (${region}): ${value.toFixed(1)} ${metric.unit}`;
+            return `${metric.shortLabel}: ${value.toFixed(1)} ${metric.unit}`;
           },
         },
       }),
       scales: scales as LineGraphConfig['scales'],
     };
-  }, [axisWindow, dataPoints.length]);
+  }, [axisWindow, dataPoints.length, forecast]);
 
   if (locked) {
     return (
@@ -332,7 +338,7 @@ const historyOptions = [
 ];
 
   return (
-    <div className={`forecast-tab ${isFullscreen ? 'is-fullscreen' : ''}`}>
+    <div className={`forecast-tab${isFullscreen ? ' is-fullscreen' : ''}`}>
       <div className="devices__graphs-controls" onContextMenu={(e) => e.preventDefault()}>
         <div className="forecast-tab__control-group">
           <span className="forecast-tab__control-label">Forecast horizon</span>
@@ -390,7 +396,7 @@ const historyOptions = [
       ) : (
         <>
           <div className="forecast-tab__chart-card">
-            <div className={`forecast-tab__chart-container ${isFullscreen ? 'devices__chart-container' : ''}`}>
+            <div className={`forecast-tab__chart-container${isFullscreen ? ' forecast-tab__chart-container--fullscreen' : ''}`}>
               <LineGraph data={combinedData} config={combinedConfig} />
             </div>
           </div>
