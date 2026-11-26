@@ -128,7 +128,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
       <div className="overview__stats">
         <button type="button" className="overview__stat" onClick={() => onNavigate('devices')}>
           <span className="overview__stat-label">
-            <IconDeviceDesktop size={16} strokeWidth={1.75} />
+            <IconDeviceDesktop size={16} strokeWidth={1.75} aria-hidden="true" />
             Devices
           </span>
           <span className="overview__stat-value">{error ? '—' : devices.length}</span>
@@ -139,7 +139,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
 
         <button type="button" className="overview__stat" onClick={() => onNavigate('credits')}>
           <span className="overview__stat-label">
-            <IconCoin size={16} strokeWidth={1.75} />
+            <IconCoin size={16} strokeWidth={1.75} aria-hidden="true" />
             Credits
           </span>
           <span className="overview__stat-value">
@@ -155,7 +155,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
           aria-label={isTeamMember ? 'Manage your team plan' : 'View plans and credits'}
         >
           <span className="overview__stat-label">
-            <IconCreditCard size={16} strokeWidth={1.75} />
+            <IconCreditCard size={16} strokeWidth={1.75} aria-hidden="true" />
             Plan
           </span>
           <span className="overview__stat-value">{planName}</span>
@@ -166,7 +166,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
 
         <button type="button" className="overview__stat" onClick={() => onNavigate('locations')}>
           <span className="overview__stat-label">
-            <IconMapPin size={16} strokeWidth={1.75} />
+            <IconMapPin size={16} strokeWidth={1.75} aria-hidden="true" />
             Locations
           </span>
           <span className="overview__stat-value">{isLoading ? '—' : error ? '—' : locations.length}</span>
