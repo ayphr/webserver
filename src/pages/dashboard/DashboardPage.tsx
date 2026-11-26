@@ -1075,18 +1075,18 @@ export const DashboardPage = () => {
                   <div className="dashboard-page__appeal-status">
                     <div className="dashboard-page__appeal-tracker" data-status={existingAppeal.status}>
                       <div className="dashboard-page__appeal-step dashboard-page__appeal-step--done">
-                        <span className="dashboard-page__appeal-step-icon"><IconSend size={14} /></span>
+                        <span className="dashboard-page__appeal-step-icon"><IconSend size={14} aria-hidden="true" /></span>
                         <span className="dashboard-page__appeal-step-label">Submitted</span>
                       </div>
                       <div className="dashboard-page__appeal-step-line" />
                       <div className={`dashboard-page__appeal-step ${existingAppeal.status === 'pending' ? 'dashboard-page__appeal-step--active' : 'dashboard-page__appeal-step--done'}`}>
-                        <span className="dashboard-page__appeal-step-icon"><IconClock size={14} /></span>
+                        <span className="dashboard-page__appeal-step-icon"><IconClock size={14} aria-hidden="true" /></span>
                         <span className="dashboard-page__appeal-step-label">Under review</span>
                       </div>
                       <div className="dashboard-page__appeal-step-line" />
                       <div className={`dashboard-page__appeal-step ${existingAppeal.status === 'pending' ? 'dashboard-page__appeal-step--pending' : existingAppeal.status === 'accepted' ? 'dashboard-page__appeal-step--success' : 'dashboard-page__appeal-step--danger'}`}>
                         <span className="dashboard-page__appeal-step-icon">
-                            {existingAppeal.status === 'accepted' ? <IconCheck size={14} /> : existingAppeal.status === 'denied' ? <IconX size={14} /> : <IconGavel size={14} />}
+                            {existingAppeal.status === 'accepted' ? <IconCheck size={14} aria-hidden="true" /> : existingAppeal.status === 'denied' ? <IconX size={14} aria-hidden="true" /> : <IconGavel size={14} aria-hidden="true" />}
                         </span>
                         <span className="dashboard-page__appeal-step-label">
                           {existingAppeal.status === 'accepted' ? 'Accepted' : existingAppeal.status === 'denied' ? 'Denied' : 'Decision'}
