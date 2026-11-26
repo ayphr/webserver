@@ -12,4 +12,9 @@ export const queryKeys = {
   notifications: (params: unknown) => ['notifications', params] as const,
   creditsMe: () => ['credits', 'me'] as const,
   teams: (scope: string, params?: unknown) => ['teams', scope, params] as const,
+  sessions: () => ['sessions'] as const,
+  deviceTokens: (serial: number) => ['deviceTokens', serial] as const,
+  deviceLogs: (serial: number) => ['deviceLogs', serial] as const,
+  deviceAlerts: (serial: number) => ['deviceAlerts', serial] as const,
+  teamAudit: (teamId: string) => ['teamAudit', teamId] as const,
 };

@@ -5,6 +5,8 @@ import { queryKeys } from './keys';
 describe('shouldPersistQueryKey', () => {
   test('excludes device data points', () => {
     expect(shouldPersistQueryKey(queryKeys.deviceDataPoints(1, { from: 'a' }))).toBe(false);
+    expect(shouldPersistQueryKey(queryKeys.deviceDataPointCount('1', 'a', 'b'))).toBe(false);
+    expect(shouldPersistQueryKey(queryKeys.sessions())).toBe(false);
   });
 
   test('excludes location history/data points keys', () => {

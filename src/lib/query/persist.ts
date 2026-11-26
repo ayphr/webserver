@@ -5,7 +5,19 @@ import type { Query } from '@tanstack/react-query';
 export const QUERY_CACHE_BUSTER = 'v1';
 export const QUERY_CACHE_STORAGE_KEY = `ayphr-query-cache-${QUERY_CACHE_BUSTER}`;
 
-const NON_PERSISTED_ROOT_KEYS = new Set(['deviceDataPoints', 'deviceDataPointCount', 'locationDataPoints', 'locationHistory']);
+const NON_PERSISTED_ROOT_KEYS = new Set([
+  'deviceDataPoints',
+  'deviceDataPointCount',
+  'locationDataPoints',
+  'locationHistory',
+  'sessions',
+  'deviceTokens',
+  'deviceLogs',
+  'deviceAlerts',
+  'teamAudit',
+  'staff',
+  'users',
+]);
 
 export function shouldPersistQueryKey(queryKey: readonly unknown[]): boolean {
   const root = queryKey[0];
