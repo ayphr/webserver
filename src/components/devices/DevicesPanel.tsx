@@ -923,13 +923,13 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
 
         {devices.length === 0 ? (
           <div className="devices__empty">
-            <IconDatabase size={28} strokeWidth={1.5} />
+            <IconDatabase size={28} strokeWidth={1.5} aria-hidden="true" />
             <h3>No devices yet</h3>
             <p>Use &quot;Add device&quot; to open ayphr.com/link and enter the code shown on your device.</p>
           </div>
         ) : filteredDevices.length === 0 ? (
           <div className="devices__empty">
-            <IconSearch size={28} strokeWidth={1.5} />
+            <IconSearch size={28} strokeWidth={1.5} aria-hidden="true" />
             <h3>No devices match your filters</h3>
             <p>Try a different search term or clear the filters to see all devices.</p>
             <Button variant="secondary" onClick={clearDeviceFilters}>Clear filters</Button>
@@ -1240,7 +1240,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
               </div>
             ) : dataPoints.length === 0 || enabledDefs.length === 0 ? (
               <div className="devices__empty">
-                <IconDatabase size={28} strokeWidth={1.5} />
+                <IconDatabase size={28} strokeWidth={1.5} aria-hidden="true" />
                 <h3>{dataPoints.length === 0 ? 'No data points found' : 'No series selected'}</h3>
                 <p>
                   {dataPoints.length === 0

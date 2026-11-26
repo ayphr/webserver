@@ -78,7 +78,7 @@ export function TokensTab({ serial, deviceName }: Props) {
 
       {sorted.length === 0 ? (
         <div className="tokens-tab__empty">
-          <IconKey size={28} strokeWidth={1.5} />
+          <IconKey size={28} strokeWidth={1.5} aria-hidden="true" />
           <h3>No upload tokens</h3>
           <p>This device has no upload tokens yet. Tokens are created when the device is linked.</p>
         </div>
