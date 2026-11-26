@@ -153,21 +153,21 @@
 .assistant-chat__user-wrap {
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.4rem;
   width: fit-content;
   max-width: 75%;
 }
 
 .assistant-chat__chevron {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
+  position: static;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.35rem;
   height: 1.35rem;
+  margin-top: 0.35rem;
   border: none;
   border-radius: var(--radius-sm);
   background-color: var(--bg-elevated);
