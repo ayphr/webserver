@@ -197,7 +197,7 @@ export function StaffUserDetailView({ user, onBack, tab: routeTab, onTabChange }
               aria-labelledby={`${tabIdPrefix}-tab-overview`}
               tabIndex={0}
             >
-              <div className="staff-user-detail__hero"><IconUser size={28} /><div><h3>{user.username}</h3><span>{user.role}</span></div></div>
+              <div className="staff-user-detail__hero"><IconUser size={28} aria-hidden="true" /><div><h3>{user.username}</h3><span>{user.role}</span></div></div>
               <div className="staff-user-detail__facts">
                 <div><span>Username</span><strong>{user.username}</strong></div>
                 <div><span>User ID</span><strong className="staff-user-detail__mono">{user.uuid}</strong></div>
