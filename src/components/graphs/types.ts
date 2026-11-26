@@ -17,6 +17,7 @@ export type LineGraphAxisData = {
   tension?: number;
   fill?: boolean | string;
   pointRadius?: number;
+  pointHitRadius?: number;
   pointHoverRadius?: number;
   borderWidth?: number;
   borderDash?: number[];
@@ -36,6 +37,7 @@ export type LineGraphScale = {
     display?: boolean;
     color?: string;
     maxTicksLimit?: number;
+    stepSize?: number;
     callback?: (value: number | string) => string;
   };
   title?: {

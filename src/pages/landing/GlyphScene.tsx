@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { getImagePlacement, type CropFit, type ImagePlacement } from './glyphCrop';
 
 /* The sensor scene is the source image; this renderer turns its luminance into
    a quiet glyph portrait. A few cells change slowly so the scene feels alive
@@ -45,34 +46,24 @@ const smootherstep = (edge0: number, edge1: number, value: number) => {
   return t * t * t * (t * (t * 6 - 15) + 10);
 };
 
-const drawCover = (
+const drawPlacement = (
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
-  width: number,
-  height: number,
-  focusX: number,
-  zoom: number,
+  placement: ImagePlacement,
 ) => {
-  const imageRatio = img.naturalWidth / img.naturalHeight;
-  const targetRatio = width / height;
-  let sy: number;
-  let sw: number;
-  let sh: number;
-
-  if (imageRatio > targetRatio) {
-    sh = img.naturalHeight / zoom;
-    sw = sh * targetRatio;
-    sy = (img.naturalHeight - sh) * 0.54;
-  } else {
-    sw = img.naturalWidth / zoom;
-    sh = sw / targetRatio;
-    sy = (img.naturalHeight - sh) * 0.54;
-  }
-
-  const sx = img.naturalWidth * focusX - sw / 2;
   ctx.fillStyle = '#121212';
-  ctx.fillRect(0, 0, width, height);
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.drawImage(
+    img,
+    placement.sx,
+    placement.sy,
+    placement.sw,
+    placement.sh,
+    placement.dx,
+    placement.dy,
+    placement.dw,
+    placement.dh,
+  );
 };
 
 const buildAtlas = (step: number, color: string) => {
@@ -186,19 +177,27 @@ export const GlyphScene = ({ src, cell = 10 }: { src: string; cell?: number }) =
       const zoom = setting('--glyph-zoom', 1.45);
       const fadeStart = setting('--glyph-fade-start', 0.12);
       const fadeEnd = setting('--glyph-fade-end', 0.62);
-      drawCover(sampleCtx, image, columns, rows, focusX, zoom);
+      const fit: CropFit =
+        style.getPropertyValue('--glyph-fit').trim() === 'contain' ? 'contain' : 'cover';
+      const hasBench = setting('--glyph-has-bench', 1) > 0.5;
+      const placement = getImagePlacement({
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        targetWidth: columns,
+        targetHeight: rows,
+        focusX,
+        zoom,
+        fit,
+      });
+      drawPlacement(sampleCtx, image, placement);
       const data = sampleCtx.getImageData(0, 0, columns, rows).data;
 
       // The workbench starts at y=596 in the 900px source scene. Keep it out of
       // the left fade so it can run the full width of the hero.
-      const imageRatio = image.naturalWidth / image.naturalHeight;
-      const targetRatio = columns / rows;
-      const cropHeight =
-        imageRatio > targetRatio
-          ? image.naturalHeight / zoom
-          : image.naturalWidth / zoom / targetRatio;
-      const cropTop = (image.naturalHeight - cropHeight) * 0.54;
-      const benchStart = clamp((596 - cropTop) / cropHeight, 0, 1);
+      const applyBenchFade = fit === 'cover' && hasBench;
+      const benchStart = applyBenchFade
+        ? clamp((596 - placement.sy) / placement.sh, 0, 1)
+        : 1;
 
       const background = luminance(data, 0);
       const values: number[] = [];
@@ -240,9 +239,10 @@ export const GlyphScene = ({ src, cell = 10 }: { src: string; cell?: number }) =
         for (let x = 0; x < columns; x += 1) {
           const source = raws[y * columns + x];
           if (source < 0) continue;
-          const upperMask = 1 - smoothstep(benchStart - 0.03, benchStart + 0.03, y / Math.max(1, rows - 1));
           const horizontalFade = smootherstep(fadeStart, fadeEnd, x / Math.max(1, columns - 1));
-          const fade = 1 - upperMask * (1 - horizontalFade);
+          const fade = applyBenchFade
+            ? 1 - (1 - smoothstep(benchStart - 0.03, benchStart + 0.03, y / Math.max(1, rows - 1))) * (1 - horizontalFade)
+            : 1;
           const gate = smoothstep(0.02, 0.075, source * fade);
           const raw = source * fade * gate;
           if (raw <= 0) continue;
