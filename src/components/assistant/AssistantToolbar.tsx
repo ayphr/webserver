@@ -127,14 +127,14 @@ const MODE_OPTIONS: readonly ToolbarOption<AssistantMode>[] = [
   {
     value: 'chat',
     label: 'Chat',
-    icon: <IconMessageCircle size={16} strokeWidth={1.75} />,
-    selectedIcon: <IconMessageCircleFilled size={16} strokeWidth={1.75} />,
+    icon: <IconMessageCircle size={16} strokeWidth={1.75} aria-hidden="true" />,
+    selectedIcon: <IconMessageCircleFilled size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
   {
     value: 'task',
     label: 'Task',
-    icon: <IconClipboardList size={16} strokeWidth={1.75} />,
-    selectedIcon: <IconClipboardListFilled size={16} strokeWidth={1.75} />,
+    icon: <IconClipboardList size={16} strokeWidth={1.75} aria-hidden="true" />,
+    selectedIcon: <IconClipboardListFilled size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
 ];
 
@@ -142,17 +142,17 @@ const PERMISSION_OPTIONS: readonly ToolbarOption<AssistantPermissionLevel>[] = [
   {
     value: 'always-ask',
     label: 'Always ask',
-    icon: <IconShieldStar size={16} strokeWidth={1.75} />,
+    icon: <IconShieldStar size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
   {
     value: 'sometimes-ask',
     label: 'Sometimes ask',
-    icon: <IconShieldMinus size={16} strokeWidth={1.75} />,
+    icon: <IconShieldMinus size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
   {
     value: 'never-ask',
     label: 'Allow all',
-    icon: <IconShieldExclamation size={16} strokeWidth={1.75} />,
+    icon: <IconShieldExclamation size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
 ];
 
@@ -160,19 +160,19 @@ const NOTIFICATION_OPTIONS: readonly ToolbarOption<AssistantNotificationLevel>[]
   {
     value: 'always',
     label: 'Always notify',
-    icon: <IconBell size={16} strokeWidth={1.75} />,
-    selectedIcon: <IconBellFilled size={16} strokeWidth={1.75} />,
+    icon: <IconBell size={16} strokeWidth={1.75} aria-hidden="true" />,
+    selectedIcon: <IconBellFilled size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
   {
     value: 'sometimes',
     label: 'Sometimes notify',
-    icon: <IconBellMinus size={16} strokeWidth={1.75} />,
-    selectedIcon: <IconBellMinusFilled size={16} strokeWidth={1.75} />,
+    icon: <IconBellMinus size={16} strokeWidth={1.75} aria-hidden="true" />,
+    selectedIcon: <IconBellMinusFilled size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
   {
     value: 'never',
     label: 'Never notify',
-    icon: <IconBellOff size={16} strokeWidth={1.75} />,
+    icon: <IconBellOff size={16} strokeWidth={1.75} aria-hidden="true" />,
   },
 ];
 
