@@ -320,7 +320,7 @@ export const Sidebar: React.FC<Props> = ({
                     aria-label={`Sign out ${account.user.username}`}
                     onClick={() => setAccountToLogout(account)}
                   >
-                    <IconLogout size={16} strokeWidth={1.5} />
+                    <IconLogout size={16} strokeWidth={1.5} aria-hidden="true" />
                   </button>
                 </div>
               ))}
