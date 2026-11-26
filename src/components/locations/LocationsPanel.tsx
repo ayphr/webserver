@@ -275,7 +275,7 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
           onClick={() => setReloadToken((value) => value + 1)}
           disabled={isLoading || devices.length === 0 || Boolean(rangeError)}
         >
-          <IconRefresh size={16} strokeWidth={1.75} />
+          <IconRefresh aria-hidden="true" size={16} strokeWidth={1.75} />
           Reload
         </Button>
       </div>
@@ -586,18 +586,18 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
 
         <div className="locations__toolbar">
           <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
-            <IconRefresh size={16} strokeWidth={1.75} />
+            <IconRefresh aria-hidden="true" size={16} strokeWidth={1.75} />
             Refresh
           </Button>
           <Button variant="primary" onClick={() => setIsCreateOpen(true)} disabled={atLocationLimit}>
-            <IconPlus size={16} strokeWidth={1.75} />
+            <IconPlus aria-hidden="true" size={16} strokeWidth={1.75} />
             Create location
           </Button>
         </div>
 
         <div className="locations__filters">
           <div className="locations__filter-search">
-            <IconSearch size={16} strokeWidth={1.8} aria-hidden="true" />
+            <IconSearch aria-hidden="true" size={16} strokeWidth={1.8} />
             <Input
               type="search"
               className="locations__search"
@@ -662,7 +662,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
                   onKeyDown={(event) => handleLocationCardKeyDown(event, location.id)}
                 >
                   <div className="locations__location-card__content">
-                    <IconMapPin size={18} strokeWidth={1.75} aria-hidden="true" />
+                    <IconMapPin aria-hidden="true" size={18} strokeWidth={1.75} />
                     <div>
                       <div className="locations__location-card__name">{location.name}</div>
                       <div className="locations__location-card__meta">
@@ -709,11 +709,11 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
 
       <div className="locations__toolbar">
         <Button variant="secondary" onClick={() => onNavigate({ tab: 'locations' })}>
-          <IconArrowLeft size={16} strokeWidth={1.75} />
+          <IconArrowLeft aria-hidden="true" size={16} strokeWidth={1.75} />
           Back to locations
         </Button>
         <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
-          <IconRefresh size={16} strokeWidth={1.75} />
+          <IconRefresh aria-hidden="true" size={16} strokeWidth={1.75} />
           Refresh
         </Button>
       </div>
@@ -805,7 +805,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
                           className={`locations__device-status ${isOnline(device) ? 'is-online' : 'is-offline'}`}
                           aria-label={isOnline(device) ? 'Online' : 'Offline'}
                         >
-                          {isOnline(device) ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
+                          {isOnline(device) ? <IconWifi aria-hidden="true" size={18} strokeWidth={1.75} /> : <IconWifiOff aria-hidden="true" size={18} strokeWidth={1.75} />}
                         </span>
                       </Tooltip>
                     </button>
@@ -842,7 +842,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
               </Button>
               {!selectedLocation.isDefault && (
                 <Button variant="danger" onClick={() => setIsDeleteOpen(true)}>
-                  <IconTrash size={16} strokeWidth={1.75} />
+                  <IconTrash aria-hidden="true" size={16} strokeWidth={1.75} />
                   Delete location
                 </Button>
               )}
