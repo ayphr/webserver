@@ -22,6 +22,7 @@ export { ListInput, type ListInputProps } from './ListInput';
 export { ToggleDropdown, type ToggleDropdownProps } from './ToggleDropdown';
 export { Pagination, type PaginationProps } from './Pagination';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
+export { ErrorBoundary } from './ErrorBoundary';
 export { CodeInput, type CodeInputProps } from './CodeInput';
 export { createTabKeyDownHandler } from './tabKeyboard';
 export { Slider, type SliderProps } from './Slider';

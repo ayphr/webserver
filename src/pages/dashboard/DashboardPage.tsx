@@ -15,7 +15,7 @@ import {
 import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, AssistantSendShortcut } from '@common';
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
-import { ProfileCard, Button, ConfirmDialog, Pagination, ProgressBar } from '../../components/common';
+import { ProfileCard, Button, ConfirmDialog, Pagination, ProgressBar, ErrorBoundary } from '../../components/common';
 import { useAssistantState } from '../../components/assistant/useAssistantState';
 import type { AssistantChatAction } from '../../components/assistant/types';
 import { Sidebar } from '../../components/layout';
@@ -717,11 +717,13 @@ export const DashboardPage = () => {
         <a className="sr-only skip-link" href="#main-content">Skip to content</a>
         <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isTeamMember={isTeamMember} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main" id="main-content" ref={mainRef} tabIndex={-1}>
-          <DashboardPanel title="Dashboard">
-            <p>Could not load user profile.</p>
-            {loadError && <p className="dashboard-page__error" role="alert">{loadError}</p>}
-            <Button variant="primary" onClick={() => void load()}>Retry</Button>
-          </DashboardPanel>
+          <ErrorBoundary>
+            <DashboardPanel title="Dashboard">
+              <p>Could not load user profile.</p>
+              {loadError && <p className="dashboard-page__error" role="alert">{loadError}</p>}
+              <Button variant="primary" onClick={() => void load()}>Retry</Button>
+            </DashboardPanel>
+          </ErrorBoundary>
         </main>
       </div>
     );
@@ -737,6 +739,7 @@ export const DashboardPage = () => {
         ref={mainRef}
         tabIndex={-1}
       >
+        <ErrorBoundary>
         {inviteToken && inviteError && dismissedInviteError !== inviteError && (
           <DashboardBanner
             title="Could not accept team invite"
@@ -1178,6 +1181,7 @@ export const DashboardPage = () => {
             )}
           </>
         )}
+        </ErrorBoundary>
       </main>
       <SessionsModal isOpen={isSessionsOpen} onClose={() => setIsSessionsOpen(false)} />
       {isChangePasswordOpen && (
