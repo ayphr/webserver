@@ -346,7 +346,7 @@ export const DashboardPage = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [searchParams, setSearchParams, user, inviteToken, inviteRetry]);
+  }, [searchParams, setSearchParams, user, inviteToken, inviteRetry, setUser, setCredits, setActiveSuspension]);
 
   const now = useDashboardClock();
   const isSuspended = activeSuspension !== null;
