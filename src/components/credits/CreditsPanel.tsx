@@ -92,7 +92,7 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
 
       <div className="credits__hero">
         <div className="credits__hero-icon">
-          <IconCoin size={30} strokeWidth={1.5} />
+          <IconCoin aria-hidden="true" size={30} strokeWidth={1.5} />
         </div>
         <div className="credits__hero-info">
           <span className="credits__hero-label">Available credits</span>
@@ -108,7 +108,7 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
           isLoading={isRefreshing}
           disabled={isRefreshing}
         >
-          <IconRefresh size={16} />
+          <IconRefresh aria-hidden="true" size={16} />
           Refresh
         </Button>
       </div>
@@ -116,7 +116,7 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
       <div className="credits__grid">
         <section className="credits__stat">
           <div className="credits__stat-head">
-            <span className="credits__stat-icon"><IconCalendar size={18} strokeWidth={1.75} /></span>
+            <span className="credits__stat-icon"><IconCalendar aria-hidden="true" size={18} strokeWidth={1.75} /></span>
             <span className="credits__stat-label">This month</span>
           </div>
           <span className="credits__stat-value">{formatCredits(credits.monthlyRemaining)}</span>
@@ -137,7 +137,7 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
 
         <section className="credits__stat">
           <div className="credits__stat-head">
-            <span className="credits__stat-icon"><IconPlus size={18} strokeWidth={1.75} /></span>
+            <span className="credits__stat-icon"><IconPlus aria-hidden="true" size={18} strokeWidth={1.75} /></span>
             <span className="credits__stat-label">Additional credits</span>
           </div>
           <span className="credits__stat-value">{formatCredits(credits.additional)}</span>
@@ -148,7 +148,7 @@ export const CreditsPanel = ({ initialCredits = null, onCreditsChange }: Props) 
 
         <section className="credits__stat">
           <div className="credits__stat-head">
-            <span className="credits__stat-icon"><IconLock size={18} strokeWidth={1.75} /></span>
+            <span className="credits__stat-icon"><IconLock aria-hidden="true" size={18} strokeWidth={1.75} /></span>
             <span className="credits__stat-label">On hold</span>
           </div>
           <span className="credits__stat-value">{formatCredits(credits.onHold)}</span>
