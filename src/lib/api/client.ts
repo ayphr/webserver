@@ -47,16 +47,16 @@ function normalizeBaseUrl(baseUrl?: string) {
 
 function readStoredToken(storageKey: string) {
   if (globalThis.window === undefined) return null;
-  return globalThis.localStorage.getItem(storageKey);
+  return globalThis.sessionStorage.getItem(storageKey);
 }
 
 function writeStoredToken(storageKey: string, token: string | null) {
   if (globalThis.window === undefined) return;
 
   if (token) {
-    globalThis.localStorage.setItem(storageKey, token);
+    globalThis.sessionStorage.setItem(storageKey, token);
   } else {
-    globalThis.localStorage.removeItem(storageKey);
+    globalThis.sessionStorage.removeItem(storageKey);
   }
 }
 

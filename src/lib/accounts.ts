@@ -35,7 +35,7 @@ export function isStoredAccountExpired(account: StoredAccount): boolean {
 export function getAllStoredAccounts(): StoredAccount[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.localStorage.getItem(ACCOUNTS_KEY);
+    const raw = window.sessionStorage.getItem(ACCOUNTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -51,7 +51,7 @@ export function getStoredAccounts(): StoredAccount[] {
 
 export function saveStoredAccounts(accounts: StoredAccount[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  window.sessionStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
   try {
     window.dispatchEvent(new CustomEvent('ayphr-accounts-changed'));
   } catch {
@@ -61,15 +61,15 @@ export function saveStoredAccounts(accounts: StoredAccount[]) {
 
 export function getActiveToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(ACTIVE_TOKEN_KEY);
+  return window.sessionStorage.getItem(ACTIVE_TOKEN_KEY);
 }
 
 export function setActiveToken(token: string | null) {
   if (typeof window === 'undefined') return;
   if (token) {
-    window.localStorage.setItem(ACTIVE_TOKEN_KEY, token);
+    window.sessionStorage.setItem(ACTIVE_TOKEN_KEY, token);
   } else {
-    window.localStorage.removeItem(ACTIVE_TOKEN_KEY);
+    window.sessionStorage.removeItem(ACTIVE_TOKEN_KEY);
   }
 }
 
