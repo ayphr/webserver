@@ -147,15 +147,15 @@ function TelemetryChips({ reading }: Readonly<{ reading: DataPoint | null }>) {
   return (
     <div className="devices__telemetry-chips">
       <div className="devices__telemetry-chip">
-        <IconThermometer size={14} strokeWidth={2} />
+        <IconThermometer aria-hidden="true" size={14} strokeWidth={2} />
         <span>{reading.temperature.toFixed(1)} °C</span>
       </div>
       <div className="devices__telemetry-chip">
-        <IconDroplet size={14} strokeWidth={2} />
+        <IconDroplet aria-hidden="true" size={14} strokeWidth={2} />
         <span>{reading.humidity.toFixed(1)} %</span>
       </div>
       <div className="devices__telemetry-chip">
-        <IconGauge size={14} strokeWidth={2} />
+        <IconGauge aria-hidden="true" size={14} strokeWidth={2} />
         <span>{reading.airPressure.toFixed(0)} hPa</span>
       </div>
     </div>
@@ -816,7 +816,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
           <h3>Device not found or not shared with your team</h3>
           <p>The device may have been unlinked, or it is no longer shared with your team.</p>
           <Button variant="secondary" onClick={closeDevice}>
-            <IconArrowLeft size={16} strokeWidth={1.75} />
+            <IconArrowLeft aria-hidden="true" size={16} strokeWidth={1.75} />
             Back to devices
           </Button>
         </div>
@@ -831,14 +831,14 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         <div className="devices__toolbar">
           <div className="devices__actions">
             <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
-              <IconRefresh size={16} strokeWidth={1.75} aria-hidden="true" />
+              <IconRefresh aria-hidden="true" size={16} strokeWidth={1.75} />
               Refresh
             </Button>
             <Button
               variant="primary"
               onClick={() => window.open(EXTERNAL_URLS.link, '_blank', 'noopener,noreferrer')}
             >
-              <IconExternalLink size={16} strokeWidth={1.75} />
+              <IconExternalLink aria-hidden="true" size={16} strokeWidth={1.75} />
               Add device
             </Button>
           </div>
@@ -847,7 +847,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         {devices.length > 0 && (
           <div className="devices__filters">
             <div className="devices__filter-search">
-              <IconSearch size={16} strokeWidth={1.8} aria-hidden="true" />
+              <IconSearch aria-hidden="true" size={16} strokeWidth={1.8} />
               <Input
                 type="search"
                 value={deviceSearch}
@@ -923,13 +923,13 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
 
         {devices.length === 0 ? (
           <div className="devices__empty">
-            <IconDatabase size={28} strokeWidth={1.5} aria-hidden="true" />
+            <IconDatabase aria-hidden="true" size={28} strokeWidth={1.5} />
             <h3>No devices yet</h3>
             <p>Use &quot;Add device&quot; to open ayphr.com/link and enter the code shown on your device.</p>
           </div>
         ) : filteredDevices.length === 0 ? (
           <div className="devices__empty">
-            <IconSearch size={28} strokeWidth={1.5} aria-hidden="true" />
+            <IconSearch aria-hidden="true" size={28} strokeWidth={1.5} />
             <h3>No devices match your filters</h3>
             <p>Try a different search term or clear the filters to see all devices.</p>
             <Button variant="secondary" onClick={clearDeviceFilters}>Clear filters</Button>
@@ -960,7 +960,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
                         className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
                         aria-label={online ? 'Online' : 'Offline'}
                       >
-                        {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
+                        {online ? <IconWifi aria-hidden="true" size={18} strokeWidth={1.75} /> : <IconWifiOff aria-hidden="true" size={18} strokeWidth={1.75} />}
                       </span>
                     </Tooltip>
                   </div>
@@ -971,11 +971,11 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
 
                   <div className="devices__card-footer">
                     <span className="devices__card-location">
-                      <IconMapPin size={13} strokeWidth={1.75} />
+                      <IconMapPin aria-hidden="true" size={13} strokeWidth={1.75} />
                       {deviceLoc ? deviceLoc.name : 'Unassigned location'}
                     </span>
                     <span className="devices__card-lastseen">
-                      <IconClock size={13} strokeWidth={1.75} />
+                      <IconClock aria-hidden="true" size={13} strokeWidth={1.75} />
                       {formatDeviceRelativeTime(device.lastUploadAt)}
                     </span>
                   </div>
@@ -1013,7 +1013,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
             closeDevice();
           }}
         >
-          <IconArrowLeft size={16} strokeWidth={1.75} />
+          <IconArrowLeft aria-hidden="true" size={16} strokeWidth={1.75} />
           Back to devices
         </Button>
         <div className="devices__actions">
@@ -1028,27 +1028,27 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
                 aria-pressed={isGraphFullscreen}
               >
                 {isGraphFullscreen ? (
-                  <IconMinimize size={18} strokeWidth={1.75} />
+                  <IconMinimize aria-hidden="true" size={18} strokeWidth={1.75} />
                 ) : (
-                  <IconMaximize size={18} strokeWidth={1.75} />
+                  <IconMaximize aria-hidden="true" size={18} strokeWidth={1.75} />
                 )}
               </button>
             </Tooltip>
           )}
           {detailTab !== 'forecasts' && detailTab !== 'settings' && detailTab !== 'alerts' && detailTab !== 'tokens' && detailTab !== 'logs' && (
             <Button variant="secondary" onClick={() => setIsDataFillOpen(true)}>
-              <IconDatabase size={16} strokeWidth={1.75} />
+              <IconDatabase aria-hidden="true" size={16} strokeWidth={1.75} />
               Data fill
             </Button>
           )}
           {detailTab !== 'alerts' && detailTab !== 'tokens' && detailTab !== 'logs' && (
             <Button variant="secondary" onClick={() => setIsExportOpen(true)}>
-              <IconFileDownload size={16} strokeWidth={1.75} />
+              <IconFileDownload aria-hidden="true" size={16} strokeWidth={1.75} />
               Export
             </Button>
           )}
           <Button variant="secondary" onClick={() => void handleRefresh()} isLoading={isRefreshing}>
-            <IconRefresh size={16} strokeWidth={1.75} aria-hidden="true" />
+            <IconRefresh aria-hidden="true" size={16} strokeWidth={1.75} />
             Refresh
           </Button>
         </div>
@@ -1067,7 +1067,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
               className={`devices__connection-icon ${online ? 'is-online' : 'is-offline'}`}
               aria-label={online ? 'Online' : 'Offline'}
             >
-              {online ? <IconWifi size={18} strokeWidth={1.75} /> : <IconWifiOff size={18} strokeWidth={1.75} />}
+              {online ? <IconWifi aria-hidden="true" size={18} strokeWidth={1.75} /> : <IconWifiOff aria-hidden="true" size={18} strokeWidth={1.75} />}
             </span>
           </Tooltip>
         </div>
@@ -1075,11 +1075,11 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         <div className="devices__detail-data-row">
           <div className="devices__detail-meta">
             <span>
-              <IconMapPin size={14} strokeWidth={1.75} />
+              <IconMapPin aria-hidden="true" size={14} strokeWidth={1.75} />
               {selectedLocation?.name ?? 'No location'}
             </span>
             <span>
-              <IconDatabase size={14} strokeWidth={1.75} />
+              <IconDatabase aria-hidden="true" size={14} strokeWidth={1.75} />
               <span
                 style={
                   planFeatures && selectedDevice.dataPointCount > planFeatures.sharedMaxDataPointsPerUser
@@ -1092,7 +1092,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
               data points
             </span>
             <span>
-              <IconClock size={14} strokeWidth={1.75} />
+              <IconClock aria-hidden="true" size={14} strokeWidth={1.75} />
               {online
                 ? uptime?.online
                   ? `Uptime ${uptime.durationMs < 60_000 ? 'just now' : formatDuration(uptime.durationMs / 1000)}`
@@ -1240,7 +1240,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
               </div>
             ) : dataPoints.length === 0 || enabledDefs.length === 0 ? (
               <div className="devices__empty">
-                <IconDatabase size={28} strokeWidth={1.5} aria-hidden="true" />
+                <IconDatabase aria-hidden="true" size={28} strokeWidth={1.5} />
                 <h3>{dataPoints.length === 0 ? 'No data points found' : 'No series selected'}</h3>
                 <p>
                   {dataPoints.length === 0
@@ -1294,7 +1294,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
 
                     <div className="devices__summary-col">
                       <div className="devices__summary-header">
-                        <IconCpu size={16} strokeWidth={1.75} />
+                        <IconCpu aria-hidden="true" size={16} strokeWidth={1.75} />
                         <span>Telemetry Points</span>
                       </div>
                       <div className="devices__summary-metrics">
@@ -1433,7 +1433,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
                 </Button>
                 {saveSuccess && (
                   <span className="devices__save-success">
-                    <IconCheck size={16} strokeWidth={2} />
+                    <IconCheck aria-hidden="true" size={16} strokeWidth={2} />
                     Saved successfully
                   </span>
                 )}
@@ -1448,7 +1448,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
               </p>
 
               <Button variant="danger" onClick={() => setIsUnlinkOpen(true)}>
-                <IconTrash size={16} strokeWidth={1.75} />
+                <IconTrash aria-hidden="true" size={16} strokeWidth={1.75} />
                 Unlink device
               </Button>
             </div>
