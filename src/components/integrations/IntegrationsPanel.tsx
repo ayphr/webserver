@@ -50,10 +50,11 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
   const [testResult, setTestResult] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const load = async () => {
+  const refresh = async () => {
     setError(null);
     await queryClient.invalidateQueries({ queryKey: ['integrations', 'mine'] });
   };
+  void refresh;
 
   const effectiveError = error ?? queryError;
 
@@ -101,16 +102,16 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
           provider: draft.provider,
           webhookUrl: url,
         };
-        const updated = await api.integrations.update(editing.id, input);
-        setIntegrations((prev) => prev.map((item) => (item.id === editing.id ? updated : item)));
+        await api.integrations.update(editing.id, input);
+        await queryClient.invalidateQueries({ queryKey: ['integrations', 'mine'] });
       } else {
         const input: IntegrationCreateRequest = {
           name,
           provider: draft.provider,
           webhookUrl: url,
         };
-        const created = await api.integrations.create(input);
-        setIntegrations((prev) => [created, ...prev]);
+        await api.integrations.create(input);
+        await queryClient.invalidateQueries({ queryKey: ['integrations', 'mine'] });
       }
       setIsModalOpen(false);
       return true;
@@ -124,7 +125,7 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
     setError(null);
     try {
       await api.integrations.remove(id);
-      setIntegrations((prev) => prev.filter((item) => item.id !== id));
+      await queryClient.invalidateQueries({ queryKey: ['integrations', 'mine'] });
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete integration');
@@ -134,8 +135,8 @@ export function IntegrationsPanel({ isManager = false }: { isManager?: boolean }
 
   const handleToggle = async (item: Integration, enabled: boolean) => {
     try {
-      const updated = await api.integrations.update(item.id, { enabled });
-      setIntegrations((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
+      await api.integrations.update(item.id, { enabled });
+      await queryClient.invalidateQueries({ queryKey: ['integrations', 'mine'] });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update integration');
     }

@@ -10,7 +10,6 @@ import { bootstrapQueryOptions } from '../../lib/query/bootstrap';
 import { queryKeys } from '../../lib/query';
 import './EmailGate.css';
 
-type GateState = 'loading' | 'ready' | 'required';
 type GateStep = 'email' | 'code';
 
 export const EmailGate = ({

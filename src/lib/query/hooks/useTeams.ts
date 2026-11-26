@@ -13,7 +13,7 @@ export function useTeamMe() {
 export function useTeamMembers(teamId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.teams('members', teamId),
-    queryFn: () => api.teams.listMembers(teamId!),
+    queryFn: () => api.teams.listMembers(),
     enabled: !!teamId,
   });
 }

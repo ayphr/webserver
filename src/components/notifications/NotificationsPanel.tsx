@@ -113,24 +113,15 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
   const [testPushSent, setTestPushSent] = useState(false);
   const tabIdPrefix = useId();
 
-  const applyUnreadCount = (count: number) => {
-    queryClient.setQueryData<NotificationListPayload>(['notifications', activeTab, page, PAGE_SIZE], (current) => current ? { ...current, unreadCount: count } : current);
-    onUnreadChange?.(count);
-  };
-
   useEffect(() => {
     if (listQuery.data) onUnreadChange?.(listQuery.data.unreadCount);
   }, [listQuery.data, onUnreadChange]);
 
-  useEffect(() => {
-    if (listQuery.error) setError(listQuery.error instanceof Error ? listQuery.error.message : 'Failed to load notifications');
-  }, [listQuery.error]);
+  const queryError = listQuery.error instanceof Error ? listQuery.error.message : listQuery.error ? 'Failed to load notifications' : null;
+  const effectiveError = error ?? queryError;
 
-  useEffect(() => {
-    if (listQuery.data && page > Math.max(1, listQuery.data.totalPages)) {
-      setPage(Math.max(1, listQuery.data.totalPages));
-    }
-  }, [listQuery.data, page]);
+  const totalPages = Math.max(1, listQuery.data?.totalPages ?? 1);
+  const safePage = Math.min(page, totalPages);
 
   const handleTabChange = (tab: NotificationFilter) => {
     setActiveTab(tab);
@@ -395,10 +386,10 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
         </div>
       </div>
 
-      {error && (
+      {effectiveError && (
         <div className="notifications-panel__error" role="alert">
           <IconAlertCircle aria-hidden="true" size={18} strokeWidth={1.75} />
-          <span>{error}</span>
+          <span>{effectiveError}</span>
         </div>
       )}
 
@@ -447,8 +438,8 @@ export function NotificationsPanel({ onNavigate, onUnreadChange }: Readonly<Noti
       </div>
 
       <Pagination
-        page={page}
-        totalPages={data.totalPages}
+        page={safePage}
+        totalPages={totalPages}
         onPageChange={setPage}
         disabled={isLoading || isMarkingAll}
       />

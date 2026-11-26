@@ -6,6 +6,7 @@ import { ModalProvider, RadioProvider, TooltipProvider, useTooltip } from './con
 import { DashboardLoadingSkeleton } from './pages/dashboard/DashboardLoadingSkeleton';
 import { parseDashboardPath } from './lib/dashboardRoutes';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- preload wrapper accepts any component
 function lazyWithPreload<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
   const Component = lazy(factory) as React.LazyExoticComponent<T> & { preload: () => Promise<{ default: T }> };
   Component.preload = factory;
@@ -23,6 +24,7 @@ const LandingPage = lazyWithPreload(() => import('./pages/landing/LandingPage').
 const LinkPage = lazyWithPreload(() => import('./pages/link/LinkPage').then((m) => ({ default: m.LinkPage })));
 const NotFoundPage = lazyWithPreload(() => import('./pages/notFound/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
+// eslint-disable-next-line react-refresh/only-export-components -- route preload registry used by dashboard prefetch
 export const routePreloads = {
   landing: () => LandingPage.preload(),
   auth: () => AuthPage.preload(),
@@ -30,6 +32,7 @@ export const routePreloads = {
   profile: () => ProfilePage.preload(),
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- route preload helper
 export function preloadMainRoutes() {
   void routePreloads.landing();
   void routePreloads.auth();

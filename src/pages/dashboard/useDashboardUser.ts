@@ -29,8 +29,11 @@ export function useDashboardUser(): DashboardUserData {
     const data = bootstrap.data;
     if (!data) return;
     const token = api.getAuthToken();
-    if (token) updateStoredAccount(token, data.user);
-    setAccounts(getStoredAccounts());
+    if (token) {
+      updateStoredAccount(token, data.user);
+      // Sync local account list after token-user update.
+      queueMicrotask(() => setAccounts(getStoredAccounts()));
+    }
   }, [bootstrap.data]);
 
   const reload = useCallback(() => {
@@ -72,5 +75,5 @@ export function useDashboardUser(): DashboardUserData {
     setCredits,
     setActiveSuspension,
     setAccounts,
-  }), [accounts, bootstrap.data, bootstrap.error, bootstrap.isPending, loadError, reload, setActiveSuspension, setCredits, setUser]);
+  }), [accounts, bootstrap.data, bootstrap.isPending, loadError, reload, setActiveSuspension, setCredits, setUser]);
 }

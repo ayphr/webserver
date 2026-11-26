@@ -11,7 +11,7 @@ import {
   IconWifiOff,
 } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DataPoint, DeviceSummary, Location, PublicUser } from '@common';
+import type { DataPoint, DeviceSummary, Location } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
 import { toDate } from '../../lib/date';
@@ -348,7 +348,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   const [sort, setSort] = useState<LocationSort>('name');
   const isLoading = (!locationsQuery.data && locationsQuery.isPending) || (!devicesQuery.data && devicesQuery.isPending);
   const isRefreshing = (locationsQuery.isFetching || devicesQuery.isFetching) && !isLoading;
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -361,15 +361,11 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   const detailTab: LocationDetailTab = locationRoute?.detailTab ?? 'overview';
   const tabIdPrefix = useId();
 
-  useEffect(() => {
-    if (locationsQuery.error || devicesQuery.error) {
-      const err = locationsQuery.error ?? devicesQuery.error;
-      setError(err instanceof Error ? err.message : 'Failed to load locations');
-    }
-  }, [devicesQuery.error, locationsQuery.error]);
+  const queryError = locationsQuery.error ?? devicesQuery.error;
+  const error = actionError ?? (queryError instanceof Error ? queryError.message : queryError ? 'Failed to load locations' : null);
 
   const load = useCallback(async () => {
-    setError(null);
+    setActionError(null);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.locationsMine() }),
       queryClient.invalidateQueries({ queryKey: queryKeys.devicesMine() }),
@@ -385,8 +381,8 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   }, [isLoading, locationRoute, locations, onNavigate]);
 
   const selectedLocation = useMemo(
-    () => locations.find((location) => location.id === selectedId) ?? null,
-    [locations, selectedId],
+    () => (locationsQuery.data ?? []).find((location) => location.id === selectedId) ?? null,
+    [locationsQuery.data, selectedId],
   );
 
   const locationDevices = useMemo(
@@ -475,9 +471,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   }
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     await load();
-    setIsRefreshing(false);
   };
 
   const clearFilters = () => {
@@ -507,15 +501,15 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
     const name = createName.trim();
     if (!name) return;
     setIsCreating(true);
-    setError(null);
+    setActionError(null);
     try {
       const created = await api.locations.create(name);
-      setLocations((current) => [...current, created]);
+      queryClient.setQueryData(queryKeys.locationsMine(), (current: Location[] | undefined) => [...(current ?? []), created]);
       setCreateName('');
       setIsCreateOpen(false);
       onNavigate({ tab: 'locations', location: { id: created.id, detailTab: 'overview' } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create location');
+      setActionError(err instanceof Error ? err.message : 'Failed to create location');
     } finally {
       setIsCreating(false);
     }
@@ -526,14 +520,12 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
     const name = settingsName.trim();
     if (!name) return;
     setIsSavingSettings(true);
-    setError(null);
+    setActionError(null);
     try {
       const updated = await api.locations.update(selectedLocation.id, { name });
-      setLocations((current) =>
-        current.map((location) => (location.id === updated.id ? updated : location)),
-      );
+      queryClient.setQueryData(queryKeys.locationsMine(), (current: Location[] | undefined) => (current ?? []).map((location) => (location.id === updated.id ? updated : location)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update location');
+      setActionError(err instanceof Error ? err.message : 'Failed to update location');
     } finally {
       setIsSavingSettings(false);
     }
@@ -542,15 +534,14 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   const handleDelete = async () => {
     if (!selectedLocation || selectedLocation.isDefault) return;
     setIsDeleting(true);
-    setError(null);
+    setActionError(null);
     try {
       await api.locations.remove(selectedLocation.id);
-      const remaining = locations.filter((location) => location.id !== selectedLocation.id);
-      setLocations(remaining);
+      queryClient.setQueryData(queryKeys.locationsMine(), (current: Location[] | undefined) => (current ?? []).filter((location) => location.id !== selectedLocation.id));
       setIsDeleteOpen(false);
       onNavigate({ tab: 'locations' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete location');
+      setActionError(err instanceof Error ? err.message : 'Failed to delete location');
     } finally {
       setIsDeleting(false);
     }

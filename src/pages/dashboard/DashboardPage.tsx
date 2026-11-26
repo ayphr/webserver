@@ -29,6 +29,7 @@ import { useDashboardUser } from './useDashboardUser';
 import { STORAGE_KEYS, readStorage, writeStorage, removeStorage } from '../../lib/storage';
 import { preloadDashboardTab, registerDashboardPanelPreloads } from '../../lib/query/prefetch';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- preload wrapper must accept any component props
 function lazyWithPreload<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
   const Component = lazy(factory) as React.LazyExoticComponent<T> & { preload: () => Promise<{ default: T }> };
   Component.preload = factory;

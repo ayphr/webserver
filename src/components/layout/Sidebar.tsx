@@ -194,7 +194,7 @@ export const Sidebar: React.FC<Props> = ({
           </>
         ) : (
           visibleTabs.map((t) => {
-            const tt = tooltipHandlers(t.name) as any;
+            const tt = tooltipHandlers(t.name);
             return (
             <button
               key={t.id}

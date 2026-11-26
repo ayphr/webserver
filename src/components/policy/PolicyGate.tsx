@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { ApiError } from '../../lib/api/client';
-import type { PolicyKey, PolicyStatus } from '@common';
+import type { PolicyKey } from '@common';
 import { Button, Card, CardBody, CardHeader, ConfirmDialog, Input } from '../common';
 import { bootstrapQueryOptions } from '../../lib/query/bootstrap';
 import { queryKeys } from '../../lib/query';
@@ -15,7 +15,7 @@ const POLICY_META: Record<PolicyKey, { title: string; to: string }> = {
   privacy: { title: 'Privacy Policy', to: '/policies/privacy' },
 };
 
-type GateState = 'loading' | 'ready' | 'required';
+/* gate state derived from bootstrap query */
 
 export const PolicyGate = ({
   children,
@@ -27,16 +27,13 @@ export const PolicyGate = ({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const bootstrap = useQuery({ ...bootstrapQueryOptions(api), retry: 2 });
-  const [status, setStatus] = useState<PolicyStatus | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (bootstrap.data?.policyStatus) setStatus(bootstrap.data.policyStatus);
-  }, [bootstrap.data?.policyStatus]);
+  const policyStatus = bootstrap.data?.policyStatus ?? null;
 
   useEffect(() => {
     const err = bootstrap.error;
@@ -155,7 +152,6 @@ export const PolicyGate = ({
     );
   }
 
-  const policyStatus = bootstrap.data?.policyStatus ?? status;
   const needsPolicy = Boolean(policyStatus && !policyStatus.upToDate);
 
   if (!bootstrap.data && bootstrap.isPending) {

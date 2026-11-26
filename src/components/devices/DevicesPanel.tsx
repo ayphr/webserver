@@ -22,7 +22,7 @@ import {
   IconWifiOff,
 } from '@tabler/icons-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatDuration, getPlanFeaturesForUser, type CreditBalance, type DataPoint, type DeviceSummary, type DeviceUptime, type Location, type PublicUser } from '@common';
+import { formatDuration, getPlanFeaturesForUser, type CreditBalance, type DataPoint, type DeviceSummary, type DeviceUptime } from '@common';
 import { api } from '../../lib/api';
 import { useDevicesMine } from '../../lib/query/hooks/useDevices';
 import { useLocationsMine } from '../../lib/query/hooks/useLocations';
@@ -252,8 +252,6 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const devicesQuery = useDevicesMine();
   const locationsQuery = useLocationsMine();
   const meQuery = useQuery({ queryKey: queryKeys.bootstrap(), queryFn: () => api.users.me() });
-  const [devices, setDevices] = useState<DeviceSummary[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [devicePage, setDevicePage] = useState(1);
   const [deviceSearch, setDeviceSearch] = useState('');
   const [deviceLocationFilter, setDeviceLocationFilter] = useState('');
@@ -263,21 +261,14 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const view: 'list' | 'detail' = selectedSerial === null ? 'list' : 'detail';
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDataFillOpen, setIsDataFillOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<PublicUser | null>(null);
-  const [credits, setCredits] = useState<CreditBalance | null>(initialCredits);
+  const [creditsOverride, setCreditsOverride] = useState<CreditBalance | null>(initialCredits);
 
-  useEffect(() => { if (devicesQuery.data) setDevices(devicesQuery.data); }, [devicesQuery.data]);
-  useEffect(() => { if (locationsQuery.data) setLocations(locationsQuery.data); }, [locationsQuery.data]);
-  useEffect(() => {
-    if (meQuery.data) {
-      setUser(meQuery.data.user);
-      setCredits(meQuery.data.credits);
-      if (meQuery.data.credits && onCreditsChange) onCreditsChange(meQuery.data.credits);
-    }
-  }, [meQuery.data, onCreditsChange]);
+  const devices = devicesQuery.data ?? [];
+  const locations = locationsQuery.data ?? [];
+  const user = meQuery.data?.user ?? null;
+  const credits = creditsOverride ?? meQuery.data?.credits ?? null;
   const planFeatures = user ? getPlanFeaturesForUser(user) : null;
   const canUseAlertsAndWebhooks = planFeatures?.alertsAndWebhooks ?? false;
   const maxDevices = planFeatures?.maxDevices ?? null;
@@ -406,26 +397,17 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   const loadAll = useCallback(async () => {
     setError(null);
     try {
-      const [loadedDevices, loadedLocations, userData] = await Promise.all([
-        queryClient.fetchQuery({ queryKey: queryKeys.devicesMine(), queryFn: () => api.devices.listMine() }),
-        queryClient.fetchQuery({ queryKey: queryKeys.locationsMine(), queryFn: () => api.locations.listMine().catch(() => []) }),
-        queryClient.fetchQuery({ queryKey: queryKeys.bootstrap(), queryFn: () => api.users.me() }).catch(() => null),
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.devicesMine() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.locationsMine() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap() }),
       ]);
-      setDevices(loadedDevices);
-      setLocations(loadedLocations);
-      if (userData) {
-        setUser(userData.user);
-        setCredits(userData.credits);
-        if (userData.credits && onCreditsChange) onCreditsChange(userData.credits);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load devices');
     }
-  }, [onCreditsChange, queryClient]);
+  }, [queryClient]);
 
-  useEffect(() => {
-    setIsLoading(!devicesQuery.data && devicesQuery.isPending);
-  }, [devicesQuery.data, devicesQuery.isPending]);
+  const effectiveIsLoading = !devicesQuery.data && devicesQuery.isPending;
 
   const selectedDevice = useMemo(
     () => devices.find((d) => d.serial === selectedSerial) ?? null,
@@ -612,7 +594,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         name: settingsName.trim() || undefined,
         locationId: settingsLocationId || undefined,
       });
-      setDevices((current) =>
+      queryClient.setQueryData<DeviceSummary[]>(queryKeys.devicesMine(), (current = []) =>
         current.map((d) => (d.serial === updated.serial ? { ...d, ...updated } : d)),
       );
       setSaveSuccess(true);
@@ -631,7 +613,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     setError(null);
     try {
       await api.devices.unlink(selectedDevice.serial);
-      setDevices((current) => current.filter((d) => d.serial !== selectedDevice.serial));
+      queryClient.setQueryData<DeviceSummary[]>(queryKeys.devicesMine(), (current = []) => current.filter((d) => d.serial !== selectedDevice.serial));
       setIsUnlinkOpen(false);
       closeDevice();
     } catch (err) {
@@ -818,7 +800,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
     [dataPoints, period, enabledDefs, showAxes, showXAxis, showLegend, showGrid, gapThreshold, graphWindow],
   );
 
-  if (isLoading) {
+  if (effectiveIsLoading) {
     return <p className="devices__notice">Loading devices...</p>;
   }
 
@@ -1504,7 +1486,8 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
           credits={credits}
           creditCostPerThousandPoints={planFeatures?.dataFillCreditCostPerThousandPoints ?? 1}
           onCreditsChange={(next) => {
-            setCredits(next);
+            setCreditsOverride(next);
+            queryClient.setQueryData(queryKeys.bootstrap(), (old: { credits?: unknown } | undefined) => old ? { ...old, credits: next } : old);
             onCreditsChange?.(next);
           }}
           onFilled={() => {

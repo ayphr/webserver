@@ -17,6 +17,6 @@ describe('bootstrap query', () => {
 
   test('bootstrapQueryOptions uses bootstrap key', () => {
     const opts = bootstrapQueryOptions({ users: { me: async () => ({}) } } as never);
-    expect(opts.queryKey).toEqual(queryKeys.bootstrap());
+    expect(opts.queryKey as readonly unknown[]).toEqual(['bootstrap']);
   });
 });

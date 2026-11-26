@@ -7,7 +7,7 @@ import {
   IconDeviceDesktop,
   IconMapPin,
 } from '@tabler/icons-react';
-import { PLAN_NAMES, type CreditBalance, type PublicUser } from '@common';
+import { PLAN_NAMES, type CreditBalance, type DeviceSummary, type PublicUser } from '@common';
 import { api } from '../../lib/api';
 import { formatCredits } from '../../lib/credits';
 import { toDate } from '../../lib/date';
@@ -65,7 +65,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
     setInviteError(null);
     try {
       await api.teams.acceptInvite(token);
-      queryClient.setQueryData(['teams', 'pendingInvites'], (prev: any[] | undefined) => (prev ?? []).filter((i) => i.token !== token));
+      queryClient.setQueryData<Array<{ token: string }>>(['teams', 'pendingInvites'], (prev) => (prev ?? []).filter((i) => i.token !== token));
       void queryClient.invalidateQueries({ queryKey: ['teams'] });
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : 'Failed to accept invite');
