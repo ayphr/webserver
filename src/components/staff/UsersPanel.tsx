@@ -270,7 +270,7 @@ export const UsersPanel = ({ routeUser, onRouteUserChange }: Props) => {
                   variant="secondary"
                   onClick={() => navigate(`/dashboard/profile/${user.uuid}`)}
                 >
-                  <IconUser size={16} /> Profile
+                  <IconUser size={16} aria-hidden="true" /> Profile
                 </Button>
                 <Button
                   variant="secondary"
