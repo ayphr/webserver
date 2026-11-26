@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SERIES_DEFINITIONS, type SeriesId } from './definitions';
+import { STORAGE_KEYS, readStorage, writeStorage } from '../storage';
 
-const STORAGE_KEY = 'ayphr:device:enabledSeries';
+const STORAGE_KEY = STORAGE_KEYS.deviceEnabledSeries;
 
 const DEFAULT_ENABLED: SeriesId[] = SERIES_DEFINITIONS.filter((s) => s.defaultEnabled).map((s) => s.id);
 
@@ -10,7 +11,7 @@ const VALID_IDS = new Set<SeriesId>(SERIES_DEFINITIONS.map((s) => s.id));
 function readStored(): SeriesId[] {
   if (typeof window === 'undefined') return DEFAULT_ENABLED;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = readStorage(STORAGE_KEY, 'local');
     if (!raw) return DEFAULT_ENABLED;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return DEFAULT_ENABLED;
@@ -26,7 +27,7 @@ export function useEnabledSeries() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(enabled));
+      writeStorage(STORAGE_KEY, JSON.stringify(enabled), 'local');
     } catch {
       // ignore storage failures
     }

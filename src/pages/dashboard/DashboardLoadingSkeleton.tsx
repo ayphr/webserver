@@ -1,4 +1,5 @@
 import { Sidebar } from '../../components/layout';
+import { STORAGE_KEYS, readStorage } from '../../lib/storage';
 import './DashboardPage.css';
 
 type DashboardLoadingSkeletonProps = {
@@ -38,7 +39,7 @@ export const DashboardLoadingSkeleton = ({ activeTab = 'overview' }: DashboardLo
       activeTab={activeTab}
       onChange={() => undefined}
       username="..."
-      pinned={localStorage.getItem('ayphr-pref-sidebar-pinned') === '1'}
+      pinned={readStorage(STORAGE_KEYS.sidebarPinned, 'local') === '1'}
       credits={null}
     />
     <main className="dashboard-main">

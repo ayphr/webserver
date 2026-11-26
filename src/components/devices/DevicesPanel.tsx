@@ -23,6 +23,7 @@ import {
 } from '@tabler/icons-react';
 import { formatDuration, getPlanFeaturesForUser, type CreditBalance, type DataPoint, type DeviceSummary, type DeviceUptime, type Location, type PublicUser } from '@common';
 import { api } from '../../lib/api';
+import { STORAGE_KEYS, readStorage, writeStorage } from '../../lib/storage';
 import { toDate } from '../../lib/date';
 import { formatDeviceRelativeTime, isDeviceOnline } from '../../lib/deviceActivity';
 import { Button, Card, ConfirmDialog, createTabKeyDownHandler, Input, Pagination, Select, ToggleDropdown, Tooltip } from '../common';
@@ -169,7 +170,7 @@ type DetailTab = DeviceDetailTab;
 
 function getStoredPeriod(): Period {
   try {
-    const raw = window.localStorage.getItem('ayphr:device:period');
+    const raw = readStorage(STORAGE_KEYS.devicePeriod, 'local');
     return DEVICE_PERIODS.find((period) => period === raw) ?? '24h';
   } catch {
     return '24h';
@@ -178,7 +179,7 @@ function getStoredPeriod(): Period {
 
 function getStoredGraphMode(): GraphMode {
   try {
-    const raw = window.localStorage.getItem('ayphr:device:graphMode');
+    const raw = readStorage(STORAGE_KEYS.deviceGraphMode, 'local');
     return GRAPH_MODES.find((mode) => mode === raw) ?? 'combined';
   } catch {
     return 'combined';
@@ -279,7 +280,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
 
   const [showAxes, setShowAxes] = useState<boolean>(() => {
     try {
-      const raw = window.localStorage.getItem('ayphr:device:showAxes');
+      const raw = readStorage(STORAGE_KEYS.deviceShowAxes, 'local');
       return raw === null ? true : raw === 'true';
     } catch {
       return true;
@@ -287,7 +288,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   });
   const [showXAxis, setShowXAxis] = useState<boolean>(() => {
     try {
-      const raw = window.localStorage.getItem('ayphr:device:showXAxis');
+      const raw = readStorage(STORAGE_KEYS.deviceShowXAxis, 'local');
       return raw === null ? true : raw === 'true';
     } catch {
       return true;
@@ -295,7 +296,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   });
   const [showLegend, setShowLegend] = useState<boolean>(() => {
     try {
-      const raw = window.localStorage.getItem('ayphr:device:showLegend');
+      const raw = readStorage(STORAGE_KEYS.deviceShowLegend, 'local');
       return raw === null ? true : raw === 'true';
     } catch {
       return true;
@@ -303,7 +304,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   });
   const [showGrid, setShowGrid] = useState<boolean>(() => {
     try {
-      const raw = window.localStorage.getItem('ayphr:device:showGrid');
+      const raw = readStorage(STORAGE_KEYS.deviceShowGrid, 'local');
       return raw === null ? true : raw === 'true';
     } catch {
       return true;
@@ -311,42 +312,42 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   });
   useEffect(() => {
     try {
-      window.localStorage.setItem('ayphr:device:showAxes', String(showAxes));
+      writeStorage(STORAGE_KEYS.deviceShowAxes, String(showAxes), 'local');
     } catch {
       // ignore
     }
   }, [showAxes]);
   useEffect(() => {
     try {
-      window.localStorage.setItem('ayphr:device:showXAxis', String(showXAxis));
+      writeStorage(STORAGE_KEYS.deviceShowXAxis, String(showXAxis), 'local');
     } catch {
       // ignore
     }
   }, [showXAxis]);
   useEffect(() => {
     try {
-      window.localStorage.setItem('ayphr:device:showLegend', String(showLegend));
+      writeStorage(STORAGE_KEYS.deviceShowLegend, String(showLegend), 'local');
     } catch {
       // ignore
     }
   }, [showLegend]);
   useEffect(() => {
     try {
-      window.localStorage.setItem('ayphr:device:showGrid', String(showGrid));
+      writeStorage(STORAGE_KEYS.deviceShowGrid, String(showGrid), 'local');
     } catch {
       // ignore
     }
   }, [showGrid]);
   useEffect(() => {
     try {
-      window.localStorage.setItem('ayphr:device:period', period);
+      writeStorage(STORAGE_KEYS.devicePeriod, period, 'local');
     } catch {
       // ignore
     }
   }, [period]);
   useEffect(() => {
     try {
-      window.localStorage.setItem('ayphr:device:graphMode', graphMode);
+      writeStorage(STORAGE_KEYS.deviceGraphMode, graphMode, 'local');
     } catch {
       // ignore
     }

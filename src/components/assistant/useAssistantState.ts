@@ -13,6 +13,7 @@ import {
   type AssistantState,
 } from '@common';
 import { api } from '../../lib/api';
+import { STORAGE_KEYS, removeStorage } from '../../lib/storage';
 import { createId, toPersistableMessage } from './utils';
 
 export type AssistantSyncStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -47,12 +48,12 @@ export type AssistantController = {
 const SAVE_DELAY_MS = 500;
 
 const LEGACY_ASSISTANT_STORAGE_KEYS = [
-  'ayphr-assistant-folders',
-  'ayphr-assistant-chats',
-  'ayphr-assistant-active-chat',
-  'ayphr-assistant-active-folder',
-  'ayphr-pref-assistant-variant',
-  'ayphr-pref-assistant-send-shortcut',
+  STORAGE_KEYS.assistantFolders,
+  STORAGE_KEYS.assistantChats,
+  STORAGE_KEYS.assistantActiveChat,
+  STORAGE_KEYS.assistantActiveFolder,
+  STORAGE_KEYS.assistantVariant,
+  STORAGE_KEYS.assistantSendShortcut,
 ];
 
 const toPersistableState = (state: AssistantState): AssistantState => ({
@@ -398,7 +399,7 @@ export const useAssistantState = (): AssistantController => {
   );
 
   useEffect(() => {
-    for (const key of LEGACY_ASSISTANT_STORAGE_KEYS) localStorage.removeItem(key);
+    for (const key of LEGACY_ASSISTANT_STORAGE_KEYS) removeStorage(key, 'local');
 
     void loadState();
     return () => {

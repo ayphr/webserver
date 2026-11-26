@@ -1,5 +1,6 @@
 import { type ApiErrorBody } from '@common';
 import { getStoredAccounts, removeStoredAccount, setActiveToken } from '../accounts';
+import { readStorage, writeStorage, removeStorage } from '../storage';
 
 export type ApiClientConfig = {
   baseUrl?: string;
@@ -46,17 +47,14 @@ function normalizeBaseUrl(baseUrl?: string) {
 }
 
 function readStoredToken(storageKey: string) {
-  if (globalThis.window === undefined) return null;
-  return globalThis.sessionStorage.getItem(storageKey);
+  return readStorage(storageKey, 'session');
 }
 
 function writeStoredToken(storageKey: string, token: string | null) {
-  if (globalThis.window === undefined) return;
-
   if (token) {
-    globalThis.sessionStorage.setItem(storageKey, token);
+    writeStorage(storageKey, token, 'session');
   } else {
-    globalThis.sessionStorage.removeItem(storageKey);
+    removeStorage(storageKey, 'session');
   }
 }
 

@@ -1,4 +1,5 @@
 import type { PublicUser } from '@common';
+import { STORAGE_KEYS, readStorage, writeStorage, removeStorage } from './storage';
 
 export type StoredAccount = {
   token: string;
@@ -7,8 +8,8 @@ export type StoredAccount = {
   expiresAt?: string | number | Date;
 };
 
-const ACCOUNTS_KEY = 'ayphr-accounts';
-const ACTIVE_TOKEN_KEY = 'ayphr-api-token';
+const ACCOUNTS_KEY = STORAGE_KEYS.accounts;
+const ACTIVE_TOKEN_KEY = STORAGE_KEYS.activeToken;
 
 function isStoredAccount(value: unknown): value is StoredAccount {
   if (!value || typeof value !== 'object') return false;
@@ -35,7 +36,7 @@ export function isStoredAccountExpired(account: StoredAccount): boolean {
 export function getAllStoredAccounts(): StoredAccount[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.sessionStorage.getItem(ACCOUNTS_KEY);
+    const raw = readStorage(ACCOUNTS_KEY, 'session');
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -51,7 +52,7 @@ export function getStoredAccounts(): StoredAccount[] {
 
 export function saveStoredAccounts(accounts: StoredAccount[]) {
   if (typeof window === 'undefined') return;
-  window.sessionStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  writeStorage(ACCOUNTS_KEY, JSON.stringify(accounts), 'session');
   try {
     window.dispatchEvent(new CustomEvent('ayphr-accounts-changed'));
   } catch {
@@ -61,15 +62,15 @@ export function saveStoredAccounts(accounts: StoredAccount[]) {
 
 export function getActiveToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return window.sessionStorage.getItem(ACTIVE_TOKEN_KEY);
+  return readStorage(ACTIVE_TOKEN_KEY, 'session');
 }
 
 export function setActiveToken(token: string | null) {
   if (typeof window === 'undefined') return;
   if (token) {
-    window.sessionStorage.setItem(ACTIVE_TOKEN_KEY, token);
+    writeStorage(ACTIVE_TOKEN_KEY, token, 'session');
   } else {
-    window.sessionStorage.removeItem(ACTIVE_TOKEN_KEY);
+    removeStorage(ACTIVE_TOKEN_KEY, 'session');
   }
 }
 

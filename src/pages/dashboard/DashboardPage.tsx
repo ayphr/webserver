@@ -26,6 +26,7 @@ import { DashboardContentSkeleton, DashboardLoadingSkeleton } from './DashboardL
 import { useDashboardClock } from './useDashboardClock';
 import { buildSettingsSections } from './dashboardSettings';
 import { useDashboardUser } from './useDashboardUser';
+import { STORAGE_KEYS, readStorage, writeStorage, removeStorage } from '../../lib/storage';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const QueriesPanel = lazy(() => import('../../components/queries').then((m) => ({ default: m.QueriesPanel })));
@@ -83,22 +84,18 @@ function PunishmentCountdown({ endsAt, isPermanent }: Readonly<{ endsAt: Date | 
 }
 
 function getStoredDefaultTab(): DashboardTab {
-  const stored = localStorage.getItem('ayphr-pref-default-tab');
+  const stored = readStorage(STORAGE_KEYS.defaultTab, 'local');
   return DASHBOARD_TABS.find((tab) => tab === stored) ?? 'overview';
 }
 
 function getAcceptedInviteToken(): string | null {
-  try {
-    return sessionStorage.getItem('ayphr:accepted-invite');
-  } catch {
-    return null;
-  }
+  return readStorage(STORAGE_KEYS.acceptedInvite, 'session');
 }
 
 function setAcceptedInviteToken(token: string | null): void {
   try {
-    if (token) sessionStorage.setItem('ayphr:accepted-invite', token);
-    else sessionStorage.removeItem('ayphr:accepted-invite');
+    if (token) writeStorage(STORAGE_KEYS.acceptedInvite, token, 'session');
+    else removeStorage(STORAGE_KEYS.acceptedInvite, 'session');
   } catch {
     // Ignore storage restrictions; the in-memory ref still prevents duplicate accepts.
   }
@@ -219,7 +216,7 @@ export const DashboardPage = () => {
   const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
   const [isChangeUsernameOpen, setIsChangeUsernameOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState<boolean>(
-    () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
+    () => readStorage(STORAGE_KEYS.sidebarPinned, 'local') === '1',
   );
   const assistant = useAssistantState();
   const [chatAction, setChatAction] = useState<AssistantChatAction | null>(null);
@@ -618,12 +615,12 @@ export const DashboardPage = () => {
   const setDefaultTabPref = (value: string) => {
     const next = DASHBOARD_TABS.find((tab) => tab === value) ?? 'overview';
     setDefaultTab(next);
-    localStorage.setItem('ayphr-pref-default-tab', next);
+    writeStorage(STORAGE_KEYS.defaultTab, next, 'local');
   };
 
   const setSidebarPinnedPref = (checked: boolean) => {
     setSidebarPinned(checked);
-    localStorage.setItem('ayphr-pref-sidebar-pinned', checked ? '1' : '0');
+    writeStorage(STORAGE_KEYS.sidebarPinned, checked ? '1' : '0', 'local');
   };
 
   const assistantVariant = assistant.preferences.defaultVariant;
