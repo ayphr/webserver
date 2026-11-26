@@ -158,6 +158,8 @@ const DashboardBanner = ({
   </div>
 );
 
+const APPEALS_PAGE_SIZE = 5;
+
 export const DashboardPage = () => {
   const [user, setUser] = useState<SelfUser | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
@@ -173,7 +175,6 @@ export const DashboardPage = () => {
   const [resolvingAppealId, setResolvingAppealId] = useState<string | null>(null);
   const [appealResolveErrors, setAppealResolveErrors] = useState<Record<string, string>>({});
   const [appealsPage, setAppealsPage] = useState(1);
-  const APPEALS_PAGE_SIZE = 5;
   const appealsTotalPages = Math.max(1, Math.ceil(staffAppeals.length / APPEALS_PAGE_SIZE));
   const safeAppealsPage = Math.min(appealsPage, appealsTotalPages);
   const [isAppealsLoading, setIsAppealsLoading] = useState(false);
@@ -182,15 +183,15 @@ export const DashboardPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const legacyTab = searchParams.get('tab');
   const inviteToken = searchParams.get('invite');
-  const storedDefaultTab = getStoredDefaultTab();
   const isStaff = user?.role === 'staff';
   const isTeamMember = Boolean(user?.teamId);
+  const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   // A stored preference for a tab the account cannot open falls back to Overview.
-  const preferredDefaultTab: DashboardTab = storedDefaultTab === 'team' && !isTeamMember
+  const preferredDefaultTab: DashboardTab = defaultTab === 'team' && !isTeamMember
     ? 'overview'
-    : storedDefaultTab === 'users' && !isStaff
+    : defaultTab === 'users' && !isStaff
       ? 'overview'
-      : storedDefaultTab;
+      : (defaultTab as DashboardTab);
   const dashboardRoute = useMemo(
     () => parseDashboardPath(location.pathname, legacyTab ?? preferredDefaultTab),
     [location.pathname, legacyTab, preferredDefaultTab],
@@ -202,12 +203,12 @@ export const DashboardPage = () => {
   const activeGame = dashboardRoute.game ?? null;
   const staffUserRoute = dashboardRoute.staffUser ?? null;
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isChangeEmailOpen, setIsChangeEmailOpen] = useState(false);
   const [isChangeUsernameOpen, setIsChangeUsernameOpen] = useState(false);
-  const [defaultTab, setDefaultTab] = useState<string>(getStoredDefaultTab);
   const [sidebarPinned, setSidebarPinned] = useState<boolean>(
     () => localStorage.getItem('ayphr-pref-sidebar-pinned') === '1',
   );
@@ -227,28 +228,30 @@ export const DashboardPage = () => {
   const [dismissedAssistantSyncError, setDismissedAssistantSyncError] = useState<string | null>(null);
   const [punishmentToRemove, setPunishmentToRemove] = useState<{ id: string; label: string } | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
 
-      try {
-        const userData = await api.users.me();
-        setUser(userData.user);
-        setCredits(userData.credits);
-        setActiveSuspension(userData.activeSuspension);
-        const token = api.getAuthToken();
-        if (token) updateStoredAccount(token, userData.user);
-        setAccounts(getStoredAccounts());
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
-        console.error(message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void load();
+    try {
+      const userData = await api.users.me();
+      setUser(userData.user);
+      setCredits(userData.credits);
+      setActiveSuspension(userData.activeSuspension);
+      const token = api.getAuthToken();
+      if (token) updateStoredAccount(token, userData.user);
+      setAccounts(getStoredAccounts());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
+      setLoadError(message);
+      console.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const unreadPollUserId = user?.uuid;
   useEffect(() => {
@@ -712,10 +715,12 @@ export const DashboardPage = () => {
     return (
       <div className={`dashboard-layout`}>
         <a className="sr-only skip-link" href="#main-content">Skip to content</a>
-        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} />
+        <Sidebar activeTab={activePage} onChange={changeTab} username={'guest'} isTeamMember={isTeamMember} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} />
         <main className="dashboard-main" id="main-content" ref={mainRef} tabIndex={-1}>
           <DashboardPanel title="Dashboard">
             <p>Could not load user profile.</p>
+            {loadError && <p className="dashboard-page__error" role="alert">{loadError}</p>}
+            <Button variant="primary" onClick={() => void load()}>Retry</Button>
           </DashboardPanel>
         </main>
       </div>
@@ -725,7 +730,7 @@ export const DashboardPage = () => {
   return (
     <div className={`dashboard-layout`}>
       <a className="sr-only skip-link" href="#main-content">Skip to content</a>
-      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} isTeamManager={isTeamManager} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
+      <Sidebar activeTab={activePage} onChange={changeTab} username={user.username} badges={user.badges} country={user.country} avatarUrl={user.avatarUrl} isSuspended={isSuspended} isStaff={isStaff} isTeamMember={isTeamMember} canUseAlertsAndWebhooks={canUseAlertsAndWebhooks} pinned={sidebarPinned} credits={credits} accounts={accounts} activeToken={api.getAuthToken()} onSwitchAccount={handleSwitchAccount} onLogoutAccount={handleLogoutAccount} unreadNotifications={unreadNotifications} />
       <main
         className={`dashboard-main${activePage === 'assistant' ? ' dashboard-main--assistant' : ''}`}
         id="main-content"

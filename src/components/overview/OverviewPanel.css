@@ -43,6 +43,11 @@
   border-color: var(--border-focus);
 }
 
+.overview__stat:active {
+  border-color: var(--border-focus);
+  background: var(--bg-elevated);
+}
+
 .overview__stat-label {
   display: inline-flex;
   align-items: center;
@@ -58,6 +63,7 @@
   font-size: 1.4rem;
   font-weight: var(--font-weight-hv);
   line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .overview__stat-sub {
@@ -103,6 +109,17 @@
 
 .overview__text-button:hover {
   color: var(--text-primary);
+}
+
+.overview__text-button:active {
+  color: var(--text-primary);
+  opacity: 0.8;
+}
+
+.overview__error {
+  margin: 0;
+  color: var(--status-error);
+  font-size: 0.88rem;
 }
 
 .overview__device-list {
@@ -234,8 +251,8 @@
   border: none;
   border-radius: var(--radius-sm);
   background: var(--accent-green);
-  color: #121212;
-  font-weight: 600;
+  color: var(--bg-base);
+  font-weight: var(--font-weight-md);
   cursor: pointer;
 }
 

@@ -72,7 +72,6 @@ type Props = {
   isSuspended?: boolean;
   isStaff?: boolean;
   isTeamMember?: boolean;
-  isTeamManager?: boolean;
   canUseAlertsAndWebhooks?: boolean;
   credits?: CreditBalance | null;
   accounts?: StoredAccount[];
@@ -165,8 +164,6 @@ export const Sidebar: React.FC<Props> = ({
         <img src={logo} alt="Ayphr" className="n-sidebar__logo" />
         <h1 className="n-sidebar__title">Ayphr</h1>
       </div>
-
-
 
       <nav className="n-sidebar__tabs" aria-label="Primary">
         {isSuspended ? (
@@ -323,7 +320,7 @@ export const Sidebar: React.FC<Props> = ({
                     aria-label={`Sign out ${account.user.username}`}
                     onClick={() => setAccountToLogout(account)}
                   >
-                    <IconLogout size={16} />
+                    <IconLogout size={16} strokeWidth={1.5} />
                   </button>
                 </div>
               ))}

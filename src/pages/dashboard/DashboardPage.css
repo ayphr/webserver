@@ -241,7 +241,7 @@
   }
 }
 
- .dashboard-page__suspension-card {
+.dashboard-page__suspension-card {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -260,6 +260,7 @@
   font-weight: var(--font-weight-hv);
   color: var(--status-error);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-page__suspension-card__countdown-label {
@@ -317,6 +318,7 @@
   color: var(--status-error);
   font-weight: var(--font-weight-hv);
   font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-page__lift-button {
@@ -509,13 +511,13 @@
 .dashboard-page__appeal-step--success .dashboard-page__appeal-step-icon {
   background-color: var(--accent-green-solid);
   border-color: var(--accent-green-solid);
-  color: var(--text-primary);
+  color: var(--bg-base);
 }
 
 .dashboard-page__appeal-step--danger .dashboard-page__appeal-step-icon {
   background-color: var(--status-error);
   border-color: var(--status-error);
-  color: var(--text-primary);
+  color: var(--bg-base);
 }
 
 .dashboard-page__appeal-step-label {

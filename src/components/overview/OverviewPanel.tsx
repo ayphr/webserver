@@ -31,11 +31,15 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
   const [isLoading, setIsLoading] = useState(true);
   const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
 
     const load = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const [loadedDevices, loadedLocations, loadedInvites] = await Promise.all([
           api.devices.listMine(),
@@ -58,7 +62,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
     return () => {
       active = false;
     };
-  }, []);
+  }, [retry]);
 
   const onlineCount = useMemo(() => devices.filter(isDeviceOnline).length, [devices]);
 
@@ -79,11 +83,12 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
   const isTeamMember = Boolean(user.teamId);
 
   const handleAcceptInvite = async (token: string) => {
+    setInviteError(null);
     try {
       await api.teams.acceptInvite(token);
       setPendingInvites((prev) => prev.filter((i) => i.token !== token));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to accept invite');
+      setInviteError(err instanceof Error ? err.message : 'Failed to accept invite');
     }
   };
 
@@ -103,6 +108,9 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
       {pendingInvites.length > 0 && (
         <div className="overview__invites">
           <h3>Pending team invitations</h3>
+          {inviteError && (
+            <p className="overview__error" role="alert">{inviteError}</p>
+          )}
           {pendingInvites.map((invite) => (
             <div key={invite.id} className="overview__invite">
               <span>
@@ -123,9 +131,9 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
             <IconDeviceDesktop size={16} strokeWidth={1.75} />
             Devices
           </span>
-          <span className="overview__stat-value">{devices.length}</span>
+          <span className="overview__stat-value">{error ? '—' : devices.length}</span>
           <span className="overview__stat-sub">
-            {isLoading ? 'Loading…' : `${onlineCount} online`}
+            {isLoading ? 'Loading…' : error ? 'Unavailable' : `${onlineCount} online`}
           </span>
         </button>
 
@@ -161,7 +169,7 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
             <IconMapPin size={16} strokeWidth={1.75} />
             Locations
           </span>
-          <span className="overview__stat-value">{isLoading ? '—' : locations.length}</span>
+          <span className="overview__stat-value">{isLoading ? '—' : error ? '—' : locations.length}</span>
           <span className="overview__stat-sub">Device groups</span>
         </button>
       </div>
@@ -172,12 +180,17 @@ export const OverviewPanel = ({ user, credits, onNavigate, onDeviceNavigate }: P
           <button type="button" className="overview__text-button" onClick={() => onNavigate('devices')}>
             View all
           </button>
-          </div>
+        </div>
 
         {isLoading ? (
           <p className="overview__muted">Loading devices…</p>
         ) : error ? (
-          <p className="overview__muted">{error}</p>
+          <>
+            <p className="overview__error" role="alert">{error}</p>
+            <button type="button" className="overview__text-button" onClick={() => setRetry((value) => value + 1)}>
+              Retry
+            </button>
+          </>
         ) : recentDevices.length === 0 ? (
           <div className="overview__empty">
             <p>No devices linked yet.</p>
