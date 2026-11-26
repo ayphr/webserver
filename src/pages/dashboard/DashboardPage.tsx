@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { IconAlertCircle, IconCheck, IconClock, IconX, IconSend, IconChevronDown, IconChevronUp, IconGavel } from '@tabler/icons-react';
 import { api } from '../../lib/api';
-import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount, type StoredAccount } from '../../lib/accounts';
+import { getStoredAccounts, removeStoredAccount, setActiveToken, updateStoredAccount } from '../../lib/accounts';
 import { formatDisplayDate, toDate } from '../../lib/date';
 import {
   DASHBOARD_TABS,
@@ -12,7 +12,7 @@ import {
   type DashboardTarget,
   type TeamSection,
 } from '../../lib/dashboardRoutes';
-import type { Punishment, SelfUser, CreditBalance, Appeal, AssistantVariant, AssistantSendShortcut } from '@common';
+import type { Appeal, AssistantVariant, AssistantSendShortcut } from '@common';
 import { ASSISTANT_VARIANTS, getPlanFeaturesForUser } from '@common';
 
 import { ProfileCard, Button, ConfirmDialog, Pagination, ProgressBar, ErrorBoundary } from '../../components/common';
@@ -25,6 +25,7 @@ import { OverviewPanel } from '../../components/overview/OverviewPanel';
 import { DashboardContentSkeleton, DashboardLoadingSkeleton } from './DashboardLoadingSkeleton';
 import { useDashboardClock } from './useDashboardClock';
 import { buildSettingsSections } from './dashboardSettings';
+import { useDashboardUser } from './useDashboardUser';
 
 const DevicesPanel = lazy(() => import('../../components/devices').then((m) => ({ default: m.DevicesPanel })));
 const QueriesPanel = lazy(() => import('../../components/queries').then((m) => ({ default: m.QueriesPanel })));
@@ -161,9 +162,19 @@ const DashboardBanner = ({
 const APPEALS_PAGE_SIZE = 5;
 
 export const DashboardPage = () => {
-  const [user, setUser] = useState<SelfUser | null>(null);
-  const [credits, setCredits] = useState<CreditBalance | null>(null);
-  const [activeSuspension, setActiveSuspension] = useState<Punishment | null>(null);
+  const {
+    user,
+    credits,
+    activeSuspension,
+    accounts,
+    isLoading,
+    loadError,
+    reload: load,
+    setUser,
+    setCredits,
+    setActiveSuspension,
+    setAccounts,
+  } = useDashboardUser();
   const [isSuspensionDetailsOpen, setIsSuspensionDetailsOpen] = useState(false);
   const [existingAppeal, setExistingAppeal] = useState<Appeal | null>(null);
   const [appealText, setAppealText] = useState('');
@@ -202,8 +213,6 @@ export const DashboardPage = () => {
   const isEditingProfile = dashboardRoute.profileEdit === true;
   const activeGame = dashboardRoute.game ?? null;
   const staffUserRoute = dashboardRoute.staffUser ?? null;
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLiftingPunishment, setIsLiftingPunishment] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -218,7 +227,6 @@ export const DashboardPage = () => {
     () => typeof window !== 'undefined' && !window.matchMedia('(max-width: 768px)').matches,
   );
   const chatActionTokenRef = useRef(0);
-  const [accounts, setAccounts] = useState<StoredAccount[]>(() => getStoredAccounts());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [dismissedInviteError, setDismissedInviteError] = useState<string | null>(null);
@@ -227,27 +235,6 @@ export const DashboardPage = () => {
   const acceptedInviteRef = useRef<string | null>(null);
   const [dismissedAssistantSyncError, setDismissedAssistantSyncError] = useState<string | null>(null);
   const [punishmentToRemove, setPunishmentToRemove] = useState<{ id: string; label: string } | null>(null);
-
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-
-    try {
-      const userData = await api.users.me();
-      setUser(userData.user);
-      setCredits(userData.credits);
-      setActiveSuspension(userData.activeSuspension);
-      const token = api.getAuthToken();
-      if (token) updateStoredAccount(token, userData.user);
-      setAccounts(getStoredAccounts());
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
-      setLoadError(message);
-      console.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     void load();
