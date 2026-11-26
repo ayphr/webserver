@@ -288,14 +288,14 @@ const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
       {devices.length === 0 ? (
         <p className="locations__notice">No devices are currently assigned to this location.</p>
       ) : rangeError ? (
-        <div className="locations__error">
+        <div className="locations__error" role="alert">
           <IconAlertCircle size={16} strokeWidth={1.75} />
           <span>{rangeError}</span>
         </div>
       ) : isLoading ? (
         <p className="locations__notice">Loading location history...</p>
       ) : error ? (
-        <div className="locations__error">
+        <div className="locations__error" role="alert">
           <IconAlertCircle size={16} strokeWidth={1.75} />
           <span>{error}</span>
           <Button variant="secondary" onClick={() => setReloadToken((value) => value + 1)}>
@@ -578,7 +578,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
     return (
       <div className="locations">
         {error && (
-          <div className="locations__error">
+          <div className="locations__error" role="alert">
             <IconAlertCircle size={16} strokeWidth={1.75} />
             <span>{error}</span>
           </div>
@@ -701,7 +701,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   return (
     <div className="locations">
       {error && (
-        <div className="locations__error">
+        <div className="locations__error" role="alert">
           <IconAlertCircle size={16} strokeWidth={1.75} />
           <span>{error}</span>
         </div>

@@ -40,7 +40,7 @@ export function TeamAuditPanel() {
   }, [page]);
 
   if (isLoading) return <p className="team-panel__loading">Loading audit log…</p>;
-  if (error) return <p className="team-panel__error">{error}</p>;
+  if (error) return <p className="team-panel__error" role="alert">{error}</p>;
 
   return (
     <div className="team-panel">

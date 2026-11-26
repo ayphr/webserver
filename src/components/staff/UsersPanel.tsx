@@ -226,7 +226,7 @@ export const UsersPanel = ({ routeUser, onRouteUserChange }: Props) => {
         </div>
       </div>
 
-      {error && <div className="users-panel__error">{error}</div>}
+      {error && <div className="users-panel__error" role="alert">{error}</div>}
 
       <div className="users-panel__summary">
         <span>

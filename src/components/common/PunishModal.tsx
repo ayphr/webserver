@@ -138,7 +138,7 @@ export const PunishModal: React.FC<PunishModalProps> = ({
           />
         </div>
 
-        {error && <div className="punish-modal__error">{error}</div>}
+        {error && <div className="punish-modal__error" role="alert">{error}</div>}
 
         <div className="punish-modal__footer">
           <Button

@@ -165,7 +165,7 @@ export const EmailGate = ({
               <h1>Couldn&apos;t load your account</h1>
             </CardHeader>
             <CardBody>
-              <p className="email-gate__error">{loadError}</p>
+              <p className="email-gate__error" role="alert">{loadError}</p>
               <div className="email-gate__actions">
                 <Button variant="primary" fullWidth isLoading={isRetrying} onClick={() => setRetryKey((k) => k + 1)}>
                   {isRetrying ? 'Retrying...' : 'Try again'}

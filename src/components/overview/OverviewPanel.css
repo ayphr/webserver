@@ -159,7 +159,6 @@
 
 .overview__device-status.is-online {
   background: var(--status-success);
-  box-shadow: 0 0 6px var(--status-success);
 }
 
 .overview__device-main {

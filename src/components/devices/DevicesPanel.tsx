@@ -915,7 +915,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
         )}
 
         {error && (
-          <div className="devices__error">
+          <div className="devices__error" role="alert">
             <IconAlertCircle size={16} strokeWidth={1.75} />
             <span>{error}</span>
           </div>
@@ -999,7 +999,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
   return (
     <div className="devices devices--detail">
       {error && (
-        <div className="devices__error">
+        <div className="devices__error" role="alert">
           <IconAlertCircle size={16} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
@@ -1226,7 +1226,7 @@ export const DevicesPanel = ({ activeDevice = null, onNavigate, credits: initial
             </div>
 
             {dataError && (
-              <div className="devices__error">
+              <div className="devices__error" role="alert">
                 <IconAlertCircle size={16} strokeWidth={1.75} />
                 <span>{dataError}</span>
               </div>

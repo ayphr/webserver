@@ -859,8 +859,8 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
           <div className="queries-panel__error" role="alert">
             <IconAlertCircle size={17} strokeWidth={1.75} />
             <div className="queries-panel__error-list">
-              {errors.map((message, index) => (
-                <div key={index} className="queries-panel__error-item">{message}</div>
+              {errors.map((message) => (
+                <div key={message} className="queries-panel__error-item">{message}</div>
               ))}
             </div>
           </div>

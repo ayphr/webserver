@@ -103,7 +103,7 @@
 .n-sidebar__tab.active {
   background: var(--surface-active-subtle);
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .n-sidebar__icon {
@@ -337,7 +337,7 @@
 }
 
 .n-sidebar__accountSwitch.is-active {
-  font-weight: 600;
+  font-weight: var(--font-weight-md);
 }
 
 .n-sidebar__accountCheck {

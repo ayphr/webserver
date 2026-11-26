@@ -174,7 +174,7 @@ export const PolicyGate = ({
               <h1>Couldn&apos;t load your account</h1>
             </CardHeader>
             <CardBody>
-              <p className="policy-gate__error">{loadError}</p>
+              <p className="policy-gate__error" role="alert">{loadError}</p>
               <div className="policy-gate__actions">
                 <Button variant="primary" fullWidth isLoading={isRetrying} onClick={() => setRetryKey((k) => k + 1)}>
                   {isRetrying ? 'Retrying...' : 'Try again'}

@@ -43,7 +43,7 @@ export const DnsChallengeModal = ({
             <p>Add the following TXT record to your DNS, then click Check.</p>
             <CopyableField label="TXT name" value={recordName} />
             <CopyableField label="TXT value" value={recordValue} />
-            <div className="dns-challenge__error">
+            <div className="dns-challenge__error" role="alert">
               {error ? <p className="profile-card__form-error">{error}</p> : null}
               {error ? <p className="dns-challenge__note">DNS changes can take a few minutes to propagate.</p> : null}
             </div>
