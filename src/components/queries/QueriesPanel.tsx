@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, tooltips } from '@codemirror/view';
@@ -46,6 +47,8 @@ import { downloadRows, slugifyFilename, type ExportRow } from '../../lib/export'
 import { EXTERNAL_URLS } from '../../lib/externalUrls';
 import { prepareAssistedQuery } from '../../lib/queryAssist';
 import { tqlAutocompletion, tqlHover, tqlLanguage, tqlLinter } from '../../lib/tqlEditor';
+import { useDevicesMine } from '../../lib/query/hooks/useDevices';
+import { queryKeys } from '../../lib/query';
 import { Button, Input, Pagination, Select, ToggleDropdown, Tooltip } from '../common';
 import { createQueryDraft } from './utils';
 import './QueriesPanel.css';
@@ -263,11 +266,11 @@ function CopyFeedbackButton({ value, label, className = '' }: CopyFeedbackButton
 
 export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelProps) => {
   const planFeatures = useMemo(() => getPlanFeaturesForUser(user), [user]);
-  const [devices, setDevices] = useState<DeviceSummary[]>([]);
-  const [isDevicesLoading, setIsDevicesLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const devicesQuery = useDevicesMine();
+  const devices = devicesQuery.data ?? [];
+  const isDevicesLoading = !devicesQuery.data && devicesQuery.isPending;
   const [draft, setDraft] = useState<QueryDraft>(() => createQueryDraft());
-  const [pointCount, setPointCount] = useState<number | null>(null);
-  const [isCountLoading, setIsCountLoading] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<DeviceQueryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -299,22 +302,6 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
   const selectedSerialsKey = selectedSerials.join(',');
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const loaded = await api.devices.listMine();
-        if (!cancelled) setDevices(loaded);
-      } catch {
-        if (!cancelled) setDevices([]);
-      } finally {
-        if (!cancelled) setIsDevicesLoading(false);
-      }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (devices.length === 0) return;
     setDraft((current) => (
@@ -334,43 +321,25 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
     return null;
   }, [draft.range.from, draft.range.to]);
 
-  useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
-    if (!selectedSerialsKey || rangeError) {
-      setPointCount(null);
-      setIsCountLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setIsCountLoading(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
-    const serials = selectedSerialsKey.split(',').map(Number);
-    const timer = setTimeout(() => {
-      Promise.all(
+  const countQuery = useQuery({
+    queryKey: queryKeys.deviceDataPointCount(selectedSerialsKey, draft.range.from, draft.range.to),
+    queryFn: async () => {
+      const serials = selectedSerialsKey.split(',').map(Number).filter(Number.isFinite);
+      const responses = await Promise.all(
         serials.map((deviceSerial) => api.devices.getDataPoints(deviceSerial, {
           from: draft.range.from,
           to: draft.range.to,
           countOnly: true,
         })),
-      )
-        .then((responses) => {
-          if (!cancelled) {
-            setPointCount(responses.reduce((sum, response) => sum + response.totalCount, 0));
-            setIsCountLoading(false);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setPointCount(null);
-            setIsCountLoading(false);
-          }
-        });
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [selectedSerialsKey, draft.range.from, draft.range.to, rangeError]);
+      );
+      return responses.reduce((sum, response) => sum + response.totalCount, 0);
+    },
+    enabled: !!selectedSerialsKey && !rangeError,
+    staleTime: 30_000,
+    meta: { persist: false },
+  });
+  const pointCount = countQuery.data ?? null;
+  const isCountLoading = countQuery.isPending && !!selectedSerialsKey && !rangeError;
 
   const trimmedQuery = draft.query.trim();
   const validation = useMemo(() => {
@@ -551,6 +520,7 @@ export const QueriesPanel = ({ user, credits, onCreditsChange }: QueriesPanelPro
         try {
           const fresh = await api.credits.me();
           onCreditsChange(fresh);
+          queryClient.setQueryData(queryKeys.creditsMe(), fresh);
         } catch {
           // Ignore credit refresh failures; the query already succeeded.
         }

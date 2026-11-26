@@ -3,6 +3,7 @@ export const queryKeys = {
   devicesMine: () => ['devices', 'mine'] as const,
   device: (serial: number) => ['device', serial] as const,
   deviceDataPoints: (serial: number, params: unknown) => ['deviceDataPoints', serial, params] as const,
+  deviceDataPointCount: (serialsKey: string, from: string, to: string) => ['deviceDataPointCount', serialsKey, from, to] as const,
   locationsMine: () => ['locations', 'mine'] as const,
   location: (id: string) => ['location', id] as const,
   locationDataPoints: (id: string, params: unknown) => ['locationDataPoints', id, params] as const,
