@@ -393,7 +393,7 @@ export const AssistantComposer = ({
           </button>
         </div>
         {speechError && (
-          <p className="assistant-input__speech-error" role="status">
+          <p className="assistant-input__speech-error" role="status" aria-live="polite">
             {speechError}
           </p>
         )}

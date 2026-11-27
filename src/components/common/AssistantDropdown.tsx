@@ -98,7 +98,7 @@ export const AssistantDropdown = ({
         </span>
       </button>
       {open && (
-        <div className="select__menu assistant-dropdown__menu" role="listbox">
+        <div className="assistant-dropdown__menu" role="listbox">
           {ASSISTANT_VARIANTS.filter((variant) => availableVariants.includes(variant)).map((variant) => {
             const Icon = VARIANT_ICONS[variant];
             const active = variant === current;
@@ -108,14 +108,11 @@ export const AssistantDropdown = ({
                   type="button"
                   role="option"
                   aria-selected={active}
-                  className={`select__item assistant-dropdown__item ${active ? 'select__item--active' : ''}`}
+                  className={`assistant-dropdown__item ${active ? 'is-active' : ''}`}
                   onClick={() => handleSelect(variant)}
                   disabled={disabled}
                 >
-                  <Icon
-                    size={16}
-                    className="assistant-dropdown__icon"
-                  />
+                  <Icon size={16} className="assistant-dropdown__icon" aria-hidden="true" />
                   <span className="assistant-dropdown__item-name">{ASSISTANT_DATA[variant].variantLabel}</span>
                 </button>
               </Tooltip>

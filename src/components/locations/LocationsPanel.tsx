@@ -14,14 +14,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DeviceSummary, Location } from '@common';
 import { getPlanFeaturesForUser } from '@common';
 import { api } from '../../lib/api';
-import { toDate } from '../../lib/date';
 import { isDeviceOnline as isOnline } from '../../lib/deviceActivity';
-import { devicePeriodLabel, DEVICE_PERIODS, type DevicePeriod } from '../../lib/devicePeriod';
-import { CHART_COLORS, createLineGraphConfig, resolveCssColor } from '../../lib/chartTheme';
 import type { DashboardTarget, LocationDetailTab, LocationRouteState } from '../../lib/dashboardRoutes';
 import { Button, Card, ConfirmDialog, createTabKeyDownHandler, Input, Modal, Pagination, Select, Tooltip, type SelectOption } from '../common';
-import { LineGraph } from '../graphs';
-import type { LineGraphData } from '../graphs/types';
 import { useDevicesMine } from '../../lib/query/hooks/useDevices';
 import { useLocationsMine } from '../../lib/query/hooks/useLocations';
 import { queryKeys } from '../../lib/query';
@@ -29,7 +24,24 @@ import '../common/Tabs.css';
 import './LocationsPanel.css';
 
 const PAGE_SIZE = 5;
-const LOCATION_TABS: readonly LocationDetailTab[] = ['overview', 'devices', 'history', 'settings'];
+const LOCATION_TABS: readonly LocationDetailTab[] = ['overview', 'devices', 'settings'];
+
+type LocationStats = {
+  deviceCount: number;
+  onlineCount: number;
+  lastSeen: string | null;
+};
+
+const EMPTY_LOCATION_STATS: LocationStats = { deviceCount: 0, onlineCount: 0, lastSeen: null };
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function deviceLabel(device: DeviceSummary): string {
+  return device.name?.trim() || `Device ${device.serial}`;
+}
 
 const LOCATION_FILTER_OPTIONS: SelectOption[] = [
   { value: 'all', label: 'All' },
@@ -47,268 +59,6 @@ const LOCATION_SORT_OPTIONS: SelectOption[] = [
   { value: 'recent', label: 'Recently active' },
 ];
 type LocationSort = 'name' | 'devices' | 'online' | 'recent';
-
-const HISTORY_MODE_OPTIONS: SelectOption[] = [
-  { value: 'period', label: 'Dashboard period' },
-  { value: 'range', label: 'Custom range' },
-];
-type HistoryMode = 'period' | 'range';
-
-const HISTORY_METRICS = [
-  { value: 'temperature', label: 'Temperature', unit: '°C' },
-  { value: 'humidity', label: 'Humidity', unit: '%' },
-  { value: 'airPressure', label: 'Pressure', unit: 'hPa' },
-] as const;
-type HistoryMetric = (typeof HISTORY_METRICS)[number]['value'];
-
-const HISTORY_LINE_COLORS = [
-  'var(--accent-green-solid)',
-  'var(--accent-yellow-solid)',
-  'var(--accent-red-solid)',
-  'var(--accent-blue-solid)',
-  'var(--accent-purple-solid)',
-  'var(--accent-orange-solid)',
-  'var(--accent-teal-solid)',
-  'var(--accent-pink-solid)',
-  'var(--accent-aqua-solid)',
-  'var(--accent-indigo-solid)',
-  'var(--accent-lime-solid)',
-  'var(--accent-amber-solid)',
-  'var(--accent-rose-solid)',
-  'var(--accent-cyan-solid)',
-] as const;
-
-const HISTORY_POINT_STYLES: Array<NonNullable<LineGraphData['datasets'][number]['pointStyle']>> = [
-  'circle', 'rect', 'triangle', 'rectRot', 'star', 'cross', 'dash', 'rectRounded', 'crossRot', 'line',
-];
-
-type LocationStats = {
-  deviceCount: number;
-  onlineCount: number;
-  lastActive: number;
-};
-
-const EMPTY_LOCATION_STATS: LocationStats = { deviceCount: 0, onlineCount: 0, lastActive: 0 };
-
-function average(values: number[]): number | null {
-  if (values.length === 0) return null;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function deviceLabel(device: DeviceSummary): string {
-  return device.name?.trim() || `Device ${device.serial}`;
-}
-
-function formatChartLabel(value: Date | string, withYear = false): string {
-  const date = toDate(value);
-  const time = date.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-  const day = date.toLocaleDateString(
-    'en-GB',
-    withYear ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' },
-  );
-  return withYear ? `${day} ${time}` : time;
-}
-
-/**
- * History for the devices currently assigned to one location. Mounted only
- * while the history tab is active so its controls and results reset per location.
- */
-const LocationHistory = ({ devices }: { devices: DeviceSummary[] }) => {
-  const [mode, setMode] = useState<HistoryMode>('period');
-  const [period, setPeriod] = useState<DevicePeriod>('24h');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [metric, setMetric] = useState<HistoryMetric>('temperature');
-
-  const rangeError = useMemo(() => {
-    if (mode !== 'range') return null;
-    if (!from || !to) return 'Choose a start and an end date.';
-    const start = Date.parse(from);
-    const end = Date.parse(to);
-    if (!Number.isFinite(start) || !Number.isFinite(end)) return 'Enter valid start and end dates.';
-    if (start > end) return 'Start must be before end.';
-    return null;
-  }, [mode, from, to]);
-
-  const serialsKey = useMemo(() => devices.map((d) => d.serial).sort((a, b) => a - b).join(','), [devices]);
-  const historyQuery = useQuery({
-    queryKey: ['locationHistory', serialsKey, mode, period, from, to],
-    queryFn: async () => {
-      const options = mode === 'period' ? { period } : { from, to };
-      return Promise.all(
-        devices.map(async (device) => {
-          const response = await api.devices.getDataPoints(device.serial, options);
-          return { serial: device.serial, name: deviceLabel(device), points: response.dataPoints };
-        }),
-      );
-    },
-    enabled: devices.length > 0 && !rangeError,
-    meta: { persist: false },
-  });
-  const series = useMemo(
-    () => (devices.length === 0 || rangeError ? [] : (historyQuery.data ?? [])),
-    [devices.length, rangeError, historyQuery.data],
-  );
-  const error = rangeError ?? (historyQuery.error instanceof Error ? historyQuery.error.message : historyQuery.error ? 'Failed to load location history' : null);
-  const isLoading = historyQuery.isFetching && devices.length > 0 && !rangeError;
-
-  const activeMetric = HISTORY_METRICS.find((entry) => entry.value === metric) ?? HISTORY_METRICS[0];
-  const totalPoints = series.reduce((sum, entry) => sum + entry.points.length, 0);
-
-  const chartData = useMemo<LineGraphData>(() => ({
-    datasets: series.map((entry, index) => {
-      const color = HISTORY_LINE_COLORS[index % HISTORY_LINE_COLORS.length]!;
-      const pointStyle = HISTORY_POINT_STYLES[index % HISTORY_POINT_STYLES.length]!;
-      return {
-        label: `${entry.name} (#${entry.serial})`,
-        data: entry.points
-          .map((point) => ({ x: toDate(point.timestamp).getTime(), y: point[metric] }))
-          .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
-          .sort((a, b) => a.x - b.x),
-        parsing: false,
-        normalized: true,
-        borderColor: resolveCssColor(color),
-        backgroundColor: 'transparent',
-        pointStyle,
-        tension: 0.25,
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-      };
-    }),
-  }), [series, metric]);
-
-  const chartConfig = useMemo(() => ({
-    ...createLineGraphConfig({
-      showLegend: true,
-      styledLegend: true,
-      zoomMinRange: 30_000,
-      tooltipCallbacks: {
-        title: (items) => {
-          const x = items[0]?.parsed?.x;
-          return typeof x === 'number' ? formatChartLabel(new Date(x), true) : '';
-        },
-      },
-    }),
-    scales: {
-      x: {
-        type: 'linear' as const,
-        display: true,
-        border: { display: true },
-        grid: { display: true, color: resolveCssColor(CHART_COLORS.grid) },
-        ticks: {
-          display: true,
-          color: resolveCssColor(CHART_COLORS.mutedText),
-          maxTicksLimit: 8,
-          callback: (value: string | number) => formatChartLabel(new Date(Number(value))),
-        },
-      },
-      y: {
-        type: 'linear' as const,
-        display: true,
-        position: 'left' as const,
-        border: { display: true },
-        title: { display: true, text: activeMetric.unit, color: resolveCssColor(CHART_COLORS.mutedText) },
-        grid: { display: true, color: resolveCssColor(CHART_COLORS.grid) },
-        ticks: { display: true, color: resolveCssColor(CHART_COLORS.mutedText) },
-      },
-    },
-  }), [activeMetric.unit]);
-
-  return (
-    <div className="locations__history">
-      <div className="locations__history-controls">
-        <Select
-          label="Range"
-          value={mode}
-          options={HISTORY_MODE_OPTIONS}
-          onChange={(event) => setMode(event.target.value as HistoryMode)}
-        />
-        {mode === 'period' ? (
-          <Select
-            label="Period"
-            value={period}
-            options={DEVICE_PERIODS.map((value) => ({ value, label: devicePeriodLabel(value) }))}
-            onChange={(event) => setPeriod(event.target.value as DevicePeriod)}
-          />
-        ) : (
-          <>
-            <Input
-              label="From"
-              type="datetime-local"
-              value={from}
-              onChange={(event) => setFrom(event.target.value)}
-            />
-            <Input
-              label="To"
-              type="datetime-local"
-              value={to}
-              onChange={(event) => setTo(event.target.value)}
-            />
-          </>
-        )}
-        <Select
-          label="Metric"
-          value={metric}
-          options={HISTORY_METRICS.map((entry) => ({ value: entry.value, label: entry.label }))}
-          onChange={(event) => setMetric(event.target.value as HistoryMetric)}
-        />
-        <Button
-          variant="secondary"
-          onClick={() => { void historyQuery.refetch(); }}
-          disabled={isLoading || devices.length === 0 || Boolean(rangeError)}
-        >
-          <IconRefresh aria-hidden="true" size={16} strokeWidth={1.75} />
-          Reload
-        </Button>
-      </div>
-
-      <p className="locations__history-note">
-        This history reflects the {devices.length} device{devices.length === 1 ? '' : 's'} currently assigned
-        to this location. Devices removed from the location previously are not included.
-      </p>
-
-      {devices.length === 0 ? (
-        <p className="locations__notice">No devices are currently assigned to this location.</p>
-      ) : rangeError ? (
-        <div className="locations__error" role="alert">
-          <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
-          <span>{rangeError}</span>
-        </div>
-      ) : isLoading ? (
-        <p className="locations__notice">Loading location history...</p>
-      ) : error ? (
-        <div className="locations__error" role="alert">
-          <IconAlertCircle aria-hidden="true" size={16} strokeWidth={1.75} />
-          <span>{error}</span>
-          <Button variant="secondary" onClick={() => { void historyQuery.refetch(); }}>
-            Retry
-          </Button>
-        </div>
-      ) : totalPoints === 0 ? (
-        <p className="locations__notice">No telemetry data for the selected range.</p>
-      ) : (
-        <>
-          <div className="locations__history-graph">
-            <LineGraph data={chartData} config={chartConfig} />
-          </div>
-          <ul className="locations__history-summary">
-            {series.map((entry) => (
-              <li key={entry.serial}>
-                <span className="locations__device-name">{entry.name}</span>
-                <span className="locations__device-serial">#{entry.serial} · {entry.points.length} points</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-};
 
 type Props = {
   onDeviceNavigate: (serial: number) => void;
@@ -376,17 +126,21 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
   );
 
   const locationStatsById = useMemo(() => {
-    const stats = new Map<string, LocationStats>();
+    const stats = new Map<string, LocationStats & { lastActive: number }>();
     for (const device of devices) {
       if (!device.locationId) continue;
-      const entry = stats.get(device.locationId) ?? { deviceCount: 0, onlineCount: 0, lastActive: 0 };
+      const entry = stats.get(device.locationId) ?? { deviceCount: 0, onlineCount: 0, lastSeen: null, lastActive: 0 };
       entry.deviceCount += 1;
       if (isOnline(device)) entry.onlineCount += 1;
-      const timestamps = [device.lastUploadAt, device.latestDataPoint?.timestamp]
-        .filter((value): value is Date => Boolean(value))
-        .map((value) => toDate(value).getTime())
+      const rawTimes = [device.lastUploadAt, device.latestDataPoint?.timestamp];
+      const timestamps = rawTimes
+        .filter((value): value is NonNullable<typeof value> => value != null)
+        .map((value) => new Date(value).getTime())
         .filter((value) => Number.isFinite(value));
-      if (timestamps.length > 0) entry.lastActive = Math.max(entry.lastActive, ...timestamps);
+      if (timestamps.length > 0) {
+        entry.lastActive = Math.max(entry.lastActive, ...timestamps);
+        entry.lastSeen = new Date(entry.lastActive).toISOString();
+      }
       stats.set(device.locationId, entry);
     }
     return stats;
@@ -407,8 +161,8 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
     });
 
     return matching.sort((a, b) => {
-      const aStats = locationStatsById.get(a.id) ?? EMPTY_LOCATION_STATS;
-      const bStats = locationStatsById.get(b.id) ?? EMPTY_LOCATION_STATS;
+      const aStats = locationStatsById.get(a.id) ?? { ...EMPTY_LOCATION_STATS, lastActive: 0 };
+      const bStats = locationStatsById.get(b.id) ?? { ...EMPTY_LOCATION_STATS, lastActive: 0 };
       switch (sort) {
         case 'devices':
           return bStats.deviceCount - aStats.deviceCount || a.name.localeCompare(b.name);
@@ -625,7 +379,7 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
         ) : (
           <div className="locations__list">
             {visibleLocations.map((location) => {
-              const cardStats = locationStatsById.get(location.id) ?? EMPTY_LOCATION_STATS;
+              const cardStats = locationStatsById.get(location.id) ?? { ...EMPTY_LOCATION_STATS, lastActive: 0 };
               return (
                 <Card
                   key={location.id}
@@ -796,10 +550,6 @@ export const LocationsPanel = ({ onDeviceNavigate, onNavigate, locationRoute }: 
               disabled={isRefreshing}
             />
           </div>
-        )}
-
-        {detailTab === 'history' && selectedLocation && (
-          <LocationHistory key={selectedLocation.id} devices={locationDevices} />
         )}
 
         {detailTab === 'settings' && (

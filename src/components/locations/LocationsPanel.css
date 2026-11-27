@@ -269,6 +269,70 @@
   color: var(--text-muted);
 }
 
+.locations__settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 360px;
+}
+
+.locations__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.locations__settings-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.locations__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--status-error);
+}
+
+.locations__notice {
+  color: var(--text-muted);
+}
+
+.locations__title {
+  margin: 0;
+}
+
+.locations__location-card {
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.locations__location-card:hover {
+  border-color: var(--border-focus);
+  background: var(--bg-elevated);
+}
+
+.locations__location-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.locations__location-card__content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.locations__location-card__name {
+  font-weight: var(--font-weight-md);
+}
+
+.locations__location-card__meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .locations__history {
   display: flex;
   flex-direction: column;

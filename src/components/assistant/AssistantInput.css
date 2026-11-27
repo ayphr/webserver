@@ -112,6 +112,7 @@
   padding-top: 0.75rem;
   background: linear-gradient(to bottom, transparent, var(--bg-base) 0.75rem);
   z-index: 3;
+  overflow: visible;
 }
 
 /* In chat view the composer is in flow, so keep the disclaimer in flow with it
