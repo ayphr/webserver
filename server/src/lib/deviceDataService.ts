@@ -18,9 +18,11 @@ export function resolveDeviceTimeRange(
       '1h': 60 * 60 * 1000,
       '24h': 24 * 60 * 60 * 1000,
       '2d': 2 * 24 * 60 * 60 * 1000,
+      '3d': 3 * 24 * 60 * 60 * 1000,
       '7d': 7 * 24 * 60 * 60 * 1000,
       '2w': 14 * 24 * 60 * 60 * 1000,
       '30d': 30 * 24 * 60 * 60 * 1000,
+      '2mo': 60 * 24 * 60 * 60 * 1000,
       all: undefined,
     };
     const duration = Object.hasOwn(periods, period) ? periods[period] : periods['24h'];

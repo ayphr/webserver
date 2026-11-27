@@ -324,10 +324,10 @@ export function ForecastTab({ serial, locked, onNavigate, isFullscreen }: Props)
 ];
 
 const historyOptions = [
-  { value: '24h', label: '24h' },
-  { value: '2d', label: '2d' },
+  { value: '3d', label: '3d' },
   { value: '7d', label: '7d' },
   { value: '2w', label: '2w' },
+  { value: '2mo', label: '2mo' },
 ];
 
   return (
