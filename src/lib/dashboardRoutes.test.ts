@@ -27,7 +27,7 @@ describe('dashboardPath', () => {
     expect(dashboardPath({ tab: 'locations' })).toBe('/dashboard/locations');
     expect(dashboardPath({ tab: 'locations', location: { id: 'home' } })).toBe('/dashboard/locations/home');
     expect(dashboardPath({ tab: 'locations', location: { id: 'home', detailTab: 'overview' } })).toBe('/dashboard/locations/home');
-    expect(dashboardPath({ tab: 'locations', location: { id: 'home', detailTab: 'history' } })).toBe('/dashboard/locations/home/history');
+    expect(dashboardPath({ tab: 'locations', location: { id: 'home', detailTab: 'settings' } })).toBe('/dashboard/locations/home/settings');
     expect(dashboardPath({ tab: 'locations', location: { id: 'my place/1', detailTab: 'settings' } })).toBe('/dashboard/locations/my%20place%2F1/settings');
   });
 
@@ -82,16 +82,16 @@ describe('parseDashboardPath', () => {
       canonicalPath: '/dashboard/locations/home',
       valid: true,
     });
-    expect(parseDashboardPath('/dashboard/locations/home/history')).toMatchObject({
+    expect(parseDashboardPath('/dashboard/locations/home/settings')).toMatchObject({
       tab: 'locations',
-      location: { id: 'home', detailTab: 'history' },
-      canonicalPath: '/dashboard/locations/home/history',
+      location: { id: 'home', detailTab: 'settings' },
+      canonicalPath: '/dashboard/locations/home/settings',
       valid: true,
     });
-    expect(parseDashboardPath('/dashboard/locations/my%20place%2F1/history')).toMatchObject({
+    expect(parseDashboardPath('/dashboard/locations/my%20place%2F1/settings')).toMatchObject({
       tab: 'locations',
-      location: { id: 'my place/1', detailTab: 'history' },
-      canonicalPath: '/dashboard/locations/my%20place%2F1/history',
+      location: { id: 'my place/1', detailTab: 'settings' },
+      canonicalPath: '/dashboard/locations/my%20place%2F1/settings',
       valid: true,
     });
     // Explicit default sections normalize to the shorter canonical URL.

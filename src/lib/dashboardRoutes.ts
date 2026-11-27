@@ -31,7 +31,7 @@ export type DeviceDetailTab = (typeof DEVICE_DETAIL_TABS)[number];
 export const TEAM_SECTIONS = ['members', 'usage', 'audit', 'settings'] as const;
 export type TeamSection = (typeof TEAM_SECTIONS)[number];
 
-export const LOCATION_DETAIL_TABS = ['overview', 'devices', 'history', 'settings'] as const;
+export const LOCATION_DETAIL_TABS = ['overview', 'devices', 'settings'] as const;
 export type LocationDetailTab = (typeof LOCATION_DETAIL_TABS)[number];
 
 export const GAMES = ['memory', 'minesweeper'] as const;
