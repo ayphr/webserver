@@ -392,12 +392,10 @@ export const AssistantComposer = ({
             )}
           </button>
         </div>
-        {speechError && (
-          <p className="assistant-input__speech-error" role="status" aria-live="polite">
-            {speechError}
-          </p>
-        )}
       </div>
+      <p className="assistant-input__speech-error" role="status" aria-live="polite">
+        {speechError ?? '\u00A0'}
+      </p>
       <p className="assistant-input__disclaimer">
         Iris is AI. By using it, you agree to our{' '}
         <Link to="/policies/terms">Terms</Link> &amp;{' '}
